@@ -252,6 +252,28 @@ class PosScreen extends StatefulWidget {
 }
 
 class _PosScreenState extends State<PosScreen> {
+  static final Map<LogicalKeyboardKey, int> _digitKeys = <LogicalKeyboardKey, int>{
+    LogicalKeyboardKey.digit0: 0,
+    LogicalKeyboardKey.digit1: 1,
+    LogicalKeyboardKey.digit2: 2,
+    LogicalKeyboardKey.digit3: 3,
+    LogicalKeyboardKey.digit4: 4,
+    LogicalKeyboardKey.digit5: 5,
+    LogicalKeyboardKey.digit6: 6,
+    LogicalKeyboardKey.digit7: 7,
+    LogicalKeyboardKey.digit8: 8,
+    LogicalKeyboardKey.digit9: 9,
+    LogicalKeyboardKey.numpad0: 0,
+    LogicalKeyboardKey.numpad1: 1,
+    LogicalKeyboardKey.numpad2: 2,
+    LogicalKeyboardKey.numpad3: 3,
+    LogicalKeyboardKey.numpad4: 4,
+    LogicalKeyboardKey.numpad5: 5,
+    LogicalKeyboardKey.numpad6: 6,
+    LogicalKeyboardKey.numpad7: 7,
+    LogicalKeyboardKey.numpad8: 8,
+    LogicalKeyboardKey.numpad9: 9,
+  };
   final cart = <String, CartItem>{};
   final FocusNode _keyboardFocusNode = FocusNode(debugLabel: 'PosKeyboard');
   Category? selectedCategory;
@@ -560,29 +582,7 @@ class _PosScreenState extends State<PosScreen> {
         return parsed;
       }
     }
-    const digitKeys = {
-      LogicalKeyboardKey.digit0: 0,
-      LogicalKeyboardKey.digit1: 1,
-      LogicalKeyboardKey.digit2: 2,
-      LogicalKeyboardKey.digit3: 3,
-      LogicalKeyboardKey.digit4: 4,
-      LogicalKeyboardKey.digit5: 5,
-      LogicalKeyboardKey.digit6: 6,
-      LogicalKeyboardKey.digit7: 7,
-      LogicalKeyboardKey.digit8: 8,
-      LogicalKeyboardKey.digit9: 9,
-      LogicalKeyboardKey.numpad0: 0,
-      LogicalKeyboardKey.numpad1: 1,
-      LogicalKeyboardKey.numpad2: 2,
-      LogicalKeyboardKey.numpad3: 3,
-      LogicalKeyboardKey.numpad4: 4,
-      LogicalKeyboardKey.numpad5: 5,
-      LogicalKeyboardKey.numpad6: 6,
-      LogicalKeyboardKey.numpad7: 7,
-      LogicalKeyboardKey.numpad8: 8,
-      LogicalKeyboardKey.numpad9: 9,
-    };
-    return digitKeys[key];
+    return _digitKeys[key];
   }
 
   Future<void> _handleEnterAction() async {
