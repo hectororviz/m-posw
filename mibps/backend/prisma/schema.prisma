@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(USER)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sales     Sale[]
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String
+  imageUrl  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id         String   @id @default(uuid())
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  imageUrl   String
+  active     Boolean  @default(true)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  saleItems  SaleItem[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Sale {
+  id        String     @id @default(uuid())
+  createdAt DateTime   @default(now())
+  total     Decimal    @db.Decimal(10, 2)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  items     SaleItem[]
+}
+
+model SaleItem {
+  id        String   @id @default(uuid())
+  saleId    String
+  productId String
+  quantity  Int
+  subtotal  Decimal  @db.Decimal(10, 2)
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Setting {
+  id          String   @id @default(uuid())
+  storeName   String
+  logoUrl     String
+  faviconUrl  String
+  accentColor String?  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
