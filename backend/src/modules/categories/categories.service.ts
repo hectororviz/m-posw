@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -6,6 +6,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 @Injectable()
 export class CategoriesService {
   private readonly defaultColor = '#0EA5E9';
+  private readonly logger = new Logger(CategoriesService.name);
 
   constructor(private prisma: PrismaService) {}
 
@@ -33,7 +34,20 @@ export class CategoriesService {
   }
 
   update(id: string, dto: UpdateCategoryDto) {
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.debug(`Updating category ${id} with data: ${JSON.stringify(dto)}`);
+    }
     return this.prisma.category.update({ where: { id }, data: dto });
+  }
+
+  listProducts(categoryId: string, includeInactive = false) {
+    return this.prisma.product.findMany({
+      where: {
+        categoryId,
+        ...(includeInactive ? {} : { active: true }),
+      },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async remove(id: string) {

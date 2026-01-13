@@ -3,6 +3,7 @@ import 'dart:html' as html;
 import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -1484,23 +1485,26 @@ class _CategoryDialogState extends State<CategoryDialog> {
           onPressed: () async {
             final service = ApiService();
             if (widget.category == null) {
-              await service.createCategory(
+              final created = await service.createCategory(
                 name: nameController.text,
                 imageUrl: imageController.text,
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
+              if (context.mounted) {
+                Navigator.pop(context, created);
+              }
             } else {
-              await service.updateCategory(
-                widget.category!.id,
+              final updated = await service.updateCategoryDetails(
+                id: widget.category!.id,
                 name: nameController.text,
                 imageUrl: imageController.text,
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
-            }
-            if (context.mounted) {
-              Navigator.pop(context);
+              if (context.mounted) {
+                Navigator.pop(context, updated);
+              }
             }
           },
           child: Text(widget.category == null ? 'Crear' : 'Guardar'),
@@ -1814,6 +1818,33 @@ class ApiService {
     if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
+    if (kDebugMode) {
+      debugPrint('PATCH /categories/$id payload: ${jsonEncode(payload)}');
+    }
+    final response = await apiClient.patch(
+      Uri.parse('$apiBaseUrl/categories/$id'),
+      body: jsonEncode(payload),
+    );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Category.fromJson(data);
+  }
+
+  Future<Category> updateCategoryDetails({
+    required String id,
+    required String name,
+    required String imageUrl,
+    required String iconName,
+    required String colorHex,
+  }) async {
+    final payload = {
+      'name': name,
+      'imageUrl': imageUrl,
+      'iconName': iconName,
+      'colorHex': colorHex,
+    };
+    if (kDebugMode) {
+      debugPrint('PATCH /categories/$id payload: ${jsonEncode(payload)}');
+    }
     final response = await apiClient.patch(
       Uri.parse('$apiBaseUrl/categories/$id'),
       body: jsonEncode(payload),
@@ -1823,9 +1854,18 @@ class ApiService {
   }
 
   Future<List<Product>> getProducts(String categoryId) async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/products?categoryId=$categoryId'));
+    final response = await apiClient.get(
+      Uri.parse('$apiBaseUrl/categories/$categoryId/products?includeInactive=false'),
+    );
     final data = jsonDecode(response.body) as List<dynamic>;
-    return data.map((item) => Product.fromJson(item)).toList();
+    final products = data.map((item) => Product.fromJson(item)).toList();
+    if (kDebugMode) {
+      final categoryIds = products.map((product) => product.categoryId).toSet().join(', ');
+      debugPrint(
+        'GET /categories/$categoryId/products -> ${products.length} products (categoryIds: $categoryIds)',
+      );
+    }
+    return products;
   }
 
   Future<List<Product>> getProductsAll() async {

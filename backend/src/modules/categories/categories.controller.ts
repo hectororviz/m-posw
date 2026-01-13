@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
@@ -9,6 +9,8 @@ import { CategoriesService } from './categories.service';
 
 @Controller('categories')
 export class CategoriesController {
+  private readonly logger = new Logger(CategoriesController.name);
+
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
@@ -34,7 +36,18 @@ export class CategoriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.debug(`PATCH /categories/${id} body: ${JSON.stringify(dto)}`);
+    }
     return this.categoriesService.update(id, dto);
+  }
+
+  @Get(':id/products')
+  listProducts(
+    @Param('id') id: string,
+    @Query('includeInactive') includeInactive?: string,
+  ) {
+    return this.categoriesService.listProducts(id, includeInactive === 'true');
   }
 
   @Delete(':id')
