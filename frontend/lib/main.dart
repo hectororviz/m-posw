@@ -210,7 +210,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController(text: 'admin@mibps.local');
+  final usernameController = TextEditingController(text: 'admin');
   final passwordController = TextEditingController(text: 'Admin123!');
   bool loading = false;
   String? error;
@@ -231,12 +231,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text('Ingreso MiBPS', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 16),
                   TextField(
-                    controller: emailController,
-                    decoration: const InputDecoration(labelText: 'Email'),
+                    controller: usernameController,
+                    decoration: const InputDecoration(labelText: 'Usuario'),
                     autofillHints: const [],
                     enableSuggestions: false,
                     autocorrect: false,
-                    keyboardType: TextInputType.emailAddress,
+                    keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
@@ -265,7 +265,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             });
                             try {
                               final token = await ApiService()
-                                  .login(emailController.text, passwordController.text);
+                                  .login(usernameController.text, passwordController.text);
                               widget.onLoggedIn(token);
                             } catch (e) {
                               setState(() => error = 'Credenciales inválidas');
@@ -273,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               setState(() => loading = false);
                             }
                           },
-                    child: Padding(
+                  child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       child: Text(loading ? 'Ingresando...' : 'Ingresar'),
                     ),
@@ -350,6 +350,7 @@ class _PosScreenState extends State<PosScreen> {
         future: ApiService().getCategories(),
         builder: (context, snapshot) {
           final categories = snapshot.data ?? [];
+          final showingProducts = selectedCategory != null;
           return Row(
             children: [
               Expanded(
@@ -358,131 +359,152 @@ class _PosScreenState extends State<PosScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
+                      child: showingProducts
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () => setState(() => selectedCategory = null),
+                                  icon: const Icon(Icons.arrow_back),
+                                  label: const Text('Volver a categorías'),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  selectedCategory!.name,
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            )
+                          : Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
                     ),
                     Expanded(
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 1.2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
-                        itemCount: categories.length,
-                        itemBuilder: (context, index) {
-                          final category = categories[index];
-                          final background =
-                              colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer;
-                          final foreground = foregroundColorFor(background);
-                          return GestureDetector(
-                            onTap: () {
-                              if (kDebugMode) {
-                                debugPrint('Selected category: ${category.id}');
-                              }
-                              setState(() => selectedCategory = category);
-                            },
-                            child: Card(
-                              clipBehavior: Clip.antiAlias,
-                              child: Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(color: background),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      symbolFromName(category.iconName),
-                                      size: 48,
-                                      color: foreground,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      category.name,
-                                      style: TextStyle(fontSize: 16, color: foreground),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    if (selectedCategory != null)
-                      Expanded(
-                        child: FutureBuilder<List<Product>>(
-                          future: ApiService()
-                              .getProducts(selectedCategory!.id),
-                          builder: (context, productsSnapshot) {
-                            final products = productsSnapshot.data ?? [];
-                            if (kDebugMode) {
-                              final selectedCategoryId = selectedCategory?.id;
-                              final matchingCount = selectedCategoryId == null
-                                  ? 0
-                                  : products.where((product) => product.categoryId == selectedCategoryId).length;
-                              debugPrint(
-                                'Products view -> selectedCategoryId=$selectedCategoryId '
-                                'products=${products.length} matching=$matchingCount',
-                              );
-                            }
-                            return GridView.builder(
+                      child: showingProducts
+                          ? FutureBuilder<List<Product>>(
+                              future: ApiService().getProducts(selectedCategory!.id),
+                              builder: (context, productsSnapshot) {
+                                final products = productsSnapshot.data ?? [];
+                                if (kDebugMode) {
+                                  final selectedCategoryId = selectedCategory?.id;
+                                  final matchingCount = selectedCategoryId == null
+                                      ? 0
+                                      : products.where((product) => product.categoryId == selectedCategoryId).length;
+                                  debugPrint(
+                                    'Products view -> selectedCategoryId=$selectedCategoryId '
+                                    'products=${products.length} matching=$matchingCount',
+                                  );
+                                }
+                                return GridView.builder(
+                                  padding: const EdgeInsets.all(16),
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 1.1,
+                                    crossAxisSpacing: 12,
+                                    mainAxisSpacing: 12,
+                                  ),
+                                  itemCount: products.length,
+                                  itemBuilder: (context, index) {
+                                    final product = products[index];
+                                    final background = colorFromHex(product.colorHex) ??
+                                        colorFromHex(selectedCategory?.colorHex) ??
+                                        Theme.of(context).colorScheme.primaryContainer;
+                                    final foreground = foregroundColorFor(background);
+                                    final iconName = product.iconName ?? selectedCategory?.iconName;
+                                    return FilledButton(
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.all(8),
+                                        backgroundColor: background,
+                                        foregroundColor: foreground,
+                                      ),
+                                      onPressed: () {
+                                        final quantity = _quantityValue ?? 1;
+                                        setState(() {
+                                          if (_selectedItemId != null && _quantityValue != null) {
+                                            cart.update(
+                                              _selectedItemId!,
+                                              (value) => value.copyWith(quantity: quantity),
+                                            );
+                                            _quantityBuffer = '';
+                                          } else {
+                                            cart.update(
+                                              product.id,
+                                              (value) => value.copyWith(quantity: value.quantity + quantity),
+                                              ifAbsent: () => CartItem(product: product, quantity: quantity),
+                                            );
+                                            _quantityBuffer = '';
+                                          }
+                                          _selectedItemId = null;
+                                        });
+                                      },
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(symbolFromName(iconName), size: 40, color: foreground),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            product.name,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(color: foreground),
+                                          ),
+                                          Text(
+                                            '\$${product.price.toStringAsFixed(2)}',
+                                            style: TextStyle(color: foreground),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            )
+                          : GridView.builder(
                               padding: const EdgeInsets.all(16),
                               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
-                                childAspectRatio: 1.1,
+                                childAspectRatio: 1.2,
                                 crossAxisSpacing: 12,
                                 mainAxisSpacing: 12,
                               ),
-                              itemCount: products.length,
+                              itemCount: categories.length,
                               itemBuilder: (context, index) {
-                                final product = products[index];
-                                final background = colorFromHex(product.colorHex) ??
-                                    colorFromHex(selectedCategory?.colorHex) ??
-                                    Theme.of(context).colorScheme.primaryContainer;
+                                final category = categories[index];
+                                final background =
+                                    colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer;
                                 final foreground = foregroundColorFor(background);
-                                final iconName = product.iconName ?? selectedCategory?.iconName;
-                                return FilledButton(
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.all(8),
-                                    backgroundColor: background,
-                                    foregroundColor: foreground,
-                                  ),
-                                  onPressed: () {
-                                    final quantity = _quantityValue ?? 1;
-                                    setState(() {
-                                      if (_selectedItemId != null && _quantityValue != null) {
-                                        cart.update(
-                                          _selectedItemId!,
-                                          (value) => value.copyWith(quantity: quantity),
-                                        );
-                                        _quantityBuffer = '';
-                                      } else {
-                                        cart.update(
-                                          product.id,
-                                          (value) => value.copyWith(quantity: value.quantity + quantity),
-                                          ifAbsent: () => CartItem(product: product, quantity: quantity),
-                                        );
-                                        _quantityBuffer = '';
-                                      }
-                                      _selectedItemId = null;
-                                    });
+                                return GestureDetector(
+                                  onTap: () {
+                                    if (kDebugMode) {
+                                      debugPrint('Selected category: ${category.id}');
+                                    }
+                                    setState(() => selectedCategory = category);
                                   },
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(symbolFromName(iconName), size: 40, color: foreground),
-                                      const SizedBox(height: 8),
-                                      Text(product.name, textAlign: TextAlign.center, style: TextStyle(color: foreground)),
-                                      Text('\$${product.price.toStringAsFixed(2)}', style: TextStyle(color: foreground)),
-                                    ],
+                                  child: Card(
+                                    clipBehavior: Clip.antiAlias,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(color: background),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            symbolFromName(category.iconName),
+                                            size: 48,
+                                            color: foreground,
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            category.name,
+                                            style: TextStyle(fontSize: 16, color: foreground),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 );
                               },
-                            );
-                          },
-                        ),
-                      ),
+                            ),
+                    ),
                   ],
                 ),
               ),
@@ -749,7 +771,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               (user) => Card(
                 child: ListTile(
                   title: Text(user.name),
-                  subtitle: Text('${user.email} · ${user.role}'),
+                  subtitle: Text('${user.email ?? 'Sin correo'} · ${user.role}'),
                   trailing: Switch(
                     value: user.active,
                     onChanged: (value) async {
@@ -1376,8 +1398,8 @@ class _UserDialogState extends State<UserDialog> {
       content: SingleChildScrollView(
         child: Column(
           children: [
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
-            TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Usuario')),
+            TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email (opcional)')),
             TextField(controller: passwordController, decoration: const InputDecoration(labelText: 'Contraseña')),
             DropdownButton<String>(
               value: role,
@@ -1722,11 +1744,11 @@ class ApiService {
 
   final ApiClient apiClient;
 
-  Future<String> login(String email, String password) async {
+  Future<String> login(String username, String password) async {
     final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      body: jsonEncode({'username': username, 'password': password}),
     );
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw Exception('Login failed');
@@ -1968,10 +1990,24 @@ class ApiService {
     return data.map((item) => User.fromJson(item)).toList();
   }
 
-  Future<void> createUser({required String name, required String email, required String password, required String role}) async {
+  Future<void> createUser({
+    required String name,
+    String? email,
+    required String password,
+    required String role,
+  }) async {
+    final trimmedEmail = email?.trim();
+    final payload = <String, dynamic>{
+      'name': name,
+      'password': password,
+      'role': role,
+    };
+    if (trimmedEmail != null && trimmedEmail.isNotEmpty) {
+      payload['email'] = trimmedEmail;
+    }
     await apiClient.post(
       Uri.parse('$apiBaseUrl/users'),
-      body: jsonEncode({'name': name, 'email': email, 'password': password, 'role': role}),
+      body: jsonEncode(payload),
     );
   }
 
@@ -2181,14 +2217,14 @@ class User {
 
   final String id;
   final String name;
-  final String email;
+  final String? email;
   final String role;
   final bool active;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         id: json['id'] as String,
         name: json['name'] as String,
-        email: json['email'] as String,
+        email: json['email'] as String?,
         role: json['role'] as String,
         active: json['active'] as bool? ?? true,
       );

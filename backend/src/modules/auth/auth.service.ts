@@ -7,8 +7,8 @@ import { PrismaService } from '../common/prisma.service';
 export class AuthService {
   constructor(private prisma: PrismaService, private jwtService: JwtService) {}
 
-  async validateUser(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+  async validateUser(username: string, password: string) {
+    const user = await this.prisma.user.findUnique({ where: { name: username } });
     if (!user || !user.active) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -19,9 +19,9 @@ export class AuthService {
     return user;
   }
 
-  async login(email: string, password: string) {
-    const user = await this.validateUser(email, password);
-    const payload = { sub: user.id, role: user.role, email: user.email };
+  async login(username: string, password: string) {
+    const user = await this.validateUser(username, password);
+    const payload = { sub: user.id, role: user.role, name: user.name };
     return {
       accessToken: await this.jwtService.signAsync(payload),
       user: {

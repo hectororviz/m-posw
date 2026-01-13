@@ -9,9 +9,15 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateUserDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) {
-      throw new BadRequestException('Email ya registrado');
+    const existingByName = await this.prisma.user.findUnique({ where: { name: dto.name } });
+    if (existingByName) {
+      throw new BadRequestException('Usuario ya registrado');
+    }
+    if (dto.email) {
+      const existingByEmail = await this.prisma.user.findUnique({ where: { email: dto.email } });
+      if (existingByEmail) {
+        throw new BadRequestException('Email ya registrado');
+      }
     }
     const password = await bcrypt.hash(dto.password, 10);
     return this.prisma.user.create({
