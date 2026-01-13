@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { join } from 'path';
 
 type MaterialSymbolEntry = {
   iconName: string;
@@ -11,11 +11,19 @@ type MaterialSymbolEntry = {
 @Injectable()
 export class IconsService {
   private readonly symbols: MaterialSymbolEntry[];
+  private readonly logger = new Logger(IconsService.name);
 
   constructor() {
-    const filePath = resolve(process.cwd(), 'resources', 'material_symbols.json');
-    const raw = readFileSync(filePath, 'utf8');
-    this.symbols = JSON.parse(raw) as MaterialSymbolEntry[];
+    const filePath = join(process.cwd(), 'resources', 'material_symbols.json');
+    try {
+      const raw = readFileSync(filePath, 'utf8');
+      this.symbols = JSON.parse(raw) as MaterialSymbolEntry[];
+    } catch (error) {
+      this.logger.warn(
+        `Material symbols file not found or invalid at ${filePath}. Falling back to empty list.`,
+      );
+      this.symbols = [];
+    }
   }
 
   searchMaterialSymbols({
