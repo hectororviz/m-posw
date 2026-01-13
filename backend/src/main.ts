@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { join } from 'path';
 import { AppModule } from './modules/app.module';
 import { PrismaService } from './modules/common/prisma.service';
 
@@ -14,6 +15,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
+  app.useStaticAssets(join(process.cwd(), 'public'));
 
   const prismaService = app.get(PrismaService);
   prismaService.enableShutdownHooks(app);

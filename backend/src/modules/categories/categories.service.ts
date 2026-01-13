@@ -5,6 +5,8 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class CategoriesService {
+  private readonly defaultColor = '#0EA5E9';
+
   constructor(private prisma: PrismaService) {}
 
   listActive() {
@@ -21,7 +23,13 @@ export class CategoriesService {
   }
 
   create(dto: CreateCategoryDto) {
-    return this.prisma.category.create({ data: { ...dto, active: dto.active ?? true } });
+    return this.prisma.category.create({
+      data: {
+        ...dto,
+        colorHex: dto.colorHex ?? this.defaultColor,
+        active: dto.active ?? true,
+      },
+    });
   }
 
   update(id: string, dto: UpdateCategoryDto) {

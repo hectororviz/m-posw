@@ -1,9 +1,14 @@
 import 'dart:convert';
+import 'dart:html' as html;
+import 'dart:typed_data';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+
+import 'material_symbol_catalog.dart';
+import 'pickers.dart';
 
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
@@ -41,6 +46,11 @@ class _MiBpsAppState extends State<MiBpsApp> {
         final themeColor = setting?.accentColor != null
             ? Color(hexToColor(setting!.accentColor!))
             : const Color(0xFF0EA5E9);
+        if (setting?.faviconUrl != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            updateFavicon(resolveApiUrl(setting!.faviconUrl));
+          });
+        }
         return MaterialApp(
           title: setting?.storeName ?? 'MiBPS',
           theme: ThemeData(
@@ -106,12 +116,15 @@ class _HomeShellState extends State<HomeShell> {
             title: ValueListenableBuilder<Setting?>(
               valueListenable: widget.settingNotifier,
               builder: (context, setting, _) {
+                final logoUrl = (setting?.logoUrl?.isNotEmpty ?? false)
+                    ? resolveApiUrl(setting!.logoUrl!)
+                    : null;
                 return Row(
                   children: [
-                    if (setting?.logoUrl != null)
+                    if (logoUrl != null)
                       Padding(
                         padding: const EdgeInsets.only(right: 12),
-                        child: CircleAvatar(backgroundImage: NetworkImage(setting!.logoUrl)),
+                        child: CircleAvatar(backgroundImage: NetworkImage(logoUrl)),
                       ),
                     Text(setting?.storeName ?? 'MiBPS'),
                   ],
@@ -198,12 +211,21 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextField(
                     controller: emailController,
                     decoration: const InputDecoration(labelText: 'Email'),
+                    autofillHints: const [],
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: passwordController,
                     decoration: const InputDecoration(labelText: 'Contraseña'),
                     obscureText: true,
+                    autofillHints: const [],
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    textInputAction: TextInputAction.done,
                   ),
                   if (error != null)
                     Padding(
@@ -328,26 +350,32 @@ class _PosScreenState extends State<PosScreen> {
                         itemCount: categories.length,
                         itemBuilder: (context, index) {
                           final category = categories[index];
+                          final background =
+                              colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer;
+                          final foreground = foregroundColorFor(background);
                           return GestureDetector(
                             onTap: () => setState(() => selectedCategory = category),
                             child: Card(
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        category.imageUrl,
-                                        fit: BoxFit.cover,
-                                        width: double.infinity,
-                                      ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(color: background),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      symbolFromName(category.iconName),
+                                      size: 48,
+                                      color: foreground,
                                     ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Text(category.name, style: const TextStyle(fontSize: 16)),
-                                  ),
-                                ],
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      category.name,
+                                      style: TextStyle(fontSize: 16, color: foreground),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -372,8 +400,17 @@ class _PosScreenState extends State<PosScreen> {
                               itemCount: products.length,
                               itemBuilder: (context, index) {
                                 final product = products[index];
+                                final background = colorFromHex(product.colorHex) ??
+                                    colorFromHex(selectedCategory?.colorHex) ??
+                                    Theme.of(context).colorScheme.primaryContainer;
+                                final foreground = foregroundColorFor(background);
+                                final iconName = product.iconName ?? selectedCategory?.iconName;
                                 return FilledButton(
-                                  style: FilledButton.styleFrom(padding: const EdgeInsets.all(8)),
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.all(8),
+                                    backgroundColor: background,
+                                    foregroundColor: foreground,
+                                  ),
                                   onPressed: () {
                                     final quantity = _quantityValue ?? 1;
                                     setState(() {
@@ -397,19 +434,10 @@ class _PosScreenState extends State<PosScreen> {
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Expanded(
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(12),
-                                          child: Image.network(
-                                            product.imageUrl,
-                                            fit: BoxFit.cover,
-                                            width: double.infinity,
-                                          ),
-                                        ),
-                                      ),
+                                      Icon(symbolFromName(iconName), size: 40, color: foreground),
                                       const SizedBox(height: 8),
-                                      Text(product.name, textAlign: TextAlign.center),
-                                      Text('\$${product.price.toStringAsFixed(2)}'),
+                                      Text(product.name, textAlign: TextAlign.center, style: TextStyle(color: foreground)),
+                                      Text('\$${product.price.toStringAsFixed(2)}', style: TextStyle(color: foreground)),
                                     ],
                                   ),
                                 );
@@ -738,8 +766,24 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
             ...categories.map(
               (category) => Card(
                 child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
+                    child: Icon(
+                      symbolFromName(category.iconName),
+                      color: foregroundColorFor(
+                        colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
+                      ),
+                    ),
+                  ),
                   title: Text(category.name),
-                  subtitle: Text(category.imageUrl),
+                  subtitle: Text('${category.imageUrl} · ${category.colorHex}'),
+                  onTap: () async {
+                    await showDialog(
+                      context: context,
+                      builder: (context) => CategoryDialog(category: category),
+                    );
+                    setState(() {});
+                  },
                   trailing: Switch(
                     value: category.active,
                     onChanged: (value) async {
@@ -787,8 +831,28 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             ...products.map(
               (product) => Card(
                 child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: colorFromHex(product.colorHex) ??
+                        colorFromHex(product.categoryColorHex) ??
+                        Theme.of(context).colorScheme.primaryContainer,
+                    child: Icon(
+                      symbolFromName(product.iconName ?? product.categoryIconName),
+                      color: foregroundColorFor(
+                        colorFromHex(product.colorHex) ??
+                            colorFromHex(product.categoryColorHex) ??
+                            Theme.of(context).colorScheme.primaryContainer,
+                      ),
+                    ),
+                  ),
                   title: Text(product.name),
                   subtitle: Text('${product.categoryName} · \$${product.price.toStringAsFixed(2)}'),
+                  onTap: () async {
+                    await showDialog(
+                      context: context,
+                      builder: (context) => ProductDialog(product: product),
+                    );
+                    setState(() {});
+                  },
                   trailing: Switch(
                     value: product.active,
                     onChanged: (value) async {
@@ -1086,18 +1150,20 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final storeController = TextEditingController();
-  final logoController = TextEditingController();
-  final faviconController = TextEditingController();
   final accentController = TextEditingController();
+  bool uploadingLogo = false;
+  bool uploadingFavicon = false;
+  String? logoUrl;
+  String? faviconUrl;
 
   @override
   void initState() {
     super.initState();
     final setting = widget.settingNotifier.value;
     storeController.text = setting?.storeName ?? '';
-    logoController.text = setting?.logoUrl ?? '';
-    faviconController.text = setting?.faviconUrl ?? '';
     accentController.text = setting?.accentColor ?? '';
+    logoUrl = setting?.logoUrl;
+    faviconUrl = setting?.faviconUrl;
   }
 
   @override
@@ -1109,9 +1175,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 12),
         TextField(controller: storeController, decoration: const InputDecoration(labelText: 'Nombre del comercio')),
         const SizedBox(height: 12),
-        TextField(controller: logoController, decoration: const InputDecoration(labelText: 'Logo URL')),
+        Row(
+          children: [
+            Expanded(
+              child: _AssetPreview(
+                label: 'Logo',
+                imageUrl: logoUrl,
+                placeholder: Icons.storefront,
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: uploadingLogo ? null : () => _uploadAsset(context, 'logo'),
+              icon: const Icon(Icons.upload),
+              label: Text(uploadingLogo ? 'Subiendo...' : 'Subir logo'),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
-        TextField(controller: faviconController, decoration: const InputDecoration(labelText: 'Favicon URL')),
+        Row(
+          children: [
+            Expanded(
+              child: _AssetPreview(
+                label: 'Favicon',
+                imageUrl: faviconUrl,
+                placeholder: Icons.favorite,
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: uploadingFavicon ? null : () => _uploadAsset(context, 'favicon'),
+              icon: const Icon(Icons.upload),
+              label: Text(uploadingFavicon ? 'Subiendo...' : 'Subir favicon'),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         TextField(controller: accentController, decoration: const InputDecoration(labelText: 'Color/acento (hex)')),
         const SizedBox(height: 16),
@@ -1119,11 +1217,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onPressed: () async {
             final updated = await ApiService(tokenProvider: () => AuthScope.of(context)).updateSettings(
               storeName: storeController.text,
-              logoUrl: logoController.text,
-              faviconUrl: faviconController.text,
               accentColor: accentController.text,
             );
             widget.settingNotifier.value = updated;
+            setState(() {
+              logoUrl = updated.logoUrl;
+              faviconUrl = updated.faviconUrl;
+            });
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Personalización guardada')),
@@ -1132,6 +1232,94 @@ class _SettingsScreenState extends State<SettingsScreen> {
           },
           child: const Text('Guardar cambios'),
         ),
+      ],
+    );
+  }
+
+  Future<void> _uploadAsset(BuildContext context, String type) async {
+    final accept = type == 'favicon' ? '.ico,image/png,image/svg+xml' : 'image/*';
+    final picked = await _pickFile(accept);
+    if (picked == null) {
+      return;
+    }
+    setState(() {
+      if (type == 'logo') {
+        uploadingLogo = true;
+      } else {
+        uploadingFavicon = true;
+      }
+    });
+    try {
+      final updated = await ApiService(tokenProvider: () => AuthScope.of(context)).uploadSettingAsset(
+        type: type,
+        bytes: picked.bytes,
+        filename: picked.filename,
+        mimeType: picked.mimeType,
+      );
+      widget.settingNotifier.value = updated;
+      setState(() {
+        logoUrl = updated.logoUrl;
+        faviconUrl = updated.faviconUrl;
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${type == 'logo' ? 'Logo' : 'Favicon'} actualizado')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          uploadingLogo = false;
+          uploadingFavicon = false;
+        });
+      }
+    }
+  }
+
+  Future<_PickedFile?> _pickFile(String accept) async {
+    final uploadInput = html.FileUploadInputElement()..accept = accept;
+    uploadInput.click();
+    await uploadInput.onChange.first;
+    final file = uploadInput.files?.first;
+    if (file == null) {
+      return null;
+    }
+    final reader = html.FileReader();
+    reader.readAsArrayBuffer(file);
+    await reader.onLoad.first;
+    final bytes = reader.result as Uint8List;
+    return _PickedFile(bytes: bytes, filename: file.name, mimeType: file.type);
+  }
+}
+
+class _PickedFile {
+  _PickedFile({required this.bytes, required this.filename, required this.mimeType});
+
+  final Uint8List bytes;
+  final String filename;
+  final String mimeType;
+}
+
+class _AssetPreview extends StatelessWidget {
+  const _AssetPreview({required this.label, required this.imageUrl, required this.placeholder});
+
+  final String label;
+  final String? imageUrl;
+  final IconData placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedUrl = imageUrl != null && imageUrl!.isNotEmpty ? resolveApiUrl(imageUrl!) : null;
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 24,
+          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+          backgroundImage: resolvedUrl != null ? NetworkImage(resolvedUrl) : null,
+          child: resolvedUrl == null ? Icon(placeholder) : null,
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label)),
       ],
     );
   }
@@ -1193,7 +1381,9 @@ class _UserDialogState extends State<UserDialog> {
 }
 
 class CategoryDialog extends StatefulWidget {
-  const CategoryDialog({super.key});
+  const CategoryDialog({super.key, this.category});
+
+  final Category? category;
 
   @override
   State<CategoryDialog> createState() => _CategoryDialogState();
@@ -1202,31 +1392,70 @@ class CategoryDialog extends StatefulWidget {
 class _CategoryDialogState extends State<CategoryDialog> {
   final nameController = TextEditingController();
   final imageController = TextEditingController();
+  String? iconName;
+  String? colorHex;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController.text = widget.category?.name ?? '';
+    imageController.text = widget.category?.imageUrl ?? '';
+    iconName = widget.category?.iconName ?? 'category';
+    colorHex = widget.category?.colorHex ?? '#0EA5E9';
+  }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nueva categoría'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
-          TextField(controller: imageController, decoration: const InputDecoration(labelText: 'Imagen URL')),
-        ],
+      title: Text(widget.category == null ? 'Nueva categoría' : 'Editar categoría'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
+            const SizedBox(height: 12),
+            TextField(controller: imageController, decoration: const InputDecoration(labelText: 'Imagen URL')),
+            const SizedBox(height: 12),
+            IconPickerField(
+              label: 'Icono',
+              value: iconName,
+              onChanged: (value) => setState(() => iconName = value),
+            ),
+            const SizedBox(height: 12),
+            ColorPickerField(
+              label: 'Color',
+              value: colorHex,
+              onChanged: (value) => setState(() => colorHex = value),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: () async {
-            await ApiService(tokenProvider: () => AuthScope.of(context)).createCategory(
-              name: nameController.text,
-              imageUrl: imageController.text,
-            );
+            final service = ApiService(tokenProvider: () => AuthScope.of(context));
+            if (widget.category == null) {
+              await service.createCategory(
+                name: nameController.text,
+                imageUrl: imageController.text,
+                iconName: iconName ?? 'category',
+                colorHex: colorHex ?? '#0EA5E9',
+              );
+            } else {
+              await service.updateCategory(
+                widget.category!.id,
+                name: nameController.text,
+                imageUrl: imageController.text,
+                iconName: iconName ?? 'category',
+                colorHex: colorHex ?? '#0EA5E9',
+              );
+            }
             if (context.mounted) {
               Navigator.pop(context);
             }
           },
-          child: const Text('Crear'),
+          child: Text(widget.category == null ? 'Crear' : 'Guardar'),
         ),
       ],
     );
@@ -1234,7 +1463,9 @@ class _CategoryDialogState extends State<CategoryDialog> {
 }
 
 class ProductDialog extends StatefulWidget {
-  const ProductDialog({super.key});
+  const ProductDialog({super.key, this.product});
+
+  final Product? product;
 
   @override
   State<ProductDialog> createState() => _ProductDialogState();
@@ -1245,11 +1476,24 @@ class _ProductDialogState extends State<ProductDialog> {
   final priceController = TextEditingController();
   final imageController = TextEditingController();
   String? categoryId;
+  String? iconName;
+  String? colorHex;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController.text = widget.product?.name ?? '';
+    priceController.text = widget.product?.price.toStringAsFixed(2) ?? '';
+    imageController.text = widget.product?.imageUrl ?? '';
+    categoryId = widget.product?.categoryId;
+    iconName = widget.product?.iconName;
+    colorHex = widget.product?.colorHex;
+  }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nuevo producto'),
+      title: Text(widget.product == null ? 'Nuevo producto' : 'Editar producto'),
       content: FutureBuilder<List<Category>>(
         future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategoriesAll(),
         builder: (context, snapshot) {
@@ -1268,6 +1512,20 @@ class _ProductDialogState extends State<ProductDialog> {
                       .toList(),
                   onChanged: (value) => setState(() => categoryId = value),
                 ),
+                const SizedBox(height: 12),
+                IconPickerField(
+                  label: 'Icono (opcional)',
+                  value: iconName,
+                  allowClear: true,
+                  onChanged: (value) => setState(() => iconName = value),
+                ),
+                const SizedBox(height: 12),
+                ColorPickerField(
+                  label: 'Color (opcional)',
+                  value: colorHex,
+                  allowClear: true,
+                  onChanged: (value) => setState(() => colorHex = value),
+                ),
               ],
             ),
           );
@@ -1278,17 +1536,32 @@ class _ProductDialogState extends State<ProductDialog> {
         FilledButton(
           onPressed: () async {
             if (categoryId == null) return;
-            await ApiService(tokenProvider: () => AuthScope.of(context)).createProduct(
-              name: nameController.text,
-              price: double.tryParse(priceController.text) ?? 0,
-              imageUrl: imageController.text,
-              categoryId: categoryId!,
-            );
+            final service = ApiService(tokenProvider: () => AuthScope.of(context));
+            if (widget.product == null) {
+              await service.createProduct(
+                name: nameController.text,
+                price: double.tryParse(priceController.text) ?? 0,
+                imageUrl: imageController.text,
+                categoryId: categoryId!,
+                iconName: iconName,
+                colorHex: colorHex,
+              );
+            } else {
+              await service.updateProduct(
+                widget.product!.id,
+                name: nameController.text,
+                price: double.tryParse(priceController.text) ?? 0,
+                imageUrl: imageController.text,
+                categoryId: categoryId!,
+                iconName: iconName,
+                colorHex: colorHex,
+              );
+            }
             if (context.mounted) {
               Navigator.pop(context);
             }
           },
-          child: const Text('Crear'),
+          child: Text(widget.product == null ? 'Crear' : 'Guardar'),
         ),
       ],
     );
@@ -1335,8 +1608,6 @@ class ApiService {
 
   Future<Setting> updateSettings({
     required String storeName,
-    required String logoUrl,
-    required String faviconUrl,
     required String accentColor,
   }) async {
     final response = await http.patch(
@@ -1344,11 +1615,30 @@ class ApiService {
       headers: _headers(),
       body: jsonEncode({
         'storeName': storeName,
-        'logoUrl': logoUrl,
-        'faviconUrl': faviconUrl,
         'accentColor': accentColor,
       }),
     );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Setting.fromJson(data);
+  }
+
+  Future<Setting> uploadSettingAsset({
+    required String type,
+    required Uint8List bytes,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final uri = Uri.parse('$apiBaseUrl/settings/$type');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(_headers(json: false));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+      ),
+    );
+    final response = await http.Response.fromStream(await request.send());
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return Setting.fromJson(data);
   }
@@ -1365,19 +1655,43 @@ class ApiService {
     return data.map((item) => Category.fromJson(item)).toList();
   }
 
-  Future<void> createCategory({required String name, required String imageUrl}) async {
+  Future<void> createCategory({
+    required String name,
+    required String imageUrl,
+    required String iconName,
+    required String colorHex,
+  }) async {
     await http.post(
       Uri.parse('$apiBaseUrl/categories'),
       headers: _headers(),
-      body: jsonEncode({'name': name, 'imageUrl': imageUrl, 'active': true}),
+      body: jsonEncode({
+        'name': name,
+        'imageUrl': imageUrl,
+        'iconName': iconName,
+        'colorHex': colorHex,
+        'active': true,
+      }),
     );
   }
 
-  Future<void> updateCategory(String id, {bool? active}) async {
+  Future<void> updateCategory(
+    String id, {
+    String? name,
+    String? imageUrl,
+    String? iconName,
+    String? colorHex,
+    bool? active,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (name != null) payload['name'] = name;
+    if (imageUrl != null) payload['imageUrl'] = imageUrl;
+    if (iconName != null) payload['iconName'] = iconName;
+    if (colorHex != null) payload['colorHex'] = colorHex;
+    if (active != null) payload['active'] = active;
     await http.patch(
       Uri.parse('$apiBaseUrl/categories/$id'),
       headers: _headers(),
-      body: jsonEncode({'active': active}),
+      body: jsonEncode(payload),
     );
   }
 
@@ -1398,6 +1712,8 @@ class ApiService {
     required double price,
     required String imageUrl,
     required String categoryId,
+    String? iconName,
+    String? colorHex,
   }) async {
     await http.post(
       Uri.parse('$apiBaseUrl/products'),
@@ -1407,16 +1723,35 @@ class ApiService {
         'price': price,
         'imageUrl': imageUrl,
         'categoryId': categoryId,
+        'iconName': iconName,
+        'colorHex': colorHex,
         'active': true,
       }),
     );
   }
 
-  Future<void> updateProduct(String id, {bool? active, required String categoryId}) async {
+  Future<void> updateProduct(
+    String id, {
+    String? name,
+    double? price,
+    String? imageUrl,
+    String? categoryId,
+    String? iconName,
+    String? colorHex,
+    bool? active,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (name != null) payload['name'] = name;
+    if (price != null) payload['price'] = price;
+    if (imageUrl != null) payload['imageUrl'] = imageUrl;
+    if (categoryId != null) payload['categoryId'] = categoryId;
+    if (iconName != null) payload['iconName'] = iconName;
+    if (colorHex != null) payload['colorHex'] = colorHex;
+    if (active != null) payload['active'] = active;
     await http.patch(
       Uri.parse('$apiBaseUrl/products/$id'),
       headers: _headers(),
-      body: jsonEncode({'active': active, 'categoryId': categoryId}),
+      body: jsonEncode(payload),
     );
   }
 
@@ -1493,10 +1828,10 @@ class ApiService {
     return data.map((item) => AverageRow.fromJson(item)).toList();
   }
 
-  Map<String, String> _headers() {
+  Map<String, String> _headers({bool json = true}) {
     final token = tokenProvider();
     return {
-      'Content-Type': 'application/json',
+      if (json) 'Content-Type': 'application/json',
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
   }
@@ -1511,33 +1846,44 @@ class ApiService {
 }
 
 class Setting {
-  Setting({required this.storeName, required this.logoUrl, required this.faviconUrl, this.accentColor});
+  Setting({required this.storeName, this.logoUrl, this.faviconUrl, this.accentColor});
 
   final String storeName;
-  final String logoUrl;
-  final String faviconUrl;
+  final String? logoUrl;
+  final String? faviconUrl;
   final String? accentColor;
 
   factory Setting.fromJson(Map<String, dynamic> json) => Setting(
         storeName: json['storeName'] as String,
-        logoUrl: json['logoUrl'] as String,
-        faviconUrl: json['faviconUrl'] as String,
+        logoUrl: json['logoUrl'] as String?,
+        faviconUrl: json['faviconUrl'] as String?,
         accentColor: json['accentColor'] as String?,
       );
 }
 
 class Category {
-  Category({required this.id, required this.name, required this.imageUrl, required this.active});
+  Category({
+    required this.id,
+    required this.name,
+    required this.imageUrl,
+    required this.iconName,
+    required this.colorHex,
+    required this.active,
+  });
 
   final String id;
   final String name;
   final String imageUrl;
+  final String iconName;
+  final String colorHex;
   final bool active;
 
   factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json['id'] as String,
         name: json['name'] as String,
         imageUrl: json['imageUrl'] as String,
+        iconName: json['iconName'] as String? ?? 'category',
+        colorHex: json['colorHex'] as String? ?? '#0EA5E9',
         active: json['active'] as bool? ?? true,
       );
 }
@@ -1550,7 +1896,11 @@ class Product {
     required this.imageUrl,
     required this.categoryId,
     required this.active,
+    this.iconName,
+    this.colorHex,
     this.categoryName,
+    this.categoryIconName,
+    this.categoryColorHex,
   });
 
   final String id;
@@ -1559,7 +1909,11 @@ class Product {
   final String imageUrl;
   final String categoryId;
   final bool active;
+  final String? iconName;
+  final String? colorHex;
   final String? categoryName;
+  final String? categoryIconName;
+  final String? categoryColorHex;
 
   factory Product.fromJson(Map<String, dynamic> json) => Product(
         id: json['id'] as String,
@@ -1568,7 +1922,11 @@ class Product {
         imageUrl: json['imageUrl'] as String,
         categoryId: json['categoryId'] as String,
         active: json['active'] as bool? ?? true,
+        iconName: json['iconName'] as String?,
+        colorHex: json['colorHex'] as String?,
         categoryName: json['category'] != null ? json['category']['name'] as String : null,
+        categoryIconName: json['category'] != null ? json['category']['iconName'] as String? : null,
+        categoryColorHex: json['category'] != null ? json['category']['colorHex'] as String? : null,
       );
 }
 
@@ -1648,4 +2006,42 @@ int hexToColor(String hex) {
   if (hex.length == 6 || hex.length == 7) buffer.write('ff');
   buffer.write(hex.replaceFirst('#', ''));
   return int.parse(buffer.toString(), radix: 16);
+}
+
+Color? colorFromHex(String? hex) {
+  if (hex == null || hex.isEmpty) {
+    return null;
+  }
+  try {
+    return Color(hexToColor(hex));
+  } catch (_) {
+    return null;
+  }
+}
+
+Color foregroundColorFor(Color background) {
+  final brightness = ThemeData.estimateBrightnessForColor(background);
+  return brightness == Brightness.dark ? Colors.white : Colors.black;
+}
+
+String resolveApiUrl(String url) {
+  if (url.startsWith('http')) {
+    return url;
+  }
+  if (url.startsWith('/')) {
+    return '$apiBaseUrl$url';
+  }
+  return '$apiBaseUrl/$url';
+}
+
+void updateFavicon(String url) {
+  final link = html.document.querySelector('link[rel=\"icon\"]') as html.LinkElement?;
+  if (link == null) {
+    final newLink = html.LinkElement()
+      ..rel = 'icon'
+      ..href = url;
+    html.document.head?.append(newLink);
+    return;
+  }
+  link.href = url;
 }

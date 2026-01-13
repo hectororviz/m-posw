@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class UpdateSettingDto {
   @IsOptional()
@@ -6,11 +6,11 @@ export class UpdateSettingDto {
   storeName?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
   logoUrl?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
   faviconUrl?: string;
 
   @IsOptional()
