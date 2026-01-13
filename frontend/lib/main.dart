@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 const apiBaseUrl = String.fromEnvironment(
@@ -252,186 +253,368 @@ class PosScreen extends StatefulWidget {
 
 class _PosScreenState extends State<PosScreen> {
   final cart = <String, CartItem>{};
+  final FocusNode _keyboardFocusNode = FocusNode(debugLabel: 'PosKeyboard');
   Category? selectedCategory;
+  String _quantityBuffer = '';
+  String? _selectedItemId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _keyboardFocusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _keyboardFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Category>>(
-      future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategories(),
-      builder: (context, snapshot) {
-        final categories = snapshot.data ?? [];
-        return Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
-                  ),
-                  Expanded(
-                    child: GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
-                      itemCount: categories.length,
-                      itemBuilder: (context, index) {
-                        final category = categories[index];
-                        return GestureDetector(
-                          onTap: () => setState(() => selectedCategory = category),
-                          child: Card(
-                            child: Column(
-                              children: [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.network(category.imageUrl, fit: BoxFit.cover, width: double.infinity),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8),
-                                  child: Text(category.name, style: const TextStyle(fontSize: 16)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  if (selectedCategory != null)
-                    Expanded(
-                      child: FutureBuilder<List<Product>>(
-                        future: ApiService(tokenProvider: () => AuthScope.of(context))
-                            .getProducts(selectedCategory!.id),
-                        builder: (context, productsSnapshot) {
-                          final products = productsSnapshot.data ?? [];
-                          return GridView.builder(
-                            padding: const EdgeInsets.all(16),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 1.1,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                            itemCount: products.length,
-                            itemBuilder: (context, index) {
-                              final product = products[index];
-                              return FilledButton(
-                                style: FilledButton.styleFrom(padding: const EdgeInsets.all(8)),
-                                onPressed: () {
-                                  setState(() {
-                                    cart.update(
-                                      product.id,
-                                      (value) => value.copyWith(quantity: value.quantity + 1),
-                                      ifAbsent: () => CartItem(product: product, quantity: 1),
-                                    );
-                                  });
-                                },
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Expanded(
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Image.network(product.imageUrl, fit: BoxFit.cover, width: double.infinity),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(product.name, textAlign: TextAlign.center),
-                                    Text('\$${product.price.toStringAsFixed(2)}'),
-                                  ],
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              flex: 2,
-              child: Container(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+    return Focus(
+      autofocus: true,
+      focusNode: _keyboardFocusNode,
+      onKeyEvent: _handleKeyEvent,
+      child: FutureBuilder<List<Category>>(
+        future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategories(),
+        builder: (context, snapshot) {
+          final categories = snapshot.data ?? [];
+          return Row(
+            children: [
+              Expanded(
+                flex: 3,
                 child: Column(
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text('Carrito', style: Theme.of(context).textTheme.titleLarge),
+                      child: Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
                     ),
                     Expanded(
-                      child: ListView(
-                        children: cart.values
-                            .map(
-                              (item) => ListTile(
-                                title: Text(item.product.name),
-                                subtitle: Text('x${item.quantity}'),
-                                trailing: Text('\$${item.total.toStringAsFixed(2)}'),
-                                leading: IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline),
+                      child: GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 1.2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemCount: categories.length,
+                        itemBuilder: (context, index) {
+                          final category = categories[index];
+                          return GestureDetector(
+                            onTap: () => setState(() => selectedCategory = category),
+                            child: Card(
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        category.imageUrl,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Text(category.name, style: const TextStyle(fontSize: 16)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    if (selectedCategory != null)
+                      Expanded(
+                        child: FutureBuilder<List<Product>>(
+                          future: ApiService(tokenProvider: () => AuthScope.of(context))
+                              .getProducts(selectedCategory!.id),
+                          builder: (context, productsSnapshot) {
+                            final products = productsSnapshot.data ?? [];
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(16),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 1.1,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: products.length,
+                              itemBuilder: (context, index) {
+                                final product = products[index];
+                                return FilledButton(
+                                  style: FilledButton.styleFrom(padding: const EdgeInsets.all(8)),
                                   onPressed: () {
+                                    final quantity = _quantityValue ?? 1;
                                     setState(() {
-                                      if (item.quantity <= 1) {
-                                        cart.remove(item.product.id);
+                                      if (_selectedItemId != null && _quantityValue != null) {
+                                        cart.update(
+                                          _selectedItemId!,
+                                          (value) => value.copyWith(quantity: quantity),
+                                        );
+                                        _quantityBuffer = '';
                                       } else {
                                         cart.update(
-                                          item.product.id,
-                                          (value) => value.copyWith(quantity: value.quantity - 1),
+                                          product.id,
+                                          (value) => value.copyWith(quantity: value.quantity + quantity),
+                                          ifAbsent: () => CartItem(product: product, quantity: quantity),
                                         );
+                                        _quantityBuffer = '';
                                       }
+                                      _selectedItemId = null;
                                     });
                                   },
-                                ),
-                              ),
-                            )
-                            .toList(),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Expanded(
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: Image.network(
+                                            product.imageUrl,
+                                            fit: BoxFit.cover,
+                                            width: double.infinity,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(product.name, textAlign: TextAlign.center),
+                                      Text('\$${product.price.toStringAsFixed(2)}'),
+                                    ],
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Text('Total: \$${cartTotal.toStringAsFixed(2)}',
-                              style: Theme.of(context).textTheme.titleLarge),
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: cart.isEmpty
-                                ? null
-                                : () async {
-                                    await ApiService(tokenProvider: () => AuthScope.of(context)).createSale(cart.values.toList());
-                                    setState(() => cart.clear());
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Venta registrada')),
-                                      );
-                                    }
-                                  },
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              child: Text('Cobrar / Confirmar venta'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
-            ),
-          ],
-        );
-      },
+              Expanded(
+                flex: 2,
+                child: Container(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text('Carrito', style: Theme.of(context).textTheme.titleLarge),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Cantidad rápida:',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(width: 8),
+                            Chip(
+                              label: Text(_quantityBuffer.isEmpty ? '—' : _quantityBuffer),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: ListView(
+                          children: cart.values
+                              .map(
+                                (item) => ListTile(
+                                  selected: _selectedItemId == item.product.id,
+                                  onTap: () => setState(() => _selectedItemId = item.product.id),
+                                  title: Text(item.product.name),
+                                  subtitle: Text('x${item.quantity}'),
+                                  trailing: Text('\$${item.total.toStringAsFixed(2)}'),
+                                  leading: IconButton(
+                                    icon: const Icon(Icons.remove_circle_outline),
+                                    onPressed: () {
+                                      setState(() {
+                                        if (item.quantity <= 1) {
+                                          cart.remove(item.product.id);
+                                          if (_selectedItemId == item.product.id) {
+                                            _selectedItemId = null;
+                                          }
+                                        } else {
+                                          cart.update(
+                                            item.product.id,
+                                            (value) => value.copyWith(quantity: value.quantity - 1),
+                                          );
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Total: \$${cartTotal.toStringAsFixed(2)}',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: cart.isEmpty ? null : () => _submitSale(context),
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Text('Cobrar / Confirmar venta'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
   double get cartTotal => cart.values.fold(0, (sum, item) => sum + item.total);
+
+  bool _isTextFieldFocused() {
+    final focusedContext = FocusManager.instance.primaryFocus?.context;
+    if (focusedContext == null) {
+      return false;
+    }
+    return focusedContext.widget is EditableText;
+  }
+
+  int? get _quantityValue {
+    if (_quantityBuffer.isEmpty) {
+      return null;
+    }
+    final parsed = int.tryParse(_quantityBuffer);
+    if (parsed == null || parsed <= 0) {
+      return null;
+    }
+    return parsed;
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (_isTextFieldFocused()) {
+      return KeyEventResult.ignored;
+    }
+    final digit = _digitFromKey(event.logicalKey, event.character);
+    if (digit != null) {
+      setState(() {
+        _quantityBuffer = (_quantityBuffer + digit.toString()).replaceFirst(RegExp(r'^0+'), '');
+        if (_quantityBuffer.isEmpty) {
+          _quantityBuffer = digit.toString();
+        }
+      });
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete) {
+      setState(() {
+        if (_quantityBuffer.isNotEmpty) {
+          _quantityBuffer = _quantityBuffer.substring(0, _quantityBuffer.length - 1);
+        } else if (_selectedItemId != null) {
+          cart.remove(_selectedItemId);
+          _selectedItemId = null;
+        }
+      });
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _handleEnterAction();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      setState(() {
+        _quantityBuffer = '';
+        _selectedItemId = null;
+      });
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  int? _digitFromKey(LogicalKeyboardKey key, String? character) {
+    if (character != null && character.length == 1) {
+      final parsed = int.tryParse(character);
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+    const digitKeys = {
+      LogicalKeyboardKey.digit0: 0,
+      LogicalKeyboardKey.digit1: 1,
+      LogicalKeyboardKey.digit2: 2,
+      LogicalKeyboardKey.digit3: 3,
+      LogicalKeyboardKey.digit4: 4,
+      LogicalKeyboardKey.digit5: 5,
+      LogicalKeyboardKey.digit6: 6,
+      LogicalKeyboardKey.digit7: 7,
+      LogicalKeyboardKey.digit8: 8,
+      LogicalKeyboardKey.digit9: 9,
+      LogicalKeyboardKey.numpad0: 0,
+      LogicalKeyboardKey.numpad1: 1,
+      LogicalKeyboardKey.numpad2: 2,
+      LogicalKeyboardKey.numpad3: 3,
+      LogicalKeyboardKey.numpad4: 4,
+      LogicalKeyboardKey.numpad5: 5,
+      LogicalKeyboardKey.numpad6: 6,
+      LogicalKeyboardKey.numpad7: 7,
+      LogicalKeyboardKey.numpad8: 8,
+      LogicalKeyboardKey.numpad9: 9,
+    };
+    return digitKeys[key];
+  }
+
+  Future<void> _handleEnterAction() async {
+    if (_selectedItemId != null && _quantityValue != null) {
+      setState(() {
+        cart.update(
+          _selectedItemId!,
+          (value) => value.copyWith(quantity: _quantityValue!),
+        );
+        _quantityBuffer = '';
+      });
+      return;
+    }
+    if (cart.isEmpty) {
+      return;
+    }
+    await _submitSale(context);
+  }
+
+  Future<void> _submitSale(BuildContext context) async {
+    await ApiService(tokenProvider: () => AuthScope.of(context)).createSale(cart.values.toList());
+    setState(() {
+      cart.clear();
+      _quantityBuffer = '';
+      _selectedItemId = null;
+    });
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Venta registrada')),
+      );
+    }
+  }
 }
 
 class AdminScreen extends StatefulWidget {
