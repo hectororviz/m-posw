@@ -32,6 +32,8 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
+    volumes:
+      - uploads_data:/app/public/uploads
 
   frontend:
     build:
@@ -45,3 +47,4 @@ services:
 
 volumes:
   db_data:
+  uploads_data:

@@ -29,6 +29,8 @@ model Category {
   id        String   @id @default(uuid())
   name      String
   imageUrl  String
+  iconName  String
+  colorHex  String
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -40,6 +42,8 @@ model Product {
   name       String
   price      Decimal  @db.Decimal(10, 2)
   imageUrl   String
+  iconName   String?
+  colorHex   String?
   active     Boolean  @default(true)
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
@@ -70,8 +74,8 @@ model SaleItem {
 model Setting {
   id          String   @id @default(uuid())
   storeName   String
-  logoUrl     String
-  faviconUrl  String
+  logoUrl     String?
+  faviconUrl  String?
   accentColor String?  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

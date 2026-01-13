@@ -14,8 +14,8 @@ export class SettingsService {
     return this.prisma.setting.create({
       data: {
         storeName: 'MiBPS',
-        logoUrl: 'https://placehold.co/120x120?text=Logo',
-        faviconUrl: 'https://placehold.co/64x64?text=F',
+        logoUrl: null,
+        faviconUrl: null,
         accentColor: '#0ea5e9',
       },
     });
@@ -27,8 +27,8 @@ export class SettingsService {
       return this.prisma.setting.create({
         data: {
           storeName: dto.storeName || 'MiBPS',
-          logoUrl: dto.logoUrl || 'https://placehold.co/120x120?text=Logo',
-          faviconUrl: dto.faviconUrl || 'https://placehold.co/64x64?text=F',
+          logoUrl: dto.logoUrl ?? null,
+          faviconUrl: dto.faviconUrl ?? null,
           accentColor: dto.accentColor,
         },
       });

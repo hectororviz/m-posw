@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString, IsUrl, Matches } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
@@ -12,6 +12,14 @@ export class CreateProductDto {
 
   @IsString()
   categoryId: string;
+
+  @IsOptional()
+  @IsString()
+  iconName?: string;
+
+  @IsOptional()
+  @Matches(/^#[0-9A-Fa-f]{6}$/)
+  colorHex?: string;
 
   @IsOptional()
   @IsBoolean()
