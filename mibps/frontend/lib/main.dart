@@ -1,0 +1,1468 @@
+import 'dart:convert';
+
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+const apiBaseUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: 'http://localhost:3000',
+);
+
+void main() {
+  runApp(const MiBpsApp());
+}
+
+class MiBpsApp extends StatefulWidget {
+  const MiBpsApp({super.key});
+
+  @override
+  State<MiBpsApp> createState() => _MiBpsAppState();
+}
+
+class _MiBpsAppState extends State<MiBpsApp> {
+  final authState = ValueNotifier<String?>(null);
+  final settings = ValueNotifier<Setting?>(null);
+
+  @override
+  void initState() {
+    super.initState();
+    ApiService(tokenProvider: () => authState.value).getSettings().then((value) {
+      settings.value = value;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Setting?>(
+      valueListenable: settings,
+      builder: (context, setting, _) {
+        final themeColor = setting?.accentColor != null
+            ? Color(hexToColor(setting!.accentColor!))
+            : const Color(0xFF0EA5E9);
+        return MaterialApp(
+          title: setting?.storeName ?? 'MiBPS',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: themeColor),
+            useMaterial3: true,
+            visualDensity: VisualDensity.standard,
+          ),
+          home: ValueListenableBuilder<String?>(
+            valueListenable: authState,
+            builder: (context, token, _) {
+              if (token == null) {
+                return LoginScreen(
+                  onLoggedIn: (newToken) async {
+                    authState.value = newToken;
+                    settings.value = await ApiService(tokenProvider: () => authState.value)
+                        .getSettings();
+                  },
+                );
+              }
+              return AuthScope(
+                token: token,
+                child: HomeShell(
+                  authState: authState,
+                  settingNotifier: settings,
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key, required this.authState, required this.settingNotifier});
+
+  final ValueNotifier<String?> authState;
+  final ValueNotifier<Setting?> settingNotifier;
+
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  int selectedIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final destinations = [
+      _Destination('POS', Icons.storefront, const PosScreen()),
+      _Destination('Admin', Icons.admin_panel_settings, const AdminScreen()),
+      _Destination('Reportes', Icons.receipt_long, const ReportsScreen()),
+      _Destination('Estadísticas', Icons.bar_chart, const StatsScreen()),
+      _Destination('Personalización', Icons.palette, SettingsScreen(settingNotifier: widget.settingNotifier)),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 900;
+        return Scaffold(
+          appBar: AppBar(
+            title: ValueListenableBuilder<Setting?>(
+              valueListenable: widget.settingNotifier,
+              builder: (context, setting, _) {
+                return Row(
+                  children: [
+                    if (setting?.logoUrl != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: CircleAvatar(backgroundImage: NetworkImage(setting!.logoUrl)),
+                      ),
+                    Text(setting?.storeName ?? 'MiBPS'),
+                  ],
+                );
+              },
+            ),
+            actions: [
+              TextButton.icon(
+                onPressed: () => widget.authState.value = null,
+                icon: const Icon(Icons.logout),
+                label: const Text('Salir'),
+              ),
+            ],
+          ),
+          body: Row(
+            children: [
+              if (isWide)
+                NavigationRail(
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: (value) => setState(() => selectedIndex = value),
+                  destinations: destinations
+                      .map((item) => NavigationRailDestination(
+                            icon: Icon(item.icon),
+                            label: Text(item.label),
+                          ))
+                      .toList(),
+                ),
+              Expanded(child: destinations[selectedIndex].screen),
+            ],
+          ),
+          bottomNavigationBar: isWide
+              ? null
+              : NavigationBar(
+                  selectedIndex: selectedIndex,
+                  onDestinationSelected: (value) => setState(() => selectedIndex = value),
+                  destinations: destinations
+                      .map((item) => NavigationDestination(icon: Icon(item.icon), label: item.label))
+                      .toList(),
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _Destination {
+  _Destination(this.label, this.icon, this.screen);
+
+  final String label;
+  final IconData icon;
+  final Widget screen;
+}
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key, required this.onLoggedIn});
+
+  final ValueChanged<String> onLoggedIn;
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final emailController = TextEditingController(text: 'admin@mibps.local');
+  final passwordController = TextEditingController(text: 'Admin123!');
+  bool loading = false;
+  String? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Card(
+          margin: const EdgeInsets.all(24),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Ingreso MiBPS', style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: 'Email'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(labelText: 'Contraseña'),
+                    obscureText: true,
+                  ),
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(error!, style: const TextStyle(color: Colors.red)),
+                    ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: loading
+                        ? null
+                        : () async {
+                            setState(() {
+                              loading = true;
+                              error = null;
+                            });
+                            try {
+                              final token = await ApiService(tokenProvider: () => null)
+                                  .login(emailController.text, passwordController.text);
+                              widget.onLoggedIn(token);
+                            } catch (e) {
+                              setState(() => error = 'Credenciales inválidas');
+                            } finally {
+                              setState(() => loading = false);
+                            }
+                          },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      child: Text(loading ? 'Ingresando...' : 'Ingresar'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PosScreen extends StatefulWidget {
+  const PosScreen({super.key});
+
+  @override
+  State<PosScreen> createState() => _PosScreenState();
+}
+
+class _PosScreenState extends State<PosScreen> {
+  final cart = <String, CartItem>{};
+  Category? selectedCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Category>>(
+      future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategories(),
+      builder: (context, snapshot) {
+        final categories = snapshot.data ?? [];
+        return Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
+                  ),
+                  Expanded(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 1.2,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
+                      itemCount: categories.length,
+                      itemBuilder: (context, index) {
+                        final category = categories[index];
+                        return GestureDetector(
+                          onTap: () => setState(() => selectedCategory = category),
+                          child: Card(
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(category.imageUrl, fit: BoxFit.cover, width: double.infinity),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Text(category.name, style: const TextStyle(fontSize: 16)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  if (selectedCategory != null)
+                    Expanded(
+                      child: FutureBuilder<List<Product>>(
+                        future: ApiService(tokenProvider: () => AuthScope.of(context))
+                            .getProducts(selectedCategory!.id),
+                        builder: (context, productsSnapshot) {
+                          final products = productsSnapshot.data ?? [];
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: 1.1,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount: products.length,
+                            itemBuilder: (context, index) {
+                              final product = products[index];
+                              return FilledButton(
+                                style: FilledButton.styleFrom(padding: const EdgeInsets.all(8)),
+                                onPressed: () {
+                                  setState(() {
+                                    cart.update(
+                                      product.id,
+                                      (value) => value.copyWith(quantity: value.quantity + 1),
+                                      ifAbsent: () => CartItem(product: product, quantity: 1),
+                                    );
+                                  });
+                                },
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(product.imageUrl, fit: BoxFit.cover, width: double.infinity),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(product.name, textAlign: TextAlign.center),
+                                    Text('\$${product.price.toStringAsFixed(2)}'),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Container(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('Carrito', style: Theme.of(context).textTheme.titleLarge),
+                    ),
+                    Expanded(
+                      child: ListView(
+                        children: cart.values
+                            .map(
+                              (item) => ListTile(
+                                title: Text(item.product.name),
+                                subtitle: Text('x${item.quantity}'),
+                                trailing: Text('\$${item.total.toStringAsFixed(2)}'),
+                                leading: IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  onPressed: () {
+                                    setState(() {
+                                      if (item.quantity <= 1) {
+                                        cart.remove(item.product.id);
+                                      } else {
+                                        cart.update(
+                                          item.product.id,
+                                          (value) => value.copyWith(quantity: value.quantity - 1),
+                                        );
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Text('Total: \$${cartTotal.toStringAsFixed(2)}',
+                              style: Theme.of(context).textTheme.titleLarge),
+                          const SizedBox(height: 12),
+                          FilledButton(
+                            onPressed: cart.isEmpty
+                                ? null
+                                : () async {
+                                    await ApiService(tokenProvider: () => AuthScope.of(context)).createSale(cart.values.toList());
+                                    setState(() => cart.clear());
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Venta registrada')),
+                                      );
+                                    }
+                                  },
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Text('Cobrar / Confirmar venta'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  double get cartTotal => cart.values.fold(0, (sum, item) => sum + item.total);
+}
+
+class AdminScreen extends StatefulWidget {
+  const AdminScreen({super.key});
+
+  @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final tabs = [
+      _AdminTab('Usuarios', const AdminUsersTab()),
+      _AdminTab('Categorías', const AdminCategoriesTab()),
+      _AdminTab('Productos', const AdminProductsTab()),
+    ];
+    return DefaultTabController(
+      length: tabs.length,
+      child: Column(
+        children: [
+          TabBar(
+            labelStyle: Theme.of(context).textTheme.titleMedium,
+            tabs: tabs.map((tab) => Tab(text: tab.title)).toList(),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: tabs.map((tab) => tab.content).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminTab {
+  _AdminTab(this.title, this.content);
+  final String title;
+  final Widget content;
+}
+
+class AdminUsersTab extends StatefulWidget {
+  const AdminUsersTab({super.key});
+
+  @override
+  State<AdminUsersTab> createState() => _AdminUsersTabState();
+}
+
+class _AdminUsersTabState extends State<AdminUsersTab> {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<User>>(
+      future: ApiService(tokenProvider: () => AuthScope.of(context)).getUsers(),
+      builder: (context, snapshot) {
+        final users = snapshot.data ?? [];
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            FilledButton.icon(
+              onPressed: () async {
+                await showDialog(
+                  context: context,
+                  builder: (context) => const UserDialog(),
+                );
+                setState(() {});
+              },
+              icon: const Icon(Icons.person_add),
+              label: const Text('Crear usuario'),
+            ),
+            const SizedBox(height: 16),
+            ...users.map(
+              (user) => Card(
+                child: ListTile(
+                  title: Text(user.name),
+                  subtitle: Text('${user.email} · ${user.role}'),
+                  trailing: Switch(
+                    value: user.active,
+                    onChanged: (value) async {
+                      await ApiService(tokenProvider: () => AuthScope.of(context))
+                          .updateUser(user.id, active: value);
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class AdminCategoriesTab extends StatefulWidget {
+  const AdminCategoriesTab({super.key});
+
+  @override
+  State<AdminCategoriesTab> createState() => _AdminCategoriesTabState();
+}
+
+class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Category>>(
+      future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategoriesAll(),
+      builder: (context, snapshot) {
+        final categories = snapshot.data ?? [];
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            FilledButton.icon(
+              onPressed: () async {
+                await showDialog(context: context, builder: (context) => const CategoryDialog());
+                setState(() {});
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Crear categoría'),
+            ),
+            const SizedBox(height: 16),
+            ...categories.map(
+              (category) => Card(
+                child: ListTile(
+                  title: Text(category.name),
+                  subtitle: Text(category.imageUrl),
+                  trailing: Switch(
+                    value: category.active,
+                    onChanged: (value) async {
+                      await ApiService(tokenProvider: () => AuthScope.of(context))
+                          .updateCategory(category.id, active: value);
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class AdminProductsTab extends StatefulWidget {
+  const AdminProductsTab({super.key});
+
+  @override
+  State<AdminProductsTab> createState() => _AdminProductsTabState();
+}
+
+class _AdminProductsTabState extends State<AdminProductsTab> {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Product>>(
+      future: ApiService(tokenProvider: () => AuthScope.of(context)).getProductsAll(),
+      builder: (context, snapshot) {
+        final products = snapshot.data ?? [];
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            FilledButton.icon(
+              onPressed: () async {
+                await showDialog(context: context, builder: (context) => const ProductDialog());
+                setState(() {});
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Crear producto'),
+            ),
+            const SizedBox(height: 16),
+            ...products.map(
+              (product) => Card(
+                child: ListTile(
+                  title: Text(product.name),
+                  subtitle: Text('${product.categoryName} · \$${product.price.toStringAsFixed(2)}'),
+                  trailing: Switch(
+                    value: product.active,
+                    onChanged: (value) async {
+                      await ApiService(tokenProvider: () => AuthScope.of(context))
+                          .updateProduct(product.id, active: value, categoryId: product.categoryId);
+                      setState(() {});
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class ReportsScreen extends StatefulWidget {
+  const ReportsScreen({super.key});
+
+  @override
+  State<ReportsScreen> createState() => _ReportsScreenState();
+}
+
+class _ReportsScreenState extends State<ReportsScreen> {
+  DateTime? from;
+  DateTime? to;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: from ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (date != null) {
+                    setState(() => from = date);
+                  }
+                },
+                icon: const Icon(Icons.date_range),
+                label: Text(from == null ? 'Desde' : from!.toIso8601String().split('T').first),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: to ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (date != null) {
+                    setState(() => to = date);
+                  }
+                },
+                icon: const Icon(Icons.event),
+                label: Text(to == null ? 'Hasta' : to!.toIso8601String().split('T').first),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: () async {
+                  final bytes = await ApiService(tokenProvider: () => AuthScope.of(context)).exportReport(from: from, to: to);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Excel generado (${bytes.length} bytes)')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.download),
+                label: const Text('Descargar Excel'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: FutureBuilder<List<SummaryRow>>(
+                    future: ApiService(tokenProvider: () => AuthScope.of(context))
+                        .summaryByProduct(from: from, to: to),
+                    builder: (context, snapshot) {
+                      final rows = snapshot.data ?? [];
+                      return ReportCard(title: 'Resumen por producto', rows: rows);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: FutureBuilder<List<SummaryRow>>(
+                    future: ApiService(tokenProvider: () => AuthScope.of(context))
+                        .summaryByCategory(from: from, to: to),
+                    builder: (context, snapshot) {
+                      final rows = snapshot.data ?? [];
+                      return ReportCard(title: 'Resumen por categoría', rows: rows);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ReportCard extends StatelessWidget {
+  const ReportCard({super.key, required this.title, required this.rows});
+
+  final String title;
+  final List<SummaryRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                children: rows
+                    .map(
+                      (row) => ListTile(
+                        title: Text(row.name),
+                        subtitle: Text('Cantidad: ${row.quantity}'),
+                        trailing: Text('\$${row.total.toStringAsFixed(2)}'),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class StatsScreen extends StatelessWidget {
+  const StatsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: ListView(
+        children: [
+          FutureBuilder<List<TotalRow>>(
+            future: ApiService(tokenProvider: () => AuthScope.of(context)).totalsByDay(),
+            builder: (context, snapshot) {
+              final rows = snapshot.data ?? [];
+              return ChartCard(title: 'Ventas por día (últimos 15)', rows: rows);
+            },
+          ),
+          const SizedBox(height: 16),
+          FutureBuilder<List<TotalRow>>(
+            future: ApiService(tokenProvider: () => AuthScope.of(context)).totalsByMonth(),
+            builder: (context, snapshot) {
+              final rows = snapshot.data ?? [];
+              return ChartCard(title: 'Ventas por mes (últimos 6)', rows: rows);
+            },
+          ),
+          const SizedBox(height: 16),
+          FutureBuilder<List<AverageRow>>(
+            future: ApiService(tokenProvider: () => AuthScope.of(context)).averageByCategory(),
+            builder: (context, snapshot) {
+              final rows = snapshot.data ?? [];
+              return AverageCard(title: 'Promedio diario por categoría', rows: rows);
+            },
+          ),
+          const SizedBox(height: 16),
+          FutureBuilder<List<AverageRow>>(
+            future: ApiService(tokenProvider: () => AuthScope.of(context)).averageByProduct(),
+            builder: (context, snapshot) {
+              final rows = snapshot.data ?? [];
+              return AverageCard(title: 'Promedio diario por producto', rows: rows);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ChartCard extends StatelessWidget {
+  const ChartCard({super.key, required this.title, required this.rows});
+
+  final String title;
+  final List<TotalRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 200,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  barGroups: rows
+                      .asMap()
+                      .entries
+                      .map(
+                        (entry) => BarChartGroupData(
+                          x: entry.key,
+                          barRods: [
+                            BarChartRodData(toY: entry.value.total, color: Theme.of(context).colorScheme.primary),
+                          ],
+                        ),
+                      )
+                      .toList(),
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index < 0 || index >= rows.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Text(rows[index].label, style: const TextStyle(fontSize: 10));
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AverageCard extends StatelessWidget {
+  const AverageCard({super.key, required this.title, required this.rows});
+
+  final String title;
+  final List<AverageRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            ...rows.map(
+              (row) => ListTile(
+                title: Text(row.name),
+                trailing: Text('\$${row.averageDaily.toStringAsFixed(2)}'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key, required this.settingNotifier});
+
+  final ValueNotifier<Setting?> settingNotifier;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final storeController = TextEditingController();
+  final logoController = TextEditingController();
+  final faviconController = TextEditingController();
+  final accentController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final setting = widget.settingNotifier.value;
+    storeController.text = setting?.storeName ?? '';
+    logoController.text = setting?.logoUrl ?? '';
+    faviconController.text = setting?.faviconUrl ?? '';
+    accentController.text = setting?.accentColor ?? '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Personalización', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        TextField(controller: storeController, decoration: const InputDecoration(labelText: 'Nombre del comercio')),
+        const SizedBox(height: 12),
+        TextField(controller: logoController, decoration: const InputDecoration(labelText: 'Logo URL')),
+        const SizedBox(height: 12),
+        TextField(controller: faviconController, decoration: const InputDecoration(labelText: 'Favicon URL')),
+        const SizedBox(height: 12),
+        TextField(controller: accentController, decoration: const InputDecoration(labelText: 'Color/acento (hex)')),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: () async {
+            final updated = await ApiService(tokenProvider: () => AuthScope.of(context)).updateSettings(
+              storeName: storeController.text,
+              logoUrl: logoController.text,
+              faviconUrl: faviconController.text,
+              accentColor: accentController.text,
+            );
+            widget.settingNotifier.value = updated;
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Personalización guardada')),
+              );
+            }
+          },
+          child: const Text('Guardar cambios'),
+        ),
+      ],
+    );
+  }
+}
+
+class UserDialog extends StatefulWidget {
+  const UserDialog({super.key});
+
+  @override
+  State<UserDialog> createState() => _UserDialogState();
+}
+
+class _UserDialogState extends State<UserDialog> {
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  String role = 'USER';
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Crear usuario'),
+      content: SingleChildScrollView(
+        child: Column(
+          children: [
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
+            TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
+            TextField(controller: passwordController, decoration: const InputDecoration(labelText: 'Contraseña')),
+            DropdownButton<String>(
+              value: role,
+              items: const [
+                DropdownMenuItem(value: 'USER', child: Text('USER')),
+                DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN')),
+              ],
+              onChanged: (value) => setState(() => role = value ?? 'USER'),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () async {
+            await ApiService(tokenProvider: () => AuthScope.of(context)).createUser(
+              name: nameController.text,
+              email: emailController.text,
+              password: passwordController.text,
+              role: role,
+            );
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('Crear'),
+        ),
+      ],
+    );
+  }
+}
+
+class CategoryDialog extends StatefulWidget {
+  const CategoryDialog({super.key});
+
+  @override
+  State<CategoryDialog> createState() => _CategoryDialogState();
+}
+
+class _CategoryDialogState extends State<CategoryDialog> {
+  final nameController = TextEditingController();
+  final imageController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nueva categoría'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
+          TextField(controller: imageController, decoration: const InputDecoration(labelText: 'Imagen URL')),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () async {
+            await ApiService(tokenProvider: () => AuthScope.of(context)).createCategory(
+              name: nameController.text,
+              imageUrl: imageController.text,
+            );
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('Crear'),
+        ),
+      ],
+    );
+  }
+}
+
+class ProductDialog extends StatefulWidget {
+  const ProductDialog({super.key});
+
+  @override
+  State<ProductDialog> createState() => _ProductDialogState();
+}
+
+class _ProductDialogState extends State<ProductDialog> {
+  final nameController = TextEditingController();
+  final priceController = TextEditingController();
+  final imageController = TextEditingController();
+  String? categoryId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nuevo producto'),
+      content: FutureBuilder<List<Category>>(
+        future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategoriesAll(),
+        builder: (context, snapshot) {
+          final categories = snapshot.data ?? [];
+          categoryId ??= categories.isNotEmpty ? categories.first.id : null;
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
+                TextField(controller: priceController, decoration: const InputDecoration(labelText: 'Precio')),
+                TextField(controller: imageController, decoration: const InputDecoration(labelText: 'Imagen URL')),
+                DropdownButton<String>(
+                  value: categoryId,
+                  items: categories
+                      .map((category) => DropdownMenuItem(value: category.id, child: Text(category.name)))
+                      .toList(),
+                  onChanged: (value) => setState(() => categoryId = value),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () async {
+            if (categoryId == null) return;
+            await ApiService(tokenProvider: () => AuthScope.of(context)).createProduct(
+              name: nameController.text,
+              price: double.tryParse(priceController.text) ?? 0,
+              imageUrl: imageController.text,
+              categoryId: categoryId!,
+            );
+            if (context.mounted) {
+              Navigator.pop(context);
+            }
+          },
+          child: const Text('Crear'),
+        ),
+      ],
+    );
+  }
+}
+
+class AuthScope extends InheritedWidget {
+  const AuthScope({super.key, required this.token, required super.child});
+
+  final String token;
+
+  static String of(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<AuthScope>();
+    return scope?.token ?? '';
+  }
+
+  @override
+  bool updateShouldNotify(AuthScope oldWidget) => token != oldWidget.token;
+}
+
+class ApiService {
+  ApiService({required this.tokenProvider});
+
+  final String? Function() tokenProvider;
+
+  Future<String> login(String email, String password) async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Login failed');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return data['accessToken'] as String;
+  }
+
+  Future<Setting> getSettings() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/settings'));
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Setting.fromJson(data);
+  }
+
+  Future<Setting> updateSettings({
+    required String storeName,
+    required String logoUrl,
+    required String faviconUrl,
+    required String accentColor,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$apiBaseUrl/settings'),
+      headers: _headers(),
+      body: jsonEncode({
+        'storeName': storeName,
+        'logoUrl': logoUrl,
+        'faviconUrl': faviconUrl,
+        'accentColor': accentColor,
+      }),
+    );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Setting.fromJson(data);
+  }
+
+  Future<List<Category>> getCategories() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/categories'));
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => Category.fromJson(item)).toList();
+  }
+
+  Future<List<Category>> getCategoriesAll() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/categories/all'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => Category.fromJson(item)).toList();
+  }
+
+  Future<void> createCategory({required String name, required String imageUrl}) async {
+    await http.post(
+      Uri.parse('$apiBaseUrl/categories'),
+      headers: _headers(),
+      body: jsonEncode({'name': name, 'imageUrl': imageUrl, 'active': true}),
+    );
+  }
+
+  Future<void> updateCategory(String id, {bool? active}) async {
+    await http.patch(
+      Uri.parse('$apiBaseUrl/categories/$id'),
+      headers: _headers(),
+      body: jsonEncode({'active': active}),
+    );
+  }
+
+  Future<List<Product>> getProducts(String categoryId) async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/products?categoryId=$categoryId'));
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => Product.fromJson(item)).toList();
+  }
+
+  Future<List<Product>> getProductsAll() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/products/all'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => Product.fromJson(item)).toList();
+  }
+
+  Future<void> createProduct({
+    required String name,
+    required double price,
+    required String imageUrl,
+    required String categoryId,
+  }) async {
+    await http.post(
+      Uri.parse('$apiBaseUrl/products'),
+      headers: _headers(),
+      body: jsonEncode({
+        'name': name,
+        'price': price,
+        'imageUrl': imageUrl,
+        'categoryId': categoryId,
+        'active': true,
+      }),
+    );
+  }
+
+  Future<void> updateProduct(String id, {bool? active, required String categoryId}) async {
+    await http.patch(
+      Uri.parse('$apiBaseUrl/products/$id'),
+      headers: _headers(),
+      body: jsonEncode({'active': active, 'categoryId': categoryId}),
+    );
+  }
+
+  Future<void> createSale(List<CartItem> items) async {
+    await http.post(
+      Uri.parse('$apiBaseUrl/sales'),
+      headers: _headers(),
+      body: jsonEncode({
+        'items': items.map((item) => {'productId': item.product.id, 'quantity': item.quantity}).toList(),
+      }),
+    );
+  }
+
+  Future<List<User>> getUsers() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/users'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => User.fromJson(item)).toList();
+  }
+
+  Future<void> createUser({required String name, required String email, required String password, required String role}) async {
+    await http.post(
+      Uri.parse('$apiBaseUrl/users'),
+      headers: _headers(),
+      body: jsonEncode({'name': name, 'email': email, 'password': password, 'role': role}),
+    );
+  }
+
+  Future<void> updateUser(String id, {bool? active}) async {
+    await http.patch(
+      Uri.parse('$apiBaseUrl/users/$id'),
+      headers: _headers(),
+      body: jsonEncode({'active': active}),
+    );
+  }
+
+  Future<List<SummaryRow>> summaryByProduct({DateTime? from, DateTime? to}) async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/reports/products${_dateQuery(from, to)}'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => SummaryRow.fromJson(item)).toList();
+  }
+
+  Future<List<SummaryRow>> summaryByCategory({DateTime? from, DateTime? to}) async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/reports/categories${_dateQuery(from, to)}'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => SummaryRow.fromJson(item)).toList();
+  }
+
+  Future<List<int>> exportReport({DateTime? from, DateTime? to}) async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/reports/export${_dateQuery(from, to)}'), headers: _headers());
+    return response.bodyBytes;
+  }
+
+  Future<List<TotalRow>> totalsByDay() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/stats/totals-by-day'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => TotalRow.fromJson(item)).toList();
+  }
+
+  Future<List<TotalRow>> totalsByMonth() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/stats/totals-by-month'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => TotalRow.fromJson(item)).toList();
+  }
+
+  Future<List<AverageRow>> averageByCategory() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-category'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => AverageRow.fromJson(item)).toList();
+  }
+
+  Future<List<AverageRow>> averageByProduct() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-product'), headers: _headers());
+    final data = jsonDecode(response.body) as List<dynamic>;
+    return data.map((item) => AverageRow.fromJson(item)).toList();
+  }
+
+  Map<String, String> _headers() {
+    final token = tokenProvider();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  String _dateQuery(DateTime? from, DateTime? to) {
+    final params = <String>[];
+    if (from != null) params.add('from=${from.toIso8601String()}');
+    if (to != null) params.add('to=${to.toIso8601String()}');
+    if (params.isEmpty) return '';
+    return '?${params.join('&')}';
+  }
+}
+
+class Setting {
+  Setting({required this.storeName, required this.logoUrl, required this.faviconUrl, this.accentColor});
+
+  final String storeName;
+  final String logoUrl;
+  final String faviconUrl;
+  final String? accentColor;
+
+  factory Setting.fromJson(Map<String, dynamic> json) => Setting(
+        storeName: json['storeName'] as String,
+        logoUrl: json['logoUrl'] as String,
+        faviconUrl: json['faviconUrl'] as String,
+        accentColor: json['accentColor'] as String?,
+      );
+}
+
+class Category {
+  Category({required this.id, required this.name, required this.imageUrl, required this.active});
+
+  final String id;
+  final String name;
+  final String imageUrl;
+  final bool active;
+
+  factory Category.fromJson(Map<String, dynamic> json) => Category(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        imageUrl: json['imageUrl'] as String,
+        active: json['active'] as bool? ?? true,
+      );
+}
+
+class Product {
+  Product({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.imageUrl,
+    required this.categoryId,
+    required this.active,
+    this.categoryName,
+  });
+
+  final String id;
+  final String name;
+  final double price;
+  final String imageUrl;
+  final String categoryId;
+  final bool active;
+  final String? categoryName;
+
+  factory Product.fromJson(Map<String, dynamic> json) => Product(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        price: (json['price'] as num).toDouble(),
+        imageUrl: json['imageUrl'] as String,
+        categoryId: json['categoryId'] as String,
+        active: json['active'] as bool? ?? true,
+        categoryName: json['category'] != null ? json['category']['name'] as String : null,
+      );
+}
+
+class CartItem {
+  CartItem({required this.product, required this.quantity});
+
+  final Product product;
+  final int quantity;
+
+  double get total => product.price * quantity;
+
+  CartItem copyWith({int? quantity}) => CartItem(product: product, quantity: quantity ?? this.quantity);
+}
+
+class SummaryRow {
+  SummaryRow({required this.id, required this.name, required this.quantity, required this.total});
+
+  final String id;
+  final String name;
+  final int quantity;
+  final double total;
+
+  factory SummaryRow.fromJson(Map<String, dynamic> json) => SummaryRow(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        quantity: json['quantity'] as int,
+        total: (json['total'] as num).toDouble(),
+      );
+}
+
+class TotalRow {
+  TotalRow({required this.label, required this.total});
+
+  final String label;
+  final double total;
+
+  factory TotalRow.fromJson(Map<String, dynamic> json) => TotalRow(
+        label: json['label'] as String,
+        total: (json['total'] as num).toDouble(),
+      );
+}
+
+class AverageRow {
+  AverageRow({required this.id, required this.name, required this.averageDaily});
+
+  final String id;
+  final String name;
+  final double averageDaily;
+
+  factory AverageRow.fromJson(Map<String, dynamic> json) => AverageRow(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        averageDaily: (json['averageDaily'] as num).toDouble(),
+      );
+}
+
+class User {
+  User({required this.id, required this.name, required this.email, required this.role, required this.active});
+
+  final String id;
+  final String name;
+  final String email;
+  final String role;
+  final bool active;
+
+  factory User.fromJson(Map<String, dynamic> json) => User(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        email: json['email'] as String,
+        role: json['role'] as String,
+        active: json['active'] as bool? ?? true,
+      );
+}
+
+int hexToColor(String hex) {
+  final buffer = StringBuffer();
+  if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+  buffer.write(hex.replaceFirst('#', ''));
+  return int.parse(buffer.toString(), radix: 16);
+}
