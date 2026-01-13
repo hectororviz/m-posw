@@ -46,9 +46,10 @@ class _MiBpsAppState extends State<MiBpsApp> {
         final themeColor = setting?.accentColor != null
             ? Color(hexToColor(setting!.accentColor!))
             : const Color(0xFF0EA5E9);
-        if (setting?.faviconUrl != null) {
+        final faviconUrl = setting?.faviconUrl;
+        if (faviconUrl != null && faviconUrl.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            updateFavicon(resolveApiUrl(setting!.faviconUrl));
+            updateFavicon(resolveApiUrl(faviconUrl));
           });
         }
         return MaterialApp(
