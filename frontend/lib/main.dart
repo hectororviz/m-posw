@@ -1425,6 +1425,10 @@ class _CategoryDialogState extends State<CategoryDialog> {
   final imageController = TextEditingController();
   String? iconName;
   String? colorHex;
+  String? _normalizedImageUrl() {
+    final value = imageController.text.trim();
+    return value.isEmpty ? null : value;
+  }
 
   @override
   void initState() {
@@ -1499,10 +1503,17 @@ class _CategoryDialogState extends State<CategoryDialog> {
         FilledButton(
           onPressed: () async {
             final service = ApiService();
+            final imageUrl = _normalizedImageUrl();
             if (widget.category == null) {
+              if (imageUrl == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('La imagen URL es obligatoria para crear la categoría.')),
+                );
+                return;
+              }
               final created = await service.createCategory(
                 name: nameController.text,
-                imageUrl: imageController.text,
+                imageUrl: imageUrl,
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
@@ -1510,10 +1521,10 @@ class _CategoryDialogState extends State<CategoryDialog> {
                 Navigator.pop(context, created);
               }
             } else {
-              final updated = await service.updateCategoryDetails(
-                id: widget.category!.id,
+              final updated = await service.updateCategory(
+                widget.category!.id,
                 name: nameController.text,
-                imageUrl: imageController.text,
+                imageUrl: imageUrl,
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
@@ -1545,6 +1556,11 @@ class _ProductDialogState extends State<ProductDialog> {
   String? categoryId;
   String? iconName;
   String? colorHex;
+
+  String? _normalizedImageUrl() {
+    final value = imageController.text.trim();
+    return value.isEmpty ? null : value;
+  }
 
   @override
   void initState() {
@@ -1637,11 +1653,18 @@ class _ProductDialogState extends State<ProductDialog> {
           onPressed: () async {
             if (categoryId == null) return;
             final service = ApiService();
+            final imageUrl = _normalizedImageUrl();
             if (widget.product == null) {
+              if (imageUrl == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('La imagen URL es obligatoria para crear el producto.')),
+                );
+                return;
+              }
               await service.createProduct(
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
-                imageUrl: imageController.text,
+                imageUrl: imageUrl,
                 categoryId: categoryId!,
                 iconName: iconName,
                 colorHex: colorHex,
@@ -1651,7 +1674,7 @@ class _ProductDialogState extends State<ProductDialog> {
                 widget.product!.id,
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
-                imageUrl: imageController.text,
+                imageUrl: imageUrl,
                 categoryId: categoryId!,
                 iconName: iconName,
                 colorHex: colorHex,
