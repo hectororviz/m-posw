@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUrl, Matches } from 'class-validator';
+import { IsBoolean, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateProductDto {
   @IsOptional()
@@ -8,10 +8,6 @@ export class UpdateProductDto {
   @IsOptional()
   @IsNumber()
   price?: number;
-
-  @IsOptional()
-  @IsUrl()
-  imageUrl?: string;
 
   @IsOptional()
   @IsString()

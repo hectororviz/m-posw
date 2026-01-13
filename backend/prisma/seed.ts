@@ -32,8 +32,6 @@ async function main() {
     await prisma.setting.create({
       data: {
         storeName: 'MiBPS Demo',
-        logoUrl: 'https://placehold.co/120x120?text=Logo',
-        faviconUrl: 'https://placehold.co/64x64?text=F',
         accentColor: '#0ea5e9',
       },
     });
@@ -44,7 +42,6 @@ async function main() {
     const bebidas = await prisma.category.create({
       data: {
         name: 'Bebidas',
-        imageUrl: 'https://placehold.co/400x240?text=Bebidas',
         iconName: 'local_drink',
         colorHex: '#38BDF8',
         active: true,
@@ -53,7 +50,6 @@ async function main() {
     const snacks = await prisma.category.create({
       data: {
         name: 'Snacks',
-        imageUrl: 'https://placehold.co/400x240?text=Snacks',
         iconName: 'lunch_dining',
         colorHex: '#F97316',
         active: true,
@@ -65,7 +61,6 @@ async function main() {
         {
           name: 'Agua',
           price: 1.5,
-          imageUrl: 'https://placehold.co/300x200?text=Agua',
           iconName: 'water_drop',
           colorHex: '#0EA5E9',
           active: true,
@@ -74,7 +69,6 @@ async function main() {
         {
           name: 'Gaseosa',
           price: 2.0,
-          imageUrl: 'https://placehold.co/300x200?text=Gaseosa',
           iconName: 'sports_bar',
           colorHex: '#38BDF8',
           active: true,
@@ -83,7 +77,6 @@ async function main() {
         {
           name: 'Papas Fritas',
           price: 2.5,
-          imageUrl: 'https://placehold.co/300x200?text=Papas',
           iconName: 'fastfood',
           colorHex: '#F59E0B',
           active: true,
@@ -92,7 +85,6 @@ async function main() {
         {
           name: 'Barra de cereal',
           price: 1.2,
-          imageUrl: 'https://placehold.co/300x200?text=Cereal',
           iconName: 'energy_savings_leaf',
           colorHex: '#22C55E',
           active: true,

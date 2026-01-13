@@ -1,11 +1,8 @@
-import { IsBoolean, IsOptional, IsString, IsUrl, Matches } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateCategoryDto {
   @IsString()
   name: string;
-
-  @IsUrl()
-  imageUrl: string;
 
   @IsString()
   iconName: string;

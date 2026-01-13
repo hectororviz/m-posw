@@ -37,7 +37,6 @@ export class CategoriesService {
     const data: Record<string, unknown> = {};
 
     if (dto.name !== undefined) data.name = dto.name;
-    if (dto.imageUrl !== undefined) data.imageUrl = dto.imageUrl;
     if (dto.iconName !== undefined) data.iconName = dto.iconName;
     if (dto.colorHex !== undefined) data.colorHex = dto.colorHex;
     if (dto.active !== undefined) data.active = dto.active;

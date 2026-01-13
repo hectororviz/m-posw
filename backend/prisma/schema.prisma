@@ -28,7 +28,6 @@ model User {
 model Category {
   id        String   @id @default(uuid())
   name      String
-  imageUrl  String
   iconName  String
   colorHex  String
   active    Boolean  @default(true)
@@ -41,7 +40,6 @@ model Product {
   id         String   @id @default(uuid())
   name       String
   price      Decimal  @db.Decimal(10, 2)
-  imageUrl   String
   iconName   String?
   colorHex   String?
   active     Boolean  @default(true)
