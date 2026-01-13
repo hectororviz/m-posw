@@ -376,7 +376,12 @@ class _PosScreenState extends State<PosScreen> {
                               colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer;
                           final foreground = foregroundColorFor(background);
                           return GestureDetector(
-                            onTap: () => setState(() => selectedCategory = category),
+                            onTap: () {
+                              if (kDebugMode) {
+                                debugPrint('Selected category: ${category.id}');
+                              }
+                              setState(() => selectedCategory = category);
+                            },
                             child: Card(
                               clipBehavior: Clip.antiAlias,
                               child: Container(
@@ -411,6 +416,16 @@ class _PosScreenState extends State<PosScreen> {
                               .getProducts(selectedCategory!.id),
                           builder: (context, productsSnapshot) {
                             final products = productsSnapshot.data ?? [];
+                            if (kDebugMode) {
+                              final selectedCategoryId = selectedCategory?.id;
+                              final matchingCount = selectedCategoryId == null
+                                  ? 0
+                                  : products.where((product) => product.categoryId == selectedCategoryId).length;
+                              debugPrint(
+                                'Products view -> selectedCategoryId=$selectedCategoryId '
+                                'products=${products.length} matching=$matchingCount',
+                              );
+                            }
                             return GridView.builder(
                               padding: const EdgeInsets.all(16),
                               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -2108,18 +2123,30 @@ class Product {
   final String? categoryIconName;
   final String? categoryColorHex;
 
+  static double _priceFromJson(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.parse(value);
+    throw FormatException('Unsupported price value: $value');
+  }
+
   factory Product.fromJson(Map<String, dynamic> json) => Product(
         id: json['id'] as String,
         name: json['name'] as String,
-        price: (json['price'] as num).toDouble(),
+        price: _priceFromJson(json['price']),
         imageUrl: json['imageUrl'] as String,
         categoryId: json['categoryId'] as String,
         active: json['active'] as bool? ?? true,
         iconName: json['iconName'] as String?,
         colorHex: json['colorHex'] as String?,
-        categoryName: json['category'] != null ? json['category']['name'] as String : null,
-        categoryIconName: json['category'] != null ? json['category']['iconName'] as String? : null,
-        categoryColorHex: json['category'] != null ? json['category']['colorHex'] as String? : null,
+        categoryName: json['category'] is Map<String, dynamic>
+            ? (json['category'] as Map<String, dynamic>)['name'] as String?
+            : null,
+        categoryIconName: json['category'] is Map<String, dynamic>
+            ? (json['category'] as Map<String, dynamic>)['iconName'] as String?
+            : null,
+        categoryColorHex: json['category'] is Map<String, dynamic>
+            ? (json['category'] as Map<String, dynamic>)['colorHex'] as String?
+            : null,
       );
 }
 
