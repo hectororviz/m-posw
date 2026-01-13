@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'material_symbol_catalog.dart';
 import 'pickers.dart';
@@ -15,27 +16,45 @@ const apiBaseUrl = String.fromEnvironment(
   defaultValue: 'http://localhost:3000',
 );
 
-void main() {
-  runApp(const MiBpsApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final token = await AuthTokenStore.load();
+  runApp(MiBpsApp(initialToken: token));
 }
 
 class MiBpsApp extends StatefulWidget {
-  const MiBpsApp({super.key});
+  const MiBpsApp({super.key, this.initialToken});
+
+  final String? initialToken;
 
   @override
   State<MiBpsApp> createState() => _MiBpsAppState();
 }
 
 class _MiBpsAppState extends State<MiBpsApp> {
-  final authState = ValueNotifier<String?>(null);
+  late final ValueNotifier<String?> authState;
   final settings = ValueNotifier<Setting?>(null);
+  final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
-    ApiService(tokenProvider: () => authState.value).getSettings().then((value) {
+    authState = ValueNotifier<String?>(widget.initialToken);
+    ApiClient.initialize(
+      tokenProvider: () => authState.value,
+      onUnauthorized: _handleUnauthorized,
+    );
+    ApiService().getSettings().then((value) {
       settings.value = value;
     });
+  }
+
+  Future<void> _handleUnauthorized() async {
+    await AuthTokenStore.clear();
+    authState.value = null;
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      const SnackBar(content: Text('Sesión expirada. Inicia sesión nuevamente.')),
+    );
   }
 
   @override
@@ -54,6 +73,7 @@ class _MiBpsAppState extends State<MiBpsApp> {
         }
         return MaterialApp(
           title: setting?.storeName ?? 'MiBPS',
+          scaffoldMessengerKey: scaffoldMessengerKey,
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: themeColor),
             useMaterial3: true,
@@ -65,18 +85,15 @@ class _MiBpsAppState extends State<MiBpsApp> {
               if (token == null) {
                 return LoginScreen(
                   onLoggedIn: (newToken) async {
+                    await AuthTokenStore.save(newToken);
                     authState.value = newToken;
-                    settings.value = await ApiService(tokenProvider: () => authState.value)
-                        .getSettings();
+                    settings.value = await ApiService().getSettings();
                   },
                 );
               }
-              return AuthScope(
-                token: token,
-                child: HomeShell(
-                  authState: authState,
-                  settingNotifier: settings,
-                ),
+              return HomeShell(
+                authState: authState,
+                settingNotifier: settings,
               );
             },
           ),
@@ -134,7 +151,10 @@ class _HomeShellState extends State<HomeShell> {
             ),
             actions: [
               TextButton.icon(
-                onPressed: () => widget.authState.value = null,
+                onPressed: () async {
+                  await AuthTokenStore.clear();
+                  widget.authState.value = null;
+                },
                 icon: const Icon(Icons.logout),
                 label: const Text('Salir'),
               ),
@@ -243,7 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               error = null;
                             });
                             try {
-                              final token = await ApiService(tokenProvider: () => null)
+                              final token = await ApiService()
                                   .login(emailController.text, passwordController.text);
                               widget.onLoggedIn(token);
                             } catch (e) {
@@ -326,7 +346,7 @@ class _PosScreenState extends State<PosScreen> {
       focusNode: _keyboardFocusNode,
       onKeyEvent: _handleKeyEvent,
       child: FutureBuilder<List<Category>>(
-        future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategories(),
+        future: ApiService().getCategories(),
         builder: (context, snapshot) {
           final categories = snapshot.data ?? [];
           return Row(
@@ -386,7 +406,7 @@ class _PosScreenState extends State<PosScreen> {
                     if (selectedCategory != null)
                       Expanded(
                         child: FutureBuilder<List<Product>>(
-                          future: ApiService(tokenProvider: () => AuthScope.of(context))
+                          future: ApiService()
                               .getProducts(selectedCategory!.id),
                           builder: (context, productsSnapshot) {
                             final products = productsSnapshot.data ?? [];
@@ -626,7 +646,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _submitSale(BuildContext context) async {
-    await ApiService(tokenProvider: () => AuthScope.of(context)).createSale(cart.values.toList());
+    await ApiService().createSale(cart.values.toList());
     setState(() {
       cart.clear();
       _quantityBuffer = '';
@@ -691,7 +711,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<User>>(
-      future: ApiService(tokenProvider: () => AuthScope.of(context)).getUsers(),
+      future: ApiService().getUsers(),
       builder: (context, snapshot) {
         final users = snapshot.data ?? [];
         return ListView(
@@ -717,7 +737,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                   trailing: Switch(
                     value: user.active,
                     onChanged: (value) async {
-                      await ApiService(tokenProvider: () => AuthScope.of(context))
+                      await ApiService()
                           .updateUser(user.id, active: value);
                       setState(() {});
                     },
@@ -743,7 +763,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Category>>(
-      future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategoriesAll(),
+      future: ApiService().getCategoriesAll(),
       builder: (context, snapshot) {
         final categories = snapshot.data ?? [];
         return ListView(
@@ -782,7 +802,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
                   trailing: Switch(
                     value: category.active,
                     onChanged: (value) async {
-                      await ApiService(tokenProvider: () => AuthScope.of(context))
+                      await ApiService()
                           .updateCategory(category.id, active: value);
                       setState(() {});
                     },
@@ -808,7 +828,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Product>>(
-      future: ApiService(tokenProvider: () => AuthScope.of(context)).getProductsAll(),
+      future: ApiService().getProductsAll(),
       builder: (context, snapshot) {
         final products = snapshot.data ?? [];
         return ListView(
@@ -851,7 +871,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                   trailing: Switch(
                     value: product.active,
                     onChanged: (value) async {
-                      await ApiService(tokenProvider: () => AuthScope.of(context))
+                      await ApiService()
                           .updateProduct(product.id, active: value, categoryId: product.categoryId);
                       setState(() {});
                     },
@@ -919,7 +939,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(width: 12),
               FilledButton.icon(
                 onPressed: () async {
-                  final bytes = await ApiService(tokenProvider: () => AuthScope.of(context)).exportReport(from: from, to: to);
+                  final bytes = await ApiService().exportReport(from: from, to: to);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Excel generado (${bytes.length} bytes)')),
@@ -937,7 +957,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               children: [
                 Expanded(
                   child: FutureBuilder<List<SummaryRow>>(
-                    future: ApiService(tokenProvider: () => AuthScope.of(context))
+                    future: ApiService()
                         .summaryByProduct(from: from, to: to),
                     builder: (context, snapshot) {
                       final rows = snapshot.data ?? [];
@@ -948,7 +968,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: FutureBuilder<List<SummaryRow>>(
-                    future: ApiService(tokenProvider: () => AuthScope.of(context))
+                    future: ApiService()
                         .summaryByCategory(from: from, to: to),
                     builder: (context, snapshot) {
                       final rows = snapshot.data ?? [];
@@ -1011,7 +1031,7 @@ class StatsScreen extends StatelessWidget {
       child: ListView(
         children: [
           FutureBuilder<List<TotalRow>>(
-            future: ApiService(tokenProvider: () => AuthScope.of(context)).totalsByDay(),
+            future: ApiService().totalsByDay(),
             builder: (context, snapshot) {
               final rows = snapshot.data ?? [];
               return ChartCard(title: 'Ventas por día (últimos 15)', rows: rows);
@@ -1019,7 +1039,7 @@ class StatsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           FutureBuilder<List<TotalRow>>(
-            future: ApiService(tokenProvider: () => AuthScope.of(context)).totalsByMonth(),
+            future: ApiService().totalsByMonth(),
             builder: (context, snapshot) {
               final rows = snapshot.data ?? [];
               return ChartCard(title: 'Ventas por mes (últimos 6)', rows: rows);
@@ -1027,7 +1047,7 @@ class StatsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           FutureBuilder<List<AverageRow>>(
-            future: ApiService(tokenProvider: () => AuthScope.of(context)).averageByCategory(),
+            future: ApiService().averageByCategory(),
             builder: (context, snapshot) {
               final rows = snapshot.data ?? [];
               return AverageCard(title: 'Promedio diario por categoría', rows: rows);
@@ -1035,7 +1055,7 @@ class StatsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           FutureBuilder<List<AverageRow>>(
-            future: ApiService(tokenProvider: () => AuthScope.of(context)).averageByProduct(),
+            future: ApiService().averageByProduct(),
             builder: (context, snapshot) {
               final rows = snapshot.data ?? [];
               return AverageCard(title: 'Promedio diario por producto', rows: rows);
@@ -1210,7 +1230,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const SizedBox(height: 16),
         FilledButton(
           onPressed: () async {
-            final updated = await ApiService(tokenProvider: () => AuthScope.of(context)).updateSettings(
+            final updated = await ApiService().updateSettings(
               storeName: storeController.text,
               accentColor: accentController.text,
             );
@@ -1245,7 +1265,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     });
     try {
-      final updated = await ApiService(tokenProvider: () => AuthScope.of(context)).uploadSettingAsset(
+      final updated = await ApiService().uploadSettingAsset(
         type: type,
         bytes: picked.bytes,
         filename: picked.filename,
@@ -1358,7 +1378,7 @@ class _UserDialogState extends State<UserDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: () async {
-            await ApiService(tokenProvider: () => AuthScope.of(context)).createUser(
+            await ApiService().createUser(
               name: nameController.text,
               email: emailController.text,
               password: passwordController.text,
@@ -1416,7 +1436,7 @@ class _CategoryDialogState extends State<CategoryDialog> {
               value: iconName,
               onChanged: (value) => setState(() => iconName = value),
               searcher: (query) =>
-                  ApiService(tokenProvider: () => AuthScope.of(context)).searchMaterialSymbols(query),
+                  ApiService().searchMaterialSymbols(query),
             ),
             const SizedBox(height: 12),
             ColorPickerField(
@@ -1445,7 +1465,7 @@ class _CategoryDialogState extends State<CategoryDialog> {
                   false;
               if (!shouldDelete) return;
               try {
-                await ApiService(tokenProvider: () => AuthScope.of(context)).deleteCategory(widget.category!.id);
+                await ApiService().deleteCategory(widget.category!.id);
                 if (context.mounted) {
                   Navigator.pop(context);
                 }
@@ -1462,7 +1482,7 @@ class _CategoryDialogState extends State<CategoryDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: () async {
-            final service = ApiService(tokenProvider: () => AuthScope.of(context));
+            final service = ApiService();
             if (widget.category == null) {
               await service.createCategory(
                 name: nameController.text,
@@ -1523,7 +1543,7 @@ class _ProductDialogState extends State<ProductDialog> {
     return AlertDialog(
       title: Text(widget.product == null ? 'Nuevo producto' : 'Editar producto'),
       content: FutureBuilder<List<Category>>(
-        future: ApiService(tokenProvider: () => AuthScope.of(context)).getCategoriesAll(),
+        future: ApiService().getCategoriesAll(),
         builder: (context, snapshot) {
           final categories = snapshot.data ?? [];
           categoryId ??= categories.isNotEmpty ? categories.first.id : null;
@@ -1547,7 +1567,7 @@ class _ProductDialogState extends State<ProductDialog> {
                   allowClear: true,
                   onChanged: (value) => setState(() => iconName = value),
                   searcher: (query) =>
-                      ApiService(tokenProvider: () => AuthScope.of(context)).searchMaterialSymbols(query),
+                      ApiService().searchMaterialSymbols(query),
                 ),
                 const SizedBox(height: 12),
                 ColorPickerField(
@@ -1579,7 +1599,7 @@ class _ProductDialogState extends State<ProductDialog> {
                   false;
               if (!shouldDelete) return;
               try {
-                await ApiService(tokenProvider: () => AuthScope.of(context)).deleteProduct(widget.product!.id);
+                await ApiService().deleteProduct(widget.product!.id);
                 if (context.mounted) {
                   Navigator.pop(context);
                 }
@@ -1597,7 +1617,7 @@ class _ProductDialogState extends State<ProductDialog> {
         FilledButton(
           onPressed: () async {
             if (categoryId == null) return;
-            final service = ApiService(tokenProvider: () => AuthScope.of(context));
+            final service = ApiService();
             if (widget.product == null) {
               await service.createProduct(
                 name: nameController.text,
@@ -1629,27 +1649,73 @@ class _ProductDialogState extends State<ProductDialog> {
   }
 }
 
-class AuthScope extends InheritedWidget {
-  const AuthScope({super.key, required this.token, required super.child});
+class AuthTokenStore {
+  static const _tokenKey = 'accessToken';
 
-  final String token;
+  static Future<String?> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_tokenKey);
+  }
 
-  static String of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<AuthScope>();
-    return scope?.token ?? '';
+  static Future<void> save(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
+  }
+
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+  }
+}
+
+class ApiClient extends http.BaseClient {
+  ApiClient({required this.tokenProvider, required this.onUnauthorized}) : _inner = http.Client();
+
+  static ApiClient? _instance;
+
+  final String? Function() tokenProvider;
+  final Future<void> Function()? onUnauthorized;
+  final http.Client _inner;
+
+  static void initialize({
+    required String? Function() tokenProvider,
+    required Future<void> Function() onUnauthorized,
+  }) {
+    _instance = ApiClient(tokenProvider: tokenProvider, onUnauthorized: onUnauthorized);
+  }
+
+  static ApiClient get instance {
+    final instance = _instance;
+    if (instance == null) {
+      throw StateError('ApiClient must be initialized before use.');
+    }
+    return instance;
   }
 
   @override
-  bool updateShouldNotify(AuthScope oldWidget) => token != oldWidget.token;
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (request is! http.MultipartRequest) {
+      request.headers.putIfAbsent('Content-Type', () => 'application/json');
+    }
+    final token = tokenProvider();
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    final response = await _inner.send(request);
+    if (response.statusCode == 401 && token != null && token.isNotEmpty && onUnauthorized != null) {
+      await onUnauthorized!();
+    }
+    return response;
+  }
 }
 
 class ApiService {
-  ApiService({required this.tokenProvider});
+  ApiService({ApiClient? client}) : apiClient = client ?? ApiClient.instance;
 
-  final String? Function() tokenProvider;
+  final ApiClient apiClient;
 
   Future<String> login(String email, String password) async {
-    final response = await http.post(
+    final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
@@ -1662,7 +1728,7 @@ class ApiService {
   }
 
   Future<Setting> getSettings() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/settings'));
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/settings'));
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return Setting.fromJson(data);
   }
@@ -1671,9 +1737,8 @@ class ApiService {
     required String storeName,
     required String accentColor,
   }) async {
-    final response = await http.patch(
+    final response = await apiClient.patch(
       Uri.parse('$apiBaseUrl/settings'),
-      headers: _headers(),
       body: jsonEncode({
         'storeName': storeName,
         'accentColor': accentColor,
@@ -1691,7 +1756,6 @@ class ApiService {
   }) async {
     final uri = Uri.parse('$apiBaseUrl/settings/$type');
     final request = http.MultipartRequest('POST', uri);
-    request.headers.addAll(_headers(json: false));
     request.files.add(
       http.MultipartFile.fromBytes(
         'file',
@@ -1699,19 +1763,19 @@ class ApiService {
         filename: filename,
       ),
     );
-    final response = await http.Response.fromStream(await request.send());
+    final response = await http.Response.fromStream(await apiClient.send(request));
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return Setting.fromJson(data);
   }
 
   Future<List<Category>> getCategories() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/categories'));
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/categories'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => Category.fromJson(item)).toList();
   }
 
   Future<List<Category>> getCategoriesAll() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/categories/all'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/categories/all'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => Category.fromJson(item)).toList();
   }
@@ -1722,9 +1786,8 @@ class ApiService {
     required String iconName,
     required String colorHex,
   }) async {
-    final response = await http.post(
+    final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/categories'),
-      headers: _headers(),
       body: jsonEncode({
         'name': name,
         'imageUrl': imageUrl,
@@ -1751,9 +1814,8 @@ class ApiService {
     if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
-    final response = await http.patch(
+    final response = await apiClient.patch(
       Uri.parse('$apiBaseUrl/categories/$id'),
-      headers: _headers(),
       body: jsonEncode(payload),
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1761,13 +1823,13 @@ class ApiService {
   }
 
   Future<List<Product>> getProducts(String categoryId) async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/products?categoryId=$categoryId'));
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/products?categoryId=$categoryId'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => Product.fromJson(item)).toList();
   }
 
   Future<List<Product>> getProductsAll() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/products/all'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/products/all'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => Product.fromJson(item)).toList();
   }
@@ -1780,9 +1842,8 @@ class ApiService {
     String? iconName,
     String? colorHex,
   }) async {
-    final response = await http.post(
+    final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/products'),
-      headers: _headers(),
       body: jsonEncode({
         'name': name,
         'price': price,
@@ -1815,9 +1876,8 @@ class ApiService {
     if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
-    final response = await http.patch(
+    final response = await apiClient.patch(
       Uri.parse('$apiBaseUrl/products/$id'),
-      headers: _headers(),
       body: jsonEncode(payload),
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1825,10 +1885,7 @@ class ApiService {
   }
 
   Future<void> deleteCategory(String id) async {
-    final response = await http.delete(
-      Uri.parse('$apiBaseUrl/categories/$id'),
-      headers: _headers(),
-    );
+    final response = await apiClient.delete(Uri.parse('$apiBaseUrl/categories/$id'));
     if (response.statusCode == 409) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       throw Exception(data['message'] ?? 'No se pudo eliminar la categoría');
@@ -1839,9 +1896,8 @@ class ApiService {
   }
 
   Future<void> deleteProduct(String id) async {
-    final response = await http.delete(
+    final response = await apiClient.delete(
       Uri.parse('$apiBaseUrl/products/$id'),
-      headers: _headers(),
     );
     if (response.statusCode == 409) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -1854,7 +1910,7 @@ class ApiService {
 
   Future<List<String>> searchMaterialSymbols(String query) async {
     final uri = Uri.parse('$apiBaseUrl/icons/material-symbols?q=$query');
-    final response = await http.get(uri);
+    final response = await apiClient.get(uri);
     if (response.statusCode >= 400) {
       throw Exception('No se pudieron cargar los iconos');
     }
@@ -1864,9 +1920,8 @@ class ApiService {
   }
 
   Future<void> createSale(List<CartItem> items) async {
-    await http.post(
+    await apiClient.post(
       Uri.parse('$apiBaseUrl/sales'),
-      headers: _headers(),
       body: jsonEncode({
         'items': items.map((item) => {'productId': item.product.id, 'quantity': item.quantity}).toList(),
       }),
@@ -1874,74 +1929,64 @@ class ApiService {
   }
 
   Future<List<User>> getUsers() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/users'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/users'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => User.fromJson(item)).toList();
   }
 
   Future<void> createUser({required String name, required String email, required String password, required String role}) async {
-    await http.post(
+    await apiClient.post(
       Uri.parse('$apiBaseUrl/users'),
-      headers: _headers(),
       body: jsonEncode({'name': name, 'email': email, 'password': password, 'role': role}),
     );
   }
 
   Future<void> updateUser(String id, {bool? active}) async {
-    await http.patch(
+    await apiClient.patch(
       Uri.parse('$apiBaseUrl/users/$id'),
-      headers: _headers(),
       body: jsonEncode({'active': active}),
     );
   }
 
   Future<List<SummaryRow>> summaryByProduct({DateTime? from, DateTime? to}) async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/reports/products${_dateQuery(from, to)}'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/reports/products${_dateQuery(from, to)}'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => SummaryRow.fromJson(item)).toList();
   }
 
   Future<List<SummaryRow>> summaryByCategory({DateTime? from, DateTime? to}) async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/reports/categories${_dateQuery(from, to)}'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/reports/categories${_dateQuery(from, to)}'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => SummaryRow.fromJson(item)).toList();
   }
 
   Future<List<int>> exportReport({DateTime? from, DateTime? to}) async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/reports/export${_dateQuery(from, to)}'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/reports/export${_dateQuery(from, to)}'));
     return response.bodyBytes;
   }
 
   Future<List<TotalRow>> totalsByDay() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/stats/totals-by-day'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/totals-by-day'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => TotalRow.fromJson(item)).toList();
   }
 
   Future<List<TotalRow>> totalsByMonth() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/stats/totals-by-month'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/totals-by-month'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => TotalRow.fromJson(item)).toList();
   }
 
   Future<List<AverageRow>> averageByCategory() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-category'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-category'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => AverageRow.fromJson(item)).toList();
   }
 
   Future<List<AverageRow>> averageByProduct() async {
-    final response = await http.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-product'), headers: _headers());
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-product'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => AverageRow.fromJson(item)).toList();
-  }
-
-  Map<String, String> _headers({bool json = true}) {
-    final token = tokenProvider();
-    return {
-      if (json) 'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
   }
 
   String _dateQuery(DateTime? from, DateTime? to) {
