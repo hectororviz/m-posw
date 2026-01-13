@@ -807,7 +807,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
                     ),
                   ),
                   title: Text(category.name),
-                  subtitle: Text('${category.imageUrl} · ${category.colorHex}'),
+                  subtitle: Text(category.colorHex),
                   onTap: () async {
                     await showDialog(
                       context: context,
@@ -1422,19 +1422,13 @@ class CategoryDialog extends StatefulWidget {
 
 class _CategoryDialogState extends State<CategoryDialog> {
   final nameController = TextEditingController();
-  final imageController = TextEditingController();
   String? iconName;
   String? colorHex;
-  String? _normalizedImageUrl() {
-    final value = imageController.text.trim();
-    return value.isEmpty ? null : value;
-  }
 
   @override
   void initState() {
     super.initState();
     nameController.text = widget.category?.name ?? '';
-    imageController.text = widget.category?.imageUrl ?? '';
     iconName = widget.category?.iconName ?? 'category';
     colorHex = widget.category?.colorHex ?? '#0EA5E9';
   }
@@ -1448,8 +1442,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
-            const SizedBox(height: 12),
-            TextField(controller: imageController, decoration: const InputDecoration(labelText: 'Imagen URL')),
             const SizedBox(height: 12),
             IconPickerField(
               label: 'Icono',
@@ -1503,17 +1495,9 @@ class _CategoryDialogState extends State<CategoryDialog> {
         FilledButton(
           onPressed: () async {
             final service = ApiService();
-            final imageUrl = _normalizedImageUrl();
             if (widget.category == null) {
-              if (imageUrl == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('La imagen URL es obligatoria para crear la categoría.')),
-                );
-                return;
-              }
               final created = await service.createCategory(
                 name: nameController.text,
-                imageUrl: imageUrl,
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
@@ -1524,7 +1508,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
               final updated = await service.updateCategory(
                 widget.category!.id,
                 name: nameController.text,
-                imageUrl: imageUrl,
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
@@ -1552,22 +1535,15 @@ class ProductDialog extends StatefulWidget {
 class _ProductDialogState extends State<ProductDialog> {
   final nameController = TextEditingController();
   final priceController = TextEditingController();
-  final imageController = TextEditingController();
   String? categoryId;
   String? iconName;
   String? colorHex;
-
-  String? _normalizedImageUrl() {
-    final value = imageController.text.trim();
-    return value.isEmpty ? null : value;
-  }
 
   @override
   void initState() {
     super.initState();
     nameController.text = widget.product?.name ?? '';
     priceController.text = widget.product?.price.toStringAsFixed(2) ?? '';
-    imageController.text = widget.product?.imageUrl ?? '';
     categoryId = widget.product?.categoryId;
     iconName = widget.product?.iconName;
     colorHex = widget.product?.colorHex;
@@ -1587,7 +1563,6 @@ class _ProductDialogState extends State<ProductDialog> {
               children: [
                 TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
                 TextField(controller: priceController, decoration: const InputDecoration(labelText: 'Precio')),
-                TextField(controller: imageController, decoration: const InputDecoration(labelText: 'Imagen URL')),
                 DropdownButton<String>(
                   value: categoryId,
                   items: categories
@@ -1653,18 +1628,10 @@ class _ProductDialogState extends State<ProductDialog> {
           onPressed: () async {
             if (categoryId == null) return;
             final service = ApiService();
-            final imageUrl = _normalizedImageUrl();
             if (widget.product == null) {
-              if (imageUrl == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('La imagen URL es obligatoria para crear el producto.')),
-                );
-                return;
-              }
               await service.createProduct(
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
-                imageUrl: imageUrl,
                 categoryId: categoryId!,
                 iconName: iconName,
                 colorHex: colorHex,
@@ -1674,7 +1641,6 @@ class _ProductDialogState extends State<ProductDialog> {
                 widget.product!.id,
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
-                imageUrl: imageUrl,
                 categoryId: categoryId!,
                 iconName: iconName,
                 colorHex: colorHex,
@@ -1824,7 +1790,6 @@ class ApiService {
 
   Future<Category> createCategory({
     required String name,
-    required String imageUrl,
     required String iconName,
     required String colorHex,
   }) async {
@@ -1832,7 +1797,6 @@ class ApiService {
       Uri.parse('$apiBaseUrl/categories'),
       body: jsonEncode({
         'name': name,
-        'imageUrl': imageUrl,
         'iconName': iconName,
         'colorHex': colorHex,
         'active': true,
@@ -1845,14 +1809,12 @@ class ApiService {
   Future<Category> updateCategory(
     String id, {
     String? name,
-    String? imageUrl,
     String? iconName,
     String? colorHex,
     bool? active,
   }) async {
     final payload = <String, dynamic>{};
     if (name != null) payload['name'] = name;
-    if (imageUrl != null) payload['imageUrl'] = imageUrl;
     if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
@@ -1870,13 +1832,11 @@ class ApiService {
   Future<Category> updateCategoryDetails({
     required String id,
     required String name,
-    required String imageUrl,
     required String iconName,
     required String colorHex,
   }) async {
     final payload = {
       'name': name,
-      'imageUrl': imageUrl,
       'iconName': iconName,
       'colorHex': colorHex,
     };
@@ -1915,7 +1875,6 @@ class ApiService {
   Future<Product> createProduct({
     required String name,
     required double price,
-    required String imageUrl,
     required String categoryId,
     String? iconName,
     String? colorHex,
@@ -1925,7 +1884,6 @@ class ApiService {
       body: jsonEncode({
         'name': name,
         'price': price,
-        'imageUrl': imageUrl,
         'categoryId': categoryId,
         'iconName': iconName,
         'colorHex': colorHex,
@@ -1940,7 +1898,6 @@ class ApiService {
     String id, {
     String? name,
     double? price,
-    String? imageUrl,
     String? categoryId,
     String? iconName,
     String? colorHex,
@@ -1949,7 +1906,6 @@ class ApiService {
     final payload = <String, dynamic>{};
     if (name != null) payload['name'] = name;
     if (price != null) payload['price'] = price;
-    if (imageUrl != null) payload['imageUrl'] = imageUrl;
     if (categoryId != null) payload['categoryId'] = categoryId;
     if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
@@ -2096,7 +2052,6 @@ class Category {
   Category({
     required this.id,
     required this.name,
-    required this.imageUrl,
     required this.iconName,
     required this.colorHex,
     required this.active,
@@ -2104,7 +2059,6 @@ class Category {
 
   final String id;
   final String name;
-  final String imageUrl;
   final String iconName;
   final String colorHex;
   final bool active;
@@ -2112,7 +2066,6 @@ class Category {
   factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json['id'] as String,
         name: json['name'] as String,
-        imageUrl: json['imageUrl'] as String,
         iconName: json['iconName'] as String? ?? 'category',
         colorHex: json['colorHex'] as String? ?? '#0EA5E9',
         active: json['active'] as bool? ?? true,
@@ -2124,7 +2077,6 @@ class Product {
     required this.id,
     required this.name,
     required this.price,
-    required this.imageUrl,
     required this.categoryId,
     required this.active,
     this.iconName,
@@ -2137,7 +2089,6 @@ class Product {
   final String id;
   final String name;
   final double price;
-  final String imageUrl;
   final String categoryId;
   final bool active;
   final String? iconName;
@@ -2156,7 +2107,6 @@ class Product {
         id: json['id'] as String,
         name: json['name'] as String,
         price: _priceFromJson(json['price']),
-        imageUrl: json['imageUrl'] as String,
         categoryId: json['categoryId'] as String,
         active: json['active'] as bool? ?? true,
         iconName: json['iconName'] as String?,
