@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -36,7 +36,11 @@ export class CategoriesService {
     return this.prisma.category.update({ where: { id }, data: dto });
   }
 
-  remove(id: string) {
+  async remove(id: string) {
+    const productCount = await this.prisma.product.count({ where: { categoryId: id } });
+    if (productCount > 0) {
+      throw new ConflictException('No se puede borrar: tiene productos asociados');
+    }
     return this.prisma.category.delete({ where: { id } });
   }
 }
