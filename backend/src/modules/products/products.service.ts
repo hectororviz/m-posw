@@ -26,7 +26,17 @@ export class ProductsService {
   }
 
   update(id: string, dto: UpdateProductDto) {
-    return this.prisma.product.update({ where: { id }, data: dto });
+    const data: Record<string, unknown> = {};
+
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.price !== undefined) data.price = dto.price;
+    if (dto.imageUrl !== undefined) data.imageUrl = dto.imageUrl;
+    if (dto.categoryId !== undefined) data.categoryId = dto.categoryId;
+    if (dto.iconName !== undefined) data.iconName = dto.iconName;
+    if (dto.colorHex !== undefined) data.colorHex = dto.colorHex;
+    if (dto.active !== undefined) data.active = dto.active;
+
+    return this.prisma.product.update({ where: { id }, data });
   }
 
   async remove(id: string) {
