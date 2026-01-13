@@ -1703,7 +1703,7 @@ class ApiClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (request is! http.MultipartRequest) {
-      request.headers.putIfAbsent('Content-Type', () => 'application/json');
+      request.headers['Content-Type'] = 'application/json';
     }
     final token = tokenProvider();
     if (token != null && token.isNotEmpty) {
