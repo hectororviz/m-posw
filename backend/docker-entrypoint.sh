@@ -2,5 +2,7 @@
 set -e
 
 npx prisma migrate deploy
-npx prisma db seed
+if [ "${RUN_SEED:-0}" = "1" ]; then
+  npx prisma db seed
+fi
 node dist/main.js
