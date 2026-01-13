@@ -567,7 +567,7 @@ class _PosScreenState extends State<PosScreen> {
     if (_isTextFieldFocused()) {
       return KeyEventResult.ignored;
     }
-    final digit = _digitFromKey(event.logicalKey, event.character);
+    final digit = _digitFromKey(event.logicalKey);
     if (digit != null) {
       setState(() {
         _quantityBuffer = (_quantityBuffer + digit.toString()).replaceFirst(RegExp(r'^0+'), '');
@@ -604,13 +604,7 @@ class _PosScreenState extends State<PosScreen> {
     return KeyEventResult.ignored;
   }
 
-  int? _digitFromKey(LogicalKeyboardKey key, String? character) {
-    if (character != null && character.length == 1) {
-      final parsed = int.tryParse(character);
-      if (parsed != null) {
-        return parsed;
-      }
-    }
+  int? _digitFromKey(LogicalKeyboardKey key) {
     return _digitKeys[key];
   }
 
@@ -1421,6 +1415,8 @@ class _CategoryDialogState extends State<CategoryDialog> {
               label: 'Icono',
               value: iconName,
               onChanged: (value) => setState(() => iconName = value),
+              searcher: (query) =>
+                  ApiService(tokenProvider: () => AuthScope.of(context)).searchMaterialSymbols(query),
             ),
             const SizedBox(height: 12),
             ColorPickerField(
@@ -1432,6 +1428,37 @@ class _CategoryDialogState extends State<CategoryDialog> {
         ),
       ),
       actions: [
+        if (widget.category != null)
+          TextButton(
+            onPressed: () async {
+              final shouldDelete = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Eliminar categoría'),
+                      content: const Text('¿Seguro que deseas eliminar esta categoría?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Eliminar')),
+                      ],
+                    ),
+                  ) ??
+                  false;
+              if (!shouldDelete) return;
+              try {
+                await ApiService(tokenProvider: () => AuthScope.of(context)).deleteCategory(widget.category!.id);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              } catch (err) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                  );
+                }
+              }
+            },
+            child: const Text('Eliminar'),
+          ),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: () async {
@@ -1519,6 +1546,8 @@ class _ProductDialogState extends State<ProductDialog> {
                   value: iconName,
                   allowClear: true,
                   onChanged: (value) => setState(() => iconName = value),
+                  searcher: (query) =>
+                      ApiService(tokenProvider: () => AuthScope.of(context)).searchMaterialSymbols(query),
                 ),
                 const SizedBox(height: 12),
                 ColorPickerField(
@@ -1533,6 +1562,37 @@ class _ProductDialogState extends State<ProductDialog> {
         },
       ),
       actions: [
+        if (widget.product != null)
+          TextButton(
+            onPressed: () async {
+              final shouldDelete = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Eliminar producto'),
+                      content: const Text('¿Seguro que deseas eliminar este producto?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Eliminar')),
+                      ],
+                    ),
+                  ) ??
+                  false;
+              if (!shouldDelete) return;
+              try {
+                await ApiService(tokenProvider: () => AuthScope.of(context)).deleteProduct(widget.product!.id);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              } catch (err) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                  );
+                }
+              }
+            },
+            child: const Text('Eliminar'),
+          ),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: () async {
@@ -1656,13 +1716,13 @@ class ApiService {
     return data.map((item) => Category.fromJson(item)).toList();
   }
 
-  Future<void> createCategory({
+  Future<Category> createCategory({
     required String name,
     required String imageUrl,
     required String iconName,
     required String colorHex,
   }) async {
-    await http.post(
+    final response = await http.post(
       Uri.parse('$apiBaseUrl/categories'),
       headers: _headers(),
       body: jsonEncode({
@@ -1673,9 +1733,11 @@ class ApiService {
         'active': true,
       }),
     );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Category.fromJson(data);
   }
 
-  Future<void> updateCategory(
+  Future<Category> updateCategory(
     String id, {
     String? name,
     String? imageUrl,
@@ -1689,11 +1751,13 @@ class ApiService {
     if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
-    await http.patch(
+    final response = await http.patch(
       Uri.parse('$apiBaseUrl/categories/$id'),
       headers: _headers(),
       body: jsonEncode(payload),
     );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Category.fromJson(data);
   }
 
   Future<List<Product>> getProducts(String categoryId) async {
@@ -1708,7 +1772,7 @@ class ApiService {
     return data.map((item) => Product.fromJson(item)).toList();
   }
 
-  Future<void> createProduct({
+  Future<Product> createProduct({
     required String name,
     required double price,
     required String imageUrl,
@@ -1716,7 +1780,7 @@ class ApiService {
     String? iconName,
     String? colorHex,
   }) async {
-    await http.post(
+    final response = await http.post(
       Uri.parse('$apiBaseUrl/products'),
       headers: _headers(),
       body: jsonEncode({
@@ -1729,9 +1793,11 @@ class ApiService {
         'active': true,
       }),
     );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Product.fromJson(data);
   }
 
-  Future<void> updateProduct(
+  Future<Product> updateProduct(
     String id, {
     String? name,
     double? price,
@@ -1749,11 +1815,52 @@ class ApiService {
     if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
-    await http.patch(
+    final response = await http.patch(
       Uri.parse('$apiBaseUrl/products/$id'),
       headers: _headers(),
       body: jsonEncode(payload),
     );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Product.fromJson(data);
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final response = await http.delete(
+      Uri.parse('$apiBaseUrl/categories/$id'),
+      headers: _headers(),
+    );
+    if (response.statusCode == 409) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception(data['message'] ?? 'No se pudo eliminar la categoría');
+    }
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo eliminar la categoría');
+    }
+  }
+
+  Future<void> deleteProduct(String id) async {
+    final response = await http.delete(
+      Uri.parse('$apiBaseUrl/products/$id'),
+      headers: _headers(),
+    );
+    if (response.statusCode == 409) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception(data['message'] ?? 'No se pudo eliminar el producto');
+    }
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo eliminar el producto');
+    }
+  }
+
+  Future<List<String>> searchMaterialSymbols(String query) async {
+    final uri = Uri.parse('$apiBaseUrl/icons/material-symbols?q=$query');
+    final response = await http.get(uri);
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudieron cargar los iconos');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = data['items'] as List<dynamic>;
+    return items.map((item) => item['iconName'] as String).toList();
   }
 
   Future<void> createSale(List<CartItem> items) async {

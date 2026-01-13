@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'material_symbol_catalog.dart';
@@ -8,12 +10,14 @@ class IconPickerField extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
+    required this.searcher,
     this.allowClear = false,
   });
 
   final String label;
   final String? value;
   final ValueChanged<String?> onChanged;
+  final Future<List<String>> Function(String query) searcher;
   final bool allowClear;
 
   @override
@@ -39,7 +43,7 @@ class IconPickerField extends StatelessWidget {
             onPressed: () async {
               final selection = await showDialog<String>(
                 context: context,
-                builder: (context) => IconPickerDialog(selected: value),
+                builder: (context) => IconPickerDialog(selected: value, searcher: searcher),
               );
               if (selection != null) {
                 onChanged(selection);
@@ -54,9 +58,10 @@ class IconPickerField extends StatelessWidget {
 }
 
 class IconPickerDialog extends StatefulWidget {
-  const IconPickerDialog({super.key, this.selected});
+  const IconPickerDialog({super.key, this.selected, required this.searcher});
 
   final String? selected;
+  final Future<List<String>> Function(String query) searcher;
 
   @override
   State<IconPickerDialog> createState() => _IconPickerDialogState();
@@ -64,12 +69,52 @@ class IconPickerDialog extends StatefulWidget {
 
 class _IconPickerDialogState extends State<IconPickerDialog> {
   String query = '';
+  List<String> results = [];
+  bool loading = false;
+  String? error;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchResults('');
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchResults(String value) async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final fetched = await widget.searcher(value);
+      if (!mounted) return;
+      setState(() => results = fetched);
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => error = err.toString());
+    } finally {
+      if (!mounted) return;
+      setState(() => loading = false);
+    }
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() => query = value);
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _fetchResults(value);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = materialSymbolNames
-        .where((name) => name.toLowerCase().contains(query.toLowerCase()))
-        .toList();
+    final filtered = results;
     return AlertDialog(
       title: const Text('Seleccionar icono'),
       content: SizedBox(
@@ -82,45 +127,52 @@ class _IconPickerDialogState extends State<IconPickerDialog> {
                 labelText: 'Buscar icono',
                 prefixIcon: Icon(Icons.search),
               ),
-              onChanged: (value) => setState(() => query = value),
+              onChanged: _onQueryChanged,
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 320,
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 6,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                ),
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final name = filtered[index];
-                  final iconData = symbolFromName(name);
-                  final isSelected = name == widget.selected;
-                  return Tooltip(
-                    message: name,
-                    child: InkResponse(
-                      onTap: () => Navigator.pop(context, name),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primaryContainer
-                              : Theme.of(context).colorScheme.surfaceVariant,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.transparent,
-                          ),
-                        ),
-                        child: Icon(iconData),
-                      ),
-                    ),
-                  );
-                },
+            if (loading) const Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()),
+            if (!loading && error != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ),
-            ),
+            if (!loading && error == null)
+              SizedBox(
+                height: 320,
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 6,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final name = filtered[index];
+                    final iconData = symbolFromName(name);
+                    final isSelected = name == widget.selected;
+                    return Tooltip(
+                      message: name,
+                      child: InkResponse(
+                        onTap: () => Navigator.pop(context, name),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primaryContainer
+                                : Theme.of(context).colorScheme.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.transparent,
+                            ),
+                          ),
+                          child: Icon(iconData),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),
