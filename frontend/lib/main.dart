@@ -1795,14 +1795,22 @@ class _UserDialogState extends State<UserDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(
           onPressed: () async {
-            await ApiService().createUser(
-              name: nameController.text,
-              email: emailController.text,
-              password: passwordController.text,
-              role: role,
-            );
-            if (context.mounted) {
-              Navigator.pop(context);
+            try {
+              await ApiService().createUser(
+                name: nameController.text,
+                email: emailController.text,
+                password: passwordController.text,
+                role: role,
+              );
+              if (context.mounted) {
+                Navigator.pop(context);
+              }
+            } catch (err) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                );
+              }
             }
           },
           child: const Text('Crear'),
@@ -2384,10 +2392,13 @@ class ApiService {
     if (trimmedEmail != null && trimmedEmail.isNotEmpty) {
       payload['email'] = trimmedEmail;
     }
-    await apiClient.post(
+    final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/users'),
       body: jsonEncode(payload),
     );
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo crear el usuario'));
+    }
   }
 
   Future<void> updateUser(String id, {bool? active}) async {
@@ -2444,6 +2455,24 @@ class ApiService {
     if (to != null) params.add('to=${to.toIso8601String()}');
     if (params.isEmpty) return '';
     return '?${params.join('&')}';
+  }
+
+  String _parseErrorMessage(http.Response response, {required String fallback}) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final message = decoded['message'];
+        if (message is List) {
+          return message.map((item) => item.toString()).join('\n');
+        }
+        if (message is String && message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {
+      // Ignore parsing errors and fallback.
+    }
+    return fallback;
   }
 }
 
