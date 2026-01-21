@@ -138,6 +138,7 @@ class _MiBpsAppState extends State<MiBpsApp> {
     );
     ApiService().getSettings().then((value) {
       settings.value = value;
+      PaymentMethodStore.syncFromSetting(value);
     });
     PaymentMethodStore.load();
   }
@@ -1901,7 +1902,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: const Text('Cancelar'),
                 ),
                 FilledButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final trimmed = nameController.text.trim();
                     final updated = (method ?? PaymentMethod.qr(id: PaymentMethodStore.newId()))
                         .copyWith(
@@ -1909,6 +1910,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           qrImageDataUrl: dataUrl,
                         );
                     PaymentMethodStore.upsert(updated);
+                    try {
+                      await ApiService().updateSettingQrImage(qrImageDataUrl: updated.qrImageDataUrl);
+                    } catch (err) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                        );
+                      }
+                    }
                     Navigator.of(context).pop();
                   },
                   child: const Text('Guardar'),
@@ -1944,6 +1954,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (confirm ?? false) {
       PaymentMethodStore.remove(method.id);
+      if (method.type == PaymentMethodType.qr) {
+        try {
+          await ApiService().updateSettingQrImage(qrImageDataUrl: null);
+        } catch (err) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+            );
+          }
+        }
+      }
     }
   }
 }
@@ -2899,6 +2920,17 @@ class ApiService {
     return Setting.fromJson(data);
   }
 
+  Future<Setting> updateSettingQrImage({required String? qrImageDataUrl}) async {
+    final response = await apiClient.patch(
+      Uri.parse('$apiBaseUrl/settings'),
+      body: jsonEncode({
+        'qrImageDataUrl': qrImageDataUrl,
+      }),
+    );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Setting.fromJson(data);
+  }
+
   Future<Setting> uploadSettingAsset({
     required String type,
     required Uint8List bytes,
@@ -3291,17 +3323,19 @@ class ApiService {
 }
 
 class Setting {
-  Setting({required this.storeName, this.logoUrl, this.faviconUrl, this.accentColor});
+  Setting({required this.storeName, this.logoUrl, this.faviconUrl, this.qrImageDataUrl, this.accentColor});
 
   final String storeName;
   final String? logoUrl;
   final String? faviconUrl;
+  final String? qrImageDataUrl;
   final String? accentColor;
 
   factory Setting.fromJson(Map<String, dynamic> json) => Setting(
         storeName: json['storeName'] as String,
         logoUrl: json['logoUrl'] as String?,
         faviconUrl: json['faviconUrl'] as String?,
+        qrImageDataUrl: json['qrImageDataUrl'] as String?,
         accentColor: json['accentColor'] as String?,
       );
 }
@@ -3397,6 +3431,22 @@ class PaymentMethodStore {
     final decoded = jsonDecode(raw) as List<dynamic>;
     final parsed = decoded.map((entry) => PaymentMethod.fromJson(entry as Map<String, dynamic>)).toList();
     methods.value = _ensureCash(parsed);
+  }
+
+  static Future<void> syncFromSetting(Setting? setting) async {
+    final qrDataUrl = setting?.qrImageDataUrl;
+    if (qrDataUrl == null || qrDataUrl.isEmpty) {
+      return;
+    }
+    final list = [...methods.value];
+    final index = list.indexWhere((entry) => entry.type == PaymentMethodType.qr);
+    if (index == -1) {
+      list.add(PaymentMethod.qr(id: newId()).copyWith(qrImageDataUrl: qrDataUrl));
+    } else {
+      list[index] = list[index].copyWith(qrImageDataUrl: qrDataUrl);
+    }
+    methods.value = _ensureCash(list);
+    await _persist();
   }
 
   static Future<void> upsert(PaymentMethod method) async {

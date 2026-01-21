@@ -78,6 +78,7 @@ model Setting {
   storeName   String
   logoUrl     String?
   faviconUrl  String?
+  qrImageDataUrl String?
   accentColor String?  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
