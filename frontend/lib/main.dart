@@ -1107,13 +1107,27 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                 child: ListTile(
                   title: Text(user.name),
                   subtitle: Text('${user.email ?? 'Sin correo'} · ${user.role}'),
-                  trailing: Switch(
-                    value: user.active,
-                    onChanged: (value) async {
-                      await ApiService()
-                          .updateUser(user.id, active: value);
-                      setState(() {});
-                    },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Cambiar contraseña',
+                        icon: const Icon(Icons.lock_reset),
+                        onPressed: () async {
+                          await showDialog(
+                            context: context,
+                            builder: (context) => ChangeUserPasswordDialog(user: user),
+                          );
+                        },
+                      ),
+                      Switch(
+                        value: user.active,
+                        onChanged: (value) async {
+                          await ApiService().updateUser(user.id, active: value);
+                          setState(() {});
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1992,6 +2006,64 @@ class _UserDialogState extends State<UserDialog> {
             }
           },
           child: const Text('Crear'),
+        ),
+      ],
+    );
+  }
+}
+
+class ChangeUserPasswordDialog extends StatefulWidget {
+  const ChangeUserPasswordDialog({super.key, required this.user});
+
+  final User user;
+
+  @override
+  State<ChangeUserPasswordDialog> createState() => _ChangeUserPasswordDialogState();
+}
+
+class _ChangeUserPasswordDialogState extends State<ChangeUserPasswordDialog> {
+  final passwordController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Cambiar contraseña: ${widget.user.name}'),
+      content: Focus(
+        onKeyEvent: (node, event) => _handleNumpadInput(passwordController, event),
+        child: TextField(
+          controller: passwordController,
+          decoration: const InputDecoration(labelText: 'Nueva contraseña'),
+          obscureText: true,
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: () async {
+            final password = passwordController.text.trim();
+            if (password.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ingresa una contraseña válida.')),
+              );
+              return;
+            }
+            try {
+              await ApiService().updateUserPassword(widget.user.id, password);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Contraseña actualizada.')),
+                );
+              }
+            } catch (err) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                );
+              }
+            }
+          },
+          child: const Text('Guardar'),
         ),
       ],
     );
@@ -3060,10 +3132,24 @@ class ApiService {
   }
 
   Future<void> updateUser(String id, {bool? active}) async {
+    final payload = <String, dynamic>{};
+    if (active != null) {
+      payload['active'] = active;
+    }
     await apiClient.patch(
       Uri.parse('$apiBaseUrl/users/$id'),
-      body: jsonEncode({'active': active}),
+      body: jsonEncode(payload),
     );
+  }
+
+  Future<void> updateUserPassword(String id, String password) async {
+    final response = await apiClient.patch(
+      Uri.parse('$apiBaseUrl/users/$id'),
+      body: jsonEncode({'password': password}),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo actualizar la contraseña'));
+    }
   }
 
   Future<List<SummaryRow>> summaryByProduct({DateTime? from, DateTime? to}) async {
