@@ -353,261 +353,279 @@ class _PosScreenState extends State<PosScreen> {
         builder: (context, snapshot) {
           final categories = snapshot.data ?? [];
           final showingProducts = selectedCategory != null;
-          return Row(
+          return Column(
             children: [
               Expanded(
-                flex: 3,
-                child: Column(
+                child: Row(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: showingProducts
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                FilledButton.icon(
-                                  onPressed: () => setState(() => selectedCategory = null),
-                                  icon: const Icon(Icons.arrow_back),
-                                  label: const Text('Volver a categorías'),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  selectedCategory!.name,
-                                  style: Theme.of(context).textTheme.titleMedium,
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            )
-                          : Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
-                    ),
                     Expanded(
-                      child: showingProducts
-                          ? FutureBuilder<List<Product>>(
-                              future: ApiService().getProducts(selectedCategory!.id),
-                              builder: (context, productsSnapshot) {
-                                final products = productsSnapshot.data ?? [];
-                                if (kDebugMode) {
-                                  final selectedCategoryId = selectedCategory?.id;
-                                  final matchingCount = selectedCategoryId == null
-                                      ? 0
-                                      : products.where((product) => product.categoryId == selectedCategoryId).length;
-                                  debugPrint(
-                                    'Products view -> selectedCategoryId=$selectedCategoryId '
-                                    'products=${products.length} matching=$matchingCount',
-                                  );
-                                }
-                                return GridView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    childAspectRatio: 1.1,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 12,
-                                  ),
-                                  itemCount: products.length,
-                                  itemBuilder: (context, index) {
-                                    final product = products[index];
-                                    final background = colorFromHex(product.colorHex) ??
-                                        colorFromHex(selectedCategory?.colorHex) ??
-                                        Theme.of(context).colorScheme.primaryContainer;
-                                    final foreground = foregroundColorFor(background);
-                                    final iconName = product.iconName ?? selectedCategory?.iconName;
-                                    return FilledButton(
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.all(8),
-                                        backgroundColor: background,
-                                        foregroundColor: foreground,
+                      flex: 3,
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: showingProducts
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      FilledButton.icon(
+                                        onPressed: () => setState(() => selectedCategory = null),
+                                        icon: const Icon(Icons.arrow_back),
+                                        label: const Text('Volver a categorías'),
                                       ),
-                                      onPressed: () {
-                                        final quantity = _quantityValue ?? 1;
-                                        setState(() {
-                                          if (_selectedItemId != null && _quantityValue != null) {
-                                            cart.update(
-                                              _selectedItemId!,
-                                              (value) => value.copyWith(quantity: quantity),
-                                            );
-                                            _quantityBuffer = '';
-                                          } else {
-                                            cart.update(
-                                              product.id,
-                                              (value) => value.copyWith(quantity: value.quantity + quantity),
-                                              ifAbsent: () => CartItem(product: product, quantity: quantity),
-                                            );
-                                            _quantityBuffer = '';
-                                          }
-                                          _selectedItemId = null;
-                                        });
-                                      },
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(symbolFromName(iconName), size: 40, color: foreground),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            product.name,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(color: foreground),
-                                          ),
-                                          Text(
-                                            '\$${product.price.toStringAsFixed(2)}',
-                                            style: TextStyle(color: foreground),
-                                          ),
-                                        ],
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        selectedCategory!.name,
+                                        style: Theme.of(context).textTheme.titleMedium,
+                                        textAlign: TextAlign.center,
                                       ),
-                                    );
-                                  },
-                                );
-                              },
-                            )
-                          : GridView.builder(
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 1.2,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                              ),
-                              itemCount: categories.length,
-                              itemBuilder: (context, index) {
-                                final category = categories[index];
-                                final background =
-                                    colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer;
-                                final foreground = foregroundColorFor(background);
-                                return GestureDetector(
-                                  onTap: () {
-                                    if (kDebugMode) {
-                                      debugPrint('Selected category: ${category.id}');
-                                    }
-                                    setState(() => selectedCategory = category);
-                                  },
-                                  child: Card(
-                                    clipBehavior: Clip.antiAlias,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(color: background),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            symbolFromName(category.iconName),
-                                            size: 48,
-                                            color: foreground,
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            category.name,
-                                            style: TextStyle(fontSize: 16, color: foreground),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
-                                      ),
+                                    ],
+                                  )
+                                : Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
+                          ),
+                          Expanded(
+                            child: showingProducts
+                                ? FutureBuilder<List<Product>>(
+                                    future: ApiService().getProducts(selectedCategory!.id),
+                                    builder: (context, productsSnapshot) {
+                                      final products = productsSnapshot.data ?? [];
+                                      if (kDebugMode) {
+                                        final selectedCategoryId = selectedCategory?.id;
+                                        final matchingCount = selectedCategoryId == null
+                                            ? 0
+                                            : products
+                                                .where((product) => product.categoryId == selectedCategoryId)
+                                                .length;
+                                        debugPrint(
+                                          'Products view -> selectedCategoryId=$selectedCategoryId '
+                                          'products=${products.length} matching=$matchingCount',
+                                        );
+                                      }
+                                      return GridView.builder(
+                                        padding: const EdgeInsets.all(16),
+                                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: 2,
+                                          childAspectRatio: 1.1,
+                                          crossAxisSpacing: 12,
+                                          mainAxisSpacing: 12,
+                                        ),
+                                        itemCount: products.length,
+                                        itemBuilder: (context, index) {
+                                          final product = products[index];
+                                          final background = colorFromHex(product.colorHex) ??
+                                              colorFromHex(selectedCategory?.colorHex) ??
+                                              Theme.of(context).colorScheme.primaryContainer;
+                                          final foreground = foregroundColorFor(background);
+                                          final iconName = product.iconName ?? selectedCategory?.iconName;
+                                          return FilledButton(
+                                            style: FilledButton.styleFrom(
+                                              padding: const EdgeInsets.all(8),
+                                              backgroundColor: background,
+                                              foregroundColor: foreground,
+                                            ),
+                                            onPressed: () {
+                                              final quantity = _quantityValue ?? 1;
+                                              setState(() {
+                                                if (_selectedItemId != null && _quantityValue != null) {
+                                                  cart.update(
+                                                    _selectedItemId!,
+                                                    (value) => value.copyWith(quantity: quantity),
+                                                  );
+                                                  _quantityBuffer = '';
+                                                } else {
+                                                  cart.update(
+                                                    product.id,
+                                                    (value) => value.copyWith(quantity: value.quantity + quantity),
+                                                    ifAbsent: () => CartItem(product: product, quantity: quantity),
+                                                  );
+                                                  _quantityBuffer = '';
+                                                }
+                                                _selectedItemId = null;
+                                              });
+                                            },
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(symbolFromName(iconName), size: 40, color: foreground),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  product.name,
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(color: foreground),
+                                                ),
+                                                Text(
+                                                  '\$${product.price.toStringAsFixed(2)}',
+                                                  style: TextStyle(color: foreground),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  )
+                                : GridView.builder(
+                                    padding: const EdgeInsets.all(16),
+                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      childAspectRatio: 1.2,
+                                      crossAxisSpacing: 12,
+                                      mainAxisSpacing: 12,
                                     ),
+                                    itemCount: categories.length,
+                                    itemBuilder: (context, index) {
+                                      final category = categories[index];
+                                      final background = colorFromHex(category.colorHex) ??
+                                          Theme.of(context).colorScheme.primaryContainer;
+                                      final foreground = foregroundColorFor(background);
+                                      return GestureDetector(
+                                        onTap: () {
+                                          if (kDebugMode) {
+                                            debugPrint('Selected category: ${category.id}');
+                                          }
+                                          setState(() => selectedCategory = category);
+                                        },
+                                        child: Card(
+                                          clipBehavior: Clip.antiAlias,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(16),
+                                            decoration: BoxDecoration(color: background),
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  symbolFromName(category.iconName),
+                                                  size: 48,
+                                                  color: foreground,
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Text(
+                                                  category.name,
+                                                  style: TextStyle(fontSize: 16, color: foreground),
+                                                  textAlign: TextAlign.center,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                );
-                              },
-                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    if (!_isCartCollapsed)
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          child: Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Carrito', style: Theme.of(context).textTheme.titleLarge),
+                                    IconButton(
+                                      tooltip: 'Colapsar carrito',
+                                      icon: const Icon(Icons.chevron_right),
+                                      onPressed: () => setState(() => _isCartCollapsed = true),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'Cantidad rápida:',
+                                      style: Theme.of(context).textTheme.bodyMedium,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Chip(
+                                      label: Text(_quantityBuffer.isEmpty ? '—' : _quantityBuffer),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: ListView(
+                                  children: cart.values
+                                      .map(
+                                        (item) => ListTile(
+                                          selected: _selectedItemId == item.product.id,
+                                          onTap: () => setState(() => _selectedItemId = item.product.id),
+                                          title: Text(item.product.name),
+                                          subtitle: Text('x${item.quantity}'),
+                                          trailing: Text('\$${item.total.toStringAsFixed(2)}'),
+                                          leading: IconButton(
+                                            icon: const Icon(Icons.remove_circle_outline),
+                                            onPressed: () {
+                                              setState(() {
+                                                if (item.quantity <= 1) {
+                                                  cart.remove(item.product.id);
+                                                  if (_selectedItemId == item.product.id) {
+                                                    _selectedItemId = null;
+                                                  }
+                                                } else {
+                                                  cart.update(
+                                                    item.product.id,
+                                                    (value) => value.copyWith(quantity: value.quantity - 1),
+                                                  );
+                                                }
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
-              Expanded(
-                flex: 2,
+              SafeArea(
+                top: false,
                 child: Container(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
-                  child: Column(
-                    children: [
-                      if (!_isCartCollapsed)
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Carrito', style: Theme.of(context).textTheme.titleLarge),
-                              IconButton(
-                                tooltip: 'Colapsar carrito',
-                                icon: const Icon(Icons.chevron_right),
-                                onPressed: () => setState(() => _isCartCollapsed = true),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (!_isCartCollapsed)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            children: [
-                              Text(
-                                'Cantidad rápida:',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(width: 8),
-                              Chip(
-                                label: Text(_quantityBuffer.isEmpty ? '—' : _quantityBuffer),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (!_isCartCollapsed) const SizedBox(height: 8),
-                      Expanded(
-                        child: _isCartCollapsed
-                            ? const SizedBox.shrink()
-                            : ListView(
-                                children: cart.values
-                                    .map(
-                                      (item) => ListTile(
-                                        selected: _selectedItemId == item.product.id,
-                                        onTap: () => setState(() => _selectedItemId = item.product.id),
-                                        title: Text(item.product.name),
-                                        subtitle: Text('x${item.quantity}'),
-                                        trailing: Text('\$${item.total.toStringAsFixed(2)}'),
-                                        leading: IconButton(
-                                          icon: const Icon(Icons.remove_circle_outline),
-                                          onPressed: () {
-                                            setState(() {
-                                              if (item.quantity <= 1) {
-                                                cart.remove(item.product.id);
-                                                if (_selectedItemId == item.product.id) {
-                                                  _selectedItemId = null;
-                                                }
-                                              } else {
-                                                cart.update(
-                                                  item.product.id,
-                                                  (value) => value.copyWith(quantity: value.quantity - 1),
-                                                );
-                                              }
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 8,
+                        offset: Offset(0, -2),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            InkWell(
-                              onTap: () => setState(() => _isCartCollapsed = !_isCartCollapsed),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: Text(
-                                  'Total: \$${cartTotal.toStringAsFixed(2)}',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ),
-                            ),
-                            if (!_isCartCollapsed) ...[
-                              const SizedBox(height: 12),
-                              FilledButton(
-                                onPressed: cart.isEmpty ? null : () => _startCheckout(context),
-                                child: const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  child: Text('Cobrar / Confirmar venta'),
-                                ),
-                              ),
-                            ],
-                          ],
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      if (_isCartCollapsed)
+                        FilledButton.tonalIcon(
+                          onPressed: () => setState(() => _isCartCollapsed = false),
+                          icon: const Icon(Icons.chevron_left),
+                          label: const Text('Mostrar carrito'),
+                        ),
+                      if (_isCartCollapsed) const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Total: \$${cartTotal.toStringAsFixed(2)}',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      FilledButton(
+                        onPressed: cart.isEmpty ? null : () => _startCheckout(context),
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Text('Cobrar / Confirmar venta'),
                         ),
                       ),
                     ],
