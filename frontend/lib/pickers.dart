@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'icons/material_symbol_resolver.dart';
 import 'package:material_symbols_icons/get.dart';
-import 'package:material_symbols_icons/symbols.dart';
 
 class IconPickerField extends StatelessWidget {
   const IconPickerField({
@@ -76,7 +75,7 @@ class _IconPickerDialogState extends State<IconPickerDialog> {
   @override
   void initState() {
     super.initState();
-    allSymbols = Symbols.values.map((symbol) => symbol.name).toList()..sort();
+    allSymbols = SymbolsGet.map.keys.toList()..sort();
     _applyFilter('');
   }
 
