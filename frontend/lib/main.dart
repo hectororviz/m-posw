@@ -17,6 +17,47 @@ const apiBaseUrl = String.fromEnvironment(
   defaultValue: 'http://localhost:3000',
 );
 
+const Map<LogicalKeyboardKey, String> _numpadTextMap = {
+  LogicalKeyboardKey.numpad0: '0',
+  LogicalKeyboardKey.numpad1: '1',
+  LogicalKeyboardKey.numpad2: '2',
+  LogicalKeyboardKey.numpad3: '3',
+  LogicalKeyboardKey.numpad4: '4',
+  LogicalKeyboardKey.numpad5: '5',
+  LogicalKeyboardKey.numpad6: '6',
+  LogicalKeyboardKey.numpad7: '7',
+  LogicalKeyboardKey.numpad8: '8',
+  LogicalKeyboardKey.numpad9: '9',
+};
+
+KeyEventResult _handleNumpadInput(
+  TextEditingController controller,
+  KeyEvent event, {
+  bool allowDecimal = false,
+}) {
+  if (event is! KeyDownEvent) {
+    return KeyEventResult.ignored;
+  }
+  String? insertText = _numpadTextMap[event.logicalKey];
+  if (insertText == null && allowDecimal && event.logicalKey == LogicalKeyboardKey.numpadDecimal) {
+    insertText = '.';
+  }
+  if (insertText == null) {
+    return KeyEventResult.ignored;
+  }
+  final text = controller.text;
+  final selection = controller.selection;
+  final start = selection.start >= 0 ? selection.start : text.length;
+  final end = selection.end >= 0 ? selection.end : text.length;
+  final newText = text.replaceRange(start, end, insertText);
+  controller.value = controller.value.copyWith(
+    text: newText,
+    selection: TextSelection.collapsed(offset: start + insertText.length),
+    composing: TextRange.empty,
+  );
+  return KeyEventResult.handled;
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final token = await AuthTokenStore.load();
@@ -241,14 +282,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: passwordController,
-                    decoration: const InputDecoration(labelText: 'Contraseña'),
-                    obscureText: true,
-                    autofillHints: const [],
-                    enableSuggestions: false,
-                    autocorrect: false,
-                    textInputAction: TextInputAction.done,
+                  Focus(
+                    onKeyEvent: (node, event) => _handleNumpadInput(passwordController, event),
+                    child: TextField(
+                      controller: passwordController,
+                      decoration: const InputDecoration(labelText: 'Contraseña'),
+                      obscureText: true,
+                      autofillHints: const [],
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      textInputAction: TextInputAction.done,
+                    ),
                   ),
                   if (error != null)
                     Padding(
@@ -804,11 +848,15 @@ class _PosScreenState extends State<PosScreen> {
                 children: [
                   Text('Total: \$${total.toStringAsFixed(2)}'),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: controller,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Monto recibido'),
-                    onChanged: (_) => setState(() {}),
+                  Focus(
+                    onKeyEvent: (node, event) =>
+                        _handleNumpadInput(controller, event, allowDecimal: true),
+                    child: TextField(
+                      controller: controller,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(labelText: 'Monto recibido'),
+                      onChanged: (_) => setState(() {}),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -1797,7 +1845,13 @@ class _UserDialogState extends State<UserDialog> {
           children: [
             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Usuario')),
             TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email (opcional)')),
-            TextField(controller: passwordController, decoration: const InputDecoration(labelText: 'Contraseña')),
+            Focus(
+              onKeyEvent: (node, event) => _handleNumpadInput(passwordController, event),
+              child: TextField(
+                controller: passwordController,
+                decoration: const InputDecoration(labelText: 'Contraseña'),
+              ),
+            ),
             DropdownButton<String>(
               value: role,
               items: const [
@@ -1989,7 +2043,14 @@ class _ProductDialogState extends State<ProductDialog> {
             child: Column(
               children: [
                 TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
-                TextField(controller: priceController, decoration: const InputDecoration(labelText: 'Precio')),
+                Focus(
+                  onKeyEvent: (node, event) =>
+                      _handleNumpadInput(priceController, event, allowDecimal: true),
+                  child: TextField(
+                    controller: priceController,
+                    decoration: const InputDecoration(labelText: 'Precio'),
+                  ),
+                ),
                 DropdownButton<String>(
                   value: categoryId,
                   items: categories
