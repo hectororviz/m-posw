@@ -10,6 +10,9 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateUserDto) {
+    if (!dto?.password) {
+      throw new BadRequestException('Password requerido');
+    }
     const existingByName = await this.prisma.user.findUnique({ where: { name: dto.name } });
     if (existingByName) {
       throw new BadRequestException('Usuario ya registrado');
