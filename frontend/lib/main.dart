@@ -558,9 +558,15 @@ class _PosScreenState extends State<PosScreen> {
                                                 );
                                                 return FilledButton(
                                                   style: FilledButton.styleFrom(
-                                                    padding: const EdgeInsets.all(8),
-                                                    backgroundColor: background,
-                                                    foregroundColor: foreground,
+                                                    padding: EdgeInsets.zero,
+                                                    backgroundColor: Colors.transparent,
+                                                    foregroundColor: Colors.white,
+                                                    surfaceTintColor: Colors.transparent,
+                                                    elevation: 0,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(16),
+                                                      side: BorderSide(color: background, width: 3),
+                                                    ),
                                                   ),
                                                   onPressed: () {
                                                     final quantity = _quantityValue ?? 1;
@@ -585,24 +591,50 @@ class _PosScreenState extends State<PosScreen> {
                                                     });
                                                   },
                                                   child: Column(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    crossAxisAlignment: CrossAxisAlignment.stretch,
                                                     children: [
-                                                      buildImageOrIcon(
-                                                        imageUrl: imageUrl,
-                                                        iconName: iconName,
-                                                        iconColor: foreground,
-                                                        size: 56,
-                                                        cacheSize: 128,
+                                                      Expanded(
+                                                        flex: 8,
+                                                        child: Padding(
+                                                          padding: const EdgeInsets.all(6),
+                                                          child: buildFillImageOrIcon(
+                                                            imageUrl: imageUrl,
+                                                            iconName: iconName,
+                                                            iconColor: foreground,
+                                                            cacheSize: 256,
+                                                          ),
+                                                        ),
                                                       ),
-                                                      const SizedBox(height: 8),
-                                                      Text(
-                                                        product.name,
-                                                        textAlign: TextAlign.center,
-                                                        style: TextStyle(color: foreground),
-                                                      ),
-                                                      Text(
-                                                        '\$${product.price.toStringAsFixed(2)}',
-                                                        style: TextStyle(color: foreground),
+                                                      Expanded(
+                                                        flex: 2,
+                                                        child: Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.black.withOpacity(0.75),
+                                                            borderRadius: const BorderRadius.vertical(
+                                                              bottom: Radius.circular(12),
+                                                            ),
+                                                          ),
+                                                          child: Column(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Text(
+                                                                product.name,
+                                                                textAlign: TextAlign.center,
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
+                                                                style: const TextStyle(
+                                                                  color: Colors.white,
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                              ),
+                                                              Text(
+                                                                '\$${product.price.toStringAsFixed(2)}',
+                                                                style: const TextStyle(color: Colors.white),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
                                                       ),
                                                     ],
                                                   ),
@@ -629,36 +661,59 @@ class _PosScreenState extends State<PosScreen> {
                                               category.imagePath,
                                               category.imageUpdatedAt,
                                             );
-                                            return GestureDetector(
+                                            return InkWell(
+                                              borderRadius: BorderRadius.circular(16),
                                               onTap: () {
                                                 if (kDebugMode) {
                                                   debugPrint('Selected category: ${category.id}');
                                                 }
                                                 setState(() => selectedCategory = category);
                                               },
-                                              child: Card(
-                                                clipBehavior: Clip.antiAlias,
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(16),
-                                                  decoration: BoxDecoration(color: background),
-                                                  child: Column(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    children: [
-                                                      buildImageOrIcon(
-                                                        imageUrl: imageUrl,
-                                                        iconName: category.iconName,
-                                                        iconColor: foreground,
-                                                        size: 64,
-                                                        cacheSize: 160,
+                                              child: Ink(
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(color: background, width: 3),
+                                                  borderRadius: BorderRadius.circular(16),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                  children: [
+                                                    Expanded(
+                                                      flex: 8,
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.all(6),
+                                                        child: buildFillImageOrIcon(
+                                                          imageUrl: imageUrl,
+                                                          iconName: category.iconName,
+                                                          iconColor: foreground,
+                                                          cacheSize: 256,
+                                                        ),
                                                       ),
-                                                      const SizedBox(height: 12),
-                                                      Text(
-                                                        category.name,
-                                                        style: TextStyle(fontSize: 16, color: foreground),
-                                                        textAlign: TextAlign.center,
+                                                    ),
+                                                    Expanded(
+                                                      flex: 2,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.black.withOpacity(0.75),
+                                                          borderRadius: const BorderRadius.vertical(
+                                                            bottom: Radius.circular(12),
+                                                          ),
+                                                        ),
+                                                        alignment: Alignment.center,
+                                                        child: Text(
+                                                          category.name,
+                                                          textAlign: TextAlign.center,
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: const TextStyle(
+                                                            fontSize: 14,
+                                                            color: Colors.white,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
                                                       ),
-                                                    ],
-                                                  ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ),
                                             );
@@ -3724,6 +3779,41 @@ Widget buildImageOrIcon({
     resolveMaterialSymbol(iconName),
     size: size * 0.7,
     color: iconColor,
+  );
+}
+
+Widget buildFillImageOrIcon({
+  required String? imageUrl,
+  required String iconName,
+  required Color iconColor,
+  double? cacheSize,
+}) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.network(
+            imageUrl,
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            fit: BoxFit.cover,
+            cacheWidth: cacheSize?.round(),
+            cacheHeight: cacheSize?.round(),
+            errorBuilder: (context, error, stackTrace) => Icon(
+              resolveMaterialSymbol(iconName),
+              size: constraints.biggest.shortestSide * 0.5,
+              color: iconColor,
+            ),
+          ),
+        );
+      }
+      return Icon(
+        resolveMaterialSymbol(iconName),
+        size: constraints.biggest.shortestSide * 0.5,
+        color: iconColor,
+      );
+    },
   );
 }
 
