@@ -323,6 +323,7 @@ class _PosScreenState extends State<PosScreen> {
   Category? selectedCategory;
   String _quantityBuffer = '';
   String? _selectedItemId;
+  bool _isCartCollapsed = false;
 
   @override
   void initState() {
@@ -514,75 +515,97 @@ class _PosScreenState extends State<PosScreen> {
                   color: Theme.of(context).colorScheme.surfaceVariant,
                   child: Column(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text('Carrito', style: Theme.of(context).textTheme.titleLarge),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            Text(
-                              'Cantidad rápida:',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(width: 8),
-                            Chip(
-                              label: Text(_quantityBuffer.isEmpty ? '—' : _quantityBuffer),
-                            ),
-                          ],
+                      if (!_isCartCollapsed)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Carrito', style: Theme.of(context).textTheme.titleLarge),
+                              IconButton(
+                                tooltip: 'Colapsar carrito',
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: () => setState(() => _isCartCollapsed = true),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
+                      if (!_isCartCollapsed)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Cantidad rápida:',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(width: 8),
+                              Chip(
+                                label: Text(_quantityBuffer.isEmpty ? '—' : _quantityBuffer),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (!_isCartCollapsed) const SizedBox(height: 8),
                       Expanded(
-                        child: ListView(
-                          children: cart.values
-                              .map(
-                                (item) => ListTile(
-                                  selected: _selectedItemId == item.product.id,
-                                  onTap: () => setState(() => _selectedItemId = item.product.id),
-                                  title: Text(item.product.name),
-                                  subtitle: Text('x${item.quantity}'),
-                                  trailing: Text('\$${item.total.toStringAsFixed(2)}'),
-                                  leading: IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline),
-                                    onPressed: () {
-                                      setState(() {
-                                        if (item.quantity <= 1) {
-                                          cart.remove(item.product.id);
-                                          if (_selectedItemId == item.product.id) {
-                                            _selectedItemId = null;
-                                          }
-                                        } else {
-                                          cart.update(
-                                            item.product.id,
-                                            (value) => value.copyWith(quantity: value.quantity - 1),
-                                          );
-                                        }
-                                      });
-                                    },
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
+                        child: _isCartCollapsed
+                            ? const SizedBox.shrink()
+                            : ListView(
+                                children: cart.values
+                                    .map(
+                                      (item) => ListTile(
+                                        selected: _selectedItemId == item.product.id,
+                                        onTap: () => setState(() => _selectedItemId = item.product.id),
+                                        title: Text(item.product.name),
+                                        subtitle: Text('x${item.quantity}'),
+                                        trailing: Text('\$${item.total.toStringAsFixed(2)}'),
+                                        leading: IconButton(
+                                          icon: const Icon(Icons.remove_circle_outline),
+                                          onPressed: () {
+                                            setState(() {
+                                              if (item.quantity <= 1) {
+                                                cart.remove(item.product.id);
+                                                if (_selectedItemId == item.product.id) {
+                                                  _selectedItemId = null;
+                                                }
+                                              } else {
+                                                cart.update(
+                                                  item.product.id,
+                                                  (value) => value.copyWith(quantity: value.quantity - 1),
+                                                );
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
                       ),
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
                           children: [
-                            Text(
-                              'Total: \$${cartTotal.toStringAsFixed(2)}',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                              onPressed: cart.isEmpty ? null : () => _submitSale(context),
-                              child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                child: Text('Cobrar / Confirmar venta'),
+                            InkWell(
+                              onTap: () => setState(() => _isCartCollapsed = !_isCartCollapsed),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: Text(
+                                  'Total: \$${cartTotal.toStringAsFixed(2)}',
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
                               ),
                             ),
+                            if (!_isCartCollapsed) ...[
+                              const SizedBox(height: 12),
+                              FilledButton(
+                                onPressed: cart.isEmpty ? null : () => _submitSale(context),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  child: Text('Cobrar / Confirmar venta'),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
