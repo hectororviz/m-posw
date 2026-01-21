@@ -18,10 +18,11 @@ import { extname, join } from 'path';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
+import { SETTINGS_IMAGE_SUBDIR, UPLOADS_DIR } from '../common/upload.constants';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 import { SettingsService } from './settings.service';
 
-const uploadDir = join(process.cwd(), 'public', 'uploads');
+const uploadDir = join(UPLOADS_DIR, SETTINGS_IMAGE_SUBDIR);
 mkdirSync(uploadDir, { recursive: true });
 
 const logoUploadOptions = {
@@ -79,7 +80,7 @@ export class SettingsController {
     if (!file) {
       throw new BadRequestException('Logo requerido');
     }
-    return this.settingsService.update({ logoUrl: `/uploads/${file.filename}` });
+    return this.settingsService.update({ logoUrl: `/uploads/${SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
   }
 
   @Post('favicon')
@@ -90,6 +91,6 @@ export class SettingsController {
     if (!file) {
       throw new BadRequestException('Favicon requerido');
     }
-    return this.settingsService.update({ faviconUrl: `/uploads/${file.filename}` });
+    return this.settingsService.update({ faviconUrl: `/uploads/${SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
   }
 }

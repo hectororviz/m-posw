@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'icons/material_symbol_resolver.dart';
@@ -29,6 +31,8 @@ final Map<int, String> _numpadTextMap = {
   LogicalKeyboardKey.numpad8.keyId: '8',
   LogicalKeyboardKey.numpad9.keyId: '9',
 };
+
+const int _maxImageBytes = 3 * 1024 * 1024;
 
 KeyEventResult _handleNumpadInput(
   TextEditingController controller,
@@ -56,6 +60,31 @@ KeyEventResult _handleNumpadInput(
     composing: TextRange.empty,
   );
   return KeyEventResult.handled;
+}
+
+class _SelectedImage {
+  _SelectedImage({required this.bytes, required this.filename, required this.mimeType});
+
+  final Uint8List bytes;
+  final String filename;
+  final String mimeType;
+}
+
+String? _mimeTypeFromFilename(String filename) {
+  final parts = filename.split('.');
+  if (parts.length < 2) return null;
+  final ext = parts.last.toLowerCase();
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    default:
+      return null;
+  }
 }
 
 Future<void> main() async {
@@ -460,7 +489,11 @@ class _PosScreenState extends State<PosScreen> {
                                               colorFromHex(selectedCategory?.colorHex) ??
                                               Theme.of(context).colorScheme.primaryContainer;
                                           final foreground = foregroundColorFor(background);
-                                          final iconName = product.iconName ?? selectedCategory?.iconName;
+                                          final iconName = product.iconName ?? selectedCategory?.iconName ?? 'help';
+                                          final imageUrl = resolveImageUrl(
+                                            product.imagePath,
+                                            product.imageUpdatedAt,
+                                          );
                                           return FilledButton(
                                             style: FilledButton.styleFrom(
                                               padding: const EdgeInsets.all(8),
@@ -490,10 +523,12 @@ class _PosScreenState extends State<PosScreen> {
                                             child: Column(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                Icon(
-                                                  resolveMaterialSymbol(iconName ?? 'help'),
-                                                  size: 40,
-                                                  color: foreground,
+                                                buildImageOrIcon(
+                                                  imageUrl: imageUrl,
+                                                  iconName: iconName,
+                                                  iconColor: foreground,
+                                                  size: 56,
+                                                  cacheSize: 128,
                                                 ),
                                                 const SizedBox(height: 8),
                                                 Text(
@@ -526,6 +561,10 @@ class _PosScreenState extends State<PosScreen> {
                                       final background = colorFromHex(category.colorHex) ??
                                           Theme.of(context).colorScheme.primaryContainer;
                                       final foreground = foregroundColorFor(background);
+                                      final imageUrl = resolveImageUrl(
+                                        category.imagePath,
+                                        category.imageUpdatedAt,
+                                      );
                                       return GestureDetector(
                                         onTap: () {
                                           if (kDebugMode) {
@@ -541,10 +580,12 @@ class _PosScreenState extends State<PosScreen> {
                                             child: Column(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                Icon(
-                                                  resolveMaterialSymbol(category.iconName),
-                                                  size: 48,
-                                                  color: foreground,
+                                                buildImageOrIcon(
+                                                  imageUrl: imageUrl,
+                                                  iconName: category.iconName,
+                                                  iconColor: foreground,
+                                                  size: 64,
+                                                  cacheSize: 160,
                                                 ),
                                                 const SizedBox(height: 12),
                                                 Text(
@@ -1072,12 +1113,21 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
-                    child: Icon(
-                      resolveMaterialSymbol(category.iconName),
-                      color: foregroundColorFor(
-                        colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
-                      ),
-                    ),
+                    backgroundImage: (() {
+                      final imageUrl = resolveImageUrl(category.imagePath, category.imageUpdatedAt);
+                      if (imageUrl == null) return null;
+                      return NetworkImage(imageUrl);
+                    })(),
+                    child: (() {
+                      final imageUrl = resolveImageUrl(category.imagePath, category.imageUpdatedAt);
+                      if (imageUrl != null) return null;
+                      return Icon(
+                        resolveMaterialSymbol(category.iconName),
+                        color: foregroundColorFor(
+                          colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
+                        ),
+                      );
+                    })(),
                   ),
                   title: Text(category.name),
                   subtitle: Text(category.colorHex),
@@ -1139,14 +1189,23 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                     backgroundColor: colorFromHex(product.colorHex) ??
                         colorFromHex(product.categoryColorHex) ??
                         Theme.of(context).colorScheme.primaryContainer,
-                    child: Icon(
-                      resolveMaterialSymbol(product.iconName ?? product.categoryIconName ?? 'help'),
-                      color: foregroundColorFor(
-                        colorFromHex(product.colorHex) ??
-                            colorFromHex(product.categoryColorHex) ??
-                            Theme.of(context).colorScheme.primaryContainer,
-                      ),
-                    ),
+                    backgroundImage: (() {
+                      final imageUrl = resolveImageUrl(product.imagePath, product.imageUpdatedAt);
+                      if (imageUrl == null) return null;
+                      return NetworkImage(imageUrl);
+                    })(),
+                    child: (() {
+                      final imageUrl = resolveImageUrl(product.imagePath, product.imageUpdatedAt);
+                      if (imageUrl != null) return null;
+                      return Icon(
+                        resolveMaterialSymbol(product.iconName ?? product.categoryIconName ?? 'help'),
+                        color: foregroundColorFor(
+                          colorFromHex(product.colorHex) ??
+                              colorFromHex(product.categoryColorHex) ??
+                              Theme.of(context).colorScheme.primaryContainer,
+                        ),
+                      );
+                    })(),
                   ),
                   title: Text(product.name),
                   subtitle: Text('${product.categoryName} · \$${product.price.toStringAsFixed(2)}'),
@@ -1909,6 +1968,9 @@ class _CategoryDialogState extends State<CategoryDialog> {
   final nameController = TextEditingController();
   String? iconName;
   String? colorHex;
+  _SelectedImage? selectedImage;
+  bool isUploadingImage = false;
+  Category? imageCategory;
 
   @override
   void initState() {
@@ -1916,6 +1978,101 @@ class _CategoryDialogState extends State<CategoryDialog> {
     nameController.text = widget.category?.name ?? '';
     iconName = widget.category?.iconName ?? 'category';
     colorHex = widget.category?.colorHex ?? '#0EA5E9';
+    imageCategory = widget.category;
+  }
+
+  Future<void> _pickImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo leer el archivo seleccionado.')),
+        );
+      }
+      return;
+    }
+    if (bytes.length > _maxImageBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('La imagen supera el tamaño máximo permitido (3MB).')),
+        );
+      }
+      return;
+    }
+    final mimeType = _mimeTypeFromFilename(file.name);
+    if (mimeType == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Formato de imagen no soportado.')),
+        );
+      }
+      return;
+    }
+    setState(() {
+      selectedImage = _SelectedImage(bytes: bytes, filename: file.name, mimeType: mimeType);
+    });
+  }
+
+  Future<void> _uploadImage(String categoryId) async {
+    final image = selectedImage;
+    if (image == null) return;
+    setState(() => isUploadingImage = true);
+    try {
+      final updated = await ApiService().uploadCategoryImage(
+        id: categoryId,
+        bytes: image.bytes,
+        filename: image.filename,
+        mimeType: image.mimeType,
+      );
+      if (mounted) {
+        setState(() {
+          imageCategory = updated;
+          selectedImage = null;
+        });
+      }
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
+  }
+
+  Future<void> _deleteImage(String categoryId) async {
+    setState(() => isUploadingImage = true);
+    try {
+      final updated = await ApiService().deleteCategoryImage(categoryId);
+      if (mounted) {
+        setState(() {
+          imageCategory = updated;
+          selectedImage = null;
+        });
+      }
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
   }
 
   @override
@@ -1939,6 +2096,78 @@ class _CategoryDialogState extends State<CategoryDialog> {
               value: colorHex,
               onChanged: (value) => setState(() => colorHex = value),
             ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Imagen', style: Theme.of(context).textTheme.titleSmall),
+            ),
+            const SizedBox(height: 8),
+            Builder(
+              builder: (context) {
+                final imageUrl = resolveImageUrl(
+                  imageCategory?.imagePath ?? widget.category?.imagePath,
+                  imageCategory?.imageUpdatedAt ?? widget.category?.imageUpdatedAt,
+                );
+                Widget preview;
+                if (selectedImage != null) {
+                  preview = Image.memory(
+                    selectedImage!.bytes,
+                    width: 160,
+                    height: 160,
+                    fit: BoxFit.cover,
+                  );
+                } else if (imageUrl != null) {
+                  preview = Image.network(
+                    imageUrl,
+                    width: 160,
+                    height: 160,
+                    fit: BoxFit.cover,
+                  );
+                } else {
+                  preview = Container(
+                    width: 160,
+                    height: 160,
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    child: const Icon(Icons.image, size: 48),
+                  );
+                }
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: preview,
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: isUploadingImage ? null : _pickImage,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Elegir archivo'),
+                ),
+                if (widget.category != null)
+                  FilledButton(
+                    onPressed: isUploadingImage || selectedImage == null
+                        ? null
+                        : () => _uploadImage(widget.category!.id),
+                    child: Text(isUploadingImage ? 'Subiendo...' : 'Subir'),
+                  ),
+                if (widget.category != null &&
+                    (imageCategory?.imagePath ?? widget.category?.imagePath) != null)
+                  TextButton.icon(
+                    onPressed: isUploadingImage ? null : () => _deleteImage(widget.category!.id),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Eliminar imagen'),
+                  ),
+              ],
+            ),
+            if (widget.category == null)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('La imagen se subirá después de crear la categoría.'),
+              ),
           ],
         ),
       ),
@@ -1984,8 +2213,25 @@ class _CategoryDialogState extends State<CategoryDialog> {
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
+              Category updated = created;
+              if (selectedImage != null) {
+                try {
+                  updated = await service.uploadCategoryImage(
+                    id: created.id,
+                    bytes: selectedImage!.bytes,
+                    filename: selectedImage!.filename,
+                    mimeType: selectedImage!.mimeType,
+                  );
+                } catch (err) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                    );
+                  }
+                }
+              }
               if (context.mounted) {
-                Navigator.pop(context, created);
+                Navigator.pop(context, updated);
               }
             } else {
               final updated = await service.updateCategory(
@@ -1994,8 +2240,25 @@ class _CategoryDialogState extends State<CategoryDialog> {
                 iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
+              Category result = updated;
+              if (selectedImage != null) {
+                try {
+                  result = await service.uploadCategoryImage(
+                    id: widget.category!.id,
+                    bytes: selectedImage!.bytes,
+                    filename: selectedImage!.filename,
+                    mimeType: selectedImage!.mimeType,
+                  );
+                } catch (err) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                    );
+                  }
+                }
+              }
               if (context.mounted) {
-                Navigator.pop(context, updated);
+                Navigator.pop(context, result);
               }
             }
           },
@@ -2021,6 +2284,9 @@ class _ProductDialogState extends State<ProductDialog> {
   String? categoryId;
   String? iconName;
   String? colorHex;
+  _SelectedImage? selectedImage;
+  bool isUploadingImage = false;
+  Product? imageProduct;
 
   @override
   void initState() {
@@ -2030,6 +2296,101 @@ class _ProductDialogState extends State<ProductDialog> {
     categoryId = widget.product?.categoryId;
     iconName = widget.product?.iconName;
     colorHex = widget.product?.colorHex;
+    imageProduct = widget.product;
+  }
+
+  Future<void> _pickImage() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo leer el archivo seleccionado.')),
+        );
+      }
+      return;
+    }
+    if (bytes.length > _maxImageBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('La imagen supera el tamaño máximo permitido (3MB).')),
+        );
+      }
+      return;
+    }
+    final mimeType = _mimeTypeFromFilename(file.name);
+    if (mimeType == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Formato de imagen no soportado.')),
+        );
+      }
+      return;
+    }
+    setState(() {
+      selectedImage = _SelectedImage(bytes: bytes, filename: file.name, mimeType: mimeType);
+    });
+  }
+
+  Future<void> _uploadImage(String productId) async {
+    final image = selectedImage;
+    if (image == null) return;
+    setState(() => isUploadingImage = true);
+    try {
+      final updated = await ApiService().uploadProductImage(
+        id: productId,
+        bytes: image.bytes,
+        filename: image.filename,
+        mimeType: image.mimeType,
+      );
+      if (mounted) {
+        setState(() {
+          imageProduct = updated;
+          selectedImage = null;
+        });
+      }
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
+  }
+
+  Future<void> _deleteImage(String productId) async {
+    setState(() => isUploadingImage = true);
+    try {
+      final updated = await ApiService().deleteProductImage(productId);
+      if (mounted) {
+        setState(() {
+          imageProduct = updated;
+          selectedImage = null;
+        });
+      }
+    } catch (err) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isUploadingImage = false);
+      }
+    }
   }
 
   @override
@@ -2074,6 +2435,78 @@ class _ProductDialogState extends State<ProductDialog> {
                   allowClear: true,
                   onChanged: (value) => setState(() => colorHex = value),
                 ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Imagen', style: Theme.of(context).textTheme.titleSmall),
+                ),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final imageUrl = resolveImageUrl(
+                      imageProduct?.imagePath ?? widget.product?.imagePath,
+                      imageProduct?.imageUpdatedAt ?? widget.product?.imageUpdatedAt,
+                    );
+                    Widget preview;
+                    if (selectedImage != null) {
+                      preview = Image.memory(
+                        selectedImage!.bytes,
+                        width: 160,
+                        height: 160,
+                        fit: BoxFit.cover,
+                      );
+                    } else if (imageUrl != null) {
+                      preview = Image.network(
+                        imageUrl,
+                        width: 160,
+                        height: 160,
+                        fit: BoxFit.cover,
+                      );
+                    } else {
+                      preview = Container(
+                        width: 160,
+                        height: 160,
+                        color: Theme.of(context).colorScheme.surfaceVariant,
+                        child: const Icon(Icons.image, size: 48),
+                      );
+                    }
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: preview,
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: isUploadingImage ? null : _pickImage,
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text('Elegir archivo'),
+                    ),
+                    if (widget.product != null)
+                      FilledButton(
+                        onPressed: isUploadingImage || selectedImage == null
+                            ? null
+                            : () => _uploadImage(widget.product!.id),
+                        child: Text(isUploadingImage ? 'Subiendo...' : 'Subir'),
+                      ),
+                    if (widget.product != null &&
+                        (imageProduct?.imagePath ?? widget.product?.imagePath) != null)
+                      TextButton.icon(
+                        onPressed: isUploadingImage ? null : () => _deleteImage(widget.product!.id),
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('Eliminar imagen'),
+                      ),
+                  ],
+                ),
+                if (widget.product == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('La imagen se subirá después de crear el producto.'),
+                  ),
               ],
             ),
           );
@@ -2117,15 +2550,35 @@ class _ProductDialogState extends State<ProductDialog> {
             if (categoryId == null) return;
             final service = ApiService();
             if (widget.product == null) {
-              await service.createProduct(
+              final created = await service.createProduct(
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
                 categoryId: categoryId!,
                 iconName: iconName,
                 colorHex: colorHex,
               );
+              Product result = created;
+              if (selectedImage != null) {
+                try {
+                  result = await service.uploadProductImage(
+                    id: created.id,
+                    bytes: selectedImage!.bytes,
+                    filename: selectedImage!.filename,
+                    mimeType: selectedImage!.mimeType,
+                  );
+                } catch (err) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                    );
+                  }
+                }
+              }
+              if (context.mounted) {
+                Navigator.pop(context, result);
+              }
             } else {
-              await service.updateProduct(
+              final updated = await service.updateProduct(
                 widget.product!.id,
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
@@ -2133,9 +2586,26 @@ class _ProductDialogState extends State<ProductDialog> {
                 iconName: iconName,
                 colorHex: colorHex,
               );
-            }
-            if (context.mounted) {
-              Navigator.pop(context);
+              Product result = updated;
+              if (selectedImage != null) {
+                try {
+                  result = await service.uploadProductImage(
+                    id: widget.product!.id,
+                    bytes: selectedImage!.bytes,
+                    filename: selectedImage!.filename,
+                    mimeType: selectedImage!.mimeType,
+                  );
+                } catch (err) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+                    );
+                  }
+                }
+              }
+              if (context.mounted) {
+                Navigator.pop(context, result);
+              }
             }
           },
           child: Text(widget.product == null ? 'Crear' : 'Guardar'),
@@ -2317,6 +2787,39 @@ class ApiService {
     return Category.fromJson(data);
   }
 
+  Future<Category> uploadCategoryImage({
+    required String id,
+    required Uint8List bytes,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final uri = Uri.parse('$apiBaseUrl/categories/$id/image');
+    final request = http.MultipartRequest('POST', uri);
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(mimeType),
+      ),
+    );
+    final response = await http.Response.fromStream(await apiClient.send(request));
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo subir la imagen'));
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Category.fromJson(data);
+  }
+
+  Future<Category> deleteCategoryImage(String id) async {
+    final response = await apiClient.delete(Uri.parse('$apiBaseUrl/categories/$id/image'));
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo eliminar la imagen'));
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Category.fromJson(data);
+  }
+
   Future<Category> updateCategoryDetails({
     required String id,
     required String name,
@@ -2402,6 +2905,39 @@ class ApiService {
       Uri.parse('$apiBaseUrl/products/$id'),
       body: jsonEncode(payload),
     );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Product.fromJson(data);
+  }
+
+  Future<Product> uploadProductImage({
+    required String id,
+    required Uint8List bytes,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final uri = Uri.parse('$apiBaseUrl/products/$id/image');
+    final request = http.MultipartRequest('POST', uri);
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: MediaType.parse(mimeType),
+      ),
+    );
+    final response = await http.Response.fromStream(await apiClient.send(request));
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo subir la imagen'));
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Product.fromJson(data);
+  }
+
+  Future<Product> deleteProductImage(String id) async {
+    final response = await apiClient.delete(Uri.parse('$apiBaseUrl/products/$id/image'));
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo eliminar la imagen'));
+    }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return Product.fromJson(data);
   }
@@ -2713,6 +3249,8 @@ class Category {
     required this.iconName,
     required this.colorHex,
     required this.active,
+    this.imagePath,
+    this.imageUpdatedAt,
   });
 
   final String id;
@@ -2720,6 +3258,8 @@ class Category {
   final String iconName;
   final String colorHex;
   final bool active;
+  final String? imagePath;
+  final DateTime? imageUpdatedAt;
 
   factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json['id'] as String,
@@ -2727,6 +3267,9 @@ class Category {
         iconName: json['iconName'] as String? ?? 'category',
         colorHex: json['colorHex'] as String? ?? '#0EA5E9',
         active: json['active'] as bool? ?? true,
+        imagePath: json['imagePath'] as String?,
+        imageUpdatedAt:
+            json['imageUpdatedAt'] != null ? DateTime.parse(json['imageUpdatedAt'] as String) : null,
       );
 }
 
@@ -2742,6 +3285,8 @@ class Product {
     this.categoryName,
     this.categoryIconName,
     this.categoryColorHex,
+    this.imagePath,
+    this.imageUpdatedAt,
   });
 
   final String id;
@@ -2754,6 +3299,8 @@ class Product {
   final String? categoryName;
   final String? categoryIconName;
   final String? categoryColorHex;
+  final String? imagePath;
+  final DateTime? imageUpdatedAt;
 
   static double _priceFromJson(dynamic value) {
     if (value is num) return value.toDouble();
@@ -2761,7 +3308,7 @@ class Product {
     throw FormatException('Unsupported price value: $value');
   }
 
-  factory Product.fromJson(Map<String, dynamic> json) => Product(
+      factory Product.fromJson(Map<String, dynamic> json) => Product(
         id: json['id'] as String,
         name: json['name'] as String,
         price: _priceFromJson(json['price']),
@@ -2778,6 +3325,9 @@ class Product {
         categoryColorHex: json['category'] is Map<String, dynamic>
             ? (json['category'] as Map<String, dynamic>)['colorHex'] as String?
             : null,
+        imagePath: json['imagePath'] as String?,
+        imageUpdatedAt:
+            json['imageUpdatedAt'] != null ? DateTime.parse(json['imageUpdatedAt'] as String) : null,
       );
 }
 
@@ -2883,6 +3433,49 @@ String resolveApiUrl(String url) {
     return '$apiBaseUrl$url';
   }
   return '$apiBaseUrl/$url';
+}
+
+String? resolveImageUrl(String? url, DateTime? updatedAt) {
+  if (url == null || url.isEmpty) {
+    return null;
+  }
+  final resolved = resolveApiUrl(url);
+  if (updatedAt == null) {
+    return resolved;
+  }
+  return '$resolved?v=${updatedAt.millisecondsSinceEpoch}';
+}
+
+Widget buildImageOrIcon({
+  required String? imageUrl,
+  required String iconName,
+  required Color iconColor,
+  required double size,
+  double? cacheSize,
+}) {
+  if (imageUrl != null && imageUrl.isNotEmpty) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.network(
+        imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        cacheWidth: cacheSize?.round(),
+        cacheHeight: cacheSize?.round(),
+        errorBuilder: (context, error, stackTrace) => Icon(
+          resolveMaterialSymbol(iconName),
+          size: size * 0.7,
+          color: iconColor,
+        ),
+      ),
+    );
+  }
+  return Icon(
+    resolveMaterialSymbol(iconName),
+    size: size * 0.7,
+    color: iconColor,
+  );
 }
 
 void updateFavicon(String url) {
