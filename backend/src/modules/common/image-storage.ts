@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import type { Express } from 'express';
 import { promises as fs } from 'fs';
 import { dirname, resolve, sep } from 'path';
-import sharp from 'sharp';
+import sharp = require('sharp');
 import {
   ALLOWED_IMAGE_TYPES,
   IMAGE_MAX_DIMENSION,

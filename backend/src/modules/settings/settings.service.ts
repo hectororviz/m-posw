@@ -16,6 +16,7 @@ export class SettingsService {
         storeName: 'MiBPS',
         logoUrl: null,
         faviconUrl: null,
+        qrImageDataUrl: null,
         accentColor: '#0ea5e9',
       },
     });
@@ -29,6 +30,7 @@ export class SettingsService {
           storeName: dto.storeName || 'MiBPS',
           logoUrl: dto.logoUrl ?? null,
           faviconUrl: dto.faviconUrl ?? null,
+          qrImageDataUrl: dto.qrImageDataUrl ?? null,
           accentColor: dto.accentColor,
         },
       });
