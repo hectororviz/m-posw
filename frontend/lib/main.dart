@@ -48,6 +48,7 @@ class _MiBpsAppState extends State<MiBpsApp> {
     ApiService().getSettings().then((value) {
       settings.value = value;
     });
+    PaymentMethodStore.load();
   }
 
   Future<void> _handleUnauthorized() async {
@@ -599,7 +600,7 @@ class _PosScreenState extends State<PosScreen> {
                             if (!_isCartCollapsed) ...[
                               const SizedBox(height: 12),
                               FilledButton(
-                                onPressed: cart.isEmpty ? null : () => _submitSale(context),
+                                onPressed: cart.isEmpty ? null : () => _startCheckout(context),
                                 child: const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                   child: Text('Cobrar / Confirmar venta'),
@@ -703,7 +704,164 @@ class _PosScreenState extends State<PosScreen> {
     if (cart.isEmpty) {
       return;
     }
+    await _startCheckout(context);
+  }
+
+  Future<void> _startCheckout(BuildContext context) async {
+    final selected = await _showPaymentSelectionDialog(context);
+    if (selected == null) {
+      return;
+    }
+    if (selected.type == PaymentMethodType.cash) {
+      final confirmed = await _showCashPaymentDialog(context, selected);
+      if (!confirmed) {
+        return;
+      }
+    } else if (selected.type == PaymentMethodType.qr) {
+      final confirmed = await _showQrPaymentDialog(context, selected);
+      if (!confirmed) {
+        return;
+      }
+    }
     await _submitSale(context);
+  }
+
+  Future<PaymentMethod?> _showPaymentSelectionDialog(BuildContext context) {
+    return showDialog<PaymentMethod>(
+      context: context,
+      builder: (context) {
+        return ValueListenableBuilder<List<PaymentMethod>>(
+          valueListenable: PaymentMethodStore.methods,
+          builder: (context, methods, _) {
+            final available = methods
+                .where((method) => method.type == PaymentMethodType.cash || method.enabled)
+                .toList();
+            return AlertDialog(
+              title: const Text('Elegí un medio de pago'),
+              content: SizedBox(
+                width: 360,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: available.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final method = available[index];
+                    return ListTile(
+                      leading: Icon(method.type.icon),
+                      title: Text(method.name),
+                      subtitle: Text(method.type.label),
+                      onTap: () => Navigator.of(context).pop(method),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _showCashPaymentDialog(BuildContext context, PaymentMethod method) async {
+    final controller = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final received = _parseAmount(controller.text);
+            final total = cartTotal;
+            final change = received - total;
+            final isEnough = received >= total;
+            return AlertDialog(
+              title: Text('Pago en ${method.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Total: \$${total.toStringAsFixed(2)}'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Monto recibido'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(isEnough ? 'Vuelto' : 'Falta'),
+                      Text(
+                        '\$${change.abs().toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isEnough ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: isEnough ? () => Navigator.of(context).pop(true) : null,
+                  child: const Text('Confirmar cobro'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    return result ?? false;
+  }
+
+  Future<bool> _showQrPaymentDialog(BuildContext context, PaymentMethod method) async {
+    return (await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: Text('Pago en ${method.name}'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Total: \$${cartTotal.toStringAsFixed(2)}'),
+                  const SizedBox(height: 12),
+                  _QrPreview(dataUrl: method.qrImageDataUrl),
+                  const SizedBox(height: 12),
+                  const Text('Escaneá el QR para completar el pago.'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Confirmar pago'),
+                ),
+              ],
+            );
+          },
+        )) ??
+        false;
+  }
+
+  double _parseAmount(String value) {
+    final normalized = value.replaceAll(',', '.');
+    return double.tryParse(normalized) ?? 0;
   }
 
   Future<void> _submitSale(BuildContext context) async {
@@ -1308,6 +1466,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
           },
           child: const Text('Guardar cambios'),
         ),
+        const SizedBox(height: 24),
+        Text('Medios de pago', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        ValueListenableBuilder<List<PaymentMethod>>(
+          valueListenable: PaymentMethodStore.methods,
+          builder: (context, methods, _) {
+            return Card(
+              child: Column(
+                children: [
+                  for (final method in methods)
+                    ListTile(
+                      leading: Icon(method.type.icon),
+                      title: Text(method.name),
+                      subtitle: Text(method.type == PaymentMethodType.cash
+                          ? 'Siempre disponible'
+                          : method.type.label),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (method.type != PaymentMethodType.cash)
+                            Switch(
+                              value: method.enabled,
+                              onChanged: (value) {
+                                final updated = method.copyWith(enabled: value);
+                                PaymentMethodStore.upsert(updated);
+                              },
+                            ),
+                          if (method.type != PaymentMethodType.cash) ...[
+                            IconButton(
+                              tooltip: 'Editar',
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showPaymentMethodDialog(method),
+                            ),
+                            IconButton(
+                              tooltip: 'Eliminar',
+                              icon: const Icon(Icons.delete),
+                              onPressed: () => _removePaymentMethod(context, method),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  const Divider(height: 1),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: FilledButton.icon(
+                        onPressed: _showPaymentMethodDialog,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Agregar medio'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ],
     );
   }
@@ -1366,6 +1583,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final bytes = reader.result as Uint8List;
     return _PickedFile(bytes: bytes, filename: file.name, mimeType: file.type);
   }
+
+  Future<String?> _pickImageDataUrl() async {
+    final uploadInput = html.FileUploadInputElement()..accept = 'image/*';
+    uploadInput.click();
+    await uploadInput.onChange.first;
+    final file = uploadInput.files?.first;
+    if (file == null) {
+      return null;
+    }
+    final reader = html.FileReader();
+    reader.readAsDataUrl(file);
+    await reader.onLoad.first;
+    return reader.result as String?;
+  }
+
+  Future<void> _showPaymentMethodDialog([PaymentMethod? method]) async {
+    final nameController = TextEditingController(text: method?.name ?? 'QR');
+    String? dataUrl = method?.qrImageDataUrl;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(method == null ? 'Agregar medio de pago' : 'Editar medio de pago'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Nombre'),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Tipo'),
+                      Chip(label: Text(PaymentMethodType.qr.label)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _QrPreview(dataUrl: dataUrl),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        final picked = await _pickImageDataUrl();
+                        if (picked != null) {
+                          setState(() => dataUrl = picked);
+                        }
+                      },
+                      icon: const Icon(Icons.upload),
+                      label: const Text('Subir QR'),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final trimmed = nameController.text.trim();
+                    final updated = (method ?? PaymentMethod.qr(id: PaymentMethodStore.newId()))
+                        .copyWith(
+                          name: trimmed.isEmpty ? 'QR' : trimmed,
+                          qrImageDataUrl: dataUrl,
+                        );
+                    PaymentMethodStore.upsert(updated);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    nameController.dispose();
+  }
+
+  Future<void> _removePaymentMethod(BuildContext context, PaymentMethod method) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar medio de pago'),
+          content: Text('¿Querés eliminar ${method.name}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirm ?? false) {
+      PaymentMethodStore.remove(method.id);
+    }
+  }
 }
 
 class _PickedFile {
@@ -1397,6 +1723,36 @@ class _AssetPreview extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Text(label)),
       ],
+    );
+  }
+}
+
+class _QrPreview extends StatelessWidget {
+  const _QrPreview({this.dataUrl});
+
+  final String? dataUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasData = dataUrl != null && dataUrl!.isNotEmpty;
+    return Container(
+      height: 160,
+      width: 160,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Theme.of(context).colorScheme.surfaceVariant,
+        image: hasData ? DecorationImage(image: NetworkImage(dataUrl!), fit: BoxFit.cover) : null,
+      ),
+      child: hasData
+          ? null
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.qr_code, size: 48),
+                SizedBox(height: 8),
+                Text('Sin QR', textAlign: TextAlign.center),
+              ],
+            ),
     );
   }
 }
@@ -2105,6 +2461,141 @@ class Setting {
         faviconUrl: json['faviconUrl'] as String?,
         accentColor: json['accentColor'] as String?,
       );
+}
+
+enum PaymentMethodType {
+  cash('Efectivo', Icons.payments),
+  qr('QR', Icons.qr_code_2);
+
+  const PaymentMethodType(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+class PaymentMethod {
+  PaymentMethod({
+    required this.id,
+    required this.name,
+    required this.type,
+    this.enabled = true,
+    this.qrImageDataUrl,
+  });
+
+  factory PaymentMethod.cash() => PaymentMethod(
+        id: 'cash',
+        name: 'Efectivo',
+        type: PaymentMethodType.cash,
+        enabled: true,
+      );
+
+  factory PaymentMethod.qr({required String id}) => PaymentMethod(
+        id: id,
+        name: 'QR',
+        type: PaymentMethodType.qr,
+        enabled: true,
+      );
+
+  factory PaymentMethod.fromJson(Map<String, dynamic> json) {
+    final type = PaymentMethodType.values.firstWhere(
+      (entry) => entry.name == json['type'],
+      orElse: () => PaymentMethodType.qr,
+    );
+    return PaymentMethod(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      type: type,
+      enabled: json['enabled'] as bool? ?? true,
+      qrImageDataUrl: json['qrImageDataUrl'] as String?,
+    );
+  }
+
+  final String id;
+  final String name;
+  final PaymentMethodType type;
+  final bool enabled;
+  final String? qrImageDataUrl;
+
+  PaymentMethod copyWith({
+    String? name,
+    bool? enabled,
+    String? qrImageDataUrl,
+  }) {
+    return PaymentMethod(
+      id: id,
+      name: name ?? this.name,
+      type: type,
+      enabled: type == PaymentMethodType.cash ? true : (enabled ?? this.enabled),
+      qrImageDataUrl: qrImageDataUrl ?? this.qrImageDataUrl,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'type': type.name,
+        'enabled': enabled,
+        'qrImageDataUrl': qrImageDataUrl,
+      };
+}
+
+class PaymentMethodStore {
+  static const _storageKey = 'payment_methods';
+  static final ValueNotifier<List<PaymentMethod>> methods = ValueNotifier<List<PaymentMethod>>([]);
+
+  static Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_storageKey);
+    if (raw == null) {
+      methods.value = _defaultMethods();
+      await _persist();
+      return;
+    }
+    final decoded = jsonDecode(raw) as List<dynamic>;
+    final parsed = decoded.map((entry) => PaymentMethod.fromJson(entry as Map<String, dynamic>)).toList();
+    methods.value = _ensureCash(parsed);
+  }
+
+  static Future<void> upsert(PaymentMethod method) async {
+    final list = [...methods.value];
+    final index = list.indexWhere((entry) => entry.id == method.id);
+    if (index == -1) {
+      list.add(method);
+    } else {
+      list[index] = method;
+    }
+    methods.value = _ensureCash(list);
+    await _persist();
+  }
+
+  static Future<void> remove(String id) async {
+    final list = methods.value.where((entry) => entry.id != id).toList();
+    methods.value = _ensureCash(list);
+    await _persist();
+  }
+
+  static String newId() => DateTime.now().microsecondsSinceEpoch.toString();
+
+  static List<PaymentMethod> _defaultMethods() {
+    return [PaymentMethod.cash(), PaymentMethod.qr(id: newId())];
+  }
+
+  static List<PaymentMethod> _ensureCash(List<PaymentMethod> list) {
+    if (list.any((method) => method.type == PaymentMethodType.cash)) {
+      return list
+          .map((method) => method.type == PaymentMethodType.cash ? method.copyWith(enabled: true) : method)
+          .toList();
+    }
+    return [PaymentMethod.cash(), ...list];
+  }
+
+  static Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _storageKey,
+      jsonEncode(methods.value.map((method) => method.toJson()).toList()),
+    );
+  }
 }
 
 class Category {
