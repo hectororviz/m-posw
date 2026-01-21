@@ -93,6 +93,27 @@ Future<void> main() async {
   runApp(MiBpsApp(initialToken: token));
 }
 
+String? _roleFromToken(String? token) {
+  if (token == null || token.isEmpty) {
+    return null;
+  }
+  final parts = token.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+    final decoded = jsonDecode(payload);
+    if (decoded is Map<String, dynamic>) {
+      final role = decoded['role'];
+      return role?.toString();
+    }
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
+
 class MiBpsApp extends StatefulWidget {
   const MiBpsApp({super.key, this.initialToken});
 
@@ -190,73 +211,95 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final destinations = [
-      _Destination('POS', Icons.storefront, const PosScreen()),
-      _Destination('Admin', Icons.admin_panel_settings, const AdminScreen()),
-      _Destination('Reportes', Icons.receipt_long, const ReportsScreen()),
-      _Destination('Estadísticas', Icons.bar_chart, const StatsScreen()),
-      _Destination('Personalización', Icons.palette, SettingsScreen(settingNotifier: widget.settingNotifier)),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 900;
-        return Scaffold(
-          appBar: AppBar(
-            title: ValueListenableBuilder<Setting?>(
-              valueListenable: widget.settingNotifier,
-              builder: (context, setting, _) {
-                final logoUrl = (setting?.logoUrl?.isNotEmpty ?? false)
-                    ? resolveApiUrl(setting!.logoUrl!)
-                    : null;
-                return Row(
-                  children: [
-                    if (logoUrl != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: CircleAvatar(backgroundImage: NetworkImage(logoUrl)),
-                      ),
-                    Text(setting?.storeName ?? 'MiBPS'),
-                  ],
-                );
-              },
+    return ValueListenableBuilder<String?>(
+      valueListenable: widget.authState,
+      builder: (context, token, _) {
+        final role = _roleFromToken(token);
+        final isAdmin = role == 'ADMIN';
+        final destinations = [
+          _Destination('POS', Icons.storefront, const PosScreen()),
+          if (isAdmin) _Destination('Admin', Icons.admin_panel_settings, const AdminScreen()),
+          if (isAdmin) _Destination('Reportes', Icons.receipt_long, const ReportsScreen()),
+          if (isAdmin) _Destination('Estadísticas', Icons.bar_chart, const StatsScreen()),
+          if (isAdmin)
+            _Destination(
+              'Personalización',
+              Icons.palette,
+              SettingsScreen(settingNotifier: widget.settingNotifier),
             ),
-            actions: [
-              TextButton.icon(
-                onPressed: () async {
-                  await AuthTokenStore.clear();
-                  widget.authState.value = null;
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text('Salir'),
+        ];
+
+        final maxIndex = destinations.length - 1;
+        final effectiveIndex = selectedIndex.clamp(0, maxIndex);
+        if (effectiveIndex != selectedIndex) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() => selectedIndex = effectiveIndex);
+            }
+          });
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 900;
+            return Scaffold(
+              appBar: AppBar(
+                title: ValueListenableBuilder<Setting?>(
+                  valueListenable: widget.settingNotifier,
+                  builder: (context, setting, _) {
+                    final logoUrl = (setting?.logoUrl?.isNotEmpty ?? false)
+                        ? resolveApiUrl(setting!.logoUrl!)
+                        : null;
+                    return Row(
+                      children: [
+                        if (logoUrl != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: CircleAvatar(backgroundImage: NetworkImage(logoUrl)),
+                          ),
+                        Text(setting?.storeName ?? 'MiBPS'),
+                      ],
+                    );
+                  },
+                ),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () async {
+                      await AuthTokenStore.clear();
+                      widget.authState.value = null;
+                    },
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Salir'),
+                  ),
+                ],
               ),
-            ],
-          ),
-          body: Row(
-            children: [
-              if (isWide)
-                NavigationRail(
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: (value) => setState(() => selectedIndex = value),
-                  destinations: destinations
-                      .map((item) => NavigationRailDestination(
-                            icon: Icon(item.icon),
-                            label: Text(item.label),
-                          ))
-                      .toList(),
-                ),
-              Expanded(child: destinations[selectedIndex].screen),
-            ],
-          ),
-          bottomNavigationBar: isWide
-              ? null
-              : NavigationBar(
-                  selectedIndex: selectedIndex,
-                  onDestinationSelected: (value) => setState(() => selectedIndex = value),
-                  destinations: destinations
-                      .map((item) => NavigationDestination(icon: Icon(item.icon), label: item.label))
-                      .toList(),
-                ),
+              body: Row(
+                children: [
+                  if (isWide)
+                    NavigationRail(
+                      selectedIndex: effectiveIndex,
+                      onDestinationSelected: (value) => setState(() => selectedIndex = value),
+                      destinations: destinations
+                          .map((item) => NavigationRailDestination(
+                                icon: Icon(item.icon),
+                                label: Text(item.label),
+                              ))
+                          .toList(),
+                    ),
+                  Expanded(child: destinations[effectiveIndex].screen),
+                ],
+              ),
+              bottomNavigationBar: isWide
+                  ? null
+                  : NavigationBar(
+                      selectedIndex: effectiveIndex,
+                      onDestinationSelected: (value) => setState(() => selectedIndex = value),
+                      destinations: destinations
+                          .map((item) => NavigationDestination(icon: Icon(item.icon), label: item.label))
+                          .toList(),
+                    ),
+            );
+          },
         );
       },
     );
