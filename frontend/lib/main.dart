@@ -17,17 +17,17 @@ const apiBaseUrl = String.fromEnvironment(
   defaultValue: 'http://localhost:3000',
 );
 
-const Map<LogicalKeyboardKey, String> _numpadTextMap = {
-  LogicalKeyboardKey.numpad0: '0',
-  LogicalKeyboardKey.numpad1: '1',
-  LogicalKeyboardKey.numpad2: '2',
-  LogicalKeyboardKey.numpad3: '3',
-  LogicalKeyboardKey.numpad4: '4',
-  LogicalKeyboardKey.numpad5: '5',
-  LogicalKeyboardKey.numpad6: '6',
-  LogicalKeyboardKey.numpad7: '7',
-  LogicalKeyboardKey.numpad8: '8',
-  LogicalKeyboardKey.numpad9: '9',
+const Map<int, String> _numpadTextMap = {
+  LogicalKeyboardKey.numpad0.keyId: '0',
+  LogicalKeyboardKey.numpad1.keyId: '1',
+  LogicalKeyboardKey.numpad2.keyId: '2',
+  LogicalKeyboardKey.numpad3.keyId: '3',
+  LogicalKeyboardKey.numpad4.keyId: '4',
+  LogicalKeyboardKey.numpad5.keyId: '5',
+  LogicalKeyboardKey.numpad6.keyId: '6',
+  LogicalKeyboardKey.numpad7.keyId: '7',
+  LogicalKeyboardKey.numpad8.keyId: '8',
+  LogicalKeyboardKey.numpad9.keyId: '9',
 };
 
 KeyEventResult _handleNumpadInput(
@@ -38,7 +38,7 @@ KeyEventResult _handleNumpadInput(
   if (event is! KeyDownEvent) {
     return KeyEventResult.ignored;
   }
-  String? insertText = _numpadTextMap[event.logicalKey];
+  String? insertText = _numpadTextMap[event.logicalKey.keyId];
   if (insertText == null && allowDecimal && event.logicalKey == LogicalKeyboardKey.numpadDecimal) {
     insertText = '.';
   }
