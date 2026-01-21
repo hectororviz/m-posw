@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'material_symbol_catalog.dart';
+import 'icons/material_symbol_resolver.dart';
 import 'pickers.dart';
 
 const apiBaseUrl = String.fromEnvironment(
@@ -490,7 +490,11 @@ class _PosScreenState extends State<PosScreen> {
                                             child: Column(
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                Icon(symbolFromName(iconName), size: 40, color: foreground),
+                                                Icon(
+                                                  resolveMaterialSymbol(iconName ?? 'help'),
+                                                  size: 40,
+                                                  color: foreground,
+                                                ),
                                                 const SizedBox(height: 8),
                                                 Text(
                                                   product.name,
@@ -538,7 +542,7 @@ class _PosScreenState extends State<PosScreen> {
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
                                                 Icon(
-                                                  symbolFromName(category.iconName),
+                                                  resolveMaterialSymbol(category.iconName),
                                                   size: 48,
                                                   color: foreground,
                                                 ),
@@ -1069,7 +1073,7 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
                   leading: CircleAvatar(
                     backgroundColor: colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
                     child: Icon(
-                      symbolFromName(category.iconName),
+                      resolveMaterialSymbol(category.iconName),
                       color: foregroundColorFor(
                         colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
                       ),
@@ -1136,7 +1140,7 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
                         colorFromHex(product.categoryColorHex) ??
                         Theme.of(context).colorScheme.primaryContainer,
                     child: Icon(
-                      symbolFromName(product.iconName ?? product.categoryIconName),
+                      resolveMaterialSymbol(product.iconName ?? product.categoryIconName ?? 'help'),
                       color: foregroundColorFor(
                         colorFromHex(product.colorHex) ??
                             colorFromHex(product.categoryColorHex) ??
@@ -1928,8 +1932,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
               label: 'Icono',
               value: iconName,
               onChanged: (value) => setState(() => iconName = value),
-              searcher: (query) =>
-                  ApiService().searchMaterialSymbols(query),
             ),
             const SizedBox(height: 12),
             ColorPickerField(
@@ -2064,8 +2066,6 @@ class _ProductDialogState extends State<ProductDialog> {
                   value: iconName,
                   allowClear: true,
                   onChanged: (value) => setState(() => iconName = value),
-                  searcher: (query) =>
-                      ApiService().searchMaterialSymbols(query),
                 ),
                 const SizedBox(height: 12),
                 ColorPickerField(

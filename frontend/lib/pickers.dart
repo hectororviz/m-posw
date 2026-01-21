@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'material_symbol_catalog.dart';
+import 'icons/material_symbol_resolver.dart';
+import 'package:material_symbols_icons/get.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 class IconPickerField extends StatelessWidget {
   const IconPickerField({
@@ -10,19 +12,17 @@ class IconPickerField extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
-    required this.searcher,
     this.allowClear = false,
   });
 
   final String label;
   final String? value;
   final ValueChanged<String?> onChanged;
-  final Future<List<String>> Function(String query) searcher;
   final bool allowClear;
 
   @override
   Widget build(BuildContext context) {
-    final iconData = symbolFromName(value);
+    final iconData = resolveMaterialSymbol(value ?? 'help');
     return InputDecorator(
       decoration: InputDecoration(
         labelText: label,
@@ -43,7 +43,7 @@ class IconPickerField extends StatelessWidget {
             onPressed: () async {
               final selection = await showDialog<String>(
                 context: context,
-                builder: (context) => IconPickerDialog(selected: value, searcher: searcher),
+                builder: (context) => IconPickerDialog(selected: value),
               );
               if (selection != null) {
                 onChanged(selection);
@@ -58,26 +58,26 @@ class IconPickerField extends StatelessWidget {
 }
 
 class IconPickerDialog extends StatefulWidget {
-  const IconPickerDialog({super.key, this.selected, required this.searcher});
+  const IconPickerDialog({super.key, this.selected});
 
   final String? selected;
-  final Future<List<String>> Function(String query) searcher;
 
   @override
   State<IconPickerDialog> createState() => _IconPickerDialogState();
 }
 
 class _IconPickerDialogState extends State<IconPickerDialog> {
-  String query = '';
-  List<String> results = [];
-  bool loading = false;
-  String? error;
+  List<String> filtered = [];
+  int visibleCount = 0;
+  final int pageSize = 200;
   Timer? _debounce;
+  late final List<String> allSymbols;
 
   @override
   void initState() {
     super.initState();
-    _fetchResults('');
+    allSymbols = Symbols.values.map((symbol) => symbol.name).toList()..sort();
+    _applyFilter('');
   }
 
   @override
@@ -86,35 +86,36 @@ class _IconPickerDialogState extends State<IconPickerDialog> {
     super.dispose();
   }
 
-  Future<void> _fetchResults(String value) async {
+  void _applyFilter(String value) {
+    final normalized = value.trim().toLowerCase();
+    final matches = normalized.isEmpty
+        ? allSymbols
+        : allSymbols.where((name) => name.contains(normalized)).toList();
     setState(() {
-      loading = true;
-      error = null;
+      filtered = matches;
+      visibleCount = matches.length < pageSize ? matches.length : pageSize;
     });
-    try {
-      final fetched = await widget.searcher(value);
-      if (!mounted) return;
-      setState(() => results = fetched);
-    } catch (err) {
-      if (!mounted) return;
-      setState(() => error = err.toString());
-    } finally {
-      if (!mounted) return;
-      setState(() => loading = false);
-    }
   }
 
   void _onQueryChanged(String value) {
-    setState(() => query = value);
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      _fetchResults(value);
+      _applyFilter(value);
+    });
+  }
+
+  void _showMore() {
+    setState(() {
+      final nextCount = visibleCount + pageSize;
+      visibleCount = nextCount > filtered.length ? filtered.length : nextCount;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final filtered = results;
+    final visibleSymbols = filtered.take(visibleCount).toList();
+    final remaining = filtered.length - visibleCount;
+    final nextBatch = remaining < pageSize ? remaining : pageSize;
     return AlertDialog(
       title: const Text('Seleccionar icono'),
       content: SizedBox(
@@ -130,47 +131,46 @@ class _IconPickerDialogState extends State<IconPickerDialog> {
               onChanged: _onQueryChanged,
             ),
             const SizedBox(height: 12),
-            if (loading) const Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()),
-            if (!loading && error != null)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-            if (!loading && error == null)
-              SizedBox(
-                height: 320,
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 6,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, index) {
-                    final name = filtered[index];
-                    final iconData = symbolFromName(name);
-                    final isSelected = name == widget.selected;
-                    return Tooltip(
-                      message: name,
-                      child: InkResponse(
-                        onTap: () => Navigator.pop(context, name),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Theme.of(context).colorScheme.surfaceVariant,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.transparent,
-                            ),
+            SizedBox(
+              height: 320,
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: visibleSymbols.length,
+                itemBuilder: (context, index) {
+                  final name = visibleSymbols[index];
+                  final iconData = resolveMaterialSymbol(name);
+                  final isSelected = name == widget.selected;
+                  return Tooltip(
+                    message: name,
+                    child: InkResponse(
+                      onTap: () => Navigator.pop(context, name),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primaryContainer
+                              : Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
                           ),
-                          child: Icon(iconData),
                         ),
+                        child: Icon(iconData),
                       ),
-                    );
-                  },
+                    ),
+                  );
+                },
+              ),
+            ),
+            if (visibleCount < filtered.length)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: TextButton(
+                  onPressed: _showMore,
+                  child: Text('Mostrar $nextBatch más'),
                 ),
               ),
           ],
