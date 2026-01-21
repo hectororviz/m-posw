@@ -17,7 +17,7 @@ const apiBaseUrl = String.fromEnvironment(
   defaultValue: 'http://localhost:3000',
 );
 
-const Map<int, String> _numpadTextMap = {
+final Map<int, String> _numpadTextMap = {
   LogicalKeyboardKey.numpad0.keyId: '0',
   LogicalKeyboardKey.numpad1.keyId: '1',
   LogicalKeyboardKey.numpad2.keyId: '2',
