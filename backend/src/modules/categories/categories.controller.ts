@@ -1,8 +1,26 @@
-import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Logger,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Role } from '@prisma/client';
+import type { Express } from 'express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../common/upload.constants';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoriesService } from './categories.service';
@@ -55,5 +73,35 @@ export class CategoriesController {
   @Roles(Role.ADMIN)
   remove(@Param('id') id: string) {
     return this.categoriesService.remove(id);
+  }
+
+  @Post(':id/image')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: MAX_IMAGE_BYTES },
+      fileFilter: (_req: unknown, file: Express.Multer.File, cb) => {
+        if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+          cb(new BadRequestException('Tipo de archivo inválido'), false);
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  uploadImage(@Param('id') id: string, @UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Imagen requerida');
+    }
+    return this.categoriesService.uploadImage(id, file);
+  }
+
+  @Delete(':id/image')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  deleteImage(@Param('id') id: string) {
+    return this.categoriesService.deleteImage(id);
   }
 }

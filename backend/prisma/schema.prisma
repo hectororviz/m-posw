@@ -30,6 +30,8 @@ model Category {
   name      String
   iconName  String
   colorHex  String
+  imagePath String?
+  imageUpdatedAt DateTime?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -42,6 +44,8 @@ model Product {
   price      Decimal  @db.Decimal(10, 2)
   iconName   String?
   colorHex   String?
+  imagePath String?
+  imageUpdatedAt DateTime?
   active     Boolean  @default(true)
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])

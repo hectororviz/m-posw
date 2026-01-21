@@ -1,4 +1,6 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { Express } from 'express';
+import { buildImageRelativePath, deleteImageFolder, saveImageFile } from '../common/image-storage';
 import { PrismaService } from '../common/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -63,5 +65,35 @@ export class CategoriesService {
       throw new ConflictException('No se puede borrar: tiene productos asociados');
     }
     return this.prisma.category.delete({ where: { id } });
+  }
+
+  async uploadImage(id: string, file: Express.Multer.File) {
+    const category = await this.prisma.category.findUnique({ where: { id } });
+    if (!category) {
+      throw new NotFoundException('Categoría no encontrada');
+    }
+    await saveImageFile('categories', id, file);
+    return this.prisma.category.update({
+      where: { id },
+      data: {
+        imagePath: buildImageRelativePath('categories', id),
+        imageUpdatedAt: new Date(),
+      },
+    });
+  }
+
+  async deleteImage(id: string) {
+    const category = await this.prisma.category.findUnique({ where: { id } });
+    if (!category) {
+      throw new NotFoundException('Categoría no encontrada');
+    }
+    await deleteImageFolder('categories', id);
+    return this.prisma.category.update({
+      where: { id },
+      data: {
+        imagePath: null,
+        imageUpdatedAt: null,
+      },
+    });
   }
 }
