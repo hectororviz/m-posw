@@ -590,11 +590,9 @@ class _PosScreenState extends State<PosScreen> {
                                                       _selectedItemId = null;
                                                     });
                                                   },
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                  child: Stack(
                                                     children: [
-                                                      Expanded(
-                                                        flex: 8,
+                                                      Positioned.fill(
                                                         child: Padding(
                                                           padding: const EdgeInsets.all(6),
                                                           child: buildFillImageOrIcon(
@@ -605,34 +603,24 @@ class _PosScreenState extends State<PosScreen> {
                                                           ),
                                                         ),
                                                       ),
-                                                      Expanded(
-                                                        flex: 2,
+                                                      Positioned(
+                                                        top: 8,
+                                                        right: 8,
                                                         child: Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                                                          decoration: BoxDecoration(
-                                                            color: Colors.black.withOpacity(0.75),
-                                                            borderRadius: const BorderRadius.vertical(
-                                                              bottom: Radius.circular(12),
-                                                            ),
+                                                          padding: const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
                                                           ),
-                                                          child: Column(
-                                                            mainAxisAlignment: MainAxisAlignment.center,
-                                                            children: [
-                                                              Text(
-                                                                product.name,
-                                                                textAlign: TextAlign.center,
-                                                                maxLines: 1,
-                                                                overflow: TextOverflow.ellipsis,
-                                                                style: const TextStyle(
-                                                                  color: Colors.white,
-                                                                  fontWeight: FontWeight.w600,
-                                                                ),
-                                                              ),
-                                                              Text(
-                                                                '\$${product.price.toStringAsFixed(2)}',
-                                                                style: const TextStyle(color: Colors.white),
-                                                              ),
-                                                            ],
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.black.withOpacity(0.7),
+                                                            borderRadius: BorderRadius.circular(12),
+                                                          ),
+                                                          child: Text(
+                                                            '\$${product.price.toStringAsFixed(2)}',
+                                                            style: const TextStyle(
+                                                              color: Colors.white,
+                                                              fontWeight: FontWeight.w600,
+                                                            ),
                                                           ),
                                                         ),
                                                       ),
@@ -674,46 +662,14 @@ class _PosScreenState extends State<PosScreen> {
                                                   border: Border.all(color: background, width: 3),
                                                   borderRadius: BorderRadius.circular(16),
                                                 ),
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                                  children: [
-                                                    Expanded(
-                                                      flex: 8,
-                                                      child: Padding(
-                                                        padding: const EdgeInsets.all(6),
-                                                        child: buildFillImageOrIcon(
-                                                          imageUrl: imageUrl,
-                                                          iconName: category.iconName,
-                                                          iconColor: foreground,
-                                                          cacheSize: 256,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    Expanded(
-                                                      flex: 2,
-                                                      child: Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.black.withOpacity(0.75),
-                                                          borderRadius: const BorderRadius.vertical(
-                                                            bottom: Radius.circular(12),
-                                                          ),
-                                                        ),
-                                                        alignment: Alignment.center,
-                                                        child: Text(
-                                                          category.name,
-                                                          textAlign: TextAlign.center,
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                          style: const TextStyle(
-                                                            fontSize: 14,
-                                                            color: Colors.white,
-                                                            fontWeight: FontWeight.w600,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(6),
+                                                  child: buildFillImageOrIcon(
+                                                    imageUrl: imageUrl,
+                                                    iconName: category.iconName,
+                                                    iconColor: foreground,
+                                                    cacheSize: 256,
+                                                  ),
                                                 ),
                                               ),
                                             );
