@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:html' as html;
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
@@ -11,13 +11,15 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'config/app_config.dart';
+import 'data/repositories/catalog_repository.dart';
 import 'icons/material_symbol_resolver.dart';
 import 'pickers.dart';
+import 'platform/web_utils.dart';
+import 'ui/backend_config_screen.dart';
 
-const apiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'http://localhost:3000',
-);
+final Stopwatch appStartupStopwatch = Stopwatch()..start();
+String get apiBaseUrl => AppConfig.instance.baseUrl.value;
 
 final Map<int, String> _numpadTextMap = {
   LogicalKeyboardKey.numpad0.keyId: '0',
@@ -89,6 +91,7 @@ String? _mimeTypeFromFilename(String filename) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.initialize();
   final token = await AuthTokenStore.load();
   runApp(MiBpsApp(initialToken: token));
 }
@@ -141,6 +144,11 @@ class _MiBpsAppState extends State<MiBpsApp> {
       PaymentMethodStore.syncFromSetting(value);
     });
     PaymentMethodStore.load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (kDebugMode) {
+        debugPrint('App first frame in ${appStartupStopwatch.elapsedMilliseconds}ms');
+      }
+    });
   }
 
   Future<void> _handleUnauthorized() async {
@@ -209,6 +217,66 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int selectedIndex = 0;
+  int _hiddenTapCount = 0;
+  Timer? _hiddenTapTimer;
+
+  void _registerHiddenTap() {
+    _hiddenTapTimer?.cancel();
+    _hiddenTapCount += 1;
+    if (_hiddenTapCount >= 7) {
+      _hiddenTapCount = 0;
+      _openConfig();
+      return;
+    }
+    _hiddenTapTimer = Timer(const Duration(seconds: 3), () {
+      _hiddenTapCount = 0;
+    });
+  }
+
+  Future<void> _openConfig() async {
+    final configPin = AppConfig.instance.configPin;
+    if (configPin != null && configPin.isNotEmpty) {
+      final controller = TextEditingController();
+      final allowed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('PIN de configuración'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(labelText: 'PIN'),
+            obscureText: true,
+            keyboardType: TextInputType.number,
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim() == configPin),
+              child: const Text('Ingresar'),
+            ),
+          ],
+        ),
+      );
+      if (allowed != true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PIN incorrecto.')),
+          );
+        }
+        return;
+      }
+    }
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BackendConfigScreen()),
+    );
+  }
+
+  @override
+  void dispose() {
+    _hiddenTapTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -245,25 +313,34 @@ class _HomeShellState extends State<HomeShell> {
             final isWide = constraints.maxWidth >= 900;
             return Scaffold(
               appBar: AppBar(
-                title: ValueListenableBuilder<Setting?>(
-                  valueListenable: widget.settingNotifier,
-                  builder: (context, setting, _) {
-                    final logoUrl = (setting?.logoUrl?.isNotEmpty ?? false)
-                        ? resolveApiUrl(setting!.logoUrl!)
-                        : null;
-                    return Row(
-                      children: [
-                        if (logoUrl != null)
+                title: GestureDetector(
+                  onLongPress: _openConfig,
+                  onTap: _registerHiddenTap,
+                  child: ValueListenableBuilder<Setting?>(
+                    valueListenable: widget.settingNotifier,
+                    builder: (context, setting, _) {
+                      final logoUrl = (setting?.logoUrl?.isNotEmpty ?? false)
+                          ? resolveApiUrl(setting!.logoUrl!)
+                          : null;
+                      return Row(
+                        children: [
+                          if (logoUrl != null)
                           Padding(
                             padding: const EdgeInsets.only(right: 12),
-                            child: CircleAvatar(backgroundImage: NetworkImage(logoUrl)),
+                            child: CircleAvatar(backgroundImage: CachedNetworkImageProvider(logoUrl)),
                           ),
-                        Text(setting?.storeName ?? 'MiBPS'),
-                      ],
-                    );
-                  },
+                          Text(setting?.storeName ?? 'MiBPS'),
+                        ],
+                      );
+                    },
+                  ),
                 ),
                 actions: [
+                  IconButton(
+                    onPressed: _openConfig,
+                    icon: const Icon(Icons.settings),
+                    tooltip: 'Configuración backend',
+                  ),
                   TextButton.icon(
                     onPressed: () async {
                       await AuthTokenStore.clear();
@@ -443,10 +520,14 @@ class _PosScreenState extends State<PosScreen> {
   String? _selectedItemId;
   bool _isCartCollapsed = false;
   bool _didSetInitialCartState = false;
+  bool _loggedFirstList = false;
+  final CatalogRepository _catalogRepository = CatalogRepository.instance;
 
   @override
   void initState() {
     super.initState();
+    _catalogRepository.syncCatalogIfNeeded();
+    _catalogRepository.logLocalReadTimings();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _keyboardFocusNode.requestFocus();
@@ -466,10 +547,16 @@ class _PosScreenState extends State<PosScreen> {
       autofocus: true,
       focusNode: _keyboardFocusNode,
       onKeyEvent: _handleKeyEvent,
-      child: FutureBuilder<List<Category>>(
-        future: ApiService().getCategories(),
+      child: StreamBuilder<List<Category>>(
+        stream: _catalogRepository.watchCategories(),
         builder: (context, snapshot) {
           final categories = snapshot.data ?? [];
+          if (!_loggedFirstList && categories.isNotEmpty) {
+            _loggedFirstList = true;
+            if (kDebugMode) {
+              debugPrint('Time-to-first-list: ${appStartupStopwatch.elapsedMilliseconds}ms');
+            }
+          }
           final showingProducts = selectedCategory != null;
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -517,10 +604,33 @@ class _PosScreenState extends State<PosScreen> {
                                         )
                                       : Text('Categorías', style: Theme.of(context).textTheme.titleLarge),
                                 ),
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: _catalogRepository.isSyncing,
+                                  builder: (context, syncing, _) {
+                                    if (!syncing) return const SizedBox.shrink();
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: Row(
+                                        children: [
+                                          const SizedBox(
+                                            width: 12,
+                                            height: 12,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Actualizando catálogo...',
+                                            style: Theme.of(context).textTheme.bodySmall,
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                                 Expanded(
                                   child: showingProducts
-                                      ? FutureBuilder<List<Product>>(
-                                          future: ApiService().getProducts(selectedCategory!.id),
+                                      ? StreamBuilder<List<Product>>(
+                                          stream: _catalogRepository.watchProducts(selectedCategory!.id),
                                           builder: (context, productsSnapshot) {
                                             final products = productsSnapshot.data ?? [];
                                             if (kDebugMode) {
@@ -534,6 +644,9 @@ class _PosScreenState extends State<PosScreen> {
                                                 'Products view -> selectedCategoryId=$selectedCategoryId '
                                                 'products=${products.length} matching=$matchingCount',
                                               );
+                                            }
+                                            if (products.isEmpty) {
+                                              return _buildEmptyCatalogState();
                                             }
                                             return GridView.builder(
                                               padding: const EdgeInsets.all(16),
@@ -631,50 +744,52 @@ class _PosScreenState extends State<PosScreen> {
                                             );
                                           },
                                         )
-                                      : GridView.builder(
-                                          padding: const EdgeInsets.all(16),
-                                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                            crossAxisCount: 2,
-                                            childAspectRatio: 1.2,
-                                            crossAxisSpacing: 12,
-                                            mainAxisSpacing: 12,
-                                          ),
-                                          itemCount: categories.length,
-                                          itemBuilder: (context, index) {
-                                            final category = categories[index];
-                                            final background = colorFromHex(category.colorHex) ??
-                                                Theme.of(context).colorScheme.primaryContainer;
-                                            final foreground = foregroundColorFor(background);
-                                            final imageUrl = resolveImageUrl(
-                                              category.imagePath,
-                                              category.imageUpdatedAt,
-                                            );
-                                            return InkWell(
-                                              borderRadius: BorderRadius.circular(16),
-                                              onTap: () {
-                                                if (kDebugMode) {
-                                                  debugPrint('Selected category: ${category.id}');
-                                                }
-                                                setState(() => selectedCategory = category);
-                                              },
-                                              child: Ink(
-                                                decoration: BoxDecoration(
-                                                  border: Border.all(color: background, width: 3),
-                                                  borderRadius: BorderRadius.circular(16),
-                                                ),
-                                                child: Padding(
-                                                  padding: const EdgeInsets.all(6),
-                                                  child: buildFillImageOrIcon(
-                                                    imageUrl: imageUrl,
-                                                    iconName: category.iconName,
-                                                    iconColor: foreground,
-                                                    cacheSize: 256,
-                                                  ),
-                                                ),
+                                      : categories.isEmpty
+                                          ? _buildEmptyCatalogState()
+                                          : GridView.builder(
+                                              padding: const EdgeInsets.all(16),
+                                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                                crossAxisCount: 2,
+                                                childAspectRatio: 1.2,
+                                                crossAxisSpacing: 12,
+                                                mainAxisSpacing: 12,
                                               ),
-                                            );
-                                          },
-                                        ),
+                                              itemCount: categories.length,
+                                              itemBuilder: (context, index) {
+                                                final category = categories[index];
+                                                final background = colorFromHex(category.colorHex) ??
+                                                    Theme.of(context).colorScheme.primaryContainer;
+                                                final foreground = foregroundColorFor(background);
+                                                final imageUrl = resolveImageUrl(
+                                                  category.imagePath,
+                                                  category.imageUpdatedAt,
+                                                );
+                                                return InkWell(
+                                                  borderRadius: BorderRadius.circular(16),
+                                                  onTap: () {
+                                                    if (kDebugMode) {
+                                                      debugPrint('Selected category: ${category.id}');
+                                                    }
+                                                    setState(() => selectedCategory = category);
+                                                  },
+                                                  child: Ink(
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(color: background, width: 3),
+                                                      borderRadius: BorderRadius.circular(16),
+                                                    ),
+                                                    child: Padding(
+                                                      padding: const EdgeInsets.all(6),
+                                                      child: buildFillImageOrIcon(
+                                                        imageUrl: imageUrl,
+                                                        iconName: category.iconName,
+                                                        iconColor: foreground,
+                                                        cacheSize: 256,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                 ),
                               ],
                             ),
@@ -809,6 +924,32 @@ class _PosScreenState extends State<PosScreen> {
                 ],
               );
             },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyCatalogState() {
+    return Center(
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _catalogRepository.isSyncing,
+        builder: (context, syncing, _) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (syncing)
+                const CircularProgressIndicator()
+              else
+                const Icon(Icons.cloud_off, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                syncing
+                    ? 'Sincronizando catálogo...'
+                    : 'Sin datos locales. Conéctate para descargar el catálogo.',
+                textAlign: TextAlign.center,
+              ),
+            ],
           );
         },
       ),
@@ -2334,11 +2475,22 @@ class _CategoryDialogState extends State<CategoryDialog> {
                     fit: BoxFit.cover,
                   );
                 } else if (imageUrl != null) {
-                  preview = Image.network(
-                    imageUrl,
+                  preview = CachedNetworkImage(
+                    imageUrl: imageUrl,
                     width: 160,
                     height: 160,
                     fit: BoxFit.cover,
+                    placeholder: (context, url) => const SizedBox(
+                      width: 160,
+                      height: 160,
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 160,
+                      height: 160,
+                      color: Theme.of(context).colorScheme.surfaceVariant,
+                      child: const Icon(Icons.image_not_supported),
+                    ),
                   );
                 } else {
                   preview = Container(
@@ -2673,11 +2825,22 @@ class _ProductDialogState extends State<ProductDialog> {
                         fit: BoxFit.cover,
                       );
                     } else if (imageUrl != null) {
-                      preview = Image.network(
-                        imageUrl,
+                      preview = CachedNetworkImage(
+                        imageUrl: imageUrl,
                         width: 160,
                         height: 160,
                         fit: BoxFit.cover,
+                        placeholder: (context, url) => const SizedBox(
+                          width: 160,
+                          height: 160,
+                          child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          width: 160,
+                          height: 160,
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          child: const Icon(Icons.image_not_supported),
+                        ),
                       );
                     } else {
                       preview = Container(
@@ -3511,6 +3674,7 @@ class Category {
     required this.active,
     this.imagePath,
     this.imageUpdatedAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -3520,6 +3684,7 @@ class Category {
   final bool active;
   final String? imagePath;
   final DateTime? imageUpdatedAt;
+  final DateTime? updatedAt;
 
   factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json['id'] as String,
@@ -3530,6 +3695,7 @@ class Category {
         imagePath: json['imagePath'] as String?,
         imageUpdatedAt:
             json['imageUpdatedAt'] != null ? DateTime.parse(json['imageUpdatedAt'] as String) : null,
+        updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'] as String) : null,
       );
 }
 
@@ -3547,6 +3713,7 @@ class Product {
     this.categoryColorHex,
     this.imagePath,
     this.imageUpdatedAt,
+    this.updatedAt,
   });
 
   final String id;
@@ -3561,6 +3728,7 @@ class Product {
   final String? categoryColorHex;
   final String? imagePath;
   final DateTime? imageUpdatedAt;
+  final DateTime? updatedAt;
 
   static double _priceFromJson(dynamic value) {
     if (value is num) return value.toDouble();
@@ -3588,6 +3756,7 @@ class Product {
         imagePath: json['imagePath'] as String?,
         imageUpdatedAt:
             json['imageUpdatedAt'] != null ? DateTime.parse(json['imageUpdatedAt'] as String) : null,
+        updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'] as String) : null,
       );
 }
 
@@ -3716,14 +3885,21 @@ Widget buildImageOrIcon({
   if (imageUrl != null && imageUrl.isNotEmpty) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        imageUrl,
+      child: CachedNetworkImage(
+        imageUrl: imageUrl,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        cacheWidth: cacheSize?.round(),
-        cacheHeight: cacheSize?.round(),
-        errorBuilder: (context, error, stackTrace) => Icon(
+        memCacheWidth: cacheSize?.round(),
+        memCacheHeight: cacheSize?.round(),
+        placeholder: (context, url) => Center(
+          child: SizedBox(
+            width: size * 0.3,
+            height: size * 0.3,
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) => Icon(
           resolveMaterialSymbol(iconName),
           size: size * 0.7,
           color: iconColor,
@@ -3749,14 +3925,21 @@ Widget buildFillImageOrIcon({
       if (imageUrl != null && imageUrl.isNotEmpty) {
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            imageUrl,
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
             width: constraints.maxWidth,
             height: constraints.maxHeight,
             fit: BoxFit.cover,
-            cacheWidth: cacheSize?.round(),
-            cacheHeight: cacheSize?.round(),
-            errorBuilder: (context, error, stackTrace) => Icon(
+            memCacheWidth: cacheSize?.round(),
+            memCacheHeight: cacheSize?.round(),
+            placeholder: (context, url) => Center(
+              child: SizedBox(
+                width: constraints.biggest.shortestSide * 0.3,
+                height: constraints.biggest.shortestSide * 0.3,
+                child: const CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            errorWidget: (context, url, error) => Icon(
               resolveMaterialSymbol(iconName),
               size: constraints.biggest.shortestSide * 0.5,
               color: iconColor,
@@ -3771,16 +3954,4 @@ Widget buildFillImageOrIcon({
       );
     },
   );
-}
-
-void updateFavicon(String url) {
-  final link = html.document.querySelector('link[rel=\"icon\"]') as html.LinkElement?;
-  if (link == null) {
-    final newLink = html.LinkElement()
-      ..rel = 'icon'
-      ..href = url;
-    html.document.head?.append(newLink);
-    return;
-  }
-  link.href = url;
 }
