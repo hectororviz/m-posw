@@ -120,9 +120,7 @@ String? _mimeTypeFromFilename(String filename) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kDebugMode) {
-    debugPrint('API base URL: ${AppConfig.apiBaseUrl}');
-  }
+  print('API_BASE_URL_EFFECTIVE=${AppConfig.apiBaseUrl}');
   final token = await AuthTokenStore.load();
   runApp(MiBpsApp(initialToken: token));
 }
@@ -372,14 +370,14 @@ class _LoginScreenState extends State<LoginScreen> {
     if (statusCode == 400) {
       final details = exception.backendMessage?.trim();
       if (details != null && details.isNotEmpty) {
-        return 'Datos inválidos\n$details';
+        return details;
       }
       return 'Datos inválidos';
     }
     if (statusCode == 401 || statusCode == 403) {
       return 'Credenciales inválidas';
     }
-    return 'Error inesperado';
+    return 'Error de conexión';
   }
 
   @override
@@ -399,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: usernameController,
-                    decoration: const InputDecoration(labelText: 'Email/Usuario'),
+                    decoration: const InputDecoration(labelText: 'Usuario'),
                     autofillHints: const [],
                     enableSuggestions: false,
                     autocorrect: false,
@@ -429,22 +427,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: loading
                         ? null
                         : () async {
-                            setState(() {
-                              loading = true;
-                              error = null;
-                            });
                             try {
+                              print('LOGIN_CLICK');
+                              print(
+                                'username=${usernameController.text} '
+                                'passwordLen=${passwordController.text.length}',
+                              );
+                              setState(() {
+                                loading = true;
+                                error = null;
+                              });
                               final token = await ApiService()
                                   .login(usernameController.text, passwordController.text);
                               widget.onLoggedIn(token);
-                            } on LoginException catch (e) {
+                            } on LoginException catch (e, stackTrace) {
+                              print('LOGIN_ERROR: $e');
+                              print(stackTrace);
                               final message = _buildLoginErrorMessage(e);
                               setState(() => error = message);
-                            } on TimeoutException {
+                            } on TimeoutException catch (e, stackTrace) {
+                              print('LOGIN_TIMEOUT: $e');
+                              print(stackTrace);
                               setState(() => error = 'Error de conexión');
-                            } on http.ClientException {
+                            } on http.ClientException catch (e, stackTrace) {
+                              print('LOGIN_CLIENT_ERROR: $e');
+                              print(stackTrace);
                               setState(() => error = 'Error de conexión');
-                            } catch (_) {
+                            } catch (e, stackTrace) {
+                              print('LOGIN_UNEXPECTED_ERROR: $e');
+                              print(stackTrace);
                               setState(() => error = 'Error inesperado');
                             } finally {
                               setState(() => loading = false);
@@ -2783,13 +2794,13 @@ class ApiService {
 
   Future<String> login(String username, String password) async {
     final uri = Uri.parse('${AppConfig.apiBaseUrl}/auth/login');
-    debugPrint('Login request: $uri');
+    print('LOGIN_REQUEST url=$uri body=${jsonEncode({'username': username})}');
     final response = await apiClient.post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
     );
-    debugPrint('Login response status: ${response.statusCode}');
+    print('LOGIN_RESPONSE status=${response.statusCode}');
     if (response.statusCode != 201 && response.statusCode != 200) {
       throw LoginException(
         statusCode: response.statusCode,
