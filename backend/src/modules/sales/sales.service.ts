@@ -5,6 +5,12 @@ import { PrismaService } from '../common/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 
+const NON_PAYABLE_STATUSES = new Set<SaleStatus>([
+  SaleStatus.CANCELLED,
+  SaleStatus.EXPIRED,
+  SaleStatus.FAILED,
+]);
+
 @Injectable()
 export class SalesService {
   private readonly paymentExpirationMinutes = 10;
@@ -96,7 +102,7 @@ export class SalesService {
     if (sale.status === SaleStatus.PAID) {
       throw new BadRequestException('La venta ya está pagada');
     }
-    if ([SaleStatus.CANCELLED, SaleStatus.EXPIRED, SaleStatus.FAILED].includes(sale.status)) {
+    if (NON_PAYABLE_STATUSES.has(sale.status)) {
       throw new BadRequestException('La venta no puede cobrarse en este estado');
     }
     if (!sale.user.externalPosId) {
