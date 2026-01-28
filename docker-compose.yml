@@ -34,6 +34,11 @@ services:
       - "3000:3000"
     volumes:
       - uploads_data:/data/uploads
+    networks:
+      shared_proxy:
+        aliases:
+          - pos-backend
+      default: {}
 
   frontend:
     build:
