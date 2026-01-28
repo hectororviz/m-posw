@@ -97,7 +97,7 @@ model SaleItem {
 model Session {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @db.Uuid
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   revokedAt DateTime?
 
@@ -113,7 +113,7 @@ model MercadoPagoPayment {
   payload   Json?
   createdAt DateTime @default(now())
 
-  sale Sale @relation(fields: [saleId], references: [id])
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([saleId])
 }
