@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma.service';
@@ -21,24 +21,16 @@ export class AuthService {
 
   async login(username: string, password: string) {
     const user = await this.validateUser(username, password);
-    const existingSession = await this.prisma.session.findFirst({
-      where: { userId: user.id, revokedAt: null },
-    });
-    if (existingSession) {
-      const sessionAgeMs = Date.now() - existingSession.createdAt.getTime();
-      const maxSessionMs = 12 * 60 * 60 * 1000;
-      if (sessionAgeMs < maxSessionMs) {
-        throw new ConflictException('Cuenta en uso');
-      }
-      await this.prisma.session.update({
-        where: { id: existingSession.id },
+    const session = await this.prisma.$transaction(async (tx) => {
+      await tx.session.updateMany({
+        where: { userId: user.id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-    }
-    const session = await this.prisma.session.create({
-      data: {
-        userId: user.id,
-      },
+      return tx.session.create({
+        data: {
+          userId: user.id,
+        },
+      });
     });
     const payload = { sub: user.id, role: user.role, name: user.name, sessionId: session.id };
     return {

@@ -1,13 +1,13 @@
-import { ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../common/prisma.service';
 
 describe('AuthService', () => {
-  it('bloquea login si existe una sesión activa', async () => {
+  it('revoca la sesión activa anterior y permite re-login', async () => {
     const prisma = {
+      $transaction: jest.fn(),
       session: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'session-1', createdAt: new Date() }),
+        updateMany: jest.fn(),
         create: jest.fn(),
       },
       user: {
@@ -27,7 +27,18 @@ describe('AuthService', () => {
       role: 'USER',
     } as any);
 
-    await expect(service.login('Caja01', 'password')).rejects.toBeInstanceOf(ConflictException);
-    expect(prisma.session.create).not.toHaveBeenCalled();
+    prisma.$transaction.mockImplementation(async (callback: (tx: PrismaService) => Promise<unknown>) =>
+      callback(prisma),
+    );
+    prisma.session.create.mockResolvedValue({ id: 'session-2' });
+
+    const result = await service.login('Caja01', 'password');
+
+    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(prisma.session.create).toHaveBeenCalled();
+    expect(result).toEqual({ accessToken: undefined, user: { id: 'user-1', name: 'Caja01', email: null, role: 'USER' } });
   });
 });
