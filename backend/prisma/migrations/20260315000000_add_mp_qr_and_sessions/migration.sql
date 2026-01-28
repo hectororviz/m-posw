@@ -17,8 +17,8 @@ ADD COLUMN     "failedAt" TIMESTAMP(3);
 
 -- CreateTable
 CREATE TABLE "Session" (
-    "id" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "userId" UUID NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "revokedAt" TIMESTAMP(3),
 

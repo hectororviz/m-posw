@@ -49,6 +49,23 @@ También se crea la caja `Caja01` (role USER) con:
 
 Configurable mediante `CORS_ORIGIN` en `.env`.
 
+## Reset de base de datos (desarrollo)
+
+Para limpiar la base de datos local y reaplicar migraciones:
+
+```bash
+cd backend
+npx prisma migrate reset --force
+```
+
+Si necesitás conservar datos y ya hay una migración fallida, podés resolverla manualmente y ajustar la columna con:
+
+```bash
+cd backend
+npx prisma migrate resolve --applied 20260315000000_add_mp_qr_and_sessions
+psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID USING "userId"::uuid;'
+```
+
 ## Variables de entorno relevantes
 
 - `DATABASE_URL`: conexión a PostgreSQL (usada por Prisma).
