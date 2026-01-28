@@ -13,6 +13,15 @@ enum Role {
   USER
 }
 
+enum SaleStatus {
+  OPEN
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  EXPIRED
+  FAILED
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String?  @unique
@@ -20,9 +29,12 @@ model User {
   name      String   @unique
   role      Role     @default(USER)
   active    Boolean  @default(true)
+  externalPosId   String?
+  externalStoreId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sales     Sale[]
+  sessions  Session[]
 }
 
 model Category {
@@ -57,10 +69,19 @@ model Product {
 model Sale {
   id        String     @id @default(uuid())
   createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   total     Decimal    @db.Decimal(10, 2)
+  status    SaleStatus @default(OPEN)
+  statusUpdatedAt DateTime @default(now())
+  paymentStartedAt DateTime?
+  paidAt    DateTime?
+  cancelledAt DateTime?
+  expiredAt DateTime?
+  failedAt  DateTime?
   userId    String
   user      User       @relation(fields: [userId], references: [id])
   items     SaleItem[]
+  mercadoPagoPayments MercadoPagoPayment[]
 }
 
 model SaleItem {
@@ -73,12 +94,35 @@ model SaleItem {
   product   Product  @relation(fields: [productId], references: [id])
 }
 
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  @@index([userId, revokedAt])
+}
+
+model MercadoPagoPayment {
+  id        String   @id @default(uuid())
+  saleId    String
+  paymentId String?
+  status    String
+  approvedAt DateTime?
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id])
+
+  @@index([saleId])
+}
+
 model Setting {
   id          String   @id @default(uuid())
   storeName   String
   logoUrl     String?
   faviconUrl  String?
-  qrImageDataUrl String?
   accentColor String?  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

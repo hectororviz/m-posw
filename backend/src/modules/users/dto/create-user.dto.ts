@@ -16,4 +16,12 @@ export class CreateUserDto {
   @IsEnum(Role)
   @IsOptional()
   role?: Role;
+
+  @IsOptional()
+  @IsString()
+  externalPosId?: string;
+
+  @IsOptional()
+  @IsString()
+  externalStoreId?: string;
 }

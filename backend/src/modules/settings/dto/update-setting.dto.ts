@@ -15,9 +15,5 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsString()
-  qrImageDataUrl?: string;
-
-  @IsOptional()
-  @IsString()
   accentColor?: string;
 }

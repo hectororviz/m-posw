@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:typed_data';
@@ -141,9 +142,7 @@ class _MiBpsAppState extends State<MiBpsApp> {
     );
     ApiService().getSettings().then((value) {
       settings.value = value;
-      PaymentMethodStore.syncFromSetting(value);
     });
-    PaymentMethodStore.load();
   }
 
   Future<void> _handleUnauthorized() async {
@@ -269,6 +268,11 @@ class _HomeShellState extends State<HomeShell> {
                 actions: [
                   TextButton.icon(
                     onPressed: () async {
+                      try {
+                        await ApiService().logout();
+                      } catch (_) {
+                        // Ignore logout failures.
+                      }
                       await AuthTokenStore.clear();
                       widget.authState.value = null;
                     },
@@ -954,52 +958,47 @@ class _PosScreenState extends State<PosScreen> {
       if (!confirmed) {
         return;
       }
-    } else if (selected.type == PaymentMethodType.qr) {
-      final confirmed = await _showQrPaymentDialog(context, selected);
-      if (!confirmed) {
-        return;
-      }
+      await _submitSale(context);
+      return;
     }
-    await _submitSale(context);
+    if (selected.type == PaymentMethodType.mercadoPagoQr) {
+      await _startMercadoPagoPayment(context);
+    }
   }
 
   Future<PaymentMethod?> _showPaymentSelectionDialog(BuildContext context) {
     return showDialog<PaymentMethod>(
       context: context,
       builder: (context) {
-        return ValueListenableBuilder<List<PaymentMethod>>(
-          valueListenable: PaymentMethodStore.methods,
-          builder: (context, methods, _) {
-            final available = methods
-                .where((method) => method.type == PaymentMethodType.cash || method.enabled)
-                .toList();
-            return AlertDialog(
-              title: const Text('Elegí un medio de pago'),
-              content: SizedBox(
-                width: 360,
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: available.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final method = available[index];
-                    return ListTile(
-                      leading: Icon(method.type.icon),
-                      title: Text(method.name),
-                      subtitle: Text(method.type.label),
-                      onTap: () => Navigator.of(context).pop(method),
-                    );
-                  },
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-              ],
-            );
-          },
+        final available = [
+          PaymentMethod.cash(),
+          PaymentMethod.mercadoPagoQr(),
+        ];
+        return AlertDialog(
+          title: const Text('Elegí un medio de pago'),
+          content: SizedBox(
+            width: 360,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: available.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final method = available[index];
+                return ListTile(
+                  leading: Icon(method.type.icon),
+                  title: Text(method.name),
+                  subtitle: Text(method.type.label),
+                  onTap: () => Navigator.of(context).pop(method),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar'),
+            ),
+          ],
         );
       },
     );
@@ -1068,74 +1067,6 @@ class _PosScreenState extends State<PosScreen> {
     return result ?? false;
   }
 
-  Future<bool> _showQrPaymentDialog(BuildContext context, PaymentMethod method) async {
-    return (await showDialog<bool>(
-          context: context,
-          builder: (context) {
-            final media = MediaQuery.of(context);
-            final maxWidth = media.size.width - 32;
-            final maxHeight = media.size.height - 64;
-            return Dialog(
-              insetPadding: const EdgeInsets.all(16),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: maxWidth.clamp(320, 720),
-                  maxHeight: maxHeight,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Pago en ${method.name}',
-                        style: Theme.of(context).textTheme.titleLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Total: \$${cartTotal.toStringAsFixed(2)}',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: Center(
-                          child: _QrPreview(
-                            dataUrl: method.qrImageDataUrl,
-                            size: (maxWidth * 0.8).clamp(240, 480),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Escaneá el QR para completar el pago.',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Cancelar'),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            child: const Text('Confirmar pago'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        )) ??
-        false;
-  }
-
   double _parseAmount(String value) {
     final normalized = value.replaceAll(',', '.');
     return double.tryParse(normalized) ?? 0;
@@ -1153,6 +1084,93 @@ class _PosScreenState extends State<PosScreen> {
         const SnackBar(content: Text('Venta registrada')),
       );
     }
+  }
+
+  Future<void> _startMercadoPagoPayment(BuildContext context) async {
+    try {
+      final createdSale = await ApiService().createSale(cart.values.toList());
+      await ApiService().startMercadoPagoPayment(createdSale.id);
+      final paid = await _showMercadoPagoWaitingDialog(context, createdSale);
+      if (paid) {
+        setState(() {
+          cart.clear();
+          _quantityBuffer = '';
+          _selectedItemId = null;
+        });
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pago confirmado')),
+          );
+        }
+      }
+    } catch (err) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    }
+  }
+
+  Future<bool> _showMercadoPagoWaitingDialog(BuildContext context, Sale sale) async {
+    final statusNotifier = ValueNotifier<String>(sale.status);
+    Timer? timer;
+
+    Future<void> pollSale() async {
+      try {
+        final updated = await ApiService().getSale(sale.id);
+        statusNotifier.value = updated.status;
+        if (updated.status == 'PAID' || updated.status == 'CANCELLED' || updated.status == 'EXPIRED') {
+          timer?.cancel();
+          if (context.mounted) {
+            Navigator.of(context).pop(updated.status == 'PAID');
+          }
+        }
+      } catch (_) {
+        // Ignore polling errors for now.
+      }
+    }
+
+    timer = Timer.periodic(const Duration(seconds: 2), (_) => pollSale());
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Esperando pago...'),
+          content: ValueListenableBuilder<String>(
+            valueListenable: statusNotifier,
+            builder: (context, status, _) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Total: \$${sale.total.toStringAsFixed(2)}'),
+                  const SizedBox(height: 12),
+                  Text('Estado: $status'),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await ApiService().cancelMercadoPagoPayment(sale.id);
+                timer?.cancel();
+                if (context.mounted) {
+                  Navigator.of(context).pop(false);
+                }
+              },
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    timer?.cancel();
+    statusNotifier.dispose();
+    return result ?? false;
   }
 }
 
@@ -1229,7 +1247,10 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
               (user) => Card(
                 child: ListTile(
                   title: Text(user.name),
-                  subtitle: Text('${user.email ?? 'Sin correo'} · ${user.role}'),
+                  subtitle: Text(
+                    '${user.email ?? 'Sin correo'} · ${user.role}'
+                    '${user.externalPosId != null ? ' · POS: ${user.externalPosId}' : ''}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1758,65 +1779,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           },
           child: const Text('Guardar cambios'),
         ),
-        const SizedBox(height: 24),
-        Text('Medios de pago', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 12),
-        ValueListenableBuilder<List<PaymentMethod>>(
-          valueListenable: PaymentMethodStore.methods,
-          builder: (context, methods, _) {
-            return Card(
-              child: Column(
-                children: [
-                  for (final method in methods)
-                    ListTile(
-                      leading: Icon(method.type.icon),
-                      title: Text(method.name),
-                      subtitle: Text(method.type == PaymentMethodType.cash
-                          ? 'Siempre disponible'
-                          : method.type.label),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (method.type != PaymentMethodType.cash)
-                            Switch(
-                              value: method.enabled,
-                              onChanged: (value) {
-                                final updated = method.copyWith(enabled: value);
-                                PaymentMethodStore.upsert(updated);
-                              },
-                            ),
-                          if (method.type != PaymentMethodType.cash) ...[
-                            IconButton(
-                              tooltip: 'Editar',
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _showPaymentMethodDialog(method),
-                            ),
-                            IconButton(
-                              tooltip: 'Eliminar',
-                              icon: const Icon(Icons.delete),
-                              onPressed: () => _removePaymentMethod(context, method),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  const Divider(height: 1),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: FilledButton.icon(
-                        onPressed: _showPaymentMethodDialog,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Agregar medio'),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
       ],
     );
   }
@@ -1876,134 +1838,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return _PickedFile(bytes: bytes, filename: file.name, mimeType: file.type);
   }
 
-  Future<String?> _pickImageDataUrl() async {
-    final uploadInput = html.FileUploadInputElement()..accept = 'image/*';
-    uploadInput.click();
-    await uploadInput.onChange.first;
-    final file = uploadInput.files?.first;
-    if (file == null) {
-      return null;
-    }
-    final reader = html.FileReader();
-    reader.readAsDataUrl(file);
-    await reader.onLoad.first;
-    return reader.result as String?;
-  }
-
-  Future<void> _showPaymentMethodDialog([PaymentMethod? method]) async {
-    final nameController = TextEditingController(text: method?.name ?? 'QR');
-    String? dataUrl = method?.qrImageDataUrl;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(method == null ? 'Agregar medio de pago' : 'Editar medio de pago'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Nombre'),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Tipo'),
-                      Chip(label: Text(PaymentMethodType.qr.label)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _QrPreview(dataUrl: dataUrl),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () async {
-                        final picked = await _pickImageDataUrl();
-                        if (picked != null) {
-                          setState(() => dataUrl = picked);
-                        }
-                      },
-                      icon: const Icon(Icons.upload),
-                      label: const Text('Subir QR'),
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    final trimmed = nameController.text.trim();
-                    final updated = (method ?? PaymentMethod.qr(id: PaymentMethodStore.newId()))
-                        .copyWith(
-                          name: trimmed.isEmpty ? 'QR' : trimmed,
-                          qrImageDataUrl: dataUrl,
-                        );
-                    PaymentMethodStore.upsert(updated);
-                    try {
-                      await ApiService().updateSettingQrImage(qrImageDataUrl: updated.qrImageDataUrl);
-                    } catch (err) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
-                        );
-                      }
-                    }
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('Guardar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    nameController.dispose();
-  }
-
-  Future<void> _removePaymentMethod(BuildContext context, PaymentMethod method) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Eliminar medio de pago'),
-          content: Text('¿Querés eliminar ${method.name}?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Eliminar'),
-            ),
-          ],
-        );
-      },
-    );
-    if (confirm ?? false) {
-      PaymentMethodStore.remove(method.id);
-      if (method.type == PaymentMethodType.qr) {
-        try {
-          await ApiService().updateSettingQrImage(qrImageDataUrl: null);
-        } catch (err) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
-            );
-          }
-        }
-      }
-    }
-  }
 }
 
 class _PickedFile {
@@ -2039,38 +1873,6 @@ class _AssetPreview extends StatelessWidget {
   }
 }
 
-class _QrPreview extends StatelessWidget {
-  const _QrPreview({this.dataUrl, this.size});
-
-  final String? dataUrl;
-  final double? size;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasData = dataUrl != null && dataUrl!.isNotEmpty;
-    final dimension = size ?? 160;
-    return Container(
-      height: dimension,
-      width: dimension,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: Theme.of(context).colorScheme.surfaceVariant,
-        image: hasData ? DecorationImage(image: NetworkImage(dataUrl!), fit: BoxFit.contain) : null,
-      ),
-      child: hasData
-          ? null
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.qr_code, size: 48),
-                SizedBox(height: 8),
-                Text('Sin QR', textAlign: TextAlign.center),
-              ],
-            ),
-    );
-  }
-}
-
 class UserDialog extends StatefulWidget {
   const UserDialog({super.key});
 
@@ -2082,6 +1884,8 @@ class _UserDialogState extends State<UserDialog> {
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final externalPosController = TextEditingController();
+  final externalStoreController = TextEditingController();
   String role = 'USER';
 
   @override
@@ -2108,6 +1912,14 @@ class _UserDialogState extends State<UserDialog> {
               ],
               onChanged: (value) => setState(() => role = value ?? 'USER'),
             ),
+            TextField(
+              controller: externalPosController,
+              decoration: const InputDecoration(labelText: 'externalPosId (caja)'),
+            ),
+            TextField(
+              controller: externalStoreController,
+              decoration: const InputDecoration(labelText: 'externalStoreId (opcional)'),
+            ),
           ],
         ),
       ),
@@ -2121,6 +1933,8 @@ class _UserDialogState extends State<UserDialog> {
                 email: emailController.text,
                 password: passwordController.text,
                 role: role,
+                externalPosId: externalPosController.text,
+                externalStoreId: externalStoreController.text,
               );
               if (context.mounted) {
                 Navigator.pop(context);
@@ -2912,10 +2726,14 @@ class ApiService {
       body: jsonEncode({'username': username, 'password': password}),
     );
     if (response.statusCode != 201 && response.statusCode != 200) {
-      throw Exception('Login failed');
+      throw Exception(_parseErrorMessage(response, fallback: 'Login failed'));
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return data['accessToken'] as String;
+  }
+
+  Future<void> logout() async {
+    await apiClient.post(Uri.parse('$apiBaseUrl/auth/logout'));
   }
 
   Future<Setting> getSettings() async {
@@ -2933,17 +2751,6 @@ class ApiService {
       body: jsonEncode({
         'storeName': storeName,
         'accentColor': accentColor,
-      }),
-    );
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return Setting.fromJson(data);
-  }
-
-  Future<Setting> updateSettingQrImage({required String? qrImageDataUrl}) async {
-    final response = await apiClient.patch(
-      Uri.parse('$apiBaseUrl/settings'),
-      body: jsonEncode({
-        'qrImageDataUrl': qrImageDataUrl,
       }),
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -3192,13 +2999,45 @@ class ApiService {
     }
   }
 
-  Future<void> createSale(List<CartItem> items) async {
-    await apiClient.post(
+  Future<Sale> createSale(List<CartItem> items) async {
+    final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/sales'),
       body: jsonEncode({
         'items': items.map((item) => {'productId': item.product.id, 'quantity': item.quantity}).toList(),
       }),
     );
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo crear la venta'));
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Sale.fromJson(data);
+  }
+
+  Future<void> startMercadoPagoPayment(String saleId) async {
+    final response = await apiClient.post(
+      Uri.parse('$apiBaseUrl/sales/$saleId/payments/mercadopago-qr'),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo iniciar el cobro'));
+    }
+  }
+
+  Future<void> cancelMercadoPagoPayment(String saleId) async {
+    final response = await apiClient.post(
+      Uri.parse('$apiBaseUrl/sales/$saleId/payments/mercadopago-qr/cancel'),
+    );
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo cancelar el cobro'));
+    }
+  }
+
+  Future<Sale> getSale(String saleId) async {
+    final response = await apiClient.get(Uri.parse('$apiBaseUrl/sales/$saleId'));
+    if (response.statusCode >= 400) {
+      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo obtener la venta'));
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Sale.fromJson(data);
   }
 
   Future<List<User>> getUsers() async {
@@ -3212,6 +3051,8 @@ class ApiService {
     String? email,
     required String password,
     required String role,
+    String? externalPosId,
+    String? externalStoreId,
   }) async {
     final trimmedEmail = email?.trim();
     final payload = <String, dynamic>{
@@ -3221,6 +3062,14 @@ class ApiService {
     };
     if (trimmedEmail != null && trimmedEmail.isNotEmpty) {
       payload['email'] = trimmedEmail;
+    }
+    final trimmedPos = externalPosId?.trim();
+    if (trimmedPos != null && trimmedPos.isNotEmpty) {
+      payload['externalPosId'] = trimmedPos;
+    }
+    final trimmedStore = externalStoreId?.trim();
+    if (trimmedStore != null && trimmedStore.isNotEmpty) {
+      payload['externalStoreId'] = trimmedStore;
     }
     final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/users'),
@@ -3321,26 +3170,24 @@ class ApiService {
 }
 
 class Setting {
-  Setting({required this.storeName, this.logoUrl, this.faviconUrl, this.qrImageDataUrl, this.accentColor});
+  Setting({required this.storeName, this.logoUrl, this.faviconUrl, this.accentColor});
 
   final String storeName;
   final String? logoUrl;
   final String? faviconUrl;
-  final String? qrImageDataUrl;
   final String? accentColor;
 
   factory Setting.fromJson(Map<String, dynamic> json) => Setting(
         storeName: json['storeName'] as String,
         logoUrl: json['logoUrl'] as String?,
         faviconUrl: json['faviconUrl'] as String?,
-        qrImageDataUrl: json['qrImageDataUrl'] as String?,
         accentColor: json['accentColor'] as String?,
       );
 }
 
 enum PaymentMethodType {
   cash('Efectivo', Icons.payments),
-  qr('QR', Icons.qr_code_2);
+  mercadoPagoQr('Mercado Pago (QR)', Icons.qr_code_2);
 
   const PaymentMethodType(this.label, this.icon);
 
@@ -3353,140 +3200,23 @@ class PaymentMethod {
     required this.id,
     required this.name,
     required this.type,
-    this.enabled = true,
-    this.qrImageDataUrl,
   });
 
   factory PaymentMethod.cash() => PaymentMethod(
         id: 'cash',
         name: 'Efectivo',
         type: PaymentMethodType.cash,
-        enabled: true,
       );
 
-  factory PaymentMethod.qr({required String id}) => PaymentMethod(
-        id: id,
-        name: 'QR',
-        type: PaymentMethodType.qr,
-        enabled: true,
+  factory PaymentMethod.mercadoPagoQr() => PaymentMethod(
+        id: 'mp_qr',
+        name: 'Mercado Pago (QR)',
+        type: PaymentMethodType.mercadoPagoQr,
       );
-
-  factory PaymentMethod.fromJson(Map<String, dynamic> json) {
-    final type = PaymentMethodType.values.firstWhere(
-      (entry) => entry.name == json['type'],
-      orElse: () => PaymentMethodType.qr,
-    );
-    return PaymentMethod(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      type: type,
-      enabled: json['enabled'] as bool? ?? true,
-      qrImageDataUrl: json['qrImageDataUrl'] as String?,
-    );
-  }
 
   final String id;
   final String name;
   final PaymentMethodType type;
-  final bool enabled;
-  final String? qrImageDataUrl;
-
-  PaymentMethod copyWith({
-    String? name,
-    bool? enabled,
-    String? qrImageDataUrl,
-  }) {
-    return PaymentMethod(
-      id: id,
-      name: name ?? this.name,
-      type: type,
-      enabled: type == PaymentMethodType.cash ? true : (enabled ?? this.enabled),
-      qrImageDataUrl: qrImageDataUrl ?? this.qrImageDataUrl,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'type': type.name,
-        'enabled': enabled,
-        'qrImageDataUrl': qrImageDataUrl,
-      };
-}
-
-class PaymentMethodStore {
-  static const _storageKey = 'payment_methods';
-  static final ValueNotifier<List<PaymentMethod>> methods = ValueNotifier<List<PaymentMethod>>([]);
-
-  static Future<void> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw == null) {
-      methods.value = _defaultMethods();
-      await _persist();
-      return;
-    }
-    final decoded = jsonDecode(raw) as List<dynamic>;
-    final parsed = decoded.map((entry) => PaymentMethod.fromJson(entry as Map<String, dynamic>)).toList();
-    methods.value = _ensureCash(parsed);
-  }
-
-  static Future<void> syncFromSetting(Setting? setting) async {
-    final qrDataUrl = setting?.qrImageDataUrl;
-    if (qrDataUrl == null || qrDataUrl.isEmpty) {
-      return;
-    }
-    final list = [...methods.value];
-    final index = list.indexWhere((entry) => entry.type == PaymentMethodType.qr);
-    if (index == -1) {
-      list.add(PaymentMethod.qr(id: newId()).copyWith(qrImageDataUrl: qrDataUrl));
-    } else {
-      list[index] = list[index].copyWith(qrImageDataUrl: qrDataUrl);
-    }
-    methods.value = _ensureCash(list);
-    await _persist();
-  }
-
-  static Future<void> upsert(PaymentMethod method) async {
-    final list = [...methods.value];
-    final index = list.indexWhere((entry) => entry.id == method.id);
-    if (index == -1) {
-      list.add(method);
-    } else {
-      list[index] = method;
-    }
-    methods.value = _ensureCash(list);
-    await _persist();
-  }
-
-  static Future<void> remove(String id) async {
-    final list = methods.value.where((entry) => entry.id != id).toList();
-    methods.value = _ensureCash(list);
-    await _persist();
-  }
-
-  static String newId() => DateTime.now().microsecondsSinceEpoch.toString();
-
-  static List<PaymentMethod> _defaultMethods() {
-    return [PaymentMethod.cash(), PaymentMethod.qr(id: newId())];
-  }
-
-  static List<PaymentMethod> _ensureCash(List<PaymentMethod> list) {
-    if (list.any((method) => method.type == PaymentMethodType.cash)) {
-      return list
-          .map((method) => method.type == PaymentMethodType.cash ? method.copyWith(enabled: true) : method)
-          .toList();
-    }
-    return [PaymentMethod.cash(), ...list];
-  }
-
-  static Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _storageKey,
-      jsonEncode(methods.value.map((method) => method.toJson()).toList()),
-    );
-  }
 }
 
 class Category {
@@ -3656,14 +3386,38 @@ class AverageRow {
       );
 }
 
+class Sale {
+  Sale({required this.id, required this.total, required this.status});
+
+  final String id;
+  final double total;
+  final String status;
+
+  factory Sale.fromJson(Map<String, dynamic> json) => Sale(
+        id: json['id'] as String,
+        total: json['total'] is num ? (json['total'] as num).toDouble() : double.parse(json['total'].toString()),
+        status: json['status'] as String? ?? 'OPEN',
+      );
+}
+
 class User {
-  User({required this.id, required this.name, required this.email, required this.role, required this.active});
+  User({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.role,
+    required this.active,
+    this.externalPosId,
+    this.externalStoreId,
+  });
 
   final String id;
   final String name;
   final String? email;
   final String role;
   final bool active;
+  final String? externalPosId;
+  final String? externalStoreId;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
         id: json['id'] as String,
@@ -3671,6 +3425,8 @@ class User {
         email: json['email'] as String?,
         role: json['role'] as String,
         active: json['active'] as bool? ?? true,
+        externalPosId: json['externalPosId'] as String?,
+        externalStoreId: json['externalStoreId'] as String?,
       );
 }
 

@@ -1,10 +1,19 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { SaleStatus } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 
 @Injectable()
 export class SalesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly paymentExpirationMinutes = 10;
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+    private mpService: MercadoPagoInstoreService,
+  ) {}
 
   async createSale(userId: string, dto: CreateSaleDto) {
     const productIds = dto.items.map((item) => item.productId);
@@ -32,6 +41,8 @@ export class SalesService {
       data: {
         userId,
         total,
+        status: SaleStatus.OPEN,
+        statusUpdatedAt: new Date(),
         items: {
           create: items,
         },
@@ -47,6 +58,163 @@ export class SalesService {
         items: { include: { product: true } },
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getSaleById(
+    saleId: string,
+    requester: { id: string; role: string },
+  ) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
+        items: { include: { product: true } },
+      },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+    if (requester.role !== 'ADMIN' && sale.userId !== requester.id) {
+      throw new ForbiddenException('No tienes acceso a esta venta');
+    }
+    const refreshed = await this.expireIfNeeded(sale);
+    return refreshed ?? sale;
+  }
+
+  async startMercadoPagoPayment(saleId: string, userId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { items: { include: { product: true } }, user: true },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+    if (sale.userId !== userId) {
+      throw new ForbiddenException('No tienes acceso a esta venta');
+    }
+    if (sale.status === SaleStatus.PAID) {
+      throw new BadRequestException('La venta ya está pagada');
+    }
+    if ([SaleStatus.CANCELLED, SaleStatus.EXPIRED, SaleStatus.FAILED].includes(sale.status)) {
+      throw new BadRequestException('La venta no puede cobrarse en este estado');
+    }
+    if (!sale.user.externalPosId) {
+      throw new BadRequestException('La caja no tiene externalPosId configurado');
+    }
+    const externalStoreId =
+      sale.user.externalStoreId || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+    if (!externalStoreId) {
+      throw new BadRequestException('externalStoreId requerido para Mercado Pago');
+    }
+
+    const updatedSale = await this.prisma.sale.update({
+      where: { id: saleId },
+      data: {
+        status: SaleStatus.PENDING_PAYMENT,
+        statusUpdatedAt: new Date(),
+        paymentStartedAt: new Date(),
+      },
+      include: { items: { include: { product: true } }, user: true },
+    });
+
+    try {
+      await this.mpService.createOrUpdateOrder({
+        externalStoreId,
+        externalPosId: sale.user.externalPosId,
+        sale: updatedSale,
+      });
+    } catch (error) {
+      await this.prisma.sale.update({
+        where: { id: saleId },
+        data: {
+          status: SaleStatus.FAILED,
+          statusUpdatedAt: new Date(),
+          failedAt: new Date(),
+        },
+      });
+      throw error;
+    }
+
+    return {
+      saleId: updatedSale.id,
+      status: updatedSale.status,
+      startedAt: updatedSale.paymentStartedAt,
+    };
+  }
+
+  async cancelMercadoPagoPayment(saleId: string, userId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { user: true },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+    if (sale.userId !== userId) {
+      throw new ForbiddenException('No tienes acceso a esta venta');
+    }
+    if (sale.status === SaleStatus.PAID) {
+      throw new BadRequestException('La venta ya está pagada');
+    }
+    if (!sale.user.externalPosId) {
+      throw new BadRequestException('La caja no tiene externalPosId configurado');
+    }
+    const externalStoreId =
+      sale.user.externalStoreId || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+    if (!externalStoreId) {
+      throw new BadRequestException('externalStoreId requerido para Mercado Pago');
+    }
+
+    await this.mpService.deleteOrder({
+      externalStoreId,
+      externalPosId: sale.user.externalPosId,
+    });
+
+    const updatedSale = await this.prisma.sale.update({
+      where: { id: saleId },
+      data: {
+        status: SaleStatus.CANCELLED,
+        statusUpdatedAt: new Date(),
+        cancelledAt: new Date(),
+      },
+    });
+
+    return { saleId: updatedSale.id, status: updatedSale.status };
+  }
+
+  private async expireIfNeeded(
+    sale: {
+      id: string;
+      status: SaleStatus;
+      paymentStartedAt: Date | null;
+      user: { externalPosId: string | null; externalStoreId: string | null };
+    },
+  ) {
+    if (sale.status !== SaleStatus.PENDING_PAYMENT || !sale.paymentStartedAt) {
+      return null;
+    }
+    const cutoff = new Date(Date.now() - this.paymentExpirationMinutes * 60 * 1000);
+    if (sale.paymentStartedAt > cutoff) {
+      return null;
+    }
+    const externalPosId = sale.user.externalPosId;
+    const externalStoreId =
+      sale.user.externalStoreId || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+    if (externalPosId && externalStoreId) {
+      await this.mpService.deleteOrder({ externalStoreId, externalPosId });
+    }
+    return this.prisma.sale.update({
+      where: { id: sale.id },
+      data: {
+        status: SaleStatus.EXPIRED,
+        statusUpdatedAt: new Date(),
+        expiredAt: new Date(),
+      },
+      include: {
+        user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
+        items: { include: { product: true } },
+      },
     });
   }
 }
