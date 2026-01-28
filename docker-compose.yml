@@ -45,8 +45,10 @@ services:
     depends_on:
       - backend
     networks:
-      - default
-      - shared_proxy
+      shared_proxy:
+        aliases:
+          - pos-frontend
+      default: {}
 
 volumes:
   db_data:
