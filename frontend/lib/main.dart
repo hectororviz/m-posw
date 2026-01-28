@@ -11,12 +11,15 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'icons/material_symbol_resolver.dart';
 import 'pickers.dart';
 
 const apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'http://localhost:3000',
+);
+const bool kEnableSymbolIcons = bool.fromEnvironment(
+  'ENABLE_SYMBOL_ICONS',
+  defaultValue: false,
 );
 
 final Map<int, String> _numpadTextMap = {
@@ -550,8 +553,6 @@ class _PosScreenState extends State<PosScreen> {
                                                     colorFromHex(selectedCategory?.colorHex) ??
                                                     Theme.of(context).colorScheme.primaryContainer;
                                                 final foreground = foregroundColorFor(background);
-                                                final iconName =
-                                                    product.iconName ?? selectedCategory?.iconName ?? 'help';
                                                 final imageUrl = resolveImageUrl(
                                                   product.imagePath,
                                                   product.imageUpdatedAt,
@@ -595,10 +596,11 @@ class _PosScreenState extends State<PosScreen> {
                                                       Positioned.fill(
                                                         child: Padding(
                                                           padding: const EdgeInsets.all(6),
-                                                          child: buildFillImageOrIcon(
+                                                          child: buildFillImageOrFallback(
                                                             imageUrl: imageUrl,
-                                                            iconName: iconName,
-                                                            iconColor: foreground,
+                                                            name: product.name,
+                                                            backgroundColor: background,
+                                                            foregroundColor: foreground,
                                                             cacheSize: 256,
                                                           ),
                                                         ),
@@ -664,10 +666,11 @@ class _PosScreenState extends State<PosScreen> {
                                                 ),
                                                 child: Padding(
                                                   padding: const EdgeInsets.all(6),
-                                                  child: buildFillImageOrIcon(
+                                                  child: buildFillImageOrFallback(
                                                     imageUrl: imageUrl,
-                                                    iconName: category.iconName,
-                                                    iconColor: foreground,
+                                                    name: category.name,
+                                                    backgroundColor: background,
+                                                    foregroundColor: foreground,
                                                     cacheSize: 256,
                                                   ),
                                                 ),
@@ -1248,23 +1251,15 @@ class _AdminCategoriesTabState extends State<AdminCategoriesTab> {
             ...categories.map(
               (category) => Card(
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
-                    backgroundImage: (() {
-                      final imageUrl = resolveImageUrl(category.imagePath, category.imageUpdatedAt);
-                      if (imageUrl == null) return null;
-                      return NetworkImage(imageUrl);
-                    })(),
-                    child: (() {
-                      final imageUrl = resolveImageUrl(category.imagePath, category.imageUpdatedAt);
-                      if (imageUrl != null) return null;
-                      return Icon(
-                        resolveMaterialSymbol(category.iconName),
-                        color: foregroundColorFor(
-                          colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
-                        ),
-                      );
-                    })(),
+                  leading: buildCircleImageOrFallback(
+                    imageUrl: resolveImageUrl(category.imagePath, category.imageUpdatedAt),
+                    name: category.name,
+                    backgroundColor:
+                        colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
+                    foregroundColor: foregroundColorFor(
+                      colorFromHex(category.colorHex) ?? Theme.of(context).colorScheme.primaryContainer,
+                    ),
+                    size: 40,
                   ),
                   title: Text(category.name),
                   subtitle: Text(category.colorHex),
@@ -1322,27 +1317,18 @@ class _AdminProductsTabState extends State<AdminProductsTab> {
             ...products.map(
               (product) => Card(
                 child: ListTile(
-                  leading: CircleAvatar(
+                  leading: buildCircleImageOrFallback(
+                    imageUrl: resolveImageUrl(product.imagePath, product.imageUpdatedAt),
+                    name: product.name,
                     backgroundColor: colorFromHex(product.colorHex) ??
                         colorFromHex(product.categoryColorHex) ??
                         Theme.of(context).colorScheme.primaryContainer,
-                    backgroundImage: (() {
-                      final imageUrl = resolveImageUrl(product.imagePath, product.imageUpdatedAt);
-                      if (imageUrl == null) return null;
-                      return NetworkImage(imageUrl);
-                    })(),
-                    child: (() {
-                      final imageUrl = resolveImageUrl(product.imagePath, product.imageUpdatedAt);
-                      if (imageUrl != null) return null;
-                      return Icon(
-                        resolveMaterialSymbol(product.iconName ?? product.categoryIconName ?? 'help'),
-                        color: foregroundColorFor(
-                          colorFromHex(product.colorHex) ??
-                              colorFromHex(product.categoryColorHex) ??
-                              Theme.of(context).colorScheme.primaryContainer,
-                        ),
-                      );
-                    })(),
+                    foregroundColor: foregroundColorFor(
+                      colorFromHex(product.colorHex) ??
+                          colorFromHex(product.categoryColorHex) ??
+                          Theme.of(context).colorScheme.primaryContainer,
+                    ),
+                    size: 40,
                   ),
                   title: Text(product.name),
                   subtitle: Text('${product.categoryName} · \$${product.price.toStringAsFixed(2)}'),
@@ -2183,7 +2169,6 @@ class CategoryDialog extends StatefulWidget {
 
 class _CategoryDialogState extends State<CategoryDialog> {
   final nameController = TextEditingController();
-  String? iconName;
   String? colorHex;
   _SelectedImage? selectedImage;
   bool isUploadingImage = false;
@@ -2193,7 +2178,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
   void initState() {
     super.initState();
     nameController.text = widget.category?.name ?? '';
-    iconName = widget.category?.iconName ?? 'category';
     colorHex = widget.category?.colorHex ?? '#0EA5E9';
     imageCategory = widget.category;
   }
@@ -2301,12 +2285,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Nombre')),
-            const SizedBox(height: 12),
-            IconPickerField(
-              label: 'Icono',
-              value: iconName,
-              onChanged: (value) => setState(() => iconName = value),
-            ),
             const SizedBox(height: 12),
             ColorPickerField(
               label: 'Color',
@@ -2427,7 +2405,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
             if (widget.category == null) {
               final created = await service.createCategory(
                 name: nameController.text,
-                iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
               Category updated = created;
@@ -2454,7 +2431,6 @@ class _CategoryDialogState extends State<CategoryDialog> {
               final updated = await service.updateCategory(
                 widget.category!.id,
                 name: nameController.text,
-                iconName: iconName ?? 'category',
                 colorHex: colorHex ?? '#0EA5E9',
               );
               Category result = updated;
@@ -2499,7 +2475,6 @@ class _ProductDialogState extends State<ProductDialog> {
   final nameController = TextEditingController();
   final priceController = TextEditingController();
   String? categoryId;
-  String? iconName;
   String? colorHex;
   _SelectedImage? selectedImage;
   bool isUploadingImage = false;
@@ -2511,7 +2486,6 @@ class _ProductDialogState extends State<ProductDialog> {
     nameController.text = widget.product?.name ?? '';
     priceController.text = widget.product?.price.toStringAsFixed(2) ?? '';
     categoryId = widget.product?.categoryId;
-    iconName = widget.product?.iconName;
     colorHex = widget.product?.colorHex;
     imageProduct = widget.product;
   }
@@ -2639,13 +2613,6 @@ class _ProductDialogState extends State<ProductDialog> {
                   onChanged: (value) => setState(() => categoryId = value),
                 ),
                 const SizedBox(height: 12),
-                IconPickerField(
-                  label: 'Icono (opcional)',
-                  value: iconName,
-                  allowClear: true,
-                  onChanged: (value) => setState(() => iconName = value),
-                ),
-                const SizedBox(height: 12),
                 ColorPickerField(
                   label: 'Color (opcional)',
                   value: colorHex,
@@ -2771,7 +2738,6 @@ class _ProductDialogState extends State<ProductDialog> {
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
                 categoryId: categoryId!,
-                iconName: iconName,
                 colorHex: colorHex,
               );
               Product result = created;
@@ -2800,7 +2766,6 @@ class _ProductDialogState extends State<ProductDialog> {
                 name: nameController.text,
                 price: double.tryParse(priceController.text) ?? 0,
                 categoryId: categoryId!,
-                iconName: iconName,
                 colorHex: colorHex,
               );
               Product result = updated;
@@ -2976,14 +2941,12 @@ class ApiService {
 
   Future<Category> createCategory({
     required String name,
-    required String iconName,
     required String colorHex,
   }) async {
     final response = await apiClient.post(
       Uri.parse('$apiBaseUrl/categories'),
       body: jsonEncode({
         'name': name,
-        'iconName': iconName,
         'colorHex': colorHex,
         'active': true,
       }),
@@ -2995,13 +2958,11 @@ class ApiService {
   Future<Category> updateCategory(
     String id, {
     String? name,
-    String? iconName,
     String? colorHex,
     bool? active,
   }) async {
     final payload = <String, dynamic>{};
     if (name != null) payload['name'] = name;
-    if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
     if (kDebugMode) {
@@ -3051,12 +3012,10 @@ class ApiService {
   Future<Category> updateCategoryDetails({
     required String id,
     required String name,
-    required String iconName,
     required String colorHex,
   }) async {
     final payload = {
       'name': name,
-      'iconName': iconName,
       'colorHex': colorHex,
     };
     if (kDebugMode) {
@@ -3095,7 +3054,6 @@ class ApiService {
     required String name,
     required double price,
     required String categoryId,
-    String? iconName,
     String? colorHex,
   }) async {
     final response = await apiClient.post(
@@ -3104,7 +3062,6 @@ class ApiService {
         'name': name,
         'price': price,
         'categoryId': categoryId,
-        'iconName': iconName,
         'colorHex': colorHex,
         'active': true,
       }),
@@ -3118,7 +3075,6 @@ class ApiService {
     String? name,
     double? price,
     String? categoryId,
-    String? iconName,
     String? colorHex,
     bool? active,
   }) async {
@@ -3126,7 +3082,6 @@ class ApiService {
     if (name != null) payload['name'] = name;
     if (price != null) payload['price'] = price;
     if (categoryId != null) payload['categoryId'] = categoryId;
-    if (iconName != null) payload['iconName'] = iconName;
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
     final response = await apiClient.patch(
@@ -3192,17 +3147,6 @@ class ApiService {
     if (response.statusCode >= 400) {
       throw Exception('No se pudo eliminar el producto');
     }
-  }
-
-  Future<List<String>> searchMaterialSymbols(String query) async {
-    final uri = Uri.parse('$apiBaseUrl/icons/material-symbols?q=$query');
-    final response = await apiClient.get(uri);
-    if (response.statusCode >= 400) {
-      throw Exception('No se pudieron cargar los iconos');
-    }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final items = data['items'] as List<dynamic>;
-    return items.map((item) => item['iconName'] as String).toList();
   }
 
   Future<void> createSale(List<CartItem> items) async {
@@ -3506,7 +3450,6 @@ class Category {
   Category({
     required this.id,
     required this.name,
-    required this.iconName,
     required this.colorHex,
     required this.active,
     this.imagePath,
@@ -3515,7 +3458,6 @@ class Category {
 
   final String id;
   final String name;
-  final String iconName;
   final String colorHex;
   final bool active;
   final String? imagePath;
@@ -3524,7 +3466,6 @@ class Category {
   factory Category.fromJson(Map<String, dynamic> json) => Category(
         id: json['id'] as String,
         name: json['name'] as String,
-        iconName: json['iconName'] as String? ?? 'category',
         colorHex: json['colorHex'] as String? ?? '#0EA5E9',
         active: json['active'] as bool? ?? true,
         imagePath: json['imagePath'] as String?,
@@ -3540,10 +3481,8 @@ class Product {
     required this.price,
     required this.categoryId,
     required this.active,
-    this.iconName,
     this.colorHex,
     this.categoryName,
-    this.categoryIconName,
     this.categoryColorHex,
     this.imagePath,
     this.imageUpdatedAt,
@@ -3554,10 +3493,8 @@ class Product {
   final double price;
   final String categoryId;
   final bool active;
-  final String? iconName;
   final String? colorHex;
   final String? categoryName;
-  final String? categoryIconName;
   final String? categoryColorHex;
   final String? imagePath;
   final DateTime? imageUpdatedAt;
@@ -3568,19 +3505,15 @@ class Product {
     throw FormatException('Unsupported price value: $value');
   }
 
-      factory Product.fromJson(Map<String, dynamic> json) => Product(
+  factory Product.fromJson(Map<String, dynamic> json) => Product(
         id: json['id'] as String,
         name: json['name'] as String,
         price: _priceFromJson(json['price']),
         categoryId: json['categoryId'] as String,
         active: json['active'] as bool? ?? true,
-        iconName: json['iconName'] as String?,
         colorHex: json['colorHex'] as String?,
         categoryName: json['category'] is Map<String, dynamic>
             ? (json['category'] as Map<String, dynamic>)['name'] as String?
-            : null,
-        categoryIconName: json['category'] is Map<String, dynamic>
-            ? (json['category'] as Map<String, dynamic>)['iconName'] as String?
             : null,
         categoryColorHex: json['category'] is Map<String, dynamic>
             ? (json['category'] as Map<String, dynamic>)['colorHex'] as String?
@@ -3706,70 +3639,160 @@ String? resolveImageUrl(String? url, DateTime? updatedAt) {
   return '$resolved?v=${updatedAt.millisecondsSinceEpoch}';
 }
 
-Widget buildImageOrIcon({
-  required String? imageUrl,
-  required String iconName,
-  required Color iconColor,
-  required double size,
-  double? cacheSize,
-}) {
-  if (imageUrl != null && imageUrl.isNotEmpty) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        imageUrl,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        cacheWidth: cacheSize?.round(),
-        cacheHeight: cacheSize?.round(),
-        errorBuilder: (context, error, stackTrace) => Icon(
-          resolveMaterialSymbol(iconName),
-          size: size * 0.7,
-          color: iconColor,
-        ),
-      ),
-    );
+String _initialFromName(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) {
+    return '';
   }
-  return Icon(
-    resolveMaterialSymbol(iconName),
-    size: size * 0.7,
-    color: iconColor,
+  final rune = trimmed.runes.isNotEmpty ? trimmed.runes.first : null;
+  if (rune == null) {
+    return '';
+  }
+  return String.fromCharCode(rune).toUpperCase();
+}
+
+Widget _buildFallbackContent({
+  required String name,
+  required double size,
+  required Color foregroundColor,
+}) {
+  final initial = _initialFromName(name);
+  if (initial.isEmpty) {
+    return Icon(Icons.image_not_supported, size: size * 0.45, color: foregroundColor);
+  }
+  return Text(
+    initial,
+    style: TextStyle(
+      fontSize: size * 0.45,
+      fontWeight: FontWeight.w700,
+      color: foregroundColor,
+    ),
   );
 }
 
-Widget buildFillImageOrIcon({
+Widget _buildFallbackContainer({
+  required String name,
+  required double width,
+  required double height,
+  required Color backgroundColor,
+  required Color foregroundColor,
+  BorderRadius borderRadius = const BorderRadius.all(Radius.circular(12)),
+  BoxShape shape = BoxShape.rectangle,
+}) {
+  final size = width < height ? width : height;
+  return Container(
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: backgroundColor,
+      shape: shape,
+      borderRadius: shape == BoxShape.rectangle ? borderRadius : null,
+    ),
+    alignment: Alignment.center,
+    child: _buildFallbackContent(
+      name: name,
+      size: size,
+      foregroundColor: foregroundColor,
+    ),
+  );
+}
+
+Widget buildImageOrFallback({
   required String? imageUrl,
-  required String iconName,
-  required Color iconColor,
+  required String name,
+  required Color backgroundColor,
+  required Color foregroundColor,
+  required double size,
   double? cacheSize,
+  BorderRadius borderRadius = const BorderRadius.all(Radius.circular(12)),
+  BoxShape shape = BoxShape.rectangle,
+}) {
+  final placeholder = _buildFallbackContainer(
+    name: name,
+    width: size,
+    height: size,
+    backgroundColor: backgroundColor,
+    foregroundColor: foregroundColor,
+    borderRadius: borderRadius,
+    shape: shape,
+  );
+  if (imageUrl == null || imageUrl.isEmpty) {
+    return placeholder;
+  }
+  final image = Image.network(
+    imageUrl,
+    width: size,
+    height: size,
+    fit: BoxFit.cover,
+    cacheWidth: cacheSize?.round(),
+    cacheHeight: cacheSize?.round(),
+    loadingBuilder: (context, child, loadingProgress) =>
+        loadingProgress == null ? child : placeholder,
+    errorBuilder: (context, error, stackTrace) => placeholder,
+  );
+  if (shape == BoxShape.circle) {
+    return ClipOval(child: image);
+  }
+  return ClipRRect(borderRadius: borderRadius, child: image);
+}
+
+Widget buildFillImageOrFallback({
+  required String? imageUrl,
+  required String name,
+  required Color backgroundColor,
+  required Color foregroundColor,
+  double? cacheSize,
+  BorderRadius borderRadius = const BorderRadius.all(Radius.circular(12)),
 }) {
   return LayoutBuilder(
     builder: (context, constraints) {
-      if (imageUrl != null && imageUrl.isNotEmpty) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            imageUrl,
-            width: constraints.maxWidth,
-            height: constraints.maxHeight,
-            fit: BoxFit.cover,
-            cacheWidth: cacheSize?.round(),
-            cacheHeight: cacheSize?.round(),
-            errorBuilder: (context, error, stackTrace) => Icon(
-              resolveMaterialSymbol(iconName),
-              size: constraints.biggest.shortestSide * 0.5,
-              color: iconColor,
-            ),
-          ),
-        );
+      final width = constraints.maxWidth;
+      final height = constraints.maxHeight;
+      final placeholder = _buildFallbackContainer(
+        name: name,
+        width: width,
+        height: height,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        borderRadius: borderRadius,
+      );
+      if (imageUrl == null || imageUrl.isEmpty) {
+        return placeholder;
       }
-      return Icon(
-        resolveMaterialSymbol(iconName),
-        size: constraints.biggest.shortestSide * 0.5,
-        color: iconColor,
+      return ClipRRect(
+        borderRadius: borderRadius,
+        child: Image.network(
+          imageUrl,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          cacheWidth: cacheSize?.round(),
+          cacheHeight: cacheSize?.round(),
+          loadingBuilder: (context, child, loadingProgress) =>
+              loadingProgress == null ? child : placeholder,
+          errorBuilder: (context, error, stackTrace) => placeholder,
+        ),
       );
     },
+  );
+}
+
+Widget buildCircleImageOrFallback({
+  required String? imageUrl,
+  required String name,
+  required Color backgroundColor,
+  required Color foregroundColor,
+  double size = 40,
+  double? cacheSize,
+}) {
+  return buildImageOrFallback(
+    imageUrl: imageUrl,
+    name: name,
+    backgroundColor: backgroundColor,
+    foregroundColor: foregroundColor,
+    size: size,
+    cacheSize: cacheSize ?? size,
+    shape: BoxShape.circle,
   );
 }
 
