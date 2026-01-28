@@ -14,14 +14,41 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'pickers.dart';
 
-const apiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'http://localhost:3000',
-);
 const bool kEnableSymbolIcons = bool.fromEnvironment(
   'ENABLE_SYMBOL_ICONS',
   defaultValue: false,
 );
+
+class AppConfig {
+  static final String apiBaseUrl = _loadApiBaseUrl();
+
+  static String _loadApiBaseUrl() {
+    String? fromWindow;
+    final dynamic config = (html.window as dynamic).__APP_CONFIG__;
+    if (config != null) {
+      final dynamic value = config.API_BASE_URL ?? config['API_BASE_URL'];
+      if (value is String) {
+        fromWindow = value;
+      }
+    }
+    if (fromWindow != null && fromWindow.trim().isNotEmpty) {
+      return _normalizeBaseUrl(fromWindow);
+    }
+    const envValue = String.fromEnvironment('API_BASE_URL');
+    if (envValue.isNotEmpty) {
+      return _normalizeBaseUrl(envValue);
+    }
+    return _normalizeBaseUrl('${html.window.location.origin}/api');
+  }
+
+  static String _normalizeBaseUrl(String value) {
+    var trimmed = value.trim();
+    if (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
+  }
+}
 
 final Map<int, String> _numpadTextMap = {
   LogicalKeyboardKey.numpad0.keyId: '0',
@@ -93,6 +120,9 @@ String? _mimeTypeFromFilename(String filename) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kDebugMode) {
+    debugPrint('API base URL: ${AppConfig.apiBaseUrl}');
+  }
   final token = await AuthTokenStore.load();
   runApp(MiBpsApp(initialToken: token));
 }
@@ -2721,7 +2751,7 @@ class ApiService {
 
   Future<String> login(String username, String password) async {
     final response = await apiClient.post(
-      Uri.parse('$apiBaseUrl/auth/login'),
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
     );
@@ -2733,11 +2763,11 @@ class ApiService {
   }
 
   Future<void> logout() async {
-    await apiClient.post(Uri.parse('$apiBaseUrl/auth/logout'));
+    await apiClient.post(Uri.parse('${AppConfig.apiBaseUrl}/auth/logout'));
   }
 
   Future<Setting> getSettings() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/settings'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/settings'));
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return Setting.fromJson(data);
   }
@@ -2747,7 +2777,7 @@ class ApiService {
     required String accentColor,
   }) async {
     final response = await apiClient.patch(
-      Uri.parse('$apiBaseUrl/settings'),
+      Uri.parse('${AppConfig.apiBaseUrl}/settings'),
       body: jsonEncode({
         'storeName': storeName,
         'accentColor': accentColor,
@@ -2763,7 +2793,7 @@ class ApiService {
     required String filename,
     required String mimeType,
   }) async {
-    final uri = Uri.parse('$apiBaseUrl/settings/$type');
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/settings/$type');
     final request = http.MultipartRequest('POST', uri);
     request.files.add(
       http.MultipartFile.fromBytes(
@@ -2778,13 +2808,13 @@ class ApiService {
   }
 
   Future<List<Category>> getCategories() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/categories'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/categories'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => Category.fromJson(item)).toList();
   }
 
   Future<List<Category>> getCategoriesAll() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/categories/all'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/categories/all'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => Category.fromJson(item)).toList();
   }
@@ -2794,7 +2824,7 @@ class ApiService {
     required String colorHex,
   }) async {
     final response = await apiClient.post(
-      Uri.parse('$apiBaseUrl/categories'),
+      Uri.parse('${AppConfig.apiBaseUrl}/categories'),
       body: jsonEncode({
         'name': name,
         'colorHex': colorHex,
@@ -2819,7 +2849,7 @@ class ApiService {
       debugPrint('PATCH /categories/$id payload: ${jsonEncode(payload)}');
     }
     final response = await apiClient.patch(
-      Uri.parse('$apiBaseUrl/categories/$id'),
+      Uri.parse('${AppConfig.apiBaseUrl}/categories/$id'),
       body: jsonEncode(payload),
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -2832,7 +2862,7 @@ class ApiService {
     required String filename,
     required String mimeType,
   }) async {
-    final uri = Uri.parse('$apiBaseUrl/categories/$id/image');
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/categories/$id/image');
     final request = http.MultipartRequest('POST', uri);
     request.files.add(
       http.MultipartFile.fromBytes(
@@ -2851,7 +2881,7 @@ class ApiService {
   }
 
   Future<Category> deleteCategoryImage(String id) async {
-    final response = await apiClient.delete(Uri.parse('$apiBaseUrl/categories/$id/image'));
+    final response = await apiClient.delete(Uri.parse('${AppConfig.apiBaseUrl}/categories/$id/image'));
     if (response.statusCode >= 400) {
       throw Exception(_parseErrorMessage(response, fallback: 'No se pudo eliminar la imagen'));
     }
@@ -2872,7 +2902,7 @@ class ApiService {
       debugPrint('PATCH /categories/$id payload: ${jsonEncode(payload)}');
     }
     final response = await apiClient.patch(
-      Uri.parse('$apiBaseUrl/categories/$id'),
+      Uri.parse('${AppConfig.apiBaseUrl}/categories/$id'),
       body: jsonEncode(payload),
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -2881,7 +2911,7 @@ class ApiService {
 
   Future<List<Product>> getProducts(String categoryId) async {
     final response = await apiClient.get(
-      Uri.parse('$apiBaseUrl/categories/$categoryId/products?includeInactive=false'),
+      Uri.parse('${AppConfig.apiBaseUrl}/categories/$categoryId/products?includeInactive=false'),
     );
     final data = jsonDecode(response.body) as List<dynamic>;
     final products = data.map((item) => Product.fromJson(item)).toList();
@@ -2895,7 +2925,7 @@ class ApiService {
   }
 
   Future<List<Product>> getProductsAll() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/products/all'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/products/all'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => Product.fromJson(item)).toList();
   }
@@ -2907,7 +2937,7 @@ class ApiService {
     String? colorHex,
   }) async {
     final response = await apiClient.post(
-      Uri.parse('$apiBaseUrl/products'),
+      Uri.parse('${AppConfig.apiBaseUrl}/products'),
       body: jsonEncode({
         'name': name,
         'price': price,
@@ -2935,7 +2965,7 @@ class ApiService {
     if (colorHex != null) payload['colorHex'] = colorHex;
     if (active != null) payload['active'] = active;
     final response = await apiClient.patch(
-      Uri.parse('$apiBaseUrl/products/$id'),
+      Uri.parse('${AppConfig.apiBaseUrl}/products/$id'),
       body: jsonEncode(payload),
     );
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -2948,7 +2978,7 @@ class ApiService {
     required String filename,
     required String mimeType,
   }) async {
-    final uri = Uri.parse('$apiBaseUrl/products/$id/image');
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/products/$id/image');
     final request = http.MultipartRequest('POST', uri);
     request.files.add(
       http.MultipartFile.fromBytes(
@@ -2967,7 +2997,7 @@ class ApiService {
   }
 
   Future<Product> deleteProductImage(String id) async {
-    final response = await apiClient.delete(Uri.parse('$apiBaseUrl/products/$id/image'));
+    final response = await apiClient.delete(Uri.parse('${AppConfig.apiBaseUrl}/products/$id/image'));
     if (response.statusCode >= 400) {
       throw Exception(_parseErrorMessage(response, fallback: 'No se pudo eliminar la imagen'));
     }
@@ -2976,7 +3006,7 @@ class ApiService {
   }
 
   Future<void> deleteCategory(String id) async {
-    final response = await apiClient.delete(Uri.parse('$apiBaseUrl/categories/$id'));
+    final response = await apiClient.delete(Uri.parse('${AppConfig.apiBaseUrl}/categories/$id'));
     if (response.statusCode == 409) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       throw Exception(data['message'] ?? 'No se pudo eliminar la categoría');
@@ -2988,7 +3018,7 @@ class ApiService {
 
   Future<void> deleteProduct(String id) async {
     final response = await apiClient.delete(
-      Uri.parse('$apiBaseUrl/products/$id'),
+      Uri.parse('${AppConfig.apiBaseUrl}/products/$id'),
     );
     if (response.statusCode == 409) {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -3001,7 +3031,7 @@ class ApiService {
 
   Future<Sale> createSale(List<CartItem> items) async {
     final response = await apiClient.post(
-      Uri.parse('$apiBaseUrl/sales'),
+      Uri.parse('${AppConfig.apiBaseUrl}/sales'),
       body: jsonEncode({
         'items': items.map((item) => {'productId': item.product.id, 'quantity': item.quantity}).toList(),
       }),
@@ -3015,7 +3045,7 @@ class ApiService {
 
   Future<void> startMercadoPagoPayment(String saleId) async {
     final response = await apiClient.post(
-      Uri.parse('$apiBaseUrl/sales/$saleId/payments/mercadopago-qr'),
+      Uri.parse('${AppConfig.apiBaseUrl}/sales/$saleId/payments/mercadopago-qr'),
     );
     if (response.statusCode >= 400) {
       throw Exception(_parseErrorMessage(response, fallback: 'No se pudo iniciar el cobro'));
@@ -3024,7 +3054,7 @@ class ApiService {
 
   Future<void> cancelMercadoPagoPayment(String saleId) async {
     final response = await apiClient.post(
-      Uri.parse('$apiBaseUrl/sales/$saleId/payments/mercadopago-qr/cancel'),
+      Uri.parse('${AppConfig.apiBaseUrl}/sales/$saleId/payments/mercadopago-qr/cancel'),
     );
     if (response.statusCode >= 400) {
       throw Exception(_parseErrorMessage(response, fallback: 'No se pudo cancelar el cobro'));
@@ -3032,7 +3062,7 @@ class ApiService {
   }
 
   Future<Sale> getSale(String saleId) async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/sales/$saleId'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/sales/$saleId'));
     if (response.statusCode >= 400) {
       throw Exception(_parseErrorMessage(response, fallback: 'No se pudo obtener la venta'));
     }
@@ -3041,7 +3071,7 @@ class ApiService {
   }
 
   Future<List<User>> getUsers() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/users'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/users'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => User.fromJson(item)).toList();
   }
@@ -3072,7 +3102,7 @@ class ApiService {
       payload['externalStoreId'] = trimmedStore;
     }
     final response = await apiClient.post(
-      Uri.parse('$apiBaseUrl/users'),
+      Uri.parse('${AppConfig.apiBaseUrl}/users'),
       body: jsonEncode(payload),
     );
     if (response.statusCode >= 400) {
@@ -3086,14 +3116,14 @@ class ApiService {
       payload['active'] = active;
     }
     await apiClient.patch(
-      Uri.parse('$apiBaseUrl/users/$id'),
+      Uri.parse('${AppConfig.apiBaseUrl}/users/$id'),
       body: jsonEncode(payload),
     );
   }
 
   Future<void> updateUserPassword(String id, String password) async {
     final response = await apiClient.patch(
-      Uri.parse('$apiBaseUrl/users/$id'),
+      Uri.parse('${AppConfig.apiBaseUrl}/users/$id'),
       body: jsonEncode({'password': password}),
     );
     if (response.statusCode >= 400) {
@@ -3102,42 +3132,42 @@ class ApiService {
   }
 
   Future<List<SummaryRow>> summaryByProduct({DateTime? from, DateTime? to}) async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/reports/products${_dateQuery(from, to)}'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/reports/products${_dateQuery(from, to)}'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => SummaryRow.fromJson(item)).toList();
   }
 
   Future<List<SummaryRow>> summaryByCategory({DateTime? from, DateTime? to}) async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/reports/categories${_dateQuery(from, to)}'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/reports/categories${_dateQuery(from, to)}'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => SummaryRow.fromJson(item)).toList();
   }
 
   Future<List<int>> exportReport({DateTime? from, DateTime? to}) async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/reports/export${_dateQuery(from, to)}'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/reports/export${_dateQuery(from, to)}'));
     return response.bodyBytes;
   }
 
   Future<List<TotalRow>> totalsByDay() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/totals-by-day'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/stats/totals-by-day'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => TotalRow.fromJson(item)).toList();
   }
 
   Future<List<TotalRow>> totalsByMonth() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/totals-by-month'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/stats/totals-by-month'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => TotalRow.fromJson(item)).toList();
   }
 
   Future<List<AverageRow>> averageByCategory() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-category'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/stats/average-daily-by-category'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => AverageRow.fromJson(item)).toList();
   }
 
   Future<List<AverageRow>> averageByProduct() async {
-    final response = await apiClient.get(Uri.parse('$apiBaseUrl/stats/average-daily-by-product'));
+    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/stats/average-daily-by-product'));
     final data = jsonDecode(response.body) as List<dynamic>;
     return data.map((item) => AverageRow.fromJson(item)).toList();
   }
@@ -3458,9 +3488,9 @@ String resolveApiUrl(String url) {
     return url;
   }
   if (url.startsWith('/')) {
-    return '$apiBaseUrl$url';
+    return '${AppConfig.apiBaseUrl}$url';
   }
-  return '$apiBaseUrl/$url';
+  return '${AppConfig.apiBaseUrl}/$url';
 }
 
 String? resolveImageUrl(String? url, DateTime? updatedAt) {
