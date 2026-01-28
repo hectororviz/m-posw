@@ -41,10 +41,17 @@ services:
       args:
         API_BASE_URL: ${API_BASE_URL}
     ports:
-      - "80"
+      - "8080:80"
     depends_on:
       - backend
+    networks:
+      - default
+      - shared_proxy
 
 volumes:
   db_data:
   uploads_data:
+
+networks:
+  shared_proxy:
+    external: true
