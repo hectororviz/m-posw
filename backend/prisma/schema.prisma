@@ -23,7 +23,7 @@ enum SaleStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   email     String?  @unique
   password  String
   name      String   @unique
@@ -38,7 +38,7 @@ model User {
 }
 
 model Category {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   name      String
   iconName  String
   colorHex  String
@@ -51,7 +51,7 @@ model Category {
 }
 
 model Product {
-  id         String   @id @default(uuid())
+  id         String   @id @default(uuid()) @db.Uuid
   name       String
   price      Decimal  @db.Decimal(10, 2)
   iconName   String?
@@ -59,7 +59,7 @@ model Product {
   imagePath String?
   imageUpdatedAt DateTime?
   active     Boolean  @default(true)
-  categoryId String
+  categoryId String  @db.Uuid
   category   Category @relation(fields: [categoryId], references: [id])
   saleItems  SaleItem[]
   createdAt  DateTime @default(now())
@@ -67,7 +67,7 @@ model Product {
 }
 
 model Sale {
-  id        String     @id @default(uuid())
+  id        String     @id @default(uuid()) @db.Uuid
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   total     Decimal    @db.Decimal(10, 2)
@@ -78,16 +78,16 @@ model Sale {
   cancelledAt DateTime?
   expiredAt DateTime?
   failedAt  DateTime?
-  userId    String
+  userId    String     @db.Uuid
   user      User       @relation(fields: [userId], references: [id])
   items     SaleItem[]
   mercadoPagoPayments MercadoPagoPayment[]
 }
 
 model SaleItem {
-  id        String   @id @default(uuid())
-  saleId    String
-  productId String
+  id        String   @id @default(uuid()) @db.Uuid
+  saleId    String   @db.Uuid
+  productId String   @db.Uuid
   quantity  Int
   subtotal  Decimal  @db.Decimal(10, 2)
   sale      Sale     @relation(fields: [saleId], references: [id])
@@ -95,8 +95,8 @@ model SaleItem {
 }
 
 model Session {
-  id        String   @id @default(uuid())
-  userId    String
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   revokedAt DateTime?
@@ -105,8 +105,8 @@ model Session {
 }
 
 model MercadoPagoPayment {
-  id        String   @id @default(uuid())
-  saleId    String
+  id        String   @id @default(uuid()) @db.Uuid
+  saleId    String   @db.Uuid
   paymentId String?
   status    String
   approvedAt DateTime?
@@ -119,7 +119,7 @@ model MercadoPagoPayment {
 }
 
 model Setting {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   storeName   String
   logoUrl     String?
   faviconUrl  String?
