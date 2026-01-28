@@ -328,8 +328,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final usernameController = TextEditingController(text: 'admin');
-  final passwordController = TextEditingController(text: 'Admin123!');
+  final usernameController = TextEditingController();
+  final passwordController = TextEditingController();
   bool loading = false;
   String? error;
 
