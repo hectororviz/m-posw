@@ -441,11 +441,14 @@ class _PosScreenState extends State<PosScreen> {
   };
   final cart = <String, CartItem>{};
   final FocusNode _keyboardFocusNode = FocusNode(debugLabel: 'PosKeyboard');
+  final ProductCache _productCache = ProductCache.instance;
   Category? selectedCategory;
   String _quantityBuffer = '';
   String? _selectedItemId;
   bool _isCartCollapsed = false;
   bool _didSetInitialCartState = false;
+  bool _isLoadingProducts = false;
+  List<Product> _categoryProducts = [];
 
   @override
   void initState() {
@@ -461,6 +464,153 @@ class _PosScreenState extends State<PosScreen> {
   void dispose() {
     _keyboardFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProductsForCategory(String categoryId) async {
+    final cachedProducts = _productCache.getFresh(categoryId);
+    if (cachedProducts != null) {
+      setState(() {
+        _categoryProducts = cachedProducts;
+        _isLoadingProducts = false;
+      });
+      return;
+    }
+    setState(() {
+      _isLoadingProducts = true;
+      _categoryProducts = [];
+    });
+    try {
+      final products = await ApiService().getProducts(categoryId);
+      _productCache.set(categoryId, products);
+      if (!mounted || selectedCategory?.id != categoryId) {
+        return;
+      }
+      setState(() {
+        _categoryProducts = products;
+        _isLoadingProducts = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoadingProducts = false;
+      });
+    }
+  }
+
+  void _selectCategory(Category category) {
+    setState(() {
+      selectedCategory = category;
+    });
+    _loadProductsForCategory(category.id);
+  }
+
+  Widget _buildProductsGrid(BuildContext context) {
+    if (_isLoadingProducts && _categoryProducts.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (kDebugMode) {
+      final selectedCategoryId = selectedCategory?.id;
+      final matchingCount = selectedCategoryId == null
+          ? 0
+          : _categoryProducts.where((product) => product.categoryId == selectedCategoryId).length;
+      debugPrint(
+        'Products view -> selectedCategoryId=$selectedCategoryId '
+        'products=${_categoryProducts.length} matching=$matchingCount',
+      );
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.1,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: _categoryProducts.length,
+      itemBuilder: (context, index) {
+        final product = _categoryProducts[index];
+        final background = colorFromHex(product.colorHex) ??
+            colorFromHex(selectedCategory?.colorHex) ??
+            Theme.of(context).colorScheme.primaryContainer;
+        final foreground = foregroundColorFor(background);
+        final imageUrl = resolveImageUrl(
+          product.imagePath,
+          product.imageUpdatedAt,
+        );
+        return FilledButton(
+          style: FilledButton.styleFrom(
+            padding: EdgeInsets.zero,
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: background, width: 3),
+            ),
+          ),
+          onPressed: () {
+            final quantity = _quantityValue ?? 1;
+            setState(() {
+              if (_selectedItemId != null && _quantityValue != null) {
+                cart.update(
+                  _selectedItemId!,
+                  (value) => value.copyWith(quantity: quantity),
+                );
+                _quantityBuffer = '';
+              } else {
+                cart.update(
+                  product.id,
+                  (value) => value.copyWith(quantity: value.quantity + quantity),
+                  ifAbsent: () => CartItem(product: product, quantity: quantity),
+                );
+                _quantityBuffer = '';
+              }
+              _selectedItemId = null;
+            });
+          },
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: buildFillImageOrFallback(
+                    imageUrl: imageUrl,
+                    name: product.name,
+                    backgroundColor: background,
+                    foregroundColor: foreground,
+                    cacheSize: 256,
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '\$${product.price.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -522,117 +672,7 @@ class _PosScreenState extends State<PosScreen> {
                                 ),
                                 Expanded(
                                   child: showingProducts
-                                      ? FutureBuilder<List<Product>>(
-                                          future: ApiService().getProducts(selectedCategory!.id),
-                                          builder: (context, productsSnapshot) {
-                                            final products = productsSnapshot.data ?? [];
-                                            if (kDebugMode) {
-                                              final selectedCategoryId = selectedCategory?.id;
-                                              final matchingCount = selectedCategoryId == null
-                                                  ? 0
-                                                  : products
-                                                      .where((product) => product.categoryId == selectedCategoryId)
-                                                      .length;
-                                              debugPrint(
-                                                'Products view -> selectedCategoryId=$selectedCategoryId '
-                                                'products=${products.length} matching=$matchingCount',
-                                              );
-                                            }
-                                            return GridView.builder(
-                                              padding: const EdgeInsets.all(16),
-                                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: 2,
-                                                childAspectRatio: 1.1,
-                                                crossAxisSpacing: 12,
-                                                mainAxisSpacing: 12,
-                                              ),
-                                              itemCount: products.length,
-                                              itemBuilder: (context, index) {
-                                                final product = products[index];
-                                                final background = colorFromHex(product.colorHex) ??
-                                                    colorFromHex(selectedCategory?.colorHex) ??
-                                                    Theme.of(context).colorScheme.primaryContainer;
-                                                final foreground = foregroundColorFor(background);
-                                                final imageUrl = resolveImageUrl(
-                                                  product.imagePath,
-                                                  product.imageUpdatedAt,
-                                                );
-                                                return FilledButton(
-                                                  style: FilledButton.styleFrom(
-                                                    padding: EdgeInsets.zero,
-                                                    backgroundColor: Colors.transparent,
-                                                    foregroundColor: Colors.white,
-                                                    surfaceTintColor: Colors.transparent,
-                                                    elevation: 0,
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(16),
-                                                      side: BorderSide(color: background, width: 3),
-                                                    ),
-                                                  ),
-                                                  onPressed: () {
-                                                    final quantity = _quantityValue ?? 1;
-                                                    setState(() {
-                                                      if (_selectedItemId != null && _quantityValue != null) {
-                                                        cart.update(
-                                                          _selectedItemId!,
-                                                          (value) => value.copyWith(quantity: quantity),
-                                                        );
-                                                        _quantityBuffer = '';
-                                                      } else {
-                                                        cart.update(
-                                                          product.id,
-                                                          (value) =>
-                                                              value.copyWith(quantity: value.quantity + quantity),
-                                                          ifAbsent: () =>
-                                                              CartItem(product: product, quantity: quantity),
-                                                        );
-                                                        _quantityBuffer = '';
-                                                      }
-                                                      _selectedItemId = null;
-                                                    });
-                                                  },
-                                                  child: Stack(
-                                                    children: [
-                                                      Positioned.fill(
-                                                        child: Padding(
-                                                          padding: const EdgeInsets.all(6),
-                                                          child: buildFillImageOrFallback(
-                                                            imageUrl: imageUrl,
-                                                            name: product.name,
-                                                            backgroundColor: background,
-                                                            foregroundColor: foreground,
-                                                            cacheSize: 256,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      Positioned(
-                                                        top: 8,
-                                                        right: 8,
-                                                        child: Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 4,
-                                                          ),
-                                                          decoration: BoxDecoration(
-                                                            color: Colors.black.withOpacity(0.7),
-                                                            borderRadius: BorderRadius.circular(12),
-                                                          ),
-                                                          child: Text(
-                                                            '\$${product.price.toStringAsFixed(2)}',
-                                                            style: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontWeight: FontWeight.w600,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          },
-                                        )
+                                      ? _buildProductsGrid(context)
                                       : GridView.builder(
                                           padding: const EdgeInsets.all(16),
                                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -657,7 +697,7 @@ class _PosScreenState extends State<PosScreen> {
                                                 if (kDebugMode) {
                                                   debugPrint('Selected category: ${category.id}');
                                                 }
-                                                setState(() => selectedCategory = category);
+                                                _selectCategory(category);
                                               },
                                               child: Ink(
                                                 decoration: BoxDecoration(
@@ -2842,7 +2882,10 @@ class ApiClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    if (request is! http.MultipartRequest) {
+    if (request is! http.MultipartRequest &&
+        request.method != 'GET' &&
+        request.method != 'HEAD' &&
+        !request.headers.containsKey('Content-Type')) {
       request.headers['Content-Type'] = 'application/json';
     }
     final token = tokenProvider();
@@ -3522,6 +3565,42 @@ class Product {
         imageUpdatedAt:
             json['imageUpdatedAt'] != null ? DateTime.parse(json['imageUpdatedAt'] as String) : null,
       );
+}
+
+class ProductCacheEntry {
+  ProductCacheEntry({required this.products, required this.fetchedAt});
+
+  final List<Product> products;
+  final DateTime fetchedAt;
+
+  bool isFresh(Duration ttl) => DateTime.now().difference(fetchedAt) < ttl;
+}
+
+class ProductCache {
+  ProductCache({Duration ttl = const Duration(seconds: 60)}) : _ttl = ttl;
+
+  static final ProductCache instance = ProductCache();
+
+  final Map<String, ProductCacheEntry> _entries = {};
+  Duration _ttl;
+
+  Duration get ttl => _ttl;
+  set ttl(Duration value) => _ttl = value;
+
+  List<Product>? getFresh(String key) {
+    final entry = _entries[key];
+    if (entry == null || !entry.isFresh(_ttl)) {
+      return null;
+    }
+    return entry.products;
+  }
+
+  void set(String key, List<Product> products) {
+    _entries[key] = ProductCacheEntry(
+      products: List<Product>.unmodifiable(products),
+      fetchedAt: DateTime.now(),
+    );
+  }
 }
 
 class CartItem {
