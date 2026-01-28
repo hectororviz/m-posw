@@ -367,6 +367,21 @@ class _LoginScreenState extends State<LoginScreen> {
   bool loading = false;
   String? error;
 
+  String _buildLoginErrorMessage(LoginException exception) {
+    final statusCode = exception.statusCode;
+    if (statusCode == 400) {
+      final details = exception.backendMessage?.trim();
+      if (details != null && details.isNotEmpty) {
+        return 'Datos inválidos\n$details';
+      }
+      return 'Datos inválidos';
+    }
+    if (statusCode == 401 || statusCode == 403) {
+      return 'Credenciales inválidas';
+    }
+    return 'Error inesperado';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -384,7 +399,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: usernameController,
-                    decoration: const InputDecoration(labelText: 'Usuario'),
+                    decoration: const InputDecoration(labelText: 'Email/Usuario'),
                     autofillHints: const [],
                     enableSuggestions: false,
                     autocorrect: false,
@@ -422,8 +437,15 @@ class _LoginScreenState extends State<LoginScreen> {
                               final token = await ApiService()
                                   .login(usernameController.text, passwordController.text);
                               widget.onLoggedIn(token);
-                            } catch (e) {
-                              setState(() => error = 'Credenciales inválidas');
+                            } on LoginException catch (e) {
+                              final message = _buildLoginErrorMessage(e);
+                              setState(() => error = message);
+                            } on TimeoutException {
+                              setState(() => error = 'Error de conexión');
+                            } on http.ClientException {
+                              setState(() => error = 'Error de conexión');
+                            } catch (_) {
+                              setState(() => error = 'Error inesperado');
                             } finally {
                               setState(() => loading = false);
                             }
@@ -2744,19 +2766,35 @@ class ApiClient extends http.BaseClient {
   }
 }
 
+class LoginException implements Exception {
+  LoginException({required this.statusCode, this.backendMessage});
+
+  final int? statusCode;
+  final String? backendMessage;
+
+  @override
+  String toString() => 'LoginException(statusCode: $statusCode, message: $backendMessage)';
+}
+
 class ApiService {
   ApiService({ApiClient? client}) : apiClient = client ?? ApiClient.instance;
 
   final ApiClient apiClient;
 
   Future<String> login(String username, String password) async {
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/auth/login');
+    debugPrint('Login request: $uri');
     final response = await apiClient.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
+      uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'username': username, 'password': password}),
     );
+    debugPrint('Login response status: ${response.statusCode}');
     if (response.statusCode != 201 && response.statusCode != 200) {
-      throw Exception(_parseErrorMessage(response, fallback: 'Login failed'));
+      throw LoginException(
+        statusCode: response.statusCode,
+        backendMessage: _parseErrorMessage(response, fallback: ''),
+      );
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     return data['accessToken'] as String;
