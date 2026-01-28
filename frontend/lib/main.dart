@@ -12,43 +12,13 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'config/app_config.dart';
 import 'pickers.dart';
 
 const bool kEnableSymbolIcons = bool.fromEnvironment(
   'ENABLE_SYMBOL_ICONS',
   defaultValue: false,
 );
-
-class AppConfig {
-  static final String apiBaseUrl = _loadApiBaseUrl();
-
-  static String _loadApiBaseUrl() {
-    String? fromWindow;
-    final dynamic config = (html.window as dynamic).__APP_CONFIG__;
-    if (config != null) {
-      final dynamic value = config.API_BASE_URL ?? config['API_BASE_URL'];
-      if (value is String) {
-        fromWindow = value;
-      }
-    }
-    if (fromWindow != null && fromWindow.trim().isNotEmpty) {
-      return _normalizeBaseUrl(fromWindow);
-    }
-    const envValue = String.fromEnvironment('API_BASE_URL');
-    if (envValue.isNotEmpty) {
-      return _normalizeBaseUrl(envValue);
-    }
-    return _normalizeBaseUrl('${html.window.location.origin}/api');
-  }
-
-  static String _normalizeBaseUrl(String value) {
-    var trimmed = value.trim();
-    if (trimmed.endsWith('/')) {
-      trimmed = trimmed.substring(0, trimmed.length - 1);
-    }
-    return trimmed;
-  }
-}
 
 final Map<int, String> _numpadTextMap = {
   LogicalKeyboardKey.numpad0.keyId: '0',
@@ -120,9 +90,21 @@ String? _mimeTypeFromFilename(String filename) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  print('API_BASE_URL_EFFECTIVE=${AppConfig.apiBaseUrl}');
-  final token = await AuthTokenStore.load();
-  runApp(MiBpsApp(initialToken: token));
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.dumpErrorToConsole(details);
+    print('FLUTTER_ERROR: ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      print(details.stack);
+    }
+  };
+  runZonedGuarded(() async {
+    print('API_BASE_URL_EFFECTIVE=${AppConfig.apiBaseUrl}');
+    final token = await AuthTokenStore.load();
+    runApp(MiBpsApp(initialToken: token));
+  }, (error, stackTrace) {
+    print('UNCAUGHT_ZONE_ERROR: $error');
+    print(stackTrace);
+  });
 }
 
 String? _roleFromToken(String? token) {
@@ -429,6 +411,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         : () async {
                             try {
                               print('LOGIN_CLICK');
+                              print('API_BASE_URL_EFFECTIVE=${AppConfig.apiBaseUrl}');
                               print(
                                 'username=${usernameController.text} '
                                 'passwordLen=${passwordController.text.length}',
@@ -456,7 +439,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             } catch (e, stackTrace) {
                               print('LOGIN_UNEXPECTED_ERROR: $e');
                               print(stackTrace);
-                              setState(() => error = 'Error inesperado');
+                              setState(() => error = 'Error de conexión');
                             } finally {
                               setState(() => loading = false);
                             }
@@ -2802,6 +2785,7 @@ class ApiService {
     );
     print('LOGIN_RESPONSE status=${response.statusCode}');
     if (response.statusCode != 201 && response.statusCode != 200) {
+      print('LOGIN_ERROR_RESPONSE status=${response.statusCode} body=${response.body}');
       throw LoginException(
         statusCode: response.statusCode,
         backendMessage: _parseErrorMessage(response, fallback: ''),
