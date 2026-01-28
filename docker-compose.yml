@@ -45,6 +45,10 @@ services:
       context: ./frontend
       args:
         API_BASE_URL: ${API_BASE_URL}
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: ${API_BASE_URL}
     ports:
       - "8080:80"
     depends_on:
