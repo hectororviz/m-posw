@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
@@ -21,5 +21,23 @@ export class SalesController {
   @Roles(Role.ADMIN)
   list() {
     return this.salesService.listSales();
+  }
+
+  @Get(':id')
+  @Roles(Role.ADMIN, Role.USER)
+  getById(@Req() req: { user: { id: string; role: string } }, @Param('id') id: string) {
+    return this.salesService.getSaleById(id, req.user);
+  }
+
+  @Post(':id/payments/mercadopago-qr')
+  @Roles(Role.USER)
+  startMercadoPagoPayment(@Req() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.salesService.startMercadoPagoPayment(id, req.user.id);
+  }
+
+  @Post(':id/payments/mercadopago-qr/cancel')
+  @Roles(Role.USER)
+  cancelMercadoPagoPayment(@Req() req: { user: { id: string } }, @Param('id') id: string) {
+    return this.salesService.cancelMercadoPagoPayment(id, req.user.id);
   }
 }

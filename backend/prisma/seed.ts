@@ -7,6 +7,7 @@ async function main() {
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
   const adminName = process.env.ADMIN_NAME || 'admin';
+  const cajaPassword = process.env.CAJA01_PASSWORD || 'Caja01!';
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
   const adminData = {
@@ -21,6 +22,27 @@ async function main() {
     where: { name: adminName },
     update: adminData,
     create: adminData,
+  });
+
+  const cajaPasswordHash = await bcrypt.hash(cajaPassword, 10);
+  await prisma.user.upsert({
+    where: { name: 'Caja01' },
+    update: {
+      name: 'Caja01',
+      password: cajaPasswordHash,
+      role: Role.USER,
+      active: true,
+      externalPosId: 'SOLER_POS_001',
+      externalStoreId: 'SOLER_STORE_001',
+    },
+    create: {
+      name: 'Caja01',
+      password: cajaPasswordHash,
+      role: Role.USER,
+      active: true,
+      externalPosId: 'SOLER_POS_001',
+      externalStoreId: 'SOLER_STORE_001',
+    },
   });
 
   const setting = await prisma.setting.findFirst();

@@ -13,6 +13,10 @@ export class UsersService {
     if (!dto?.password) {
       throw new BadRequestException('Password requerido');
     }
+    const role = dto.role || 'USER';
+    if (role === 'USER' && (!dto.externalPosId || dto.externalPosId.trim().length === 0)) {
+      throw new BadRequestException('externalPosId requerido para cajas');
+    }
     const existingByName = await this.prisma.user.findUnique({ where: { name: dto.name } });
     if (existingByName) {
       throw new BadRequestException('Usuario ya registrado');
@@ -30,8 +34,10 @@ export class UsersService {
           email: dto.email,
           name: dto.name,
           password,
-          role: dto.role || 'USER',
+          role,
           active: true,
+          externalPosId: dto.externalPosId,
+          externalStoreId: dto.externalStoreId,
         },
         select: {
           id: true,
@@ -39,6 +45,8 @@ export class UsersService {
           name: true,
           role: true,
           active: true,
+          externalPosId: true,
+          externalStoreId: true,
         },
       });
     } catch (error) {
@@ -65,6 +73,8 @@ export class UsersService {
         name: true,
         role: true,
         active: true,
+        externalPosId: true,
+        externalStoreId: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -85,6 +95,8 @@ export class UsersService {
         name: true,
         role: true,
         active: true,
+        externalPosId: true,
+        externalStoreId: true,
       },
     });
   }

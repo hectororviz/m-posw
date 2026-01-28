@@ -18,4 +18,12 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(6)
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  externalPosId?: string;
+
+  @IsOptional()
+  @IsString()
+  externalStoreId?: string;
 }
