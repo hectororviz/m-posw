@@ -27,8 +27,8 @@ CREATE TABLE "Session" (
 
 -- CreateTable
 CREATE TABLE "MercadoPagoPayment" (
-    "id" TEXT NOT NULL,
-    "saleId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "saleId" UUID NOT NULL,
     "paymentId" TEXT,
     "status" TEXT NOT NULL,
     "approvedAt" TIMESTAMP(3),
