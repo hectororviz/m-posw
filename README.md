@@ -1,6 +1,6 @@
 # MiBPS (Mini POS Web)
 
-Sistema de punto de venta web (tablet/celular) para jornadas/eventos. Incluye frontend en Flutter Web, backend NestJS y base de datos PostgreSQL, todo orquestado con Docker Compose.
+Sistema de punto de venta web (tablet/celular) para jornadas/eventos. Incluye frontend en React + Vite + TypeScript, backend NestJS y base de datos PostgreSQL, todo orquestado con Docker Compose.
 
 ## Requisitos
 
@@ -70,7 +70,8 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 
 - `DATABASE_URL`: conexión a PostgreSQL (usada por Prisma).
 - `JWT_SECRET`: firma de tokens.
-- `API_BASE_URL`: inyectado al build de Flutter con `--dart-define`.
+- `VITE_API_BASE_URL`: base del backend para el frontend (modo proxy: `/api`, modo directo: `https://backend-host`).
+- `VITE_UPLOADS_BASE_URL`: base opcional para imágenes de `/uploads` (si no se define, se usa el ORIGIN de `VITE_API_BASE_URL`).
 - `MP_ACCESS_TOKEN`: token privado de Mercado Pago (solo backend).
 - `MP_COLLECTOR_ID`: collector ID de la cuenta MP.
 - `MP_DEFAULT_EXTERNAL_STORE_ID`: store por defecto si la caja no define uno.
@@ -88,3 +89,41 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `POST /sales/:id/payments/mercadopago-qr/cancel`
 - `POST /webhooks/mercadopago`
 - `GET /sales/:id` (polling de estado)
+
+## Frontend (React + Vite)
+
+### Variables de entorno
+
+En `.env`:
+
+```bash
+VITE_API_BASE_URL=/api
+VITE_UPLOADS_BASE_URL=http://localhost:3000
+```
+
+- **Modo proxy**: `VITE_API_BASE_URL=/api` y Nginx proxya `/api` hacia el backend.
+- **Modo directo**: `VITE_API_BASE_URL=https://backend-host` (sin proxy).
+
+### Ejemplo Nginx (proxy /api + /uploads)
+
+```nginx
+server {
+  listen 80;
+  server_name _;
+
+  location /api/ {
+    proxy_pass http://backend:3000/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+
+  location /uploads/ {
+    proxy_pass http://backend:3000/uploads/;
+    proxy_set_header Host $host;
+  }
+
+  location / {
+    try_files $uri /index.html;
+  }
+}
+```
