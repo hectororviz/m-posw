@@ -4,7 +4,7 @@ COPY package.json package-lock.json* ./
 RUN npm install
 COPY prisma ./prisma
 RUN npx prisma generate
-COPY tsconfig.json nest-cli.json ./
+COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 COPY public ./public
 COPY resources ./resources
