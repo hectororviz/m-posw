@@ -3,7 +3,7 @@ WORKDIR /app
 COPY pubspec.yaml ./
 RUN flutter pub get
 COPY . .
-RUN flutter build web --release --no-tree-shake-icons --pwa-strategy=none
+RUN flutter build web --release --no-tree-shake-icons
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
