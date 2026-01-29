@@ -3,10 +3,8 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Patch,
   Post,
-  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -17,12 +15,11 @@ import type { Express } from 'express';
 import { mkdirSync } from 'fs';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
-import type { Request } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { SETTINGS_IMAGE_SUBDIR, UPLOADS_DIR } from '../common/upload.constants';
-import { UpdateSettingsDto } from './dto/update-settings.dto';
+import { UpdateSettingDto } from './dto/update-setting.dto';
 import { SettingsService } from './settings.service';
 
 const uploadDir = join(UPLOADS_DIR, SETTINGS_IMAGE_SUBDIR);
@@ -64,28 +61,15 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('Expires', '0')
   get() {
     return this.settingsService.get();
   }
 
   @Patch()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('Expires', '0')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  update(@Req() req: Request, @Body() dto: UpdateSettingsDto) {
-    console.log('RAW BODY', req.body);
-    console.log('DTO', dto);
-    if (!req.is('application/json')) {
-      throw new BadRequestException('Content-Type debe ser application/json');
-    }
-    if (!req.body || Object.keys(req.body).length === 0) {
-      throw new BadRequestException('Body requerido');
-    }
+  update(@Body() dto: UpdateSettingDto) {
+    console.log('Update settings dto:', dto);
     return this.settingsService.update(dto);
   }
 
