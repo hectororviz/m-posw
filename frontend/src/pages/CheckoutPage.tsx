@@ -97,7 +97,9 @@ export const CheckoutPage: React.FC = () => {
           >
             {qrLoading ? 'Iniciando...' : 'Iniciar cobro QR'}
           </button>
-          {qrPayload && <pre className="code-block">{JSON.stringify(qrPayload, null, 2)}</pre>}
+          {qrPayload != null ? (
+            <pre className="code-block">{JSON.stringify(qrPayload, null, 2)}</pre>
+          ) : null}
         </section>
       </div>
     </Layout>
