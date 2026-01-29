@@ -2742,6 +2742,8 @@ class ApiClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    request.headers['Cache-Control'] = 'no-cache';
+    request.headers['Pragma'] = 'no-cache';
     if (request is! http.MultipartRequest &&
         request.method != 'GET' &&
         request.method != 'HEAD' &&
