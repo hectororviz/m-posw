@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateSettingDto {
   @IsOptional()
@@ -15,5 +15,6 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/)
   accentColor?: string;
 }

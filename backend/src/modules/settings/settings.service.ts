@@ -2,40 +2,44 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 
+const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
+const DEFAULT_STORE_NAME = 'MiBPS Demo';
+const DEFAULT_ACCENT_COLOR = '#0ea5e9';
+
 @Injectable()
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
   async get() {
-    const setting = await this.prisma.setting.findFirst();
-    if (setting) {
-      return setting;
-    }
-    return this.prisma.setting.create({
-      data: {
-        storeName: 'MiBPS',
+    return this.prisma.setting.upsert({
+      where: { id: DEFAULT_SETTING_ID },
+      create: {
+        id: DEFAULT_SETTING_ID,
+        storeName: DEFAULT_STORE_NAME,
         logoUrl: null,
         faviconUrl: null,
-        accentColor: '#0ea5e9',
+        accentColor: DEFAULT_ACCENT_COLOR,
       },
+      update: {},
     });
   }
 
   async update(dto: UpdateSettingDto) {
-    const existing = await this.prisma.setting.findFirst();
-    if (!existing) {
-      return this.prisma.setting.create({
-        data: {
-          storeName: dto.storeName || 'MiBPS',
-          logoUrl: dto.logoUrl ?? null,
-          faviconUrl: dto.faviconUrl ?? null,
-          accentColor: dto.accentColor,
-        },
-      });
-    }
-    return this.prisma.setting.update({
-      where: { id: existing.id },
-      data: dto,
+    return this.prisma.setting.upsert({
+      where: { id: DEFAULT_SETTING_ID },
+      create: {
+        id: DEFAULT_SETTING_ID,
+        storeName: dto.storeName ?? DEFAULT_STORE_NAME,
+        logoUrl: dto.logoUrl ?? null,
+        faviconUrl: dto.faviconUrl ?? null,
+        accentColor: dto.accentColor ?? DEFAULT_ACCENT_COLOR,
+      },
+      update: {
+        ...(dto.storeName !== undefined ? { storeName: dto.storeName } : {}),
+        ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl } : {}),
+        ...(dto.faviconUrl !== undefined ? { faviconUrl: dto.faviconUrl } : {}),
+        ...(dto.accentColor !== undefined ? { accentColor: dto.accentColor } : {}),
+      },
     });
   }
 }
