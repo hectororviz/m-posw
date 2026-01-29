@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
-import { apiClient, normalizeApiError } from '../api/client';
+import { apiClient } from '../api/client';
 import type { Sale } from '../api/types';
 import { Layout } from '../components/Layout';
 import { useCart } from '../context/CartContext';
+import { errorToMessage } from '../utils/errorToMessage';
 
 export const CheckoutPage: React.FC = () => {
   const { items, clear } = useCart();
   const [sale, setSale] = useState<Sale | null>(null);
   const [qrPayload, setQrPayload] = useState<unknown>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
 
@@ -27,7 +28,7 @@ export const CheckoutPage: React.FC = () => {
       setSale(response.data);
       clear();
     } catch (err) {
-      setError(normalizeApiError(err));
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -43,7 +44,7 @@ export const CheckoutPage: React.FC = () => {
       const response = await apiClient.post(`/sales/${sale.id}/payments/mercadopago-qr`);
       setQrPayload(response.data);
     } catch (err) {
-      setError(normalizeApiError(err));
+      setError(err);
     } finally {
       setQrLoading(false);
     }
@@ -71,7 +72,7 @@ export const CheckoutPage: React.FC = () => {
             <strong>Total</strong>
             <span>${total.toFixed(2)}</span>
           </div>
-          {error && <p className="error-text">{error}</p>}
+          {error != null && <p className="error-text">{errorToMessage(error)}</p>}
           <button
             type="button"
             className="primary-button"
