@@ -14,7 +14,6 @@ async function bootstrap() {
   const corsOrigin = config.get<string>('CORS_ORIGIN') || '*';
 
   app.enableCors({ origin: corsOrigin });
-  app.disable('etag');
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
