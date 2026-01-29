@@ -69,6 +69,7 @@ export class SettingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   update(@Body() dto: UpdateSettingDto) {
+    console.log('Update settings dto:', dto);
     return this.settingsService.update(dto);
   }
 
