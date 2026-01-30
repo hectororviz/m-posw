@@ -151,19 +151,22 @@ export class MercadoPagoInstoreService {
     return this.config.get<string>('MP_CURRENCY_ID') || 'ARS';
   }
 
-  private async request(method: string, url: string, body?: Record<string, unknown>) {
+  private async request<T = unknown>(method: string, url: string, payload?: unknown): Promise<T> {
     const token = this.config.get<string>('MP_ACCESS_TOKEN');
     if (!token) {
       throw new HttpException('MP_ACCESS_TOKEN no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    const hasBody = typeof body !== 'undefined';
-    const payloadSummary = body
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      typeof value === 'object' && value !== null;
+    const hasBody = typeof payload !== 'undefined';
+    const payloadRecord = isRecord(payload) ? payload : undefined;
+    const payloadSummary = payloadRecord
       ? {
-          total_amount: (body as { total_amount?: unknown }).total_amount,
-          items_length: Array.isArray((body as { items?: unknown }).items)
-            ? (body as { items: unknown[] }).items.length
+          total_amount: payloadRecord.total_amount,
+          items_length: Array.isArray(payloadRecord.items)
+            ? payloadRecord.items.length
             : undefined,
-          total_amount_type: typeof (body as { total_amount?: unknown }).total_amount,
+          total_amount_type: typeof payloadRecord.total_amount,
         }
       : undefined;
     this.logger.debug(
@@ -171,28 +174,27 @@ export class MercadoPagoInstoreService {
     );
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    const jsonBody = hasBody ? JSON.stringify(body) : undefined;
+    const jsonBody = hasBody ? JSON.stringify(payload) : undefined;
     if (hasBody && !jsonBody) {
       throw new HttpException('Payload inválido para Mercado Pago', HttpStatus.BAD_REQUEST);
     }
     if (jsonBody) {
-      const parsedBody = JSON.parse(jsonBody) as { total_amount?: unknown; items?: unknown };
-      const jsonBodySummary = {
-        total_amount: parsedBody.total_amount,
-        items_length: Array.isArray(parsedBody.items) ? parsedBody.items.length : undefined,
-        total_amount_type: typeof parsedBody.total_amount,
-      };
-      this.logger.debug(
-        `Mercado Pago jsonBody summary: ${JSON.stringify(jsonBodySummary)}`,
-      );
-    }
-    if (hasBody) {
-      const totalAmount = (body as { total_amount?: unknown }).total_amount;
-      if (totalAmount === null || typeof totalAmount === 'undefined') {
-        throw new HttpException(
-          'total_amount ausente en el payload para Mercado Pago',
-          HttpStatus.BAD_REQUEST,
+      const parsedBody: unknown = JSON.parse(jsonBody);
+      if (isRecord(parsedBody)) {
+        const jsonBodySummary = {
+          total_amount: parsedBody.total_amount,
+          items_length: Array.isArray(parsedBody.items) ? parsedBody.items.length : undefined,
+          total_amount_type: typeof parsedBody.total_amount,
+        };
+        this.logger.debug(
+          `Mercado Pago jsonBody summary: ${JSON.stringify(jsonBodySummary)}`,
         );
+        if (parsedBody.total_amount === null || typeof parsedBody.total_amount === 'undefined') {
+          throw new HttpException(
+            'total_amount ausente en el payload para Mercado Pago',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
       }
     }
     try {
@@ -220,7 +222,7 @@ export class MercadoPagoInstoreService {
           HttpStatus.BAD_GATEWAY,
         );
       }
-      return text ? JSON.parse(text) : {};
+      return (text ? JSON.parse(text) : {}) as T;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
