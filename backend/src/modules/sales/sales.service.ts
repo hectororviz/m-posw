@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PaymentMethod, SaleStatus } from '@prisma/client';
+import { PaymentMethod, Prisma, SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { CreateCashSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
@@ -32,22 +32,26 @@ export class SalesService {
     }
     const changeAmount = this.roundToCurrency(cashReceived - roundedTotal);
 
-    return this.prisma.sale.create({
-      data: {
-        userId,
-        total: roundedTotal,
-        status: SaleStatus.APPROVED,
-        paymentMethod: PaymentMethod.CASH,
-        cashReceived,
-        changeAmount,
-        statusUpdatedAt: new Date(),
-        paidAt: new Date(),
-        items: {
-          create: items,
+    try {
+      return await this.prisma.sale.create({
+        data: {
+          userId,
+          total: roundedTotal,
+          status: SaleStatus.APPROVED,
+          paymentMethod: PaymentMethod.CASH,
+          cashReceived,
+          changeAmount,
+          statusUpdatedAt: new Date(),
+          paidAt: new Date(),
+          items: {
+            create: items,
+          },
         },
-      },
-      include: { items: { include: { product: true } } },
-    });
+        include: { items: { include: { product: true } } },
+      });
+    } catch (error) {
+      this.handlePrismaError(error, 'crear la venta en efectivo');
+    }
   }
 
   async createQrSale(userId: string, dto: CreateQrSaleDto) {
@@ -55,20 +59,25 @@ export class SalesService {
     const roundedTotal = this.roundToCurrency(total);
     this.assertTotal(dto.total, roundedTotal);
 
-    const sale = await this.prisma.sale.create({
-      data: {
-        userId,
-        total: roundedTotal,
-        status: SaleStatus.PENDING,
-        paymentMethod: PaymentMethod.MP_QR,
-        statusUpdatedAt: new Date(),
-        paymentStartedAt: new Date(),
-        items: {
-          create: items,
+    let sale;
+    try {
+      sale = await this.prisma.sale.create({
+        data: {
+          userId,
+          total: roundedTotal,
+          status: SaleStatus.PENDING,
+          paymentMethod: PaymentMethod.MP_QR,
+          statusUpdatedAt: new Date(),
+          paymentStartedAt: new Date(),
+          items: {
+            create: items,
+          },
         },
-      },
-      include: { items: { include: { product: true } }, user: true },
-    });
+        include: { items: { include: { product: true } }, user: true },
+      });
+    } catch (error) {
+      this.handlePrismaError(error, 'crear la venta con QR');
+    }
 
     const externalStoreId =
       sale.user.externalStoreId?.trim() ||
@@ -211,6 +220,16 @@ export class SalesService {
     if (requester.role !== 'ADMIN' && sale.userId !== requester.id) {
       throw new ForbiddenException('No tienes acceso a esta venta');
     }
+  }
+
+  private handlePrismaError(error: unknown, action: string): never {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      this.logger.error(`Error Prisma al ${action}: ${error.code}`, error.message);
+      throw new BadRequestException(
+        `No se pudo ${action}. Verificá las migraciones de la base de datos.`,
+      );
+    }
+    throw error;
   }
 
   private async expireIfNeeded(

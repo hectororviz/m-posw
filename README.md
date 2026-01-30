@@ -18,6 +18,8 @@ Luego levantar todo:
 docker compose up -d --build
 ```
 
+Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma migrate deploy` para aplicar migraciones pendientes. Esto mantiene la base alineada con el schema. 
+
 ## URLs
 
 - Frontend: http://localhost:8080
@@ -57,6 +59,13 @@ También se crea la caja `Caja01` (role USER) con:
 Configurable mediante `CORS_ORIGIN` en `.env`.
 
 ## Reset de base de datos (desarrollo)
+
+En desarrollo podés ejecutar las migraciones manualmente si no usás Docker:
+
+```bash
+cd backend
+npx prisma migrate deploy
+```
 
 Para limpiar la base de datos local y reaplicar migraciones:
 
