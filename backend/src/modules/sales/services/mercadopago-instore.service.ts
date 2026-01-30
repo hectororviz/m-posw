@@ -46,6 +46,12 @@ export class MercadoPagoInstoreService {
     });
     const total = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
     const totalAmount = Math.round((total + Number.EPSILON) * 100) / 100;
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      throw new HttpException(
+        `total_amount inválido en la venta (valor=${totalAmount})`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     const payload = {
       external_reference: `sale-${input.sale.id}`,
@@ -108,6 +114,7 @@ export class MercadoPagoInstoreService {
           items_length: Array.isArray((body as { items?: unknown }).items)
             ? (body as { items: unknown[] }).items.length
             : undefined,
+          total_amount_type: typeof (body as { total_amount?: unknown }).total_amount,
         }
       : undefined;
     this.logger.debug(
@@ -116,6 +123,29 @@ export class MercadoPagoInstoreService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     const jsonBody = hasBody ? JSON.stringify(body) : undefined;
+    if (hasBody && !jsonBody) {
+      throw new HttpException('Payload inválido para Mercado Pago', HttpStatus.BAD_REQUEST);
+    }
+    if (jsonBody) {
+      const parsedBody = JSON.parse(jsonBody) as { total_amount?: unknown; items?: unknown };
+      const jsonBodySummary = {
+        total_amount: parsedBody.total_amount,
+        items_length: Array.isArray(parsedBody.items) ? parsedBody.items.length : undefined,
+        total_amount_type: typeof parsedBody.total_amount,
+      };
+      this.logger.debug(
+        `Mercado Pago jsonBody summary: ${JSON.stringify(jsonBodySummary)}`,
+      );
+    }
+    if (hasBody) {
+      const totalAmount = (body as { total_amount?: unknown }).total_amount;
+      if (totalAmount === null || typeof totalAmount === 'undefined') {
+        throw new HttpException(
+          'total_amount ausente en el payload para Mercado Pago',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
     try {
       const headers: Record<string, string> = {
         Authorization: `Bearer ${token}`,
