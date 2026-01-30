@@ -45,6 +45,13 @@ También se crea la caja `Caja01` (role USER) con:
 - Reportes con filtros por fecha y exportación XLSX.
 - Estadísticas con gráficos (últimos 15 días con ventas, últimos 6 meses, promedios diarios).
 
+## Estado actual del proyecto (resumen funcional)
+
+- Backend NestJS expone endpoints de ventas, usuarios, productos, categorías y reportes.
+- Frontend React consume el backend mediante `/api` (proxy) o URL directa.
+- Mercado Pago QR está integrado para cobro presencial con órdenes Instore QR v2.
+- Persistencia en PostgreSQL con Prisma, incluyendo registros de pagos Mercado Pago y sesiones.
+
 ## CORS
 
 Configurable mediante `CORS_ORIGIN` en `.env`.
@@ -76,15 +83,42 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `MP_COLLECTOR_ID`: collector ID de la cuenta MP.
 - `MP_CURRENCY_ID`: moneda para items/órdenes MP (default `ARS`).
 - `MP_DEFAULT_EXTERNAL_STORE_ID`: store por defecto si la caja no define uno.
+- `MP_DEFAULT_EXTERNAL_POS_ID`: POS por defecto si la caja no define uno.
 - `MP_WEBHOOK_SECRET`: secreto opcional para validar webhook (`/webhooks/mercadopago?secret=...`).
 
-## Mercado Pago QR estático
+## Mercado Pago QR estático (cobro presencial)
 
-- Cada usuario/caja debe tener `externalPosId` (y opcional `externalStoreId`).
+### Datos necesarios para poder cobrar (checklist)
+
+**Configuración en `.env` (backend):**
+
+- `MP_ACCESS_TOKEN`: token privado (Access Token) de la cuenta Mercado Pago.
+- `MP_COLLECTOR_ID`: ID del collector (vendedor) asociado a la cuenta.
+- `MP_CURRENCY_ID`: moneda de los items (por defecto `ARS`).
+- `MP_DEFAULT_EXTERNAL_STORE_ID` / `MP_DEFAULT_EXTERNAL_POS_ID` (opcionales): valores de fallback si la caja/usuario no tiene configurados sus external IDs.
+- `MP_WEBHOOK_SECRET` (opcional): secreto compartido para validar el webhook (`/webhooks/mercadopago?secret=...`).
+
+**Configuración por caja/usuario:**
+
+- `externalStoreId`: `external_id` del Store configurado en Mercado Pago.
+- `externalPosId`: `external_id` del POS configurado en Mercado Pago.
+
+> Importante: el backend valida que estos IDs NO sean numéricos (deben ser `external_id` string, no el ID interno de MP).
+
+### Notas operativas
+
 - El backend crea/actualiza órdenes Instore QR v2 al iniciar el cobro.
 - Solo puede haber una sesión activa por caja (login único).
+- El webhook puede protegerse con `MP_WEBHOOK_SECRET` y el query param `?secret=...`.
 
-### Endpoints
+### Flujo de cobro (resumen)
+
+1. El POS crea una venta y ejecuta `POST /sales/:id/payments/mercadopago-qr`.
+2. El backend arma el payload de la orden Instore QR v2 y la crea/actualiza en MP.
+3. Mercado Pago envía el webhook a `/webhooks/mercadopago` cuando cambia el estado del pago.
+4. El backend registra el pago y marca la venta como `PAID` cuando llega `status=approved`.
+
+### Endpoints relevantes
 
 - `POST /sales/:id/payments/mercadopago-qr`
 - `POST /sales/:id/payments/mercadopago-qr/cancel`
