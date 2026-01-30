@@ -1,0 +1,129 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum SaleStatus {
+  OPEN
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  EXPIRED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String?  @unique
+  password  String
+  name      String   @unique
+  role      Role     @default(USER)
+  active    Boolean  @default(true)
+  externalPosId   String?
+  externalStoreId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sales     Sale[]
+  sessions  Session[]
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  iconName  String
+  colorHex  String
+  imagePath String?
+  imageUpdatedAt DateTime?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  iconName   String?
+  colorHex   String?
+  imagePath String?
+  imageUpdatedAt DateTime?
+  active     Boolean  @default(true)
+  categoryId String  @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id])
+  saleItems  SaleItem[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Sale {
+  id        String     @id @default(uuid()) @db.Uuid
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  total     Decimal    @db.Decimal(10, 2)
+  status    SaleStatus @default(OPEN)
+  statusUpdatedAt DateTime @default(now())
+  paymentStartedAt DateTime?
+  paidAt    DateTime?
+  cancelledAt DateTime?
+  expiredAt DateTime?
+  failedAt  DateTime?
+  userId    String     @db.Uuid
+  user      User       @relation(fields: [userId], references: [id])
+  items     SaleItem[]
+  mercadoPagoPayments MercadoPagoPayment[]
+}
+
+model SaleItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  saleId    String   @db.Uuid
+  productId String   @db.Uuid
+  quantity  Int
+  subtotal  Decimal  @db.Decimal(10, 2)
+  sale      Sale     @relation(fields: [saleId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+
+  @@index([userId, revokedAt])
+}
+
+model MercadoPagoPayment {
+  id        String   @id @default(uuid()) @db.Uuid
+  saleId    String   @db.Uuid
+  paymentId String?
+  status    String
+  approvedAt DateTime?
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+model Setting {
+  id          String   @id @default(uuid()) @db.Uuid
+  storeName   String
+  logoUrl     String?
+  faviconUrl  String?
+  accentColor String?  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
