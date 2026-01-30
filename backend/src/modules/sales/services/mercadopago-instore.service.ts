@@ -27,6 +27,8 @@ interface MercadoPagoOrderItem {
 
 interface MercadoPagoOrderPayload {
   external_reference: string;
+  title: string;
+  description: string;
   total_amount: number;
   items: MercadoPagoOrderItem[];
 }
@@ -49,6 +51,9 @@ export class MercadoPagoInstoreService {
       `Mercado Pago payload summary: total_amount=${payload.total_amount} items_len=${payload.items.length} items_sum=${this.roundToCurrency(
         itemsTotal,
       )}`,
+    );
+    this.logger.debug(
+      `Mercado Pago payload titles: title=${payload.title} first_item_title=${payload.items[0]?.title ?? 'n/a'}`,
     );
     this.logger.debug(
       `Mercado Pago request: PUT ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
@@ -81,6 +86,15 @@ export class MercadoPagoInstoreService {
   ): MercadoPagoOrderPayload {
     this.parseNumber(sale.total, 'total');
     const currencyId = this.getCurrencyId();
+    const saleIdLabel = sale.id ? String(sale.id).trim() : '';
+    const saleTitle = this.ensureNonEmptyText(
+      saleIdLabel ? `Venta ${saleIdLabel}` : 'Venta POS',
+      'title',
+    );
+    const saleDescription = this.ensureNonEmptyText(
+      saleIdLabel ? `Sale ${saleIdLabel}` : 'Sale POS',
+      'description',
+    );
     const items = sale.items.map((item) => {
       const quantityValue = this.parseNumber(item.quantity, 'quantity');
       const quantity = Math.trunc(quantityValue);
@@ -91,12 +105,12 @@ export class MercadoPagoInstoreService {
       const unitPrice = hasSubtotal
         ? this.parseNumber(item.subtotal, 'subtotal') / quantity
         : this.parseNumber(item.product?.price, 'price');
-      if (!Number.isFinite(unitPrice)) {
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
         throw new HttpException('Precio inválido en los items de la venta', HttpStatus.BAD_REQUEST);
       }
-      const title = item.product?.name ?? 'Producto';
-      const description = item.product?.name ?? 'Producto';
-      const skuNumber = item.productId ? String(item.productId) : `sale-item-${item.id}`;
+      const title = this.normalizeText(item.product?.name, 'Item');
+      const description = this.normalizeText(item.product?.name, 'Producto');
+      const skuNumber = this.toSkuNumber(item.productId, item.id);
       const totalAmount = this.roundToCurrency(unitPrice * quantity);
       return {
         sku_number: skuNumber,
@@ -121,6 +135,8 @@ export class MercadoPagoInstoreService {
     }
     return {
       external_reference: `sale-${sale.id}`,
+      title: saleTitle,
+      description: saleDescription,
       total_amount: totalAmount,
       items,
     };
@@ -216,6 +232,9 @@ export class MercadoPagoInstoreService {
       });
       const text = await response.text();
       if (!response.ok) {
+        if (response.status === 400 && jsonBody) {
+          this.logger.error(`Mercado Pago 400 payload: ${jsonBody}`);
+        }
         this.logger.error(`Mercado Pago error ${response.status}: ${text}`);
         throw new HttpException(
           `Mercado Pago error ${response.status} en ${method} ${url}: ${text}`,
@@ -242,6 +261,31 @@ export class MercadoPagoInstoreService {
       throw new HttpException(`${field} inválido en la venta`, HttpStatus.BAD_REQUEST);
     }
     return parsed;
+  }
+
+  private normalizeText(value: unknown, fallback: string) {
+    const normalized = String(value ?? '').trim();
+    if (normalized) {
+      return normalized;
+    }
+    return fallback.trim() || fallback;
+  }
+
+  private ensureNonEmptyText(value: string, field: string) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+      throw new HttpException(`${field} requerido en el payload de Mercado Pago`, HttpStatus.BAD_REQUEST);
+    }
+    return normalized;
+  }
+
+  private toSkuNumber(productId: string | number | null, itemId: string | number) {
+    const raw = productId ? String(productId) : `saleitem${itemId}`;
+    const sanitized = raw.replace(/[^a-zA-Z0-9]/g, '');
+    if (!sanitized) {
+      throw new HttpException('sku_number inválido en los items de la venta', HttpStatus.BAD_REQUEST);
+    }
+    return sanitized;
   }
 
   private toNumber(value: unknown) {
