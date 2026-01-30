@@ -5,6 +5,8 @@ CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'MP_QR');
 ALTER TYPE "SaleStatus" RENAME TO "SaleStatus_old";
 CREATE TYPE "SaleStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED');
 
+ALTER TABLE "Sale" ALTER COLUMN "status" DROP DEFAULT;
+
 ALTER TABLE "Sale" ALTER COLUMN "status" TYPE "SaleStatus" USING (
   CASE
     WHEN "status"::text IN ('OPEN', 'PENDING_PAYMENT') THEN 'PENDING'
@@ -16,11 +18,11 @@ ALTER TABLE "Sale" ALTER COLUMN "status" TYPE "SaleStatus" USING (
   END
 )::"SaleStatus";
 
-ALTER TABLE "Sale" ALTER COLUMN "status" SET DEFAULT 'PENDING';
+ALTER TABLE "Sale" ALTER COLUMN "status" SET DEFAULT 'PENDING'::"SaleStatus";
 
 DROP TYPE "SaleStatus_old";
 
 -- AlterTable
-ALTER TABLE "Sale" ADD COLUMN     "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'CASH',
+ALTER TABLE "Sale" ADD COLUMN     "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'CASH'::"PaymentMethod",
 ADD COLUMN     "cashReceived" DECIMAL(10, 2),
 ADD COLUMN     "changeAmount" DECIMAL(10, 2);
