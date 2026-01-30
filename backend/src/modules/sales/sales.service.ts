@@ -112,11 +112,12 @@ export class SalesService {
     if (NON_PAYABLE_STATUSES.has(sale.status)) {
       throw new BadRequestException('La venta no puede cobrarse en este estado');
     }
-    if (!sale.user.externalPosId) {
+    const externalPosId = sale.user.externalPosId?.trim();
+    if (!externalPosId) {
       throw new BadRequestException('La caja no tiene externalPosId configurado');
     }
     const externalStoreId =
-      sale.user.externalStoreId || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+      sale.user.externalStoreId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
     if (!externalStoreId) {
       throw new BadRequestException('externalStoreId requerido para Mercado Pago');
     }
@@ -134,7 +135,7 @@ export class SalesService {
     try {
       await this.mpService.createOrUpdateOrder({
         externalStoreId,
-        externalPosId: sale.user.externalPosId,
+        externalPosId,
         sale: updatedSale,
       });
     } catch (error) {
@@ -172,18 +173,19 @@ export class SalesService {
     if (sale.status === SaleStatus.PAID) {
       throw new BadRequestException('La venta ya está pagada');
     }
-    if (!sale.user.externalPosId) {
+    const externalPosId = sale.user.externalPosId?.trim();
+    if (!externalPosId) {
       throw new BadRequestException('La caja no tiene externalPosId configurado');
     }
     const externalStoreId =
-      sale.user.externalStoreId || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+      sale.user.externalStoreId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
     if (!externalStoreId) {
       throw new BadRequestException('externalStoreId requerido para Mercado Pago');
     }
 
     await this.mpService.deleteOrder({
       externalStoreId,
-      externalPosId: sale.user.externalPosId,
+      externalPosId,
     });
 
     const updatedSale = await this.prisma.sale.update({
@@ -229,7 +231,7 @@ export class SalesService {
     }
     const externalPosId = sale.user.externalPosId;
     const externalStoreId =
-      sale.user.externalStoreId || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+      sale.user.externalStoreId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
     if (externalPosId && externalStoreId) {
       await this.mpService.deleteOrder({ externalStoreId, externalPosId });
     }

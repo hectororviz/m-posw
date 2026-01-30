@@ -13,6 +13,24 @@ interface OrderIdentity {
   externalPosId: string;
 }
 
+interface MercadoPagoOrderItem {
+  sku_number: string;
+  category: string;
+  title: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  unit_measure: string;
+  currency_id: string;
+  total_amount: number;
+}
+
+interface MercadoPagoOrderPayload {
+  external_reference: string;
+  total_amount: number;
+  items: MercadoPagoOrderItem[];
+}
+
 @Injectable()
 export class MercadoPagoInstoreService {
   private readonly baseUrl = 'https://api.mercadopago.com';
@@ -23,8 +41,47 @@ export class MercadoPagoInstoreService {
 
   async createOrUpdateOrder(input: CreateOrderInput) {
     const url = this.buildOrdersUrl(input.externalStoreId, input.externalPosId);
-    this.parseNumber(input.sale.total, 'total');
-    const items = input.sale.items.map((item) => {
+    this.assertExternalId('externalStoreId', input.externalStoreId);
+    this.assertExternalId('externalPosId', input.externalPosId);
+    const payload = this.buildPayload(input.sale);
+    const itemsTotal = payload.items.reduce((sum, item) => sum + item.total_amount, 0);
+    this.logger.debug(
+      `Mercado Pago payload summary: total_amount=${payload.total_amount} items_len=${payload.items.length} items_sum=${this.roundToCurrency(
+        itemsTotal,
+      )}`,
+    );
+    this.logger.debug(
+      `Mercado Pago request: PUT ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
+    );
+    await this.request('PUT', url, payload);
+  }
+
+  async deleteOrder(input: OrderIdentity) {
+    const url = this.buildPosOrdersUrl(input.externalPosId);
+    this.assertExternalId('externalStoreId', input.externalStoreId);
+    this.assertExternalId('externalPosId', input.externalPosId);
+    this.logger.debug(
+      `Mercado Pago request: DELETE ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
+    );
+    await this.request('DELETE', url);
+  }
+
+  async getPayment(paymentId: string) {
+    const url = `${this.baseUrl}/v1/payments/${paymentId}`;
+    return this.request('GET', url);
+  }
+
+  async getPosInfo(posId: string) {
+    const url = `${this.baseUrl}/pos/${posId}`;
+    return this.request('GET', url);
+  }
+
+  buildPayload(
+    sale: Sale & { items: (SaleItem & { product: { name: string; price: unknown } })[] },
+  ): MercadoPagoOrderPayload {
+    this.parseNumber(sale.total, 'total');
+    const currencyId = this.getCurrencyId();
+    const items = sale.items.map((item) => {
       const quantityValue = this.parseNumber(item.quantity, 'quantity');
       const quantity = Math.trunc(quantityValue);
       if (!Number.isFinite(quantityValue) || quantity <= 0 || quantity !== quantityValue) {
@@ -37,48 +94,36 @@ export class MercadoPagoInstoreService {
       if (!Number.isFinite(unitPrice)) {
         throw new HttpException('Precio inválido en los items de la venta', HttpStatus.BAD_REQUEST);
       }
+      const title = item.product?.name ?? 'Producto';
+      const description = item.product?.name ?? 'Producto';
+      const skuNumber = item.productId ? String(item.productId) : `sale-item-${item.id}`;
+      const totalAmount = this.roundToCurrency(unitPrice * quantity);
       return {
-        title: item.product.name,
+        sku_number: skuNumber,
+        category: 'POS',
+        title,
+        description,
         quantity,
         unit_price: unitPrice,
         unit_measure: 'unit',
+        currency_id: currencyId,
+        total_amount: totalAmount,
       };
     });
-    const total = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-    const totalAmount = Math.round((total + Number.EPSILON) * 100) / 100;
+    const totalAmount = this.roundToCurrency(
+      items.reduce((sum, item) => sum + item.total_amount, 0),
+    );
     if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
       throw new HttpException(
         `total_amount inválido en la venta (valor=${totalAmount})`,
         HttpStatus.BAD_REQUEST,
       );
     }
-
-    const payload = {
-      external_reference: `sale-${input.sale.id}`,
+    return {
+      external_reference: `sale-${sale.id}`,
       total_amount: totalAmount,
       items,
     };
-
-    this.logger.debug(
-      `Mercado Pago payload summary: keys=${Object.keys(payload).join(',')} total_amount_type=${typeof payload.total_amount} items_len=${payload.items.length}`,
-    );
-    this.logger.debug(
-      `Mercado Pago request: PUT ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
-    );
-    await this.request('PUT', url, payload);
-  }
-
-  async deleteOrder(input: OrderIdentity) {
-    const url = this.buildPosOrdersUrl(input.externalPosId);
-    this.logger.debug(
-      `Mercado Pago request: DELETE ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
-    );
-    await this.request('DELETE', url);
-  }
-
-  async getPayment(paymentId: string) {
-    const url = `${this.baseUrl}/v1/payments/${paymentId}`;
-    return this.request('GET', url);
   }
 
   /**
@@ -100,6 +145,10 @@ export class MercadoPagoInstoreService {
       throw new HttpException('MP_COLLECTOR_ID no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
     }
     return collectorId;
+  }
+
+  private getCurrencyId() {
+    return this.config.get<string>('MP_CURRENCY_ID') || 'ARS';
   }
 
   private async request(method: string, url: string, body?: Record<string, unknown>) {
@@ -167,7 +216,7 @@ export class MercadoPagoInstoreService {
       if (!response.ok) {
         this.logger.error(`Mercado Pago error ${response.status}: ${text}`);
         throw new HttpException(
-          `Mercado Pago error ${response.status}: ${text}`,
+          `Mercado Pago error ${response.status} en ${method} ${url}: ${text}`,
           HttpStatus.BAD_GATEWAY,
         );
       }
@@ -176,7 +225,10 @@ export class MercadoPagoInstoreService {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new HttpException('No se pudo comunicar con Mercado Pago', HttpStatus.BAD_GATEWAY);
+      throw new HttpException(
+        `No se pudo comunicar con Mercado Pago al llamar ${method} ${url}`,
+        HttpStatus.BAD_GATEWAY,
+      );
     } finally {
       clearTimeout(timeout);
     }
@@ -201,5 +253,25 @@ export class MercadoPagoInstoreService {
       return Number(value);
     }
     return Number(value);
+  }
+
+  private roundToCurrency(value: number) {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  private assertExternalId(field: string, value: string) {
+    const normalized = String(value ?? '').trim();
+    if (!normalized) {
+      throw new HttpException(
+        `${field} requerido: configurá external IDs (external_pos_id/external_store_id)`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (/^\d+$/.test(normalized)) {
+      throw new HttpException(
+        `${field} inválido: parece un ID numérico. Configurá el external_id correspondiente en Mercado Pago`,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }

@@ -74,6 +74,7 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `VITE_UPLOADS_BASE_URL`: base opcional para imágenes de `/uploads` (si no se define, se usa el ORIGIN de `VITE_API_BASE_URL`).
 - `MP_ACCESS_TOKEN`: token privado de Mercado Pago (solo backend).
 - `MP_COLLECTOR_ID`: collector ID de la cuenta MP.
+- `MP_CURRENCY_ID`: moneda para items/órdenes MP (default `ARS`).
 - `MP_DEFAULT_EXTERNAL_STORE_ID`: store por defecto si la caja no define uno.
 - `MP_WEBHOOK_SECRET`: secreto opcional para validar webhook (`/webhooks/mercadopago?secret=...`).
 
@@ -89,6 +90,22 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `POST /sales/:id/payments/mercadopago-qr/cancel`
 - `POST /webhooks/mercadopago`
 - `GET /sales/:id` (polling de estado)
+
+### Probar con curl
+
+> Requiere que el usuario/caja tenga `externalPosId` y `externalStoreId` configurados con los external IDs de Mercado Pago (no IDs numéricos).
+
+```bash
+curl -X POST "http://localhost:3000/sales/<SALE_ID>/payments/mercadopago-qr" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
+
+Para cancelar la orden:
+
+```bash
+curl -X POST "http://localhost:3000/sales/<SALE_ID>/payments/mercadopago-qr/cancel" \
+  -H "Authorization: Bearer <JWT_TOKEN>"
+```
 
 ## Frontend (React + Vite)
 
