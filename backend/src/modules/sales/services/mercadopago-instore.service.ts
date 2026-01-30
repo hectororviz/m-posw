@@ -23,12 +23,19 @@ export class MercadoPagoInstoreService {
 
   async createOrUpdateOrder(input: CreateOrderInput) {
     const url = this.buildOrdersUrl(input.externalStoreId, input.externalPosId);
-    const total = Number(input.sale.total);
-    const items = input.sale.items.map((item) => ({
-      title: item.product.name,
-      quantity: item.quantity,
-      unit_price: Number(item.subtotal) / item.quantity,
-    }));
+    const items = input.sale.items.map((item) => {
+      const quantity = Math.trunc(Number(item.quantity));
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        throw new HttpException('Cantidad inválida en los items de la venta', HttpStatus.BAD_REQUEST);
+      }
+      return {
+        title: item.product.name,
+        quantity,
+        unit_price: Number(item.subtotal) / quantity,
+        unit_measure: 'unit',
+      };
+    });
+    const total = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
 
     const payload = {
       external_reference: input.sale.id,

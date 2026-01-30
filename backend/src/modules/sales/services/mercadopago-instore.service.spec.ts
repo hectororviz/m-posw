@@ -63,6 +63,17 @@ describe('MercadoPagoInstoreService', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer token' }),
       }),
     );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.items).toEqual([
+      expect.objectContaining({
+        title: 'Item A',
+        quantity: 1,
+        unit_price: 100,
+        unit_measure: 'unit',
+      }),
+    ]);
+    expect(body.total_amount).toBe(100);
   });
 
   it('elimina la orden con el token y la URL correcta', async () => {
