@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PaymentMethod, Prisma, SaleStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { CreateCashSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
@@ -38,6 +38,7 @@ export class SalesService {
           userId,
           total: roundedTotal,
           status: SaleStatus.APPROVED,
+          paymentStatus: PaymentStatus.APPROVED,
           paymentMethod: PaymentMethod.CASH,
           cashReceived,
           changeAmount,
@@ -66,6 +67,7 @@ export class SalesService {
           userId,
           total: roundedTotal,
           status: SaleStatus.PENDING,
+          paymentStatus: PaymentStatus.PENDING,
           paymentMethod: PaymentMethod.MP_QR,
           statusUpdatedAt: new Date(),
           paymentStartedAt: new Date(),
@@ -167,6 +169,51 @@ export class SalesService {
     return { saleId: finalSale.id, status: finalSale.status, updatedAt: finalSale.statusUpdatedAt };
   }
 
+  async getPaymentStatus(saleId: string, requester: { id: string; role: string }) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { user: true },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+    this.assertCanAccessSale(sale, requester, 'GET /sales/:id/payment-status');
+    const refreshed = await this.expireIfNeeded(sale);
+    const finalSale = refreshed ?? sale;
+    return {
+      saleId: finalSale.id,
+      paymentStatus: finalSale.paymentStatus,
+      mpStatus: finalSale.mpStatus,
+      mpStatusDetail: finalSale.mpStatusDetail,
+    };
+  }
+
+  async completeSale(saleId: string, requester: { id: string; role: string }) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { user: true, items: { include: { product: true } } },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+    this.assertCanAccessSale(sale, requester, 'POST /sales/:id/complete');
+    if (sale.paymentStatus !== PaymentStatus.APPROVED) {
+      throw new BadRequestException('La venta todavía no tiene pago aprobado');
+    }
+    if (sale.status === SaleStatus.APPROVED) {
+      return sale;
+    }
+    return this.prisma.sale.update({
+      where: { id: saleId },
+      data: {
+        status: SaleStatus.APPROVED,
+        statusUpdatedAt: new Date(),
+        paidAt: sale.paidAt ?? new Date(),
+      },
+      include: { items: { include: { product: true } } },
+    });
+  }
+
   async cancelQrSale(saleId: string, requester: { id: string; role: string }) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
@@ -200,6 +247,7 @@ export class SalesService {
       where: { id: saleId },
       data: {
         status: SaleStatus.CANCELLED,
+        paymentStatus: PaymentStatus.REJECTED,
         statusUpdatedAt: new Date(),
         cancelledAt: new Date(),
       },
@@ -259,6 +307,7 @@ export class SalesService {
       where: { id: sale.id },
       data: {
         status: SaleStatus.EXPIRED,
+        paymentStatus: PaymentStatus.EXPIRED,
         statusUpdatedAt: new Date(),
         expiredAt: new Date(),
       },

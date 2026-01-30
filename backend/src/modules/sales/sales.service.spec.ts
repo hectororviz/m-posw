@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SaleStatus } from '@prisma/client';
+import { PaymentStatus, SaleStatus } from '@prisma/client';
 import { SalesService } from './sales.service';
 
 describe('SalesService MercadoPago QR auth', () => {
@@ -9,6 +9,7 @@ describe('SalesService MercadoPago QR auth', () => {
     userId: 'owner-1',
     total: 100,
     status: SaleStatus.PENDING,
+    paymentStatus: PaymentStatus.PENDING,
     paymentStartedAt: null,
     paymentMethod: 'MP_QR',
     items: [

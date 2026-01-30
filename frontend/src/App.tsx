@@ -7,6 +7,8 @@ import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
 import { AdminProductsPage } from './pages/AdminProductsPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
+import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -42,6 +44,22 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <CategoryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checkout/payment"
+        element={
+          <ProtectedRoute>
+            <CheckoutPaymentPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checkout/qr/:saleId"
+        element={
+          <ProtectedRoute>
+            <CheckoutQrPage />
           </ProtectedRoute>
         }
       />
