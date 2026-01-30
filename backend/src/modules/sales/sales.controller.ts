@@ -47,6 +47,24 @@ export class SalesController {
     return this.salesService.getSaleStatus(id, { id: req.user.sub, role: req.user.role });
   }
 
+  @Get(':id/payment-status')
+  @Roles(Role.ADMIN, Role.USER)
+  getPaymentStatus(
+    @Req() req: { user: { sub: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.salesService.getPaymentStatus(id, { id: req.user.sub, role: req.user.role });
+  }
+
+  @Post(':id/complete')
+  @Roles(Role.ADMIN, Role.USER)
+  completeSale(
+    @Req() req: { user: { sub: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.salesService.completeSale(id, { id: req.user.sub, role: req.user.role });
+  }
+
   @Post(':id/cancel')
   @Roles(Role.ADMIN, Role.USER)
   cancelQrSale(

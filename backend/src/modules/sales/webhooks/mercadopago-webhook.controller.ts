@@ -1,14 +1,18 @@
-import { Body, Controller, Post, Query, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  Logger,
+  Post,
+  Query,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, SaleStatus } from '@prisma/client';
+import { PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../common/prisma.service';
-import { MercadoPagoInstoreService } from '../services/mercadopago-instore.service';
-
-type MpPayment = {
-  external_reference?: string | null;
-  status?: string | null;
-  date_approved?: string | null;
-};
+import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
+import { SalesGateway } from '../websockets/sales.gateway';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -37,18 +41,6 @@ const getStringIdFromBody = (body: unknown): string | null => {
   return null;
 };
 
-const isMpPayment = (value: unknown): value is MpPayment => {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const props: Array<keyof MpPayment> = ['external_reference', 'status', 'date_approved'];
-  return props.every((prop) => {
-    const propValue = value[prop];
-    return propValue === undefined || propValue === null || typeof propValue === 'string';
-  });
-};
-
 const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
   if (value === null) {
     return null;
@@ -75,80 +67,276 @@ const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
   return String(value);
 };
 
+const parseSignatureHeader = (signature: string) => {
+  const parts = signature.split(',').map((part) => part.trim());
+  const result: Record<string, string> = {};
+  for (const part of parts) {
+    const [key, ...rest] = part.split('=');
+    if (!key || rest.length === 0) {
+      continue;
+    }
+    result[key.trim()] = rest.join('=').trim();
+  }
+  return result;
+};
+
+const parseResourceIdFromUrl = (resource: string) => {
+  const trimmed = resource.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const match = trimmed.match(/\/([^/?#]+)$/);
+  return match ? match[1] : null;
+};
+
+const extractExternalReference = (payload: Record<string, unknown> | null) => {
+  const externalReference = payload?.external_reference;
+  return typeof externalReference === 'string' ? externalReference : null;
+};
+
+const normalizeSaleId = (externalReference: string) => {
+  const trimmed = externalReference.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.startsWith('sale-') ? trimmed.slice('sale-'.length) : trimmed;
+};
+
+const extractMerchantOrderId = (payload: Record<string, unknown> | null) => {
+  const order = payload?.order;
+  if (isRecord(order)) {
+    const orderId = order.id;
+    if (typeof orderId === 'string') {
+      return orderId;
+    }
+    if (typeof orderId === 'number') {
+      return String(orderId);
+    }
+  }
+  const merchantOrderId = payload?.merchant_order_id;
+  if (typeof merchantOrderId === 'string') {
+    return merchantOrderId;
+  }
+  if (typeof merchantOrderId === 'number') {
+    return String(merchantOrderId);
+  }
+  return null;
+};
+
+const mapPaymentStatus = (status?: string | null) => {
+  const normalized = status?.toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === 'approved') {
+    return PaymentStatus.APPROVED;
+  }
+  if (normalized === 'rejected' || normalized === 'cancelled') {
+    return PaymentStatus.REJECTED;
+  }
+  if (normalized === 'pending' || normalized === 'in_process') {
+    return PaymentStatus.PENDING;
+  }
+  return null;
+};
+
+const mapMerchantOrderStatus = (status?: string | null) => {
+  const normalized = status?.toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (normalized === 'closed') {
+    return PaymentStatus.APPROVED;
+  }
+  if (normalized === 'expired') {
+    return PaymentStatus.EXPIRED;
+  }
+  if (normalized === 'opened') {
+    return PaymentStatus.PENDING;
+  }
+  return null;
+};
+
+const mapSaleStatus = (status: PaymentStatus | null) => {
+  if (!status) {
+    return null;
+  }
+  if (status === PaymentStatus.APPROVED) {
+    return SaleStatus.APPROVED;
+  }
+  if (status === PaymentStatus.REJECTED) {
+    return SaleStatus.REJECTED;
+  }
+  if (status === PaymentStatus.EXPIRED) {
+    return SaleStatus.EXPIRED;
+  }
+  return SaleStatus.PENDING;
+};
+
 @Controller('webhooks')
 export class MercadoPagoWebhookController {
+  private readonly logger = new Logger(MercadoPagoWebhookController.name);
+
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
-    private mpService: MercadoPagoInstoreService,
+    private mpQueryService: MercadoPagoQueryService,
+    private salesGateway: SalesGateway,
   ) {}
 
   @Post('mercadopago')
-  async handleWebhook(@Body() body: Record<string, unknown>, @Query('secret') secret?: string) {
-    const expectedSecret = this.config.get<string>('MP_WEBHOOK_SECRET');
-    if (expectedSecret && secret !== expectedSecret) {
-      throw new UnauthorizedException('Webhook inválido');
-    }
+  async handleWebhook(
+    @Body() body: Record<string, unknown>,
+    @Query() query: Record<string, string>,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    const signatureHeader = this.getHeader(headers, 'x-signature');
+    const requestId = this.getHeader(headers, 'x-request-id');
+    const resourceId =
+      (body?.type === 'payment' && getStringIdFromBody(body)) ||
+      (query?.topic === 'merchant_order' && query?.id) ||
+      (typeof body?.resource === 'string' ? parseResourceIdFromUrl(body.resource) : null) ||
+      getStringIdFromBody(body);
 
-    const paymentId =
-      getStringIdFromBody(body) || body?.payment_id?.toString?.() || body?.id?.toString?.();
+    this.verifySignature(signatureHeader, requestId, resourceId);
 
-    if (!paymentId) {
+    const topic = body?.type?.toString?.() || query?.topic || 'unknown';
+    const eventResourceId = resourceId ?? 'unknown';
+    const shouldProcess = await this.ensureIdempotency(topic, eventResourceId);
+    if (!shouldProcess) {
       return { received: true };
     }
 
-    const payment = await this.mpService.getPayment(paymentId);
-    const parsedPayment = isMpPayment(payment) ? payment : null;
-    const externalReference = parsedPayment?.external_reference ?? null;
-    if (!externalReference) {
-      return { received: true };
-    }
+    const resourceUrl = typeof body?.resource === 'string' ? body.resource : '';
+    const isMerchantOrder =
+      query?.topic === 'merchant_order' || resourceUrl.includes('/merchant_orders/');
 
-    const saleId = externalReference.startsWith('sale-')
-      ? externalReference.slice('sale-'.length)
-      : externalReference;
-    const sale = await this.prisma.sale.findUnique({ where: { id: saleId } });
+    const mpData = isMerchantOrder
+      ? await this.mpQueryService.getMerchantOrder(eventResourceId)
+      : await this.mpQueryService.getPayment(eventResourceId);
+
+    const mpPayload = isRecord(mpData) ? mpData : null;
+    const externalReference = extractExternalReference(mpPayload);
+    const saleIdFromReference = externalReference ? normalizeSaleId(externalReference) : null;
+
+    const sale =
+      (saleIdFromReference
+        ? await this.prisma.sale.findUnique({ where: { id: saleIdFromReference } })
+        : null) ||
+      (eventResourceId
+        ? await this.prisma.sale.findFirst({
+            where: isMerchantOrder
+              ? { mpMerchantOrderId: eventResourceId }
+              : { mpPaymentId: eventResourceId },
+          })
+        : null);
+
     if (!sale) {
       return { received: true };
     }
 
-    const status = parsedPayment?.status ?? 'unknown';
-    const approvedAt = parsedPayment?.date_approved ? new Date(parsedPayment.date_approved) : null;
-
-    await this.prisma.mercadoPagoPayment.create({
+    const mpStatus = typeof mpPayload?.status === 'string' ? mpPayload.status : null;
+    const mpStatusDetail =
+      typeof mpPayload?.status_detail === 'string' ? mpPayload.status_detail : null;
+    const approvedAt =
+      typeof mpPayload?.date_approved === 'string' ? new Date(mpPayload.date_approved) : null;
+    const merchantOrderIdFromPayment = extractMerchantOrderId(mpPayload);
+    const nextPaymentStatus = isMerchantOrder
+      ? mapMerchantOrderStatus(mpStatus)
+      : mapPaymentStatus(mpStatus);
+    const nextSaleStatus = mapSaleStatus(nextPaymentStatus);
+    const updatedSale = await this.prisma.sale.update({
+      where: { id: sale.id },
       data: {
-        saleId: sale.id,
-        paymentId: paymentId.toString(),
-        status,
-        approvedAt,
-        payload: toJsonValue(payment),
+        paymentStatus: nextPaymentStatus ?? sale.paymentStatus,
+        status:
+          nextSaleStatus && sale.status !== SaleStatus.APPROVED ? nextSaleStatus : sale.status,
+        statusUpdatedAt:
+          nextSaleStatus && sale.status !== SaleStatus.APPROVED ? new Date() : sale.statusUpdatedAt,
+        paidAt:
+          nextPaymentStatus === PaymentStatus.APPROVED ? approvedAt ?? new Date() : sale.paidAt,
+        mpPaymentId: isMerchantOrder ? sale.mpPaymentId : eventResourceId,
+        mpMerchantOrderId: isMerchantOrder
+          ? eventResourceId
+          : merchantOrderIdFromPayment ?? sale.mpMerchantOrderId,
+        mpStatus,
+        mpStatusDetail,
+        mpRaw: toJsonValue(mpPayload ?? mpData),
       },
     });
 
-    const normalizedStatus = status.toLowerCase();
-    const nextStatus =
-      normalizedStatus === 'approved'
-        ? SaleStatus.APPROVED
-        : normalizedStatus === 'rejected'
-          ? SaleStatus.REJECTED
-          : normalizedStatus === 'expired'
-            ? SaleStatus.EXPIRED
-            : normalizedStatus === 'cancelled'
-              ? SaleStatus.CANCELLED
-              : null;
-
-    if (nextStatus && sale.status !== nextStatus && sale.status !== SaleStatus.APPROVED) {
-      await this.prisma.sale.update({
-        where: { id: sale.id },
-        data: {
-          status: nextStatus,
-          statusUpdatedAt: new Date(),
-          paidAt: nextStatus === SaleStatus.APPROVED ? approvedAt ?? new Date() : undefined,
-          mpPaymentId: paymentId.toString(),
-        },
-      });
-    }
+    this.salesGateway.notifyPaymentStatusChanged({
+      saleId: updatedSale.id,
+      paymentStatus: updatedSale.paymentStatus,
+      mpStatus: updatedSale.mpStatus,
+      mpStatusDetail: updatedSale.mpStatusDetail,
+    });
 
     return { received: true };
+  }
+
+  private verifySignature(
+    signatureHeader: string | undefined,
+    requestId: string | undefined,
+    resourceId: string | null | undefined,
+  ) {
+    const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
+    if (!secret || !signatureHeader || !requestId || !resourceId) {
+      this.logger.warn('Webhook de Mercado Pago sin firma válida o headers incompletos');
+      throw new UnauthorizedException('Webhook inválido');
+    }
+
+    const parsed = parseSignatureHeader(signatureHeader);
+    const ts = parsed['ts'];
+    const v1 = parsed['v1'];
+    if (!ts || !v1) {
+      this.logger.warn('Webhook de Mercado Pago con firma incompleta');
+      throw new UnauthorizedException('Webhook inválido');
+    }
+
+    const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+    const digest = createHmac('sha256', secret).update(manifest).digest('hex');
+    const digestBuffer = Buffer.from(digest, 'hex');
+    const signatureBuffer = Buffer.from(v1, 'hex');
+    if (digestBuffer.length !== signatureBuffer.length) {
+      this.logger.warn('Webhook de Mercado Pago con firma inválida');
+      throw new UnauthorizedException('Webhook inválido');
+    }
+    if (!timingSafeEqual(digestBuffer, signatureBuffer)) {
+      this.logger.warn('Webhook de Mercado Pago con firma inválida');
+      throw new UnauthorizedException('Webhook inválido');
+    }
+  }
+
+  private async ensureIdempotency(topic: string, resourceId: string) {
+    try {
+      await this.prisma.paymentEvent.create({
+        data: {
+          provider: 'MP',
+          topic,
+          resourceId,
+        },
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  private getHeader(
+    headers: Record<string, string | string[] | undefined>,
+    name: string,
+  ): string | undefined {
+    const value = headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
+    if (Array.isArray(value)) {
+      return value[0];
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    return undefined;
   }
 }

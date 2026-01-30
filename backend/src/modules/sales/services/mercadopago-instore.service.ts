@@ -31,6 +31,7 @@ interface MercadoPagoOrderPayload {
   description: string;
   total_amount: number;
   items: MercadoPagoOrderItem[];
+  notification_url?: string;
 }
 
 @Injectable()
@@ -133,12 +134,14 @@ export class MercadoPagoInstoreService {
         HttpStatus.BAD_REQUEST,
       );
     }
+    const notificationUrl = this.config.get<string>('MP_WEBHOOK_URL')?.trim();
     return {
       external_reference: `sale-${sale.id}`,
       title: saleTitle,
       description: saleDescription,
       total_amount: totalAmount,
       items,
+      notification_url: notificationUrl || undefined,
     };
   }
 

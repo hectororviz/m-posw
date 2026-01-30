@@ -26,6 +26,13 @@ enum PaymentMethod {
   MP_QR
 }
 
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   email     String?  @unique
@@ -76,6 +83,7 @@ model Sale {
   updatedAt DateTime   @updatedAt
   total     Decimal    @db.Decimal(10, 2)
   status    SaleStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
   paymentMethod PaymentMethod
   statusUpdatedAt DateTime @default(now())
   paymentStartedAt DateTime?
@@ -87,8 +95,11 @@ model Sale {
   mpExternalReference String?
   mpOrderId String?
   mpPaymentId String?
+  mpMerchantOrderId String?
   mpQrData String?
   mpStatus String?
+  mpStatusDetail String?
+  mpRaw Json?
   userId    String     @db.Uuid
   user      User       @relation(fields: [userId], references: [id])
   items     SaleItem[]
@@ -127,6 +138,16 @@ model MercadoPagoPayment {
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
 
   @@index([saleId])
+}
+
+model PaymentEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  provider  String
+  topic     String
+  resourceId String
+  createdAt DateTime @default(now())
+
+  @@unique([provider, topic, resourceId])
 }
 
 model Setting {
