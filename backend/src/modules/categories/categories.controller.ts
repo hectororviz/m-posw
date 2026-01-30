@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../common/upload.constants';
+import { mapProducts } from '../products/product.mapper';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoriesService } from './categories.service';
@@ -61,11 +62,12 @@ export class CategoriesController {
   }
 
   @Get(':id/products')
-  listProducts(
+  async listProducts(
     @Param('id') id: string,
     @Query('includeInactive') includeInactive?: string,
   ) {
-    return this.categoriesService.listProducts(id, includeInactive === 'true');
+    const products = await this.categoriesService.listProducts(id, includeInactive === 'true');
+    return mapProducts(products);
   }
 
   @Delete(':id')
