@@ -49,10 +49,17 @@ describe('MercadoPagoWebhookController', () => {
     const digest = createHmac('sha256', secret).update(manifest).digest('hex');
     const signature = `ts=${ts}, v1=${digest}`;
 
+    const response = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+
     await controller.handleWebhook(
+      { 'x-request-id': requestId, 'x-signature': signature },
       { type: 'payment', data: { id: resourceId } },
       {},
-      { 'x-request-id': requestId, 'x-signature': signature },
+      { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
+      response as any,
     );
 
     expect(prisma.sale.update).toHaveBeenCalledWith(

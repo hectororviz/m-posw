@@ -93,7 +93,7 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `MP_CURRENCY_ID`: moneda para items/órdenes MP (default `ARS`).
 - `MP_DEFAULT_EXTERNAL_STORE_ID`: store por defecto si la caja no define uno.
 - `MP_DEFAULT_EXTERNAL_POS_ID`: POS por defecto si la caja no define uno.
-- `MP_WEBHOOK_SECRET`: secreto opcional para validar webhook (`/webhooks/mercadopago?secret=...`).
+- `MP_WEBHOOK_SECRET`: secreto para validar firma del webhook de Mercado Pago.
 
 ## Mercado Pago QR estático (cobro presencial)
 
@@ -105,7 +105,7 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `MP_COLLECTOR_ID`: ID del collector (vendedor) asociado a la cuenta.
 - `MP_CURRENCY_ID`: moneda de los items (por defecto `ARS`).
 - `MP_DEFAULT_EXTERNAL_STORE_ID` / `MP_DEFAULT_EXTERNAL_POS_ID` (opcionales): valores de fallback si la caja/usuario no tiene configurados sus external IDs.
-- `MP_WEBHOOK_SECRET` (opcional): secreto compartido para validar el webhook (`/webhooks/mercadopago?secret=...`).
+- `MP_WEBHOOK_SECRET`: secreto compartido para validar la firma del webhook.
 
 **Configuración por caja/usuario:**
 
@@ -118,7 +118,7 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 
 - El backend crea/actualiza órdenes Instore QR v2 al iniciar el cobro.
 - Solo puede haber una sesión activa por caja (login único).
-- El webhook puede protegerse con `MP_WEBHOOK_SECRET` y el query param `?secret=...`.
+- El webhook valida firma HMAC si `MP_WEBHOOK_SECRET` está definido.
 
 ### Flujo de cobro (resumen)
 
@@ -133,6 +133,26 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `POST /sales/:id/payments/mercadopago-qr/cancel`
 - `POST /webhooks/mercadopago`
 - `GET /sales/:id` (polling de estado)
+
+### Webhook de Mercado Pago
+
+- Endpoint interno (backend): `POST /webhooks/mercadopago`
+- Endpoint público recomendado (con proxy `/api`): `https://pos.csdsoler.com.ar/api/webhooks/mercadopago`
+
+Prueba manual desde afuera:
+
+```bash
+curl -i -X POST https://pos.csdsoler.com.ar/api/webhooks/mercadopago \
+  -H "Content-Type: application/json" \
+  -d '{"type":"payment","data":{"id":"123456"}}'
+```
+
+Si el `curl` devuelve **502 Bad Gateway**:
+
+- Revisar el reverse proxy (Caddy/Nginx) y el upstream al backend.
+- Verificar que el servicio/host del backend sea el correcto (por ejemplo, `pos-backend:3000`)
+  y que el contenedor esté arriba.
+- Revisar logs del proxy para confirmar el motivo exacto del 502 (upstream no resuelve, puerto incorrecto, etc.).
 
 ### Probar con curl
 
@@ -184,6 +204,26 @@ server {
 
   location / {
     try_files $uri /index.html;
+  }
+}
+```
+
+### Ejemplo Caddy (proxy /api + /uploads)
+
+```caddy
+pos.csdsoler.com.ar {
+  encode gzip
+
+  handle_path /api/* {
+    reverse_proxy pos-backend:3000
+  }
+
+  handle_path /uploads/* {
+    reverse_proxy pos-backend:3000
+  }
+
+  handle {
+    reverse_proxy pos-frontend:80
   }
 }
 ```
