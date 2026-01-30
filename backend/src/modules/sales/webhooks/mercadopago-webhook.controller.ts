@@ -5,11 +5,14 @@ import {
   Logger,
   Post,
   Query,
+  Req,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { Request, Response } from 'express';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
@@ -186,10 +189,22 @@ export class MercadoPagoWebhookController {
 
   @Post('mercadopago')
   async handleWebhook(
+    @Headers() headers: Record<string, string | string[] | undefined>,
     @Body() body: Record<string, unknown>,
     @Query() query: Record<string, string>,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
   ) {
+    this.logger.log(
+      `WEBHOOK_RECEIVED ${JSON.stringify({
+        method: request.method,
+        url: request.originalUrl ?? request.url,
+        query,
+        headers,
+        body,
+      })}`,
+    );
+
     const signatureHeader = this.getHeader(headers, 'x-signature');
     const requestId = this.getHeader(headers, 'x-request-id');
     const resourceId =
@@ -200,11 +215,26 @@ export class MercadoPagoWebhookController {
 
     this.verifySignature(signatureHeader, requestId, resourceId);
 
+    response.status(200).json({ ok: true });
+
+    try {
+      await this.processWebhook(body, query, resourceId);
+    } catch (error) {
+      const message = error instanceof Error ? error.stack ?? error.message : String(error);
+      this.logger.error(`WEBHOOK_PROCESSING_FAILED ${message}`);
+    }
+  }
+
+  private async processWebhook(
+    body: Record<string, unknown>,
+    query: Record<string, string>,
+    resourceId: string | null | undefined,
+  ) {
     const topic = body?.type?.toString?.() || query?.topic || 'unknown';
     const eventResourceId = resourceId ?? 'unknown';
     const shouldProcess = await this.ensureIdempotency(topic, eventResourceId);
     if (!shouldProcess) {
-      return { received: true };
+      return;
     }
 
     const resourceUrl = typeof body?.resource === 'string' ? body.resource : '';
@@ -232,7 +262,7 @@ export class MercadoPagoWebhookController {
         : null);
 
     if (!sale) {
-      return { received: true };
+      return;
     }
 
     const mpStatus = typeof mpPayload?.status === 'string' ? mpPayload.status : null;
@@ -272,7 +302,6 @@ export class MercadoPagoWebhookController {
       mpStatusDetail: updatedSale.mpStatusDetail,
     });
 
-    return { received: true };
   }
 
   private verifySignature(
