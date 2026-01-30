@@ -45,12 +45,12 @@ describe('MercadoPagoInstoreService', () => {
       externalPosId: 'POS_1',
       sale: {
         id: 'sale-1',
-        total: 100,
+        total: '100.00',
         items: [
           {
-            product: { name: 'Item A', price: 100 },
-            quantity: 1,
-            subtotal: 100,
+            product: { name: 'Item A', price: '50.00' },
+            quantity: '2',
+            subtotal: '100.00',
           },
         ],
       } as any,
@@ -68,12 +68,17 @@ describe('MercadoPagoInstoreService', () => {
     expect(body.items).toEqual([
       expect.objectContaining({
         title: 'Item A',
-        quantity: 1,
-        unit_price: 100,
+        quantity: 2,
+        unit_price: 50,
         unit_measure: 'unit',
       }),
     ]);
     expect(body.total_amount).toBe(100);
+    expect(typeof body.total_amount).toBe('number');
+    expect(body.items[0].unit_measure).toBe('unit');
+    expect(typeof body.items[0].unit_price).toBe('number');
+    expect(typeof body.items[0].quantity).toBe('number');
+    expect(body.external_reference).toBe('sale-sale-1');
   });
 
   it('elimina la orden con el token y la URL correcta', async () => {
