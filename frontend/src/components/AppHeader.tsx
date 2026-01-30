@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
@@ -26,15 +27,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
   const { user, logout } = useAuth();
   const storeName = settings?.storeName ?? 'm-POSw';
   const logoUrl = buildImageUrl(settings?.logoUrl);
+  const [logoError, setLogoError] = useState(false);
   const showSkeleton = isLoading && !settings;
   const initials = getInitials(storeName);
+  const showLogo = Boolean(logoUrl) && !logoError;
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [logoUrl]);
 
   return (
     <header className="app-header">
       <div className="header-row">
         <div className="brand-block">
-          {logoUrl ? (
-            <img src={logoUrl} alt={storeName} className="brand-logo" />
+          {showLogo ? (
+            <img src={logoUrl} alt={storeName} className="brand-logo" onError={() => setLogoError(true)} />
           ) : (
             <div className="logo-placeholder" aria-hidden="true">
               {initials}
