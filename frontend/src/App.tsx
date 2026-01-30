@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { CategoryPage } from './pages/CategoryPage';
-import { CheckoutPage } from './pages/CheckoutPage';
 import { AdminLayout } from './pages/AdminLayout';
 import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
 import { AdminProductsPage } from './pages/AdminProductsPage';
@@ -43,14 +42,6 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <CategoryPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/checkout"
-        element={
-          <ProtectedRoute>
-            <CheckoutPage />
           </ProtectedRoute>
         }
       />

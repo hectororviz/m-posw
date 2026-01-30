@@ -14,12 +14,16 @@ enum Role {
 }
 
 enum SaleStatus {
-  OPEN
-  PENDING_PAYMENT
-  PAID
-  CANCELLED
+  PENDING
+  APPROVED
+  REJECTED
   EXPIRED
-  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  MP_QR
 }
 
 model User {
@@ -71,13 +75,18 @@ model Sale {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   total     Decimal    @db.Decimal(10, 2)
-  status    SaleStatus @default(OPEN)
+  status    SaleStatus @default(PENDING)
+  paymentMethod PaymentMethod
   statusUpdatedAt DateTime @default(now())
   paymentStartedAt DateTime?
   paidAt    DateTime?
   cancelledAt DateTime?
   expiredAt DateTime?
-  failedAt  DateTime?
+  cashReceived Decimal? @db.Decimal(10, 2)
+  changeAmount Decimal? @db.Decimal(10, 2)
+  mpExternalReference String?
+  mpOrderId String?
+  mpPaymentId String?
   userId    String     @db.Uuid
   user      User       @relation(fields: [userId], references: [id])
   items     SaleItem[]

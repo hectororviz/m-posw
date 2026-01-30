@@ -3,7 +3,7 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
-import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateCashSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
 import { SalesService } from './sales.service';
 
 @Controller('sales')
@@ -11,10 +11,16 @@ import { SalesService } from './sales.service';
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
-  @Post()
+  @Post('cash')
   @Roles(Role.ADMIN, Role.USER)
-  create(@Req() req: { user: { sub: string } }, @Body() dto: CreateSaleDto) {
-    return this.salesService.createSale(req.user.sub, dto);
+  createCash(@Req() req: { user: { sub: string } }, @Body() dto: CreateCashSaleDto) {
+    return this.salesService.createCashSale(req.user.sub, dto);
+  }
+
+  @Post('qr')
+  @Roles(Role.ADMIN, Role.USER)
+  createQr(@Req() req: { user: { sub: string } }, @Body() dto: CreateQrSaleDto) {
+    return this.salesService.createQrSale(req.user.sub, dto);
   }
 
   @Get()
@@ -32,29 +38,21 @@ export class SalesController {
     return this.salesService.getSaleById(id, { id: req.user.sub, role: req.user.role });
   }
 
-  @Post(':id/payments/mercadopago-qr')
+  @Get(':id/status')
   @Roles(Role.ADMIN, Role.USER)
-  startMercadoPagoPayment(
+  getStatus(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
   ) {
-    return this.salesService.startMercadoPagoPayment(
-      id,
-      { id: req.user.sub, sub: req.user.sub, role: req.user.role },
-      'POST /sales/:id/payments/mercadopago-qr',
-    );
+    return this.salesService.getSaleStatus(id, { id: req.user.sub, role: req.user.role });
   }
 
-  @Post(':id/payments/mercadopago-qr/cancel')
+  @Post(':id/cancel')
   @Roles(Role.ADMIN, Role.USER)
-  cancelMercadoPagoPayment(
+  cancelQrSale(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
   ) {
-    return this.salesService.cancelMercadoPagoPayment(
-      id,
-      { id: req.user.sub, sub: req.user.sub, role: req.user.role },
-      'POST /sales/:id/payments/mercadopago-qr/cancel',
-    );
+    return this.salesService.cancelQrSale(id, { id: req.user.sub, role: req.user.role });
   }
 }

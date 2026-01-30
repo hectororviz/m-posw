@@ -5,21 +5,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { SaleStatus } from '@prisma/client';
+import { PaymentMethod, SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
-import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateCashSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
-
-const NON_PAYABLE_STATUSES = new Set<SaleStatus>([
-  SaleStatus.CANCELLED,
-  SaleStatus.EXPIRED,
-  SaleStatus.FAILED,
-]);
 
 @Injectable()
 export class SalesService {
-  private readonly paymentExpirationMinutes = 10;
+  private readonly paymentExpirationMinutes = 2;
   private readonly logger = new Logger(SalesService.name);
 
   constructor(
@@ -28,40 +22,97 @@ export class SalesService {
     private mpService: MercadoPagoInstoreService,
   ) {}
 
-  async createSale(userId: string, dto: CreateSaleDto) {
-    const productIds = dto.items.map((item) => item.productId);
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, active: true },
-    });
-
-    if (products.length !== productIds.length) {
-      throw new BadRequestException('Producto inválido o inactivo');
+  async createCashSale(userId: string, dto: CreateCashSaleDto) {
+    const { items, total } = await this.buildSaleItems(dto.items);
+    const roundedTotal = this.roundToCurrency(total);
+    this.assertTotal(dto.total, roundedTotal);
+    const cashReceived = this.roundToCurrency(dto.cashReceived);
+    if (cashReceived < roundedTotal) {
+      throw new BadRequestException('El monto recibido es insuficiente');
     }
-
-    const items = dto.items.map((item) => {
-      const product = products.find((p) => p.id === item.productId);
-      const price = Number(product.price);
-      return {
-        productId: item.productId,
-        quantity: item.quantity,
-        subtotal: price * item.quantity,
-      };
-    });
-
-    const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+    const changeAmount = this.roundToCurrency(cashReceived - roundedTotal);
 
     return this.prisma.sale.create({
       data: {
         userId,
-        total,
-        status: SaleStatus.OPEN,
+        total: roundedTotal,
+        status: SaleStatus.APPROVED,
+        paymentMethod: PaymentMethod.CASH,
+        cashReceived,
+        changeAmount,
         statusUpdatedAt: new Date(),
+        paidAt: new Date(),
         items: {
           create: items,
         },
       },
       include: { items: { include: { product: true } } },
     });
+  }
+
+  async createQrSale(userId: string, dto: CreateQrSaleDto) {
+    const { items, total } = await this.buildSaleItems(dto.items);
+    const roundedTotal = this.roundToCurrency(total);
+    this.assertTotal(dto.total, roundedTotal);
+
+    const sale = await this.prisma.sale.create({
+      data: {
+        userId,
+        total: roundedTotal,
+        status: SaleStatus.PENDING,
+        paymentMethod: PaymentMethod.MP_QR,
+        statusUpdatedAt: new Date(),
+        paymentStartedAt: new Date(),
+        items: {
+          create: items,
+        },
+      },
+      include: { items: { include: { product: true } }, user: true },
+    });
+
+    const externalStoreId =
+      sale.user.externalStoreId?.trim() ||
+      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+    const externalPosId =
+      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
+    if (!externalStoreId || !externalPosId) {
+      throw new BadRequestException(
+        'externalStoreId y externalPosId requeridos para Mercado Pago',
+      );
+    }
+
+    const externalReference = `sale-${sale.id}`;
+    const saleWithReference = await this.prisma.sale.update({
+      where: { id: sale.id },
+      data: {
+        mpExternalReference: externalReference,
+        statusUpdatedAt: new Date(),
+      },
+      include: { items: { include: { product: true } }, user: true },
+    });
+
+    try {
+      await this.mpService.createOrUpdateOrder({
+        externalStoreId,
+        externalPosId,
+        sale: saleWithReference,
+      });
+    } catch (error) {
+      await this.prisma.sale.update({
+        where: { id: sale.id },
+        data: {
+          status: SaleStatus.REJECTED,
+          statusUpdatedAt: new Date(),
+        },
+      });
+      throw error;
+    }
+
+    return {
+      saleId: saleWithReference.id,
+      status: saleWithReference.status,
+      startedAt: saleWithReference.paymentStartedAt,
+    };
   }
 
   listSales() {
@@ -93,79 +144,7 @@ export class SalesService {
     return refreshed ?? sale;
   }
 
-  async startMercadoPagoPayment(
-    saleId: string,
-    requester: { id: string; role: string; sub?: string },
-    endpoint: string,
-  ) {
-    const sale = await this.prisma.sale.findUnique({
-      where: { id: saleId },
-      include: { items: { include: { product: true } }, user: true },
-    });
-    if (!sale) {
-      throw new NotFoundException('Venta no encontrada');
-    }
-    this.assertCanAccessSale(sale, requester, endpoint);
-    if (sale.status === SaleStatus.PAID) {
-      throw new BadRequestException('La venta ya está pagada');
-    }
-    if (NON_PAYABLE_STATUSES.has(sale.status)) {
-      throw new BadRequestException('La venta no puede cobrarse en este estado');
-    }
-    const externalStoreId =
-      sale.user.externalStoreId?.trim() ||
-      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
-    const externalPosId =
-      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
-    if (!externalStoreId || !externalPosId) {
-      throw new BadRequestException(
-        'externalStoreId y externalPosId requeridos para Mercado Pago',
-      );
-    }
-    this.logger.debug(
-      `MP ids store=${externalStoreId} pos=${externalPosId} userId=${sale.userId} saleId=${sale.id}`,
-    );
-
-    const updatedSale = await this.prisma.sale.update({
-      where: { id: saleId },
-      data: {
-        status: SaleStatus.PENDING_PAYMENT,
-        statusUpdatedAt: new Date(),
-        paymentStartedAt: new Date(),
-      },
-      include: { items: { include: { product: true } }, user: true },
-    });
-
-    try {
-      await this.mpService.createOrUpdateOrder({
-        externalStoreId,
-        externalPosId,
-        sale: updatedSale,
-      });
-    } catch (error) {
-      await this.prisma.sale.update({
-        where: { id: saleId },
-        data: {
-          status: SaleStatus.FAILED,
-          statusUpdatedAt: new Date(),
-          failedAt: new Date(),
-        },
-      });
-      throw error;
-    }
-
-    return {
-      saleId: updatedSale.id,
-      status: updatedSale.status,
-      startedAt: updatedSale.paymentStartedAt,
-    };
-  }
-
-  async cancelMercadoPagoPayment(
-    saleId: string,
-    requester: { id: string; role: string; sub?: string },
-    endpoint: string,
-  ) {
+  async getSaleStatus(saleId: string, requester: { id: string; role: string }) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
       include: { user: true },
@@ -173,10 +152,25 @@ export class SalesService {
     if (!sale) {
       throw new NotFoundException('Venta no encontrada');
     }
-    this.assertCanAccessSale(sale, requester, endpoint);
-    if (sale.status === SaleStatus.PAID) {
-      throw new BadRequestException('La venta ya está pagada');
+    this.assertCanAccessSale(sale, requester, 'GET /sales/:id/status');
+    const refreshed = await this.expireIfNeeded(sale);
+    const finalSale = refreshed ?? sale;
+    return { saleId: finalSale.id, status: finalSale.status, updatedAt: finalSale.statusUpdatedAt };
+  }
+
+  async cancelQrSale(saleId: string, requester: { id: string; role: string }) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { user: true },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
     }
+    this.assertCanAccessSale(sale, requester, 'POST /sales/:id/cancel');
+    if (sale.status === SaleStatus.APPROVED) {
+      throw new BadRequestException('La venta ya está aprobada');
+    }
+
     const externalStoreId =
       sale.user.externalStoreId?.trim() ||
       this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
@@ -227,7 +221,7 @@ export class SalesService {
       user: { externalPosId: string | null; externalStoreId: string | null };
     },
   ) {
-    if (sale.status !== SaleStatus.PENDING_PAYMENT || !sale.paymentStartedAt) {
+    if (sale.status !== SaleStatus.PENDING || !sale.paymentStartedAt) {
       return null;
     }
     const cutoff = new Date(Date.now() - this.paymentExpirationMinutes * 60 * 1000);
@@ -254,5 +248,42 @@ export class SalesService {
         items: { include: { product: true } },
       },
     });
+  }
+
+  private async buildSaleItems(items: SaleItemInputDto[]) {
+    const productIds = items.map((item) => item.productId);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds }, active: true },
+    });
+
+    if (products.length !== productIds.length) {
+      throw new BadRequestException('Producto inválido o inactivo');
+    }
+
+    const saleItems = items.map((item) => {
+      const product = products.find((p) => p.id === item.productId);
+      const price = Number(product.price);
+      const subtotal = this.roundToCurrency(price * item.quantity);
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        subtotal,
+      };
+    });
+
+    const total = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+    return { items: saleItems, total };
+  }
+
+  private roundToCurrency(value: number) {
+    return Math.round(value * 100) / 100;
+  }
+
+  private assertTotal(receivedTotal: number, computedTotal: number) {
+    const roundedReceived = this.roundToCurrency(receivedTotal);
+    if (Math.abs(roundedReceived - computedTotal) > 0.009) {
+      throw new BadRequestException('El total no coincide con los items');
+    }
   }
 }
