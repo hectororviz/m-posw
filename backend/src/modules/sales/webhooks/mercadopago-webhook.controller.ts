@@ -11,7 +11,31 @@ type MpPayment = {
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+  typeof value === 'object' && value !== null;
+
+const getStringIdFromBody = (body: unknown): string | null => {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const data = body['data'];
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  const id = data['id'];
+  if (typeof id === 'string') {
+    return id;
+  }
+  if (typeof id === 'number') {
+    return String(id);
+  }
+  if (isRecord(id) && typeof id['toString'] === 'function') {
+    return String(id);
+  }
+
+  return null;
+};
 
 const isMpPayment = (value: unknown): value is MpPayment => {
   if (!isRecord(value)) {
@@ -67,9 +91,7 @@ export class MercadoPagoWebhookController {
     }
 
     const paymentId =
-      body?.data?.id?.toString?.() ||
-      body?.payment_id?.toString?.() ||
-      body?.id?.toString?.();
+      getStringIdFromBody(body) || body?.payment_id?.toString?.() || body?.id?.toString?.();
 
     if (!paymentId) {
       return { received: true };
