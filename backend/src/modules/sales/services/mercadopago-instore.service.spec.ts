@@ -7,6 +7,7 @@ describe('MercadoPagoInstoreService', () => {
     get: jest.fn((key: string) => {
       if (key === 'MP_ACCESS_TOKEN') return 'token';
       if (key === 'MP_COLLECTOR_ID') return 'collector-1';
+      if (key === 'MP_CURRENCY_ID') return 'ARS';
       return null;
     }),
   } as unknown as ConfigService;
@@ -48,6 +49,7 @@ describe('MercadoPagoInstoreService', () => {
         total: '100.00',
         items: [
           {
+            productId: 'prod-1',
             product: { name: 'Item A', price: '50.00' },
             quantity: '2',
             subtotal: '100.00',
@@ -67,10 +69,15 @@ describe('MercadoPagoInstoreService', () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.items).toEqual([
       expect.objectContaining({
+        sku_number: 'prod-1',
+        category: 'POS',
         title: 'Item A',
+        description: 'Item A',
         quantity: 2,
         unit_price: 50,
         unit_measure: 'unit',
+        currency_id: 'ARS',
+        total_amount: 100,
       }),
     ]);
     expect(body.total_amount).toBe(100);
@@ -98,6 +105,7 @@ describe('MercadoPagoInstoreService', () => {
         total: '6.00',
         items: [
           {
+            productId: 'prod-2',
             product: { name: 'Item B', price: '9.00' },
             quantity: 3,
             subtotal: 6,
@@ -109,6 +117,29 @@ describe('MercadoPagoInstoreService', () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.items[0].unit_price).toBe(2);
     expect(body.total_amount).toBe(6);
+  });
+
+  it('buildPayload calcula total con decimales y currency_id', () => {
+    const service = new MercadoPagoInstoreService(config);
+
+    const payload = service.buildPayload({
+      id: 'sale-3',
+      total: '6.00',
+      items: [
+        {
+          id: 'item-1',
+          productId: 'prod-3',
+          product: { name: 'Item C', price: 1.5 },
+          quantity: 4,
+          subtotal: null,
+        },
+      ],
+    } as any);
+
+    expect(payload.total_amount).toBe(6);
+    expect(payload.total_amount.toFixed(2)).toBe('6.00');
+    expect(payload.items[0].total_amount).toBe(6);
+    expect(payload.items[0].currency_id).toBe('ARS');
   });
 
   it('elimina la orden con el token y la URL correcta', async () => {
