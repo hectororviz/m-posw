@@ -133,4 +133,28 @@ describe('MercadoPagoInstoreService', () => {
       }),
     );
   });
+
+  it('envía el body JSON en request para PUT', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '{}',
+    });
+    global.fetch = fetchMock as any;
+
+    const service = new MercadoPagoInstoreService(config);
+
+    await (service as any).request('PUT', 'https://api.mercadopago.com/test', {
+      total_amount: 10,
+      items: [{ title: 'Item' }],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.mercadopago.com/test',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ total_amount: 10, items: [{ title: 'Item' }] }),
+      }),
+    );
+  });
 });
