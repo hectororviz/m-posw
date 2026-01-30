@@ -18,7 +18,7 @@ Luego levantar todo:
 docker compose up -d --build
 ```
 
-Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma migrate deploy` para aplicar migraciones pendientes. Esto mantiene la base alineada con el schema. 
+Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma migrate deploy` para aplicar migraciones pendientes. Esto mantiene la base alineada con el schema. Para verificar si hay desincronización entre la base y el schema podés ejecutar `npx prisma migrate status` desde `backend/`. 
 
 ## URLs
 
