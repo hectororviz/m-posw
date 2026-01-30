@@ -13,8 +13,8 @@ export class SalesController {
 
   @Post()
   @Roles(Role.ADMIN, Role.USER)
-  create(@Req() req: { user: { id: string } }, @Body() dto: CreateSaleDto) {
-    return this.salesService.createSale(req.user.id, dto);
+  create(@Req() req: { user: { sub: string } }, @Body() dto: CreateSaleDto) {
+    return this.salesService.createSale(req.user.sub, dto);
   }
 
   @Get()
@@ -25,19 +25,36 @@ export class SalesController {
 
   @Get(':id')
   @Roles(Role.ADMIN, Role.USER)
-  getById(@Req() req: { user: { id: string; role: string } }, @Param('id') id: string) {
-    return this.salesService.getSaleById(id, req.user);
+  getById(
+    @Req() req: { user: { sub: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.salesService.getSaleById(id, { id: req.user.sub, role: req.user.role });
   }
 
   @Post(':id/payments/mercadopago-qr')
-  @Roles(Role.USER)
-  startMercadoPagoPayment(@Req() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.salesService.startMercadoPagoPayment(id, req.user.id);
+  @Roles(Role.ADMIN, Role.USER)
+  startMercadoPagoPayment(
+    @Req() req: { user: { sub: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.salesService.startMercadoPagoPayment(
+      id,
+      { id: req.user.sub, sub: req.user.sub, role: req.user.role },
+      'POST /sales/:id/payments/mercadopago-qr',
+    );
   }
 
   @Post(':id/payments/mercadopago-qr/cancel')
-  @Roles(Role.USER)
-  cancelMercadoPagoPayment(@Req() req: { user: { id: string } }, @Param('id') id: string) {
-    return this.salesService.cancelMercadoPagoPayment(id, req.user.id);
+  @Roles(Role.ADMIN, Role.USER)
+  cancelMercadoPagoPayment(
+    @Req() req: { user: { sub: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.salesService.cancelMercadoPagoPayment(
+      id,
+      { id: req.user.sub, sub: req.user.sub, role: req.user.role },
+      'POST /sales/:id/payments/mercadopago-qr/cancel',
+    );
   }
 }
