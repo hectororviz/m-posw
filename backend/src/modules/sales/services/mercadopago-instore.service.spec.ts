@@ -81,6 +81,36 @@ describe('MercadoPagoInstoreService', () => {
     expect(body.external_reference).toBe('sale-sale-1');
   });
 
+  it('calcula unit_price desde subtotal y quantity y total_amount correcto', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '{}',
+    });
+    global.fetch = fetchMock as any;
+
+    const service = new MercadoPagoInstoreService(config);
+
+    await service.createOrUpdateOrder({
+      externalStoreId: 'STORE_1',
+      externalPosId: 'POS_1',
+      sale: {
+        id: 'sale-2',
+        total: '6.00',
+        items: [
+          {
+            product: { name: 'Item B', price: '9.00' },
+            quantity: 3,
+            subtotal: 6,
+          },
+        ],
+      } as any,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.items[0].unit_price).toBe(2);
+    expect(body.total_amount).toBe(6);
+  });
+
   it('elimina la orden con el token y la URL correcta', async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,

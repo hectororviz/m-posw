@@ -30,12 +30,10 @@ export class MercadoPagoInstoreService {
       if (!Number.isFinite(quantityValue) || quantity <= 0 || quantity !== quantityValue) {
         throw new HttpException('Cantidad inválida en los items de la venta', HttpStatus.BAD_REQUEST);
       }
-      const subtotal = this.parseNumber(item.subtotal, 'subtotal');
-      const priceCandidate = item.price ?? item.product?.price;
-      const unitPrice =
-        priceCandidate !== undefined
-          ? this.parseNumber(priceCandidate, 'price')
-          : subtotal / quantity;
+      const hasSubtotal = item.subtotal !== null && item.subtotal !== undefined;
+      const unitPrice = hasSubtotal
+        ? this.parseNumber(item.subtotal, 'subtotal') / quantity
+        : this.parseNumber(item.product?.price, 'price');
       if (!Number.isFinite(unitPrice)) {
         throw new HttpException('Precio inválido en los items de la venta', HttpStatus.BAD_REQUEST);
       }
@@ -132,10 +130,23 @@ export class MercadoPagoInstoreService {
   }
 
   private parseNumber(value: unknown, field: string) {
-    const parsed = Number(value);
+    const parsed = this.toNumber(value);
     if (!Number.isFinite(parsed)) {
       throw new HttpException(`${field} inválido en la venta`, HttpStatus.BAD_REQUEST);
     }
     return parsed;
+  }
+
+  private toNumber(value: unknown) {
+    if (value && typeof value === 'object' && 'toNumber' in value) {
+      const maybeDecimal = value as { toNumber?: unknown };
+      if (typeof maybeDecimal.toNumber === 'function') {
+        return maybeDecimal.toNumber();
+      }
+    }
+    if (typeof value === 'string') {
+      return Number(value);
+    }
+    return Number(value);
   }
 }
