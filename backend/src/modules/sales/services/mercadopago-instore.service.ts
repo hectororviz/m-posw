@@ -156,6 +156,7 @@ export class MercadoPagoInstoreService {
       this.logger.debug(
         `Mercado Pago request config: ${method} ${url} body=${jsonBody ?? 'none'}`,
       );
+      this.logger.error('MP_REQUEST_VERSION=2026-01-30-XYZ');
       const response = await fetch(url, {
         method,
         headers,
