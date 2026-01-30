@@ -1,8 +1,55 @@
 import { Body, Controller, Post, Query, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SaleStatus } from '@prisma/client';
+import { Prisma, SaleStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoInstoreService } from '../services/mercadopago-instore.service';
+
+type MpPayment = {
+  external_reference?: string | null;
+  status?: string | null;
+  date_approved?: string | null;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isMpPayment = (value: unknown): value is MpPayment => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const props: Array<keyof MpPayment> = ['external_reference', 'status', 'date_approved'];
+  return props.every((prop) => {
+    const propValue = value[prop];
+    return propValue === undefined || propValue === null || typeof propValue === 'string';
+  });
+};
+
+const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonValue(item));
+  }
+  if (isRecord(value)) {
+    const result: Record<string, Prisma.InputJsonValue> = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry === undefined || typeof entry === 'function') {
+        continue;
+      }
+      result[key] = toJsonValue(entry);
+    }
+    return result;
+  }
+  return String(value);
+};
 
 @Controller('webhooks')
 export class MercadoPagoWebhookController {
@@ -13,7 +60,7 @@ export class MercadoPagoWebhookController {
   ) {}
 
   @Post('mercadopago')
-  async handleWebhook(@Body() body: Record<string, any>, @Query('secret') secret?: string) {
+  async handleWebhook(@Body() body: Record<string, unknown>, @Query('secret') secret?: string) {
     const expectedSecret = this.config.get<string>('MP_WEBHOOK_SECRET');
     if (expectedSecret && secret !== expectedSecret) {
       throw new UnauthorizedException('Webhook inválido');
@@ -29,7 +76,8 @@ export class MercadoPagoWebhookController {
     }
 
     const payment = await this.mpService.getPayment(paymentId);
-    const externalReference = payment?.external_reference;
+    const parsedPayment = isMpPayment(payment) ? payment : null;
+    const externalReference = parsedPayment?.external_reference ?? null;
     if (!externalReference) {
       return { received: true };
     }
@@ -39,16 +87,16 @@ export class MercadoPagoWebhookController {
       return { received: true };
     }
 
-    const status = payment?.status ?? 'unknown';
-    const approvedAt = payment?.date_approved ? new Date(payment.date_approved) : null;
+    const status = parsedPayment?.status ?? 'unknown';
+    const approvedAt = parsedPayment?.date_approved ? new Date(parsedPayment.date_approved) : null;
 
     await this.prisma.mercadoPagoPayment.create({
       data: {
         saleId: sale.id,
         paymentId: paymentId.toString(),
-        status: status.toString(),
+        status,
         approvedAt,
-        payload: payment,
+        payload: toJsonValue(payment),
       },
     });
 
