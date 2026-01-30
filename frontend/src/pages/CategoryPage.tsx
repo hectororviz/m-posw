@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { buildImageUrl } from '../api/client';
 import { useCategories, useProductsByCategory } from '../api/queries';
-import { Layout } from '../components/Layout';
+import { AppLayout } from '../components/AppLayout';
 import { useCart } from '../context/CartContext';
 
 export const CategoryPage: React.FC = () => {
@@ -12,7 +12,7 @@ export const CategoryPage: React.FC = () => {
   const category = categories?.find((item) => item.id === id);
 
   return (
-    <Layout title={category?.name ?? 'Productos'}>
+    <AppLayout title={category?.name ?? 'Productos'}>
       <div className="two-column">
         <section>
           {isLoading && <p>Cargando productos...</p>}
@@ -87,6 +87,6 @@ export const CategoryPage: React.FC = () => {
           </div>
         </aside>
       </div>
-    </Layout>
+    </AppLayout>
   );
 };

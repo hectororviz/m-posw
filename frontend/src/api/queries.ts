@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import type { Category, Product, Setting, User } from './types';
 
@@ -43,14 +43,18 @@ export const useAdminProducts = () =>
     },
   });
 
-export const useSettings = () =>
-  useQuery({
+export const useSettings = () => {
+  const queryClient = useQueryClient();
+  return useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
       const response = await apiClient.get<Setting>('/settings');
       return response.data;
     },
+    staleTime: sevenMinutes,
+    placeholderData: () => queryClient.getQueryData<Setting>(['settings']),
   });
+};
 
 export const useUsers = () =>
   useQuery({

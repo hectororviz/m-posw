@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
 import type { Sale } from '../api/types';
-import { Layout } from '../components/Layout';
+import { AppLayout } from '../components/AppLayout';
 import { useCart } from '../context/CartContext';
 import { errorToMessage } from '../utils/errorToMessage';
 
@@ -51,7 +51,7 @@ export const CheckoutPage: React.FC = () => {
   };
 
   return (
-    <Layout title="Crear venta">
+    <AppLayout title="Crear venta">
       <div className="two-column">
         <section className="card">
           <h2>Resumen</h2>
@@ -102,6 +102,6 @@ export const CheckoutPage: React.FC = () => {
           ) : null}
         </section>
       </div>
-    </Layout>
+    </AppLayout>
   );
 };

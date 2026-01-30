@@ -57,6 +57,9 @@ export const buildImageUrl = (imagePath?: string | null, imageUpdatedAt?: string
   if (!imagePath) {
     return undefined;
   }
+  if (imagePath.startsWith('http')) {
+    return imagePath;
+  }
   const base = getUploadsBaseUrl();
   const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
   const url = `${base}${normalizedPath}`;

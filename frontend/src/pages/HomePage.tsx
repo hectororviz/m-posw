@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { apiClient, buildImageUrl } from '../api/client';
 import { useCategories } from '../api/queries';
 import type { Category } from '../api/types';
-import { Layout } from '../components/Layout';
+import { AppLayout } from '../components/AppLayout';
 
 const prefetchCategories = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await queryClient.prefetchQuery({
@@ -25,7 +25,7 @@ export const HomePage: React.FC = () => {
   }, [queryClient]);
 
   return (
-    <Layout title="Categorías">
+    <AppLayout title="Categorías">
       {isLoading && <p>Cargando categorías...</p>}
       <div className="grid">
         {categories?.map((category) => {
@@ -46,6 +46,6 @@ export const HomePage: React.FC = () => {
           );
         })}
       </div>
-    </Layout>
+    </AppLayout>
   );
 };
