@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings } from '../api/queries';
+import type { Setting } from '../api/types';
 
 export const AdminSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -21,7 +22,8 @@ export const AdminSettingsPage: React.FC = () => {
   const handleSave = async () => {
     setError(null);
     try {
-      await apiClient.patch('/settings', form);
+      const response = await apiClient.patch<Setting>('/settings', form);
+      queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
     } catch (err) {
       setError(normalizeApiError(err));
