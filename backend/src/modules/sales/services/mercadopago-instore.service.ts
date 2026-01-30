@@ -54,6 +54,9 @@ export class MercadoPagoInstoreService {
     };
 
     this.logger.debug(
+      `Mercado Pago payload summary: keys=${Object.keys(payload).join(',')} total_amount_type=${typeof payload.total_amount} items_len=${payload.items.length}`,
+    );
+    this.logger.debug(
       `Mercado Pago request: PUT ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
     );
     await this.request('PUT', url, payload);
@@ -98,6 +101,7 @@ export class MercadoPagoInstoreService {
     if (!token) {
       throw new HttpException('MP_ACCESS_TOKEN no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+    const hasBody = typeof body !== 'undefined';
     const payloadSummary = body
       ? {
           total_amount: (body as { total_amount?: unknown }).total_amount,
@@ -111,14 +115,20 @@ export class MercadoPagoInstoreService {
     );
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    const jsonBody = body ? JSON.stringify(body) : undefined;
+    const jsonBody = hasBody ? JSON.stringify(body) : undefined;
     try {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+      };
+      if (hasBody) {
+        headers['Content-Type'] = 'application/json';
+      }
+      this.logger.debug(
+        `Mercado Pago request config: ${method} ${url} body=${jsonBody ?? 'none'}`,
+      );
       const response = await fetch(url, {
         method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: jsonBody,
         signal: controller.signal,
       });
