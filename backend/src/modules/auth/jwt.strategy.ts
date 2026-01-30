@@ -24,6 +24,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!session) {
       throw new UnauthorizedException('Sesión inválida');
     }
-    return { id: payload.sub, name: payload.name, role: payload.role, sessionId: payload.sessionId };
+    // sub is the canonical userId; sessionId is only for session validation and must not be used for ownership checks.
+    return {
+      id: payload.sub,
+      sub: payload.sub,
+      name: payload.name,
+      role: payload.role,
+      sessionId: payload.sessionId,
+    };
   }
 }

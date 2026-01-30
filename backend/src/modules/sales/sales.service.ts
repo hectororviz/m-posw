@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
@@ -14,6 +20,7 @@ const NON_PAYABLE_STATUSES = new Set<SaleStatus>([
 @Injectable()
 export class SalesService {
   private readonly paymentExpirationMinutes = 10;
+  private readonly logger = new Logger(SalesService.name);
 
   constructor(
     private prisma: PrismaService,
@@ -81,14 +88,16 @@ export class SalesService {
     if (!sale) {
       throw new NotFoundException('Venta no encontrada');
     }
-    if (requester.role !== 'ADMIN' && sale.userId !== requester.id) {
-      throw new ForbiddenException('No tienes acceso a esta venta');
-    }
+    this.assertCanAccessSale(sale, requester, 'GET /sales/:id');
     const refreshed = await this.expireIfNeeded(sale);
     return refreshed ?? sale;
   }
 
-  async startMercadoPagoPayment(saleId: string, userId: string) {
+  async startMercadoPagoPayment(
+    saleId: string,
+    requester: { id: string; role: string; sub?: string },
+    endpoint: string,
+  ) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
       include: { items: { include: { product: true } }, user: true },
@@ -96,9 +105,7 @@ export class SalesService {
     if (!sale) {
       throw new NotFoundException('Venta no encontrada');
     }
-    if (sale.userId !== userId) {
-      throw new ForbiddenException('No tienes acceso a esta venta');
-    }
+    this.assertCanAccessSale(sale, requester, endpoint);
     if (sale.status === SaleStatus.PAID) {
       throw new BadRequestException('La venta ya está pagada');
     }
@@ -149,7 +156,11 @@ export class SalesService {
     };
   }
 
-  async cancelMercadoPagoPayment(saleId: string, userId: string) {
+  async cancelMercadoPagoPayment(
+    saleId: string,
+    requester: { id: string; role: string; sub?: string },
+    endpoint: string,
+  ) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
       include: { user: true },
@@ -157,9 +168,7 @@ export class SalesService {
     if (!sale) {
       throw new NotFoundException('Venta no encontrada');
     }
-    if (sale.userId !== userId) {
-      throw new ForbiddenException('No tienes acceso a esta venta');
-    }
+    this.assertCanAccessSale(sale, requester, endpoint);
     if (sale.status === SaleStatus.PAID) {
       throw new BadRequestException('La venta ya está pagada');
     }
@@ -187,6 +196,20 @@ export class SalesService {
     });
 
     return { saleId: updatedSale.id, status: updatedSale.status };
+  }
+
+  private assertCanAccessSale(
+    sale: { userId: string },
+    requester: { id: string; role: string; sub?: string },
+    endpoint: string,
+  ) {
+    const requesterSub = requester.sub ?? requester.id;
+    this.logger.debug(
+      `${endpoint} auth check saleUserId=${sale.userId} requesterId=${requester.id} requesterSub=${requesterSub} requesterRole=${requester.role}`,
+    );
+    if (requester.role !== 'ADMIN' && sale.userId !== requester.id) {
+      throw new ForbiddenException('No tienes acceso a esta venta');
+    }
   }
 
   private async expireIfNeeded(
