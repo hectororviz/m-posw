@@ -22,6 +22,7 @@ import { RolesGuard } from '../common/roles.guard';
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../common/upload.constants';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { mapProduct, mapProducts } from './product.mapper';
 import { ProductsService } from './products.service';
 
 @Controller('products')
@@ -29,29 +30,33 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  listActive(@Query('categoryId') categoryId?: string) {
-    return this.productsService.listActive(categoryId);
+  async listActive(@Query('categoryId') categoryId?: string) {
+    const products = await this.productsService.listActive(categoryId);
+    return mapProducts(products);
   }
 
   @Get('all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  listAll() {
-    return this.productsService.listAll();
+  async listAll() {
+    const products = await this.productsService.listAll();
+    return mapProducts(products);
   }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  create(@Body() dto: CreateProductDto) {
-    return this.productsService.create(dto);
+  async create(@Body() dto: CreateProductDto) {
+    const product = await this.productsService.create(dto);
+    return mapProduct(product);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.productsService.update(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
+    const product = await this.productsService.update(id, dto);
+    return mapProduct(product);
   }
 
   @Delete(':id')
@@ -81,13 +86,14 @@ export class ProductsController {
     if (!file) {
       throw new BadRequestException('Imagen requerida');
     }
-    return this.productsService.uploadImage(id, file);
+    return this.productsService.uploadImage(id, file).then(mapProduct);
   }
 
   @Delete(':id/image')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  deleteImage(@Param('id') id: string) {
-    return this.productsService.deleteImage(id);
+  async deleteImage(@Param('id') id: string) {
+    const product = await this.productsService.deleteImage(id);
+    return mapProduct(product);
   }
 }

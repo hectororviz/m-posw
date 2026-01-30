@@ -1,10 +1,18 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
   name: string;
 
-  @IsNumber()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) {
+      return value;
+    }
+    return typeof value === 'string' || typeof value === 'number' ? Number(value) : value;
+  })
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
   price: number;
 
   @IsString()
