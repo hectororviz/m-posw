@@ -112,15 +112,19 @@ export class SalesService {
     if (NON_PAYABLE_STATUSES.has(sale.status)) {
       throw new BadRequestException('La venta no puede cobrarse en este estado');
     }
-    const externalPosId = sale.user.externalPosId?.trim();
-    if (!externalPosId) {
-      throw new BadRequestException('La caja no tiene externalPosId configurado');
-    }
     const externalStoreId =
-      sale.user.externalStoreId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
-    if (!externalStoreId) {
-      throw new BadRequestException('externalStoreId requerido para Mercado Pago');
+      sale.user.externalStoreId?.trim() ||
+      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+    const externalPosId =
+      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
+    if (!externalStoreId || !externalPosId) {
+      throw new BadRequestException(
+        'externalStoreId y externalPosId requeridos para Mercado Pago',
+      );
     }
+    this.logger.debug(
+      `MP ids store=${externalStoreId} pos=${externalPosId} userId=${sale.userId} saleId=${sale.id}`,
+    );
 
     const updatedSale = await this.prisma.sale.update({
       where: { id: saleId },
@@ -173,14 +177,15 @@ export class SalesService {
     if (sale.status === SaleStatus.PAID) {
       throw new BadRequestException('La venta ya está pagada');
     }
-    const externalPosId = sale.user.externalPosId?.trim();
-    if (!externalPosId) {
-      throw new BadRequestException('La caja no tiene externalPosId configurado');
-    }
     const externalStoreId =
-      sale.user.externalStoreId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
-    if (!externalStoreId) {
-      throw new BadRequestException('externalStoreId requerido para Mercado Pago');
+      sale.user.externalStoreId?.trim() ||
+      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+    const externalPosId =
+      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
+    if (!externalStoreId || !externalPosId) {
+      throw new BadRequestException(
+        'externalStoreId y externalPosId requeridos para Mercado Pago',
+      );
     }
 
     await this.mpService.deleteOrder({
@@ -229,9 +234,11 @@ export class SalesService {
     if (sale.paymentStartedAt > cutoff) {
       return null;
     }
-    const externalPosId = sale.user.externalPosId;
     const externalStoreId =
-      sale.user.externalStoreId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+      sale.user.externalStoreId?.trim() ||
+      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
+    const externalPosId =
+      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
     if (externalPosId && externalStoreId) {
       await this.mpService.deleteOrder({ externalStoreId, externalPosId });
     }
