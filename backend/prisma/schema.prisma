@@ -87,6 +87,8 @@ model Sale {
   mpExternalReference String?
   mpOrderId String?
   mpPaymentId String?
+  mpQrData String?
+  mpStatus String?
   userId    String     @db.Uuid
   user      User       @relation(fields: [userId], references: [id])
   items     SaleItem[]
