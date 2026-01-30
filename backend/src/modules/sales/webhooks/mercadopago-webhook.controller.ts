@@ -104,7 +104,10 @@ export class MercadoPagoWebhookController {
       return { received: true };
     }
 
-    const sale = await this.prisma.sale.findUnique({ where: { id: externalReference } });
+    const saleId = externalReference.startsWith('sale-')
+      ? externalReference.slice('sale-'.length)
+      : externalReference;
+    const sale = await this.prisma.sale.findUnique({ where: { id: saleId } });
     if (!sale) {
       return { received: true };
     }
@@ -122,13 +125,26 @@ export class MercadoPagoWebhookController {
       },
     });
 
-    if (status === 'approved' && sale.status !== SaleStatus.PAID) {
+    const normalizedStatus = status.toLowerCase();
+    const nextStatus =
+      normalizedStatus === 'approved'
+        ? SaleStatus.APPROVED
+        : normalizedStatus === 'rejected'
+          ? SaleStatus.REJECTED
+          : normalizedStatus === 'expired'
+            ? SaleStatus.EXPIRED
+            : normalizedStatus === 'cancelled'
+              ? SaleStatus.CANCELLED
+              : null;
+
+    if (nextStatus && sale.status !== nextStatus && sale.status !== SaleStatus.APPROVED) {
       await this.prisma.sale.update({
         where: { id: sale.id },
         data: {
-          status: SaleStatus.PAID,
+          status: nextStatus,
           statusUpdatedAt: new Date(),
-          paidAt: approvedAt ?? new Date(),
+          paidAt: nextStatus === SaleStatus.APPROVED ? approvedAt ?? new Date() : undefined,
+          mpPaymentId: paymentId.toString(),
         },
       });
     }

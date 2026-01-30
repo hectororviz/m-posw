@@ -73,9 +73,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
         <NavLink to="/" className={({ isActive }) => (isActive ? 'active' : '')}>
           POS
         </NavLink>
-        <NavLink to="/checkout" className={({ isActive }) => (isActive ? 'active' : '')}>
-          Venta
-        </NavLink>
         {user?.role === 'ADMIN' && (
           <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : '')}>
             Admin

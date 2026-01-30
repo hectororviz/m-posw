@@ -43,6 +43,9 @@ export interface SaleItemInput {
   quantity: number;
 }
 
+export type PaymentMethod = 'CASH' | 'MP_QR';
+export type SaleStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+
 export interface SaleItem {
   id: string;
   productId: string;
@@ -54,7 +57,10 @@ export interface SaleItem {
 export interface Sale {
   id: string;
   total: number;
-  status: string;
+  status: SaleStatus;
+  paymentMethod?: PaymentMethod;
+  cashReceived?: number | null;
+  changeAmount?: number | null;
   createdAt: string;
   items: SaleItem[];
 }

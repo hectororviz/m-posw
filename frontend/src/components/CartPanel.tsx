@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { CheckoutModal } from './CheckoutModal';
 
 const STORAGE_KEY = 'pos-cart-collapsed';
 
@@ -9,6 +9,7 @@ const formatAmount = (amount: number) =>
 
 export const CartPanel: React.FC = () => {
   const { items, updateQuantity, removeItem } = useCart();
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -97,12 +98,18 @@ export const CartPanel: React.FC = () => {
               <span>TOTAL</span>
               <strong>{formatAmount(total)}</strong>
             </div>
-            <Link to="/checkout" className="primary-button cart-checkout-button">
+            <button
+              type="button"
+              className="primary-button cart-checkout-button"
+              onClick={() => setIsCheckoutOpen(true)}
+              disabled={items.length === 0}
+            >
               Cobrar
-            </Link>
+            </button>
           </div>
         </>
       )}
+      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} />
     </aside>
   );
 };

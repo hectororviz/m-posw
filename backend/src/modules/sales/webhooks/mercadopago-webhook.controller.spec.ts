@@ -12,7 +12,7 @@ describe('MercadoPagoWebhookController', () => {
 
     const prisma = {
       sale: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'sale-1', status: SaleStatus.PENDING_PAYMENT }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'sale-1', status: SaleStatus.PENDING }),
         update: jest.fn().mockResolvedValue({ id: 'sale-1' }),
       },
       mercadoPagoPayment: {
@@ -22,7 +22,7 @@ describe('MercadoPagoWebhookController', () => {
 
     const mpService = {
       getPayment: jest.fn().mockResolvedValue({
-        external_reference: 'sale-1',
+        external_reference: 'sale-sale-1',
         status: 'approved',
         date_approved: '2024-01-01T00:00:00.000Z',
       }),
@@ -35,7 +35,7 @@ describe('MercadoPagoWebhookController', () => {
     expect(prisma.mercadoPagoPayment.create).toHaveBeenCalled();
     expect(prisma.sale.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: SaleStatus.PAID }),
+        data: expect.objectContaining({ status: SaleStatus.APPROVED }),
       }),
     );
   });
