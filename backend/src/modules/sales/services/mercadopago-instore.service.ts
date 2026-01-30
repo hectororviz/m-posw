@@ -23,23 +23,35 @@ export class MercadoPagoInstoreService {
 
   async createOrUpdateOrder(input: CreateOrderInput) {
     const url = this.buildOrdersUrl(input.externalStoreId, input.externalPosId);
+    this.parseNumber(input.sale.total, 'total');
     const items = input.sale.items.map((item) => {
-      const quantity = Math.trunc(Number(item.quantity));
-      if (!Number.isFinite(quantity) || quantity <= 0) {
+      const quantityValue = this.parseNumber(item.quantity, 'quantity');
+      const quantity = Math.trunc(quantityValue);
+      if (!Number.isFinite(quantityValue) || quantity <= 0 || quantity !== quantityValue) {
         throw new HttpException('Cantidad inválida en los items de la venta', HttpStatus.BAD_REQUEST);
+      }
+      const subtotal = this.parseNumber(item.subtotal, 'subtotal');
+      const priceCandidate = item.price ?? item.product?.price;
+      const unitPrice =
+        priceCandidate !== undefined
+          ? this.parseNumber(priceCandidate, 'price')
+          : subtotal / quantity;
+      if (!Number.isFinite(unitPrice)) {
+        throw new HttpException('Precio inválido en los items de la venta', HttpStatus.BAD_REQUEST);
       }
       return {
         title: item.product.name,
         quantity,
-        unit_price: Number(item.subtotal) / quantity,
+        unit_price: unitPrice,
         unit_measure: 'unit',
       };
     });
     const total = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+    const totalAmount = Math.round((total + Number.EPSILON) * 100) / 100;
 
     const payload = {
-      external_reference: input.sale.id,
-      total_amount: total,
+      external_reference: `sale-${input.sale.id}`,
+      total_amount: totalAmount,
       items,
     };
 
@@ -117,5 +129,13 @@ export class MercadoPagoInstoreService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private parseNumber(value: unknown, field: string) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      throw new HttpException(`${field} inválido en la venta`, HttpStatus.BAD_REQUEST);
+    }
+    return parsed;
   }
 }
