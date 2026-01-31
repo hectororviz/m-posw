@@ -4,13 +4,17 @@ import { createHmac } from 'crypto';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
-import { MercadoPagoWebhookController } from './mercadopago-webhook.controller';
+import { getResourceId, MercadoPagoWebhookController, verifySignature } from './mercadopago-webhook.controller';
 
 describe('MercadoPagoWebhookController', () => {
   it('marca la venta como pagada cuando el pago es aprobado', async () => {
     const secret = 'secret';
     const config = {
-      get: jest.fn((key: string) => (key === 'MP_WEBHOOK_SECRET' ? secret : null)),
+      get: jest.fn((key: string) => {
+        if (key === 'MP_WEBHOOK_SECRET_LIVE') return secret;
+        if (key === 'DEBUG_WEBHOOK_SIGNATURE') return 'false';
+        return null;
+      }),
     } as unknown as ConfigService;
 
     const prisma = {
@@ -56,7 +60,7 @@ describe('MercadoPagoWebhookController', () => {
 
     await controller.handleWebhook(
       { 'x-request-id': requestId, 'x-signature': signature },
-      { type: 'payment', data: { id: resourceId } },
+      { type: 'payment', data: { id: resourceId }, live_mode: true },
       {},
       { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
       response as any,
@@ -67,5 +71,50 @@ describe('MercadoPagoWebhookController', () => {
         data: expect.objectContaining({ status: SaleStatus.APPROVED }),
       }),
     );
+  });
+
+  it('obtiene resourceId desde data.id y type', () => {
+    const resourceId = getResourceId({
+      query: { type: 'payment', 'data.id': '143523357831' },
+      body: { data: { id: '143523357831' } },
+    });
+
+    expect(resourceId).toBe('143523357831');
+  });
+
+  it('obtiene resourceId desde id, topic y resource numérico', () => {
+    const resourceId = getResourceId({
+      query: { id: '143523357831', topic: 'payment' },
+      body: { resource: '143523357831' },
+    });
+
+    expect(resourceId).toBe('143523357831');
+  });
+
+  it('obtiene resourceId desde merchant_order y resource URL', () => {
+    const resourceId = getResourceId({
+      query: { id: '37735080629', topic: 'merchant_order' },
+      body: { resource: 'https://api.mercadolibre.com/merchant_orders/37735080629' },
+    });
+
+    expect(resourceId).toBe('37735080629');
+  });
+
+  it('verifica firma valida con manifest correcto', () => {
+    const secret = 'secret';
+    const resourceId = '123';
+    const requestId = 'req-1';
+    const ts = '1700000000';
+    const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+    const digest = createHmac('sha256', secret).update(manifest).digest('hex');
+    const signature = `ts=${ts}, v1=${digest}`;
+
+    const result = verifySignature(
+      { headers: { 'x-request-id': requestId, 'x-signature': signature } },
+      resourceId,
+      secret,
+    );
+
+    expect(result.isValid).toBe(true);
   });
 });

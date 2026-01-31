@@ -8,7 +8,6 @@ import {
   Query,
   Req,
   Res,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
@@ -20,30 +19,6 @@ import { SalesGateway } from '../websockets/sales.gateway';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
-
-const getStringIdFromBody = (body: unknown): string | null => {
-  if (!isRecord(body)) {
-    return null;
-  }
-
-  const data = body['data'];
-  if (!isRecord(data)) {
-    return null;
-  }
-
-  const id = data['id'];
-  if (typeof id === 'string') {
-    return id;
-  }
-  if (typeof id === 'number') {
-    return String(id);
-  }
-  if (isRecord(id) && typeof id['toString'] === 'function') {
-    return String(id);
-  }
-
-  return null;
-};
 
 const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
   if (value === null) {
@@ -89,8 +64,160 @@ const parseResourceIdFromUrl = (resource: string) => {
   if (!trimmed) {
     return null;
   }
-  const match = trimmed.match(/\/([^/?#]+)$/);
-  return match ? match[1] : null;
+  const segments = trimmed.split('/').filter(Boolean);
+  const lastSegment = segments[segments.length - 1];
+  if (!lastSegment) {
+    return null;
+  }
+  return /^\d+$/.test(lastSegment) ? lastSegment : null;
+};
+
+const normalizeResourceId = (value: unknown) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  return null;
+};
+
+const normalizeNumericResourceId = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return /^\d+$/.test(trimmed) ? trimmed : null;
+};
+
+export const getResourceId = (req: {
+  query?: Record<string, string | undefined>;
+  body?: Record<string, unknown>;
+}) => {
+  const query = req.query ?? {};
+  const body = req.body ?? {};
+  const dataIdFromQuery = query['data.id'];
+  if (dataIdFromQuery) {
+    return normalizeResourceId(dataIdFromQuery);
+  }
+  const dataIdFromBody = normalizeResourceId(body?.data && isRecord(body.data) ? body.data.id : null);
+  if (dataIdFromBody) {
+    return dataIdFromBody;
+  }
+  if (query.id) {
+    return normalizeResourceId(query.id);
+  }
+  if (typeof body?.resource === 'string') {
+    const normalizedResource = normalizeNumericResourceId(body.resource);
+    if (normalizedResource) {
+      return normalizedResource;
+    }
+    return parseResourceIdFromUrl(body.resource);
+  }
+  return null;
+};
+
+const parseBooleanEnv = (value: string | undefined) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+  return null;
+};
+
+const extractLiveMode = (body: Record<string, unknown> | undefined) => {
+  if (!body) {
+    return null;
+  }
+  if (typeof body.live_mode === 'boolean') {
+    return body.live_mode;
+  }
+  if (isRecord(body.data) && typeof body.data.live_mode === 'boolean') {
+    return body.data.live_mode;
+  }
+  return null;
+};
+
+const resolveHeaderValue = (
+  headers: Record<string, string | string[] | undefined>,
+  name: string,
+) => {
+  const value = headers[name];
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  return undefined;
+};
+
+export const verifySignature = (
+  req: { headers: Record<string, string | string[] | undefined> },
+  resourceId: string,
+  secret: string,
+) => {
+  const signatureHeader = resolveHeaderValue(req.headers, 'x-signature');
+  const requestId = resolveHeaderValue(req.headers, 'x-request-id');
+  if (!signatureHeader || !requestId) {
+    return {
+      isValid: false,
+      reason: 'missing_headers',
+    };
+  }
+  const parsed = parseSignatureHeader(signatureHeader);
+  const ts = parsed['ts'];
+  const v1 = parsed['v1'];
+  if (!ts || !v1) {
+    return {
+      isValid: false,
+      reason: 'missing_signature_parts',
+      requestId,
+      ts,
+      v1,
+    };
+  }
+  const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+  const digest = createHmac('sha256', secret).update(manifest).digest('hex');
+  const digestBuffer = Buffer.from(digest, 'hex');
+  const signatureBuffer = Buffer.from(v1, 'hex');
+  if (digestBuffer.length !== signatureBuffer.length) {
+    return {
+      isValid: false,
+      reason: 'length_mismatch',
+      requestId,
+      ts,
+      v1,
+      manifest,
+      digest,
+    };
+  }
+  if (!timingSafeEqual(digestBuffer, signatureBuffer)) {
+    return {
+      isValid: false,
+      reason: 'digest_mismatch',
+      requestId,
+      ts,
+      v1,
+      manifest,
+      digest,
+    };
+  }
+  return {
+    isValid: true,
+    requestId,
+    ts,
+    v1,
+    manifest,
+    digest,
+  };
 };
 
 const extractExternalReference = (payload: Record<string, unknown> | null) => {
@@ -206,20 +333,29 @@ export class MercadoPagoWebhookController {
       })}`,
     );
 
-    const signatureHeader = this.getHeader(headers, 'x-signature');
-    const requestId = this.getHeader(headers, 'x-request-id');
-    const resourceId =
-      (body?.type === 'payment' && getStringIdFromBody(body)) ||
-      (query?.topic === 'merchant_order' && query?.id) ||
-      (typeof body?.resource === 'string' ? parseResourceIdFromUrl(body.resource) : null) ||
-      getStringIdFromBody(body);
-
-    this.verifySignature(signatureHeader, requestId, resourceId);
-
-    response.status(200).json({ ok: true });
+    const resourceId = getResourceId({ query, body });
+    if (!resourceId) {
+      this.logger.warn('Webhook de Mercado Pago con headers incompletos');
+      response.status(400).json({ ok: false, error: 'headers incompletos' });
+      return;
+    }
+    const signatureResult = this.verifySignature(
+      { headers, body },
+      resourceId,
+    );
+    if (!signatureResult.isValid) {
+      if (signatureResult.acceptedInvalid) {
+        response.status(200).json({ ok: true, signatureAccepted: true });
+      } else {
+        response.status(401).json({ ok: false, error: 'invalid signature' });
+        return;
+      }
+    } else {
+      response.status(200).json({ ok: true });
+    }
 
     try {
-      await this.processWebhook(body, query, resourceId, requestId);
+      await this.processWebhook(body, query, resourceId, signatureResult.requestId);
     } catch (error) {
       const message = error instanceof Error ? error.stack ?? error.message : String(error);
       this.logger.error(`WEBHOOK_PROCESSING_FAILED ${message}`);
@@ -318,36 +454,69 @@ export class MercadoPagoWebhookController {
   }
 
   private verifySignature(
-    signatureHeader: string | undefined,
-    requestId: string | undefined,
-    resourceId: string | null | undefined,
+    req: { headers: Record<string, string | string[] | undefined>; body: Record<string, unknown> },
+    resourceId: string,
   ) {
-    const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
-    if (!secret || !signatureHeader || !requestId || !resourceId) {
+    const debugSignature = this.config.get<string>('DEBUG_WEBHOOK_SIGNATURE') === 'true';
+    const acceptInvalid =
+      debugSignature &&
+      this.config.get<string>('MP_WEBHOOK_ACCEPT_INVALID_SIGNATURE') === 'true';
+    const liveMode =
+      extractLiveMode(req.body) ?? parseBooleanEnv(this.config.get<string>('MP_WEBHOOK_LIVE_MODE'));
+    const liveSecret = this.config.get<string>('MP_WEBHOOK_SECRET_LIVE');
+    const testSecret = this.config.get<string>('MP_WEBHOOK_SECRET_TEST');
+
+    let selectedSecret: string | undefined;
+    let selectedMode: string | null = null;
+    if (liveMode === true) {
+      selectedSecret = liveSecret;
+      selectedMode = 'live';
+    } else if (liveMode === false) {
+      selectedSecret = testSecret;
+      selectedMode = 'test';
+    } else if (liveSecret && !testSecret) {
+      selectedSecret = liveSecret;
+      selectedMode = 'live';
+    } else if (testSecret && !liveSecret) {
+      selectedSecret = testSecret;
+      selectedMode = 'test';
+    }
+
+    this.logger.log(
+      `WEBHOOK_SIGNATURE_SECRET mode=${selectedMode ?? 'unknown'} length=${
+        selectedSecret?.length ?? 0
+      }`,
+    );
+
+    if (!selectedSecret) {
       this.logger.warn('Webhook de Mercado Pago sin firma válida o headers incompletos');
-      throw new UnauthorizedException('Webhook inválido');
+      return { isValid: false, acceptedInvalid: acceptInvalid };
     }
 
-    const parsed = parseSignatureHeader(signatureHeader);
-    const ts = parsed['ts'];
-    const v1 = parsed['v1'];
-    if (!ts || !v1) {
-      this.logger.warn('Webhook de Mercado Pago con firma incompleta');
-      throw new UnauthorizedException('Webhook inválido');
+    const result = verifySignature(
+      { headers: req.headers },
+      resourceId,
+      selectedSecret,
+    );
+
+    if (!result.isValid) {
+      this.logger.warn('Webhook de Mercado Pago con firma inválida');
+      if (debugSignature) {
+        this.logger.log(
+          `WEBHOOK_SIGNATURE_INVALID ${JSON.stringify({
+            resourceId,
+            requestId: result.requestId ?? resolveHeaderValue(req.headers, 'x-request-id') ?? 'unknown',
+            ts: result.ts ?? 'unknown',
+            manifest: result.manifest ?? null,
+            receivedSignature: result.v1 ?? null,
+            calculatedHash: result.digest ?? null,
+          })}`,
+        );
+      }
+      return { isValid: false, acceptedInvalid: acceptInvalid, requestId: result.requestId };
     }
 
-    const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
-    const digest = createHmac('sha256', secret).update(manifest).digest('hex');
-    const digestBuffer = Buffer.from(digest, 'hex');
-    const signatureBuffer = Buffer.from(v1, 'hex');
-    if (digestBuffer.length !== signatureBuffer.length) {
-      this.logger.warn('Webhook de Mercado Pago con firma inválida');
-      throw new UnauthorizedException('Webhook inválido');
-    }
-    if (!timingSafeEqual(digestBuffer, signatureBuffer)) {
-      this.logger.warn('Webhook de Mercado Pago con firma inválida');
-      throw new UnauthorizedException('Webhook inválido');
-    }
+    return { isValid: true, acceptedInvalid: false, requestId: result.requestId };
   }
 
   private async ensureIdempotency(topic: string, resourceId: string) {
@@ -366,20 +535,6 @@ export class MercadoPagoWebhookController {
       }
       throw error;
     }
-  }
-
-  private getHeader(
-    headers: Record<string, string | string[] | undefined>,
-    name: string,
-  ): string | undefined {
-    const value = headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
-    if (Array.isArray(value)) {
-      return value[0];
-    }
-    if (typeof value === 'string') {
-      return value;
-    }
-    return undefined;
   }
 
   private isPaymentNotFoundError(error: unknown) {
