@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Headers,
+  HttpException,
   Logger,
   Post,
   Query,
@@ -218,7 +219,7 @@ export class MercadoPagoWebhookController {
     response.status(200).json({ ok: true });
 
     try {
-      await this.processWebhook(body, query, resourceId);
+      await this.processWebhook(body, query, resourceId, requestId);
     } catch (error) {
       const message = error instanceof Error ? error.stack ?? error.message : String(error);
       this.logger.error(`WEBHOOK_PROCESSING_FAILED ${message}`);
@@ -229,6 +230,7 @@ export class MercadoPagoWebhookController {
     body: Record<string, unknown>,
     query: Record<string, string>,
     resourceId: string | null | undefined,
+    requestId?: string,
   ) {
     const topic = body?.type?.toString?.() || query?.topic || 'unknown';
     const eventResourceId = resourceId ?? 'unknown';
@@ -241,9 +243,20 @@ export class MercadoPagoWebhookController {
     const isMerchantOrder =
       query?.topic === 'merchant_order' || resourceUrl.includes('/merchant_orders/');
 
-    const mpData = isMerchantOrder
-      ? await this.mpQueryService.getMerchantOrder(eventResourceId)
-      : await this.mpQueryService.getPayment(eventResourceId);
+    let mpData: unknown;
+    try {
+      mpData = isMerchantOrder
+        ? await this.mpQueryService.getMerchantOrder(eventResourceId)
+        : await this.mpQueryService.getPayment(eventResourceId);
+    } catch (error) {
+      if (!isMerchantOrder && this.isPaymentNotFoundError(error)) {
+        this.logger.warn(
+          `WEBHOOK_IGNORED_PAYMENT_NOT_FOUND paymentId=${eventResourceId} requestId=${requestId ?? 'unknown'}`,
+        );
+        return;
+      }
+      throw error;
+    }
 
     const mpPayload = isRecord(mpData) ? mpData : null;
     const externalReference = extractExternalReference(mpPayload);
@@ -367,5 +380,18 @@ export class MercadoPagoWebhookController {
       return value;
     }
     return undefined;
+  }
+
+  private isPaymentNotFoundError(error: unknown) {
+    if (!(error instanceof HttpException)) {
+      return false;
+    }
+    const response = error.getResponse();
+    const responseText =
+      typeof response === 'string' ? response : JSON.stringify(response);
+    return (
+      responseText.includes('Mercado Pago error 404') &&
+      responseText.includes('Payment not found')
+    );
   }
 }
