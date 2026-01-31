@@ -12,6 +12,8 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT') || 3000;
   const corsOrigin = config.get<string>('CORS_ORIGIN') || '*';
+  const webhookLiveSecretLength = config.get<string>('MP_WEBHOOK_SECRET_LIVE')?.length ?? 0;
+  const webhookTestSecretLength = config.get<string>('MP_WEBHOOK_SECRET_TEST')?.length ?? 0;
 
   app.enableCors({ origin: corsOrigin });
   app.getHttpAdapter().getInstance().disable('etag');
@@ -23,6 +25,10 @@ async function bootstrap() {
 
   const prismaService = app.get(PrismaService);
   prismaService.enableShutdownHooks(app);
+
+  console.log(
+    `MercadoPago webhook secrets lengths - live: ${webhookLiveSecretLength}, test: ${webhookTestSecretLength}`,
+  );
 
   await app.listen(port);
 }
