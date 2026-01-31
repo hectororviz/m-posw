@@ -45,7 +45,7 @@ export interface SaleItemInput {
 
 export type PaymentMethod = 'CASH' | 'MP_QR';
 export type SaleStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
-export type PaymentStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+export type PaymentStatus = 'PENDING' | 'OK' | 'FAILED';
 
 export interface SaleItem {
   id: string;

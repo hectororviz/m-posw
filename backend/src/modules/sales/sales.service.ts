@@ -38,7 +38,7 @@ export class SalesService {
           userId,
           total: roundedTotal,
           status: SaleStatus.APPROVED,
-          paymentStatus: PaymentStatus.APPROVED,
+          paymentStatus: PaymentStatus.OK,
           paymentMethod: PaymentMethod.CASH,
           cashReceived,
           changeAmount,
@@ -197,7 +197,7 @@ export class SalesService {
       throw new NotFoundException('Venta no encontrada');
     }
     this.assertCanAccessSale(sale, requester, 'POST /sales/:id/complete');
-    if (sale.paymentStatus !== PaymentStatus.APPROVED) {
+    if (sale.paymentStatus !== PaymentStatus.OK) {
       throw new BadRequestException('La venta todavía no tiene pago aprobado');
     }
     if (sale.status === SaleStatus.APPROVED) {
@@ -247,7 +247,7 @@ export class SalesService {
       where: { id: saleId },
       data: {
         status: SaleStatus.CANCELLED,
-        paymentStatus: PaymentStatus.REJECTED,
+        paymentStatus: PaymentStatus.FAILED,
         statusUpdatedAt: new Date(),
         cancelledAt: new Date(),
       },
@@ -307,7 +307,7 @@ export class SalesService {
       where: { id: sale.id },
       data: {
         status: SaleStatus.EXPIRED,
-        paymentStatus: PaymentStatus.EXPIRED,
+        paymentStatus: PaymentStatus.FAILED,
         statusUpdatedAt: new Date(),
         expiredAt: new Date(),
       },

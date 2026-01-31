@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { io, Socket } from 'socket.io-client';
-import { apiClient, getWsBaseUrl, normalizeApiError } from '../api/client';
+import { apiClient, normalizeApiError } from '../api/client';
 import type { PaymentStatus } from '../api/types';
 import { AppLayout } from '../components/AppLayout';
 import { useToast } from '../components/ToastProvider';
@@ -24,6 +23,7 @@ const formatTime = (seconds: number) => {
 };
 
 type PaymentStatusResponse = {
+  saleId: string;
   paymentStatus: PaymentStatus;
   mpStatus?: string | null;
   mpStatusDetail?: string | null;
@@ -34,13 +34,16 @@ export const CheckoutQrPage: React.FC = () => {
   const navigate = useNavigate();
   const { clear, items } = useCart();
   const { pushToast } = useToast();
+  const defaultTimeout = 120;
+  const configuredTimeout = Number(import.meta.env.VITE_QR_PAYMENT_TIMEOUT ?? defaultTimeout);
+  const paymentTimeoutSeconds =
+    Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : defaultTimeout;
   const [status, setStatus] = useState<PaymentStatus>('PENDING');
   const [mpStatusDetail, setMpStatusDetail] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(120);
+  const [timeLeft, setTimeLeft] = useState(paymentTimeoutSeconds);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const pollingRef = useRef<number | null>(null);
-  const socketRef = useRef<Socket | null>(null);
   const hasCompletedRef = useRef(false);
 
   const total = useMemo(
@@ -50,7 +53,7 @@ export const CheckoutQrPage: React.FC = () => {
 
   const stopPolling = () => {
     if (pollingRef.current) {
-      window.clearTimeout(pollingRef.current);
+      window.clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
   };
@@ -60,7 +63,7 @@ export const CheckoutQrPage: React.FC = () => {
       if (!saleId || hasCompletedRef.current) {
         return;
       }
-      if (nextStatus === 'APPROVED') {
+      if (nextStatus === 'OK') {
         if (isFinalizing) {
           return;
         }
@@ -78,11 +81,8 @@ export const CheckoutQrPage: React.FC = () => {
         }
         return;
       }
-      if (nextStatus === 'REJECTED' || nextStatus === 'EXPIRED') {
-        const message =
-          nextStatus === 'REJECTED'
-            ? detail || 'Pago rechazado.'
-            : detail || 'El pago expiró.';
+      if (nextStatus === 'FAILED') {
+        const message = detail || 'El pago fue rechazado.';
         setErrorMessage(message);
         pushToast(message, 'error');
         navigate('/checkout/payment');
@@ -107,40 +107,7 @@ export const CheckoutQrPage: React.FC = () => {
     if (!saleId) {
       return;
     }
-    const socket = io(getWsBaseUrl(), {
-      transports: ['websocket'],
-      auth: { token: localStorage.getItem('authToken') ?? undefined },
-    });
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      socket.emit('sale.join', { saleId });
-    });
-
-    socket.on('sale.payment_status_changed', (payload: PaymentStatusResponse & { saleId?: string }) => {
-      if (payload.saleId && payload.saleId !== saleId) {
-        return;
-      }
-      handleStatusUpdate(payload);
-    });
-
-    socket.on('connect_error', (err) => {
-      setErrorMessage(err.message);
-    });
-
-    return () => {
-      socket.off('sale.payment_status_changed');
-      socket.disconnect();
-      socketRef.current = null;
-    };
-  }, [saleId, handleStatusUpdate]);
-
-  useEffect(() => {
-    if (!saleId) {
-      return;
-    }
     let isActive = true;
-    const startTime = Date.now();
     const poll = async () => {
       if (!isActive || hasCompletedRef.current) {
         return;
@@ -159,16 +126,10 @@ export const CheckoutQrPage: React.FC = () => {
         handleStatusUpdate(response.data);
       } catch (error) {
         setErrorMessage(normalizeApiError(error));
-      } finally {
-        if (!isActive || hasCompletedRef.current) {
-          return;
-        }
-        const elapsed = Date.now() - startTime;
-        const interval = elapsed < 30_000 ? 2000 : 5000;
-        pollingRef.current = window.setTimeout(poll, interval);
       }
     };
     void poll();
+    pollingRef.current = window.setInterval(poll, 2000);
     return () => {
       isActive = false;
       stopPolling();
@@ -179,18 +140,23 @@ export const CheckoutQrPage: React.FC = () => {
     if (!saleId || hasCompletedRef.current) {
       return;
     }
+    setTimeLeft(paymentTimeoutSeconds);
     const timer = window.setInterval(() => {
       setTimeLeft((prev) => Math.max(prev - 1, 0));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [saleId]);
+  }, [saleId, paymentTimeoutSeconds]);
 
   useEffect(() => {
     if (timeLeft !== 0 || status !== 'PENDING') {
       return;
     }
     stopPolling();
-  }, [timeLeft, status]);
+    const message = 'Tiempo agotado.';
+    setErrorMessage(message);
+    pushToast(message, 'error');
+    navigate('/checkout/payment');
+  }, [timeLeft, status, navigate, pushToast]);
 
   if (!saleId) {
     return (
@@ -209,14 +175,11 @@ export const CheckoutQrPage: React.FC = () => {
         <div className="qr-wait">
           <div className="spinner" aria-hidden="true" />
           <p>Esperando pago…</p>
+          <p className="qr-status">Estado: {status}</p>
           <p className="qr-timer">{formatTime(timeLeft)}</p>
           {status !== 'PENDING' && (
             <p className="error-text">
-              {status === 'APPROVED'
-                ? 'Pago aprobado.'
-                : status === 'REJECTED'
-                  ? 'Pago rechazado.'
-                  : 'Pago expirado.'}
+              {status === 'OK' ? 'Pago aprobado.' : 'Pago rechazado.'}
             </p>
           )}
           {mpStatusDetail && <p className="error-text">{mpStatusDetail}</p>}

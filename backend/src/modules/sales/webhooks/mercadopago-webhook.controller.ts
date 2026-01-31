@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import { Request, Response } from 'express';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
@@ -46,7 +46,7 @@ const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
   return String(value);
 };
 
-const parseSignatureHeader = (signature: string) => {
+export const parseSignatureHeader = (signature: string) => {
   const parts = signature.split(',').map((part) => part.trim());
   const result: Record<string, string> = {};
   for (const part of parts) {
@@ -59,17 +59,13 @@ const parseSignatureHeader = (signature: string) => {
   return result;
 };
 
-const parseResourceIdFromUrl = (resource: string) => {
+const parsePaymentIdFromUrl = (resource: string) => {
   const trimmed = resource.trim();
   if (!trimmed) {
     return null;
   }
-  const segments = trimmed.split('/').filter(Boolean);
-  const lastSegment = segments[segments.length - 1];
-  if (!lastSegment) {
-    return null;
-  }
-  return /^\d+$/.test(lastSegment) ? lastSegment : null;
+  const match = trimmed.match(/\/payments\/(\d+)(?:\?|$)/);
+  return match?.[1] ?? null;
 };
 
 const normalizeResourceId = (value: unknown) => {
@@ -83,14 +79,6 @@ const normalizeResourceId = (value: unknown) => {
   return null;
 };
 
-const normalizeNumericResourceId = (value: string) => {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-  return /^\d+$/.test(trimmed) ? trimmed : null;
-};
-
 export const getResourceId = (req: {
   query?: Record<string, string | undefined>;
   body?: Record<string, unknown>;
@@ -101,46 +89,15 @@ export const getResourceId = (req: {
   if (dataIdFromQuery) {
     return normalizeResourceId(dataIdFromQuery);
   }
+  if (query.id && query.topic === 'payment') {
+    return normalizeResourceId(query.id);
+  }
   const dataIdFromBody = normalizeResourceId(body?.data && isRecord(body.data) ? body.data.id : null);
   if (dataIdFromBody) {
     return dataIdFromBody;
   }
-  if (query.id) {
-    return normalizeResourceId(query.id);
-  }
   if (typeof body?.resource === 'string') {
-    const normalizedResource = normalizeNumericResourceId(body.resource);
-    if (normalizedResource) {
-      return normalizedResource;
-    }
-    return parseResourceIdFromUrl(body.resource);
-  }
-  return null;
-};
-
-const parseBooleanEnv = (value: string | undefined) => {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'true') {
-    return true;
-  }
-  if (normalized === 'false') {
-    return false;
-  }
-  return null;
-};
-
-const extractLiveMode = (body: Record<string, unknown> | undefined) => {
-  if (!body) {
-    return null;
-  }
-  if (typeof body.live_mode === 'boolean') {
-    return body.live_mode;
-  }
-  if (isRecord(body.data) && typeof body.data.live_mode === 'boolean') {
-    return body.data.live_mode;
+    return parsePaymentIdFromUrl(body.resource);
   }
   return null;
 };
@@ -186,6 +143,19 @@ export const verifySignature = (
   }
   const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
   const digest = createHmac('sha256', secret).update(manifest).digest('hex');
+  const manifestHash = createHash('sha256').update(manifest).digest('hex');
+  if (!/^[0-9a-f]+$/i.test(v1) || v1.length % 2 !== 0) {
+    return {
+      isValid: false,
+      reason: 'invalid_signature_format',
+      requestId,
+      ts,
+      v1,
+      manifest,
+      digest,
+      manifestHash,
+    };
+  }
   const digestBuffer = Buffer.from(digest, 'hex');
   const signatureBuffer = Buffer.from(v1, 'hex');
   if (digestBuffer.length !== signatureBuffer.length) {
@@ -197,6 +167,7 @@ export const verifySignature = (
       v1,
       manifest,
       digest,
+      manifestHash,
     };
   }
   if (!timingSafeEqual(digestBuffer, signatureBuffer)) {
@@ -208,6 +179,7 @@ export const verifySignature = (
       v1,
       manifest,
       digest,
+      manifestHash,
     };
   }
   return {
@@ -217,6 +189,7 @@ export const verifySignature = (
     v1,
     manifest,
     digest,
+    manifestHash,
   };
 };
 
@@ -260,29 +233,12 @@ const mapPaymentStatus = (status?: string | null) => {
     return null;
   }
   if (normalized === 'approved') {
-    return PaymentStatus.APPROVED;
+    return PaymentStatus.OK;
   }
   if (normalized === 'rejected' || normalized === 'cancelled') {
-    return PaymentStatus.REJECTED;
+    return PaymentStatus.FAILED;
   }
   if (normalized === 'pending' || normalized === 'in_process') {
-    return PaymentStatus.PENDING;
-  }
-  return null;
-};
-
-const mapMerchantOrderStatus = (status?: string | null) => {
-  const normalized = status?.toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  if (normalized === 'closed') {
-    return PaymentStatus.APPROVED;
-  }
-  if (normalized === 'expired') {
-    return PaymentStatus.EXPIRED;
-  }
-  if (normalized === 'opened') {
     return PaymentStatus.PENDING;
   }
   return null;
@@ -292,14 +248,11 @@ const mapSaleStatus = (status: PaymentStatus | null) => {
   if (!status) {
     return null;
   }
-  if (status === PaymentStatus.APPROVED) {
+  if (status === PaymentStatus.OK) {
     return SaleStatus.APPROVED;
   }
-  if (status === PaymentStatus.REJECTED) {
+  if (status === PaymentStatus.FAILED) {
     return SaleStatus.REJECTED;
-  }
-  if (status === PaymentStatus.EXPIRED) {
-    return SaleStatus.EXPIRED;
   }
   return SaleStatus.PENDING;
 };
@@ -335,31 +288,21 @@ export class MercadoPagoWebhookController {
 
     const resourceId = getResourceId({ query, body });
     if (!resourceId) {
-      this.logger.warn('Webhook de Mercado Pago con headers incompletos');
-      response.status(400).json({ ok: false, error: 'headers incompletos' });
+      this.logger.warn('WEBHOOK_MP_PAYMENT_ID_MISSING');
+      response.status(200).json({ ok: true });
       return;
     }
-    const signatureResult = this.verifySignature(
-      { headers, body },
-      resourceId,
-    );
+    const signatureResult = this.verifySignature({ headers, body }, resourceId);
     if (!signatureResult.isValid) {
-      if (signatureResult.acceptedInvalid) {
-        response.status(200).json({ ok: true, signatureAccepted: true });
-      } else {
-        response.status(401).json({ ok: false, error: 'invalid signature' });
-        return;
-      }
-    } else {
       response.status(200).json({ ok: true });
+      return;
     }
 
-    try {
-      await this.processWebhook(body, query, resourceId, signatureResult.requestId);
-    } catch (error) {
+    response.status(200).json({ ok: true });
+    void this.processWebhook(body, query, resourceId, signatureResult.requestId).catch((error) => {
       const message = error instanceof Error ? error.stack ?? error.message : String(error);
       this.logger.error(`WEBHOOK_PROCESSING_FAILED ${message}`);
-    }
+    });
   }
 
   private async processWebhook(
@@ -375,17 +318,11 @@ export class MercadoPagoWebhookController {
       return;
     }
 
-    const resourceUrl = typeof body?.resource === 'string' ? body.resource : '';
-    const isMerchantOrder =
-      query?.topic === 'merchant_order' || resourceUrl.includes('/merchant_orders/');
-
     let mpData: unknown;
     try {
-      mpData = isMerchantOrder
-        ? await this.mpQueryService.getMerchantOrder(eventResourceId)
-        : await this.mpQueryService.getPayment(eventResourceId);
+      mpData = await this.mpQueryService.getPayment(eventResourceId);
     } catch (error) {
-      if (!isMerchantOrder && this.isPaymentNotFoundError(error)) {
+      if (this.isPaymentNotFoundError(error)) {
         this.logger.warn(
           `WEBHOOK_IGNORED_PAYMENT_NOT_FOUND paymentId=${eventResourceId} requestId=${requestId ?? 'unknown'}`,
         );
@@ -404,9 +341,7 @@ export class MercadoPagoWebhookController {
         : null) ||
       (eventResourceId
         ? await this.prisma.sale.findFirst({
-            where: isMerchantOrder
-              ? { mpMerchantOrderId: eventResourceId }
-              : { mpPaymentId: eventResourceId },
+            where: { mpPaymentId: eventResourceId },
           })
         : null);
 
@@ -420,9 +355,7 @@ export class MercadoPagoWebhookController {
     const approvedAt =
       typeof mpPayload?.date_approved === 'string' ? new Date(mpPayload.date_approved) : null;
     const merchantOrderIdFromPayment = extractMerchantOrderId(mpPayload);
-    const nextPaymentStatus = isMerchantOrder
-      ? mapMerchantOrderStatus(mpStatus)
-      : mapPaymentStatus(mpStatus);
+    const nextPaymentStatus = mapPaymentStatus(mpStatus);
     const nextSaleStatus = mapSaleStatus(nextPaymentStatus);
     const updatedSale = await this.prisma.sale.update({
       where: { id: sale.id },
@@ -433,13 +366,12 @@ export class MercadoPagoWebhookController {
         statusUpdatedAt:
           nextSaleStatus && sale.status !== SaleStatus.APPROVED ? new Date() : sale.statusUpdatedAt,
         paidAt:
-          nextPaymentStatus === PaymentStatus.APPROVED ? approvedAt ?? new Date() : sale.paidAt,
-        mpPaymentId: isMerchantOrder ? sale.mpPaymentId : eventResourceId,
-        mpMerchantOrderId: isMerchantOrder
-          ? eventResourceId
-          : merchantOrderIdFromPayment ?? sale.mpMerchantOrderId,
+          nextPaymentStatus === PaymentStatus.OK ? approvedAt ?? new Date() : sale.paidAt,
+        mpPaymentId: eventResourceId,
+        mpMerchantOrderId: merchantOrderIdFromPayment ?? sale.mpMerchantOrderId,
         mpStatus,
         mpStatusDetail,
+        updatedAt: new Date(),
         mpRaw: toJsonValue(mpPayload ?? mpData),
       },
     });
@@ -457,66 +389,34 @@ export class MercadoPagoWebhookController {
     req: { headers: Record<string, string | string[] | undefined>; body: Record<string, unknown> },
     resourceId: string,
   ) {
-    const debugSignature = this.config.get<string>('DEBUG_WEBHOOK_SIGNATURE') === 'true';
-    const acceptInvalid =
-      debugSignature &&
-      this.config.get<string>('MP_WEBHOOK_ACCEPT_INVALID_SIGNATURE') === 'true';
-    const liveMode =
-      extractLiveMode(req.body) ?? parseBooleanEnv(this.config.get<string>('MP_WEBHOOK_LIVE_MODE'));
-    const liveSecret = this.config.get<string>('MP_WEBHOOK_SECRET_LIVE');
-    const testSecret = this.config.get<string>('MP_WEBHOOK_SECRET_TEST');
+    const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
 
-    let selectedSecret: string | undefined;
-    let selectedMode: string | null = null;
-    if (liveMode === true) {
-      selectedSecret = liveSecret;
-      selectedMode = 'live';
-    } else if (liveMode === false) {
-      selectedSecret = testSecret;
-      selectedMode = 'test';
-    } else if (liveSecret && !testSecret) {
-      selectedSecret = liveSecret;
-      selectedMode = 'live';
-    } else if (testSecret && !liveSecret) {
-      selectedSecret = testSecret;
-      selectedMode = 'test';
+    if (!secret) {
+      this.logger.error('WEBHOOK_MP_SECRET_MISSING');
+      return { isValid: false };
     }
 
-    this.logger.log(
-      `WEBHOOK_SIGNATURE_SECRET mode=${selectedMode ?? 'unknown'} length=${
-        selectedSecret?.length ?? 0
-      }`,
-    );
-
-    if (!selectedSecret) {
-      this.logger.warn('Webhook de Mercado Pago sin firma válida o headers incompletos');
-      return { isValid: false, acceptedInvalid: acceptInvalid };
+    const signatureHeader = resolveHeaderValue(req.headers, 'x-signature');
+    if (!signatureHeader) {
+      this.logger.warn('WEBHOOK_MP_SIGNATURE_HEADER_MISSING');
+      return { isValid: false };
     }
 
-    const result = verifySignature(
-      { headers: req.headers },
-      resourceId,
-      selectedSecret,
+    const result = verifySignature({ headers: req.headers }, resourceId, secret);
+
+    const receivedSignatureSnippet = result.v1?.slice(0, 8) ?? 'unknown';
+    const calculatedHashSnippet = result.digest?.slice(0, 8) ?? 'unknown';
+    const manifestHash = result.manifestHash ?? null;
+    this.logger.debug(
+      `WEBHOOK_MP_SIGNATURE_DEBUG received=${receivedSignatureSnippet} calculated=${calculatedHashSnippet} manifestSha256=${manifestHash ?? 'unknown'}`,
     );
 
     if (!result.isValid) {
-      this.logger.warn('Webhook de Mercado Pago con firma inválida');
-      if (debugSignature) {
-        this.logger.log(
-          `WEBHOOK_SIGNATURE_INVALID ${JSON.stringify({
-            resourceId,
-            requestId: result.requestId ?? resolveHeaderValue(req.headers, 'x-request-id') ?? 'unknown',
-            ts: result.ts ?? 'unknown',
-            manifest: result.manifest ?? null,
-            receivedSignature: result.v1 ?? null,
-            calculatedHash: result.digest ?? null,
-          })}`,
-        );
-      }
-      return { isValid: false, acceptedInvalid: acceptInvalid, requestId: result.requestId };
+      this.logger.warn('WEBHOOK_MP_SIGNATURE_INVALID');
+      return { isValid: false, requestId: result.requestId };
     }
 
-    return { isValid: true, acceptedInvalid: false, requestId: result.requestId };
+    return { isValid: true, requestId: result.requestId };
   }
 
   private async ensureIdempotency(topic: string, resourceId: string) {

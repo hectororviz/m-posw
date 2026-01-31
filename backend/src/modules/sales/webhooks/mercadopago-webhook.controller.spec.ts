@@ -4,15 +4,19 @@ import { createHmac } from 'crypto';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
-import { getResourceId, MercadoPagoWebhookController, verifySignature } from './mercadopago-webhook.controller';
+import {
+  getResourceId,
+  MercadoPagoWebhookController,
+  parseSignatureHeader,
+  verifySignature,
+} from './mercadopago-webhook.controller';
 
 describe('MercadoPagoWebhookController', () => {
   it('marca la venta como pagada cuando el pago es aprobado', async () => {
     const secret = 'secret';
     const config = {
       get: jest.fn((key: string) => {
-        if (key === 'MP_WEBHOOK_SECRET_LIVE') return secret;
-        if (key === 'DEBUG_WEBHOOK_SIGNATURE') return 'false';
+        if (key === 'MP_WEBHOOK_SECRET') return secret;
         return null;
       }),
     } as unknown as ConfigService;
@@ -21,8 +25,12 @@ describe('MercadoPagoWebhookController', () => {
       sale: {
         findUnique: jest
           .fn()
-          .mockResolvedValue({ id: 'sale-1', status: SaleStatus.PENDING, paymentStatus: PaymentStatus.PENDING }),
-        update: jest.fn().mockResolvedValue({ id: 'sale-1', paymentStatus: PaymentStatus.APPROVED }),
+          .mockResolvedValue({
+            id: 'sale-1',
+            status: SaleStatus.PENDING,
+            paymentStatus: PaymentStatus.PENDING,
+          }),
+        update: jest.fn().mockResolvedValue({ id: 'sale-1', paymentStatus: PaymentStatus.OK }),
         findFirst: jest.fn().mockResolvedValue(null),
       },
       paymentEvent: {
@@ -37,7 +45,6 @@ describe('MercadoPagoWebhookController', () => {
         status_detail: 'accredited',
         date_approved: '2024-01-01T00:00:00.000Z',
       }),
-      getMerchantOrder: jest.fn(),
     } as unknown as MercadoPagoQueryService;
 
     const salesGateway = {
@@ -65,6 +72,7 @@ describe('MercadoPagoWebhookController', () => {
       { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
       response as any,
     );
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(prisma.sale.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -82,22 +90,37 @@ describe('MercadoPagoWebhookController', () => {
     expect(resourceId).toBe('143523357831');
   });
 
-  it('obtiene resourceId desde id, topic y resource numérico', () => {
+  it('obtiene resourceId desde id con topic payment', () => {
     const resourceId = getResourceId({
       query: { id: '143523357831', topic: 'payment' },
-      body: { resource: '143523357831' },
+      body: { resource: 'https://api.mercadopago.com/v1/payments/143523357831' },
     });
 
     expect(resourceId).toBe('143523357831');
   });
 
-  it('obtiene resourceId desde merchant_order y resource URL', () => {
+  it('obtiene resourceId desde body.data.id si no hay query', () => {
     const resourceId = getResourceId({
-      query: { id: '37735080629', topic: 'merchant_order' },
-      body: { resource: 'https://api.mercadolibre.com/merchant_orders/37735080629' },
+      query: {},
+      body: { data: { id: 987654 } },
+    });
+
+    expect(resourceId).toBe('987654');
+  });
+
+  it('obtiene resourceId desde resource URL de payments', () => {
+    const resourceId = getResourceId({
+      query: { topic: 'merchant_order', id: '37735080629' },
+      body: { resource: 'https://api.mercadopago.com/v1/payments/37735080629' },
     });
 
     expect(resourceId).toBe('37735080629');
+  });
+
+  it('parsea el header x-signature con ts y v1', () => {
+    const parsed = parseSignatureHeader('ts=1700000000, v1=abc123');
+
+    expect(parsed).toEqual({ ts: '1700000000', v1: 'abc123' });
   });
 
   it('verifica firma valida con manifest correcto', () => {
