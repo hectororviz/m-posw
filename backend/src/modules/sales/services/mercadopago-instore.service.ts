@@ -37,8 +37,9 @@ interface MercadoPagoOrderPayload {
 @Injectable()
 export class MercadoPagoInstoreService {
   private readonly baseUrl = 'https://api.mercadopago.com';
-  private readonly timeoutMs = 8000;
+  private readonly timeoutMs = 15000;
   private readonly logger = new Logger(MercadoPagoInstoreService.name);
+  private readonly notificationUrl = 'https://pos.csdsoler.com.ar/api/webhooks/mercadopago';
 
   constructor(private config: ConfigService) {}
 
@@ -134,14 +135,13 @@ export class MercadoPagoInstoreService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    const notificationUrl = this.config.get<string>('MP_WEBHOOK_URL')?.trim();
     return {
       external_reference: `sale-${sale.id}`,
       title: saleTitle,
       description: saleDescription,
       total_amount: totalAmount,
       items,
-      notification_url: notificationUrl || undefined,
+      notification_url: this.notificationUrl,
     };
   }
 
@@ -192,7 +192,11 @@ export class MercadoPagoInstoreService {
       `Mercado Pago request dispatch: ${method} ${url} payload=${payloadSummary ? JSON.stringify(payloadSummary) : 'none'}`,
     );
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    let didTimeout = false;
+    const timeout = setTimeout(() => {
+      didTimeout = true;
+      controller.abort();
+    }, this.timeoutMs);
     const jsonBody = hasBody ? JSON.stringify(payload) : undefined;
     if (hasBody && !jsonBody) {
       throw new HttpException('Payload inválido para Mercado Pago', HttpStatus.BAD_REQUEST);
@@ -226,7 +230,6 @@ export class MercadoPagoInstoreService {
       this.logger.debug(
         `Mercado Pago request config: ${method} ${url} body=${jsonBody ?? 'none'}`,
       );
-      this.logger.error('MP_REQUEST_VERSION=2026-01-30-XYZ');
       const response = await fetch(url, {
         method,
         headers,
@@ -235,27 +238,106 @@ export class MercadoPagoInstoreService {
       });
       const text = await response.text();
       if (!response.ok) {
-        if (response.status === 400 && jsonBody) {
-          this.logger.error(`Mercado Pago 400 payload: ${jsonBody}`);
-        }
-        this.logger.error(`Mercado Pago error ${response.status}: ${text}`);
+        const error: { response?: { status: number; data: string } } = {
+          response: { status: response.status, data: text },
+        };
+        throw error;
+      }
+      const bodyPreview = this.truncateText(text, 1024);
+      const parsed = text ? this.safeJsonParse(text) : null;
+      const keyFields = this.extractKeyFields(parsed);
+      if (method === 'PUT' && url.includes('/instore/qr/')) {
+        this.logger.log(
+          `MP instore order OK status=${response.status} body_preview=${bodyPreview} key_fields=${JSON.stringify(
+            keyFields,
+          )}`,
+        );
+      } else {
+        this.logger.debug(
+          `Mercado Pago response OK status=${response.status} body_preview=${bodyPreview}`,
+        );
+      }
+      return (parsed ?? (text as unknown)) as T;
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'response' in error &&
+        error.response
+      ) {
+        const response = error.response as { status: number; data: string };
+        this.logger.error(
+          `Mercado Pago response error status=${response.status} data=${response.data}`,
+        );
         throw new HttpException(
-          `Mercado Pago error ${response.status} en ${method} ${url}: ${text}`,
+          `Mercado Pago error ${response.status} en ${method} ${url}: ${response.data}`,
           HttpStatus.BAD_GATEWAY,
         );
       }
-      return (text ? JSON.parse(text) : {}) as T;
-    } catch (error) {
+      if (didTimeout) {
+        this.logger.error(
+          `Mercado Pago timeout after ${this.timeoutMs}ms on ${method} ${url}`,
+        );
+      }
       if (error instanceof HttpException) {
         throw error;
       }
+      const errorCode =
+        typeof error === 'object' && error !== null && 'code' in error
+          ? String((error as { code?: string }).code)
+          : 'UNKNOWN';
+      const errorMessage =
+        typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message?: string }).message)
+          : String(error);
+      this.logger.error(`Mercado Pago network error code=${errorCode} message=${errorMessage}`);
       throw new HttpException(
-        `No se pudo comunicar con Mercado Pago al llamar ${method} ${url}`,
+        `Mercado Pago network error: ${errorCode} ${errorMessage}`,
         HttpStatus.BAD_GATEWAY,
       );
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private safeJsonParse(text: string): Record<string, unknown> | null {
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  private extractKeyFields(payload: Record<string, unknown> | null) {
+    if (!payload) {
+      return {};
+    }
+    const keyFields: Record<string, unknown> = {};
+    const keys = [
+      'id',
+      'status',
+      'status_detail',
+      'external_reference',
+      'qr_data',
+      'merchant_order_id',
+      'collector_id',
+    ];
+    keys.forEach((key) => {
+      if (typeof payload[key] !== 'undefined') {
+        keyFields[key] = payload[key];
+      }
+    });
+    return keyFields;
+  }
+
+  private truncateText(text: string, maxLength: number) {
+    if (!text) {
+      return '';
+    }
+    if (text.length <= maxLength) {
+      return text;
+    }
+    return `${text.slice(0, maxLength)}...`;
   }
 
   private parseNumber(value: unknown, field: string) {
