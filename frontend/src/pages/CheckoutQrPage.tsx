@@ -148,6 +148,13 @@ export const CheckoutQrPage: React.FC = () => {
       try {
         const response = await apiClient.get<PaymentStatusResponse>(
           `/sales/${saleId}/payment-status`,
+          {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              Pragma: 'no-cache',
+              Expires: '0',
+            },
+          },
         );
         handleStatusUpdate(response.data);
       } catch (error) {

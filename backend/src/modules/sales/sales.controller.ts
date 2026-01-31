@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
@@ -52,7 +53,13 @@ export class SalesController {
   getPaymentStatus(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
+    @Res({ passthrough: true }) res: Response,
   ) {
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+    });
     return this.salesService.getPaymentStatus(id, { id: req.user.sub, role: req.user.role });
   }
 
