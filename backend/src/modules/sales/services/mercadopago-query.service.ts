@@ -13,10 +13,6 @@ export class MercadoPagoQueryService {
     return this.request('GET', `${this.baseUrl}/v1/payments/${paymentId}`);
   }
 
-  getMerchantOrder(orderId: string) {
-    return this.request('GET', `${this.baseUrl}/merchant_orders/${orderId}`);
-  }
-
   private async request<T = unknown>(method: string, url: string): Promise<T> {
     const token = this.config.get<string>('MP_ACCESS_TOKEN');
     if (!token) {

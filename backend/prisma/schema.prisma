@@ -28,9 +28,8 @@ enum PaymentMethod {
 
 enum PaymentStatus {
   PENDING
-  APPROVED
-  REJECTED
-  EXPIRED
+  OK
+  FAILED
 }
 
 model User {
