@@ -1,10 +1,10 @@
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, SaleStatus } from '@prisma/client';
 import { createHmac } from 'crypto';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
 import {
+  buildManifest,
   getResourceId,
   MercadoPagoWebhookController,
   parseSignatureHeader,
@@ -12,6 +12,14 @@ import {
 } from './mercadopago-webhook.controller';
 
 describe('MercadoPagoWebhookController', () => {
+  const PaymentStatus = {
+    OK: 'OK',
+    PENDING: 'PENDING',
+  } as const;
+  const SaleStatus = {
+    APPROVED: 'APPROVED',
+    PENDING: 'PENDING',
+  } as const;
   it('marca la venta como pagada cuando el pago es aprobado', async () => {
     const secret = 'secret';
     const config = {
@@ -90,7 +98,7 @@ describe('MercadoPagoWebhookController', () => {
     expect(resourceId).toBe('143523357831');
   });
 
-  it('obtiene resourceId desde id con topic payment', () => {
+  it('obtiene resourceId desde id con topic payment (feed v2)', () => {
     const resourceId = getResourceId({
       query: { id: '143523357831', topic: 'payment' },
       body: { resource: 'https://api.mercadopago.com/v1/payments/143523357831' },
@@ -108,10 +116,10 @@ describe('MercadoPagoWebhookController', () => {
     expect(resourceId).toBe('987654');
   });
 
-  it('obtiene resourceId desde resource URL de payments', () => {
+  it('obtiene resourceId desde resource URL de merchant_order', () => {
     const resourceId = getResourceId({
       query: { topic: 'merchant_order', id: '37735080629' },
-      body: { resource: 'https://api.mercadopago.com/v1/payments/37735080629' },
+      body: { resource: 'https://api.mercadopago.com/merchant_orders/37735080629' },
     });
 
     expect(resourceId).toBe('37735080629');
@@ -139,5 +147,27 @@ describe('MercadoPagoWebhookController', () => {
     );
 
     expect(result.isValid).toBe(true);
+  });
+
+  it('arma el manifest correcto', () => {
+    expect(buildManifest('123', 'req-1', '1700000000')).toBe(
+      'id:123;request-id:req-1;ts:1700000000;',
+    );
+  });
+
+  it('marca firma invalida cuando el digest no coincide', () => {
+    const secret = 'secret';
+    const resourceId = '123';
+    const requestId = 'req-1';
+    const ts = '1700000000';
+    const signature = `ts=${ts}, v1=deadbeef`;
+
+    const result = verifySignature(
+      { headers: { 'x-request-id': requestId, 'x-signature': signature } },
+      resourceId,
+      secret,
+    );
+
+    expect(result.isValid).toBe(false);
   });
 });

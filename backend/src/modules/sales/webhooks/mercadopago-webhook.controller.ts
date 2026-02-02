@@ -59,12 +59,22 @@ export const parseSignatureHeader = (signature: string) => {
   return result;
 };
 
-const parsePaymentIdFromUrl = (resource: string) => {
+const parseResourceIdFromUrl = (resource: string) => {
   const trimmed = resource.trim();
   if (!trimmed) {
     return null;
   }
-  const match = trimmed.match(/\/payments\/(\d+)(?:\?|$)/);
+  try {
+    const url = new URL(trimmed);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const last = segments.at(-1);
+    if (last && /^\d+$/.test(last)) {
+      return last;
+    }
+  } catch {
+    // Not a URL, fall through.
+  }
+  const match = trimmed.match(/(\d+)(?:\D*)$/);
   return match?.[1] ?? null;
 };
 
@@ -89,7 +99,7 @@ export const getResourceId = (req: {
   if (dataIdFromQuery) {
     return normalizeResourceId(dataIdFromQuery);
   }
-  if (query.id && query.topic === 'payment') {
+  if (query.id) {
     return normalizeResourceId(query.id);
   }
   const dataIdFromBody = normalizeResourceId(body?.data && isRecord(body.data) ? body.data.id : null);
@@ -97,7 +107,7 @@ export const getResourceId = (req: {
     return dataIdFromBody;
   }
   if (typeof body?.resource === 'string') {
-    return parsePaymentIdFromUrl(body.resource);
+    return parseResourceIdFromUrl(body.resource);
   }
   return null;
 };
@@ -115,6 +125,9 @@ const resolveHeaderValue = (
   }
   return undefined;
 };
+
+export const buildManifest = (resourceId: string, requestId: string, ts: string) =>
+  `id:${resourceId};request-id:${requestId};ts:${ts};`;
 
 export const verifySignature = (
   req: { headers: Record<string, string | string[] | undefined> },
@@ -141,7 +154,7 @@ export const verifySignature = (
       v1,
     };
   }
-  const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+  const manifest = buildManifest(resourceId, requestId, ts);
   const digest = createHmac('sha256', secret).update(manifest).digest('hex');
   const manifestHash = createHash('sha256').update(manifest).digest('hex');
   if (!/^[0-9a-f]+$/i.test(v1) || v1.length % 2 !== 0) {
@@ -294,8 +307,11 @@ export class MercadoPagoWebhookController {
     }
     const signatureResult = this.verifySignature({ headers, body }, resourceId);
     if (!signatureResult.isValid) {
-      response.status(200).json({ ok: true });
-      return;
+      if (signatureResult.shouldReject) {
+        response.status(401).json({ ok: false });
+        return;
+      }
+      this.logger.warn('WEBHOOK_MP_SIGNATURE_INVALID_NON_STRICT');
     }
 
     response.status(200).json({ ok: true });
@@ -311,20 +327,67 @@ export class MercadoPagoWebhookController {
     resourceId: string | null | undefined,
     requestId?: string,
   ) {
-    const topic = body?.type?.toString?.() || query?.topic || 'unknown';
+    const topic =
+      (typeof body?.topic === 'string' && body.topic) ||
+      (typeof body?.type === 'string' && body.type) ||
+      query?.topic ||
+      query?.type ||
+      'unknown';
     const eventResourceId = resourceId ?? 'unknown';
     const shouldProcess = await this.ensureIdempotency(topic, eventResourceId);
     if (!shouldProcess) {
       return;
     }
 
+    if (topic === 'merchant_order') {
+      await this.processMerchantOrder(eventResourceId, requestId);
+      return;
+    }
+
+    if (topic !== 'payment') {
+      this.logger.warn(`WEBHOOK_MP_TOPIC_UNSUPPORTED topic=${topic} resourceId=${eventResourceId}`);
+      return;
+    }
+
+    await this.processPayment(eventResourceId, requestId);
+  }
+
+  private async processMerchantOrder(merchantOrderId: string, requestId?: string) {
+    if (!merchantOrderId || merchantOrderId === 'unknown') {
+      this.logger.warn('WEBHOOK_MP_MERCHANT_ORDER_ID_MISSING');
+      return;
+    }
+    try {
+      const merchantOrder = await this.mpQueryService.getMerchantOrder(merchantOrderId);
+      const payments = isRecord(merchantOrder)
+        ? (merchantOrder.payments as Array<{ id?: string | number }> | undefined)
+        : undefined;
+      const paymentId = payments?.find((payment) => payment?.id)?.id;
+      if (paymentId) {
+        await this.processPayment(String(paymentId), requestId);
+      } else {
+        this.logger.warn(
+          `WEBHOOK_MP_PAYMENT_ID_MISSING merchantOrderId=${merchantOrderId} requestId=${requestId ?? 'unknown'}`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `WEBHOOK_MP_MERCHANT_ORDER_LOOKUP_FAILED merchantOrderId=${merchantOrderId} requestId=${requestId ?? 'unknown'}`,
+      );
+      if (error instanceof Error) {
+        this.logger.debug(error.message);
+      }
+    }
+  }
+
+  private async processPayment(paymentId: string, requestId?: string) {
     let mpData: unknown;
     try {
-      mpData = await this.mpQueryService.getPayment(eventResourceId);
+      mpData = await this.mpQueryService.getPayment(paymentId);
     } catch (error) {
       if (this.isPaymentNotFoundError(error)) {
         this.logger.warn(
-          `WEBHOOK_IGNORED_PAYMENT_NOT_FOUND paymentId=${eventResourceId} requestId=${requestId ?? 'unknown'}`,
+          `WEBHOOK_IGNORED_PAYMENT_NOT_FOUND paymentId=${paymentId} requestId=${requestId ?? 'unknown'}`,
         );
         return;
       }
@@ -339,9 +402,9 @@ export class MercadoPagoWebhookController {
       (saleIdFromReference
         ? await this.prisma.sale.findUnique({ where: { id: saleIdFromReference } })
         : null) ||
-      (eventResourceId
+      (paymentId
         ? await this.prisma.sale.findFirst({
-            where: { mpPaymentId: eventResourceId },
+            where: { mpPaymentId: paymentId },
           })
         : null);
 
@@ -367,7 +430,7 @@ export class MercadoPagoWebhookController {
           nextSaleStatus && sale.status !== SaleStatus.APPROVED ? new Date() : sale.statusUpdatedAt,
         paidAt:
           nextPaymentStatus === PaymentStatus.OK ? approvedAt ?? new Date() : sale.paidAt,
-        mpPaymentId: eventResourceId,
+        mpPaymentId: paymentId,
         mpMerchantOrderId: merchantOrderIdFromPayment ?? sale.mpMerchantOrderId,
         mpStatus,
         mpStatusDetail,
@@ -382,24 +445,22 @@ export class MercadoPagoWebhookController {
       mpStatus: updatedSale.mpStatus,
       mpStatusDetail: updatedSale.mpStatusDetail,
     });
-
   }
 
   private verifySignature(
     req: { headers: Record<string, string | string[] | undefined>; body: Record<string, unknown> },
     resourceId: string,
   ) {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
 
     if (!secret) {
-      this.logger.error('WEBHOOK_MP_SECRET_MISSING');
-      return { isValid: false };
-    }
-
-    const signatureHeader = resolveHeaderValue(req.headers, 'x-signature');
-    if (!signatureHeader) {
-      this.logger.warn('WEBHOOK_MP_SIGNATURE_HEADER_MISSING');
-      return { isValid: false };
+      if (isProduction) {
+        this.logger.error('WEBHOOK_MP_SECRET_MISSING');
+        return { isValid: false, shouldReject: true };
+      }
+      this.logger.warn('WEBHOOK_MP_SECRET_MISSING_NON_STRICT');
+      return { isValid: true, requestId: undefined, shouldReject: false };
     }
 
     const result = verifySignature({ headers: req.headers }, resourceId, secret);
@@ -412,11 +473,16 @@ export class MercadoPagoWebhookController {
     );
 
     if (!result.isValid) {
-      this.logger.warn('WEBHOOK_MP_SIGNATURE_INVALID');
-      return { isValid: false, requestId: result.requestId };
+      this.logger.warn(
+        `WEBHOOK_MP_SIGNATURE_INVALID ts=${result.ts ?? 'unknown'} received=${receivedSignatureSnippet} calculated=${calculatedHashSnippet} resourceId=${resourceId} requestId=${result.requestId ?? 'unknown'}`,
+      );
+      if (isProduction) {
+        return { isValid: false, requestId: result.requestId, shouldReject: true };
+      }
+      return { isValid: false, requestId: result.requestId, shouldReject: false };
     }
 
-    return { isValid: true, requestId: result.requestId };
+    return { isValid: true, requestId: result.requestId, shouldReject: false };
   }
 
   private async ensureIdempotency(topic: string, resourceId: string) {
