@@ -74,14 +74,15 @@ export class MercadoPagoWebhookController {
   ) {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
+    const strictPayment = this.isStrictPaymentEnabled();
 
     if (!secret) {
       if (isProduction) {
         this.logger.error('WEBHOOK_MP_SECRET_MISSING');
-        if (topic === 'merchant_order') {
-          return { isValid: false, shouldReject: false };
+        if (topic === 'payment' && strictPayment) {
+          return { isValid: false, shouldReject: true };
         }
-        return { isValid: false, shouldReject: true };
+        return { isValid: false, shouldReject: false };
       }
       this.logger.warn('WEBHOOK_MP_SECRET_MISSING_NON_STRICT');
       return { isValid: true, requestId: undefined, shouldReject: false };
@@ -106,12 +107,24 @@ export class MercadoPagoWebhookController {
         );
         return { isValid: false, requestId: result.requestId, shouldReject: false };
       }
-      if (isProduction) {
-        return { isValid: false, requestId: result.requestId, shouldReject: true };
-      }
-      return { isValid: false, requestId: result.requestId, shouldReject: false };
+      return {
+        isValid: false,
+        requestId: result.requestId,
+        shouldReject: topic === 'payment' && strictPayment,
+      };
     }
 
     return { isValid: true, requestId: result.requestId, shouldReject: false };
+  }
+
+  private isStrictPaymentEnabled() {
+    const raw = this.config.get<string | boolean>('MP_WEBHOOK_STRICT_PAYMENT');
+    if (raw === true || raw === 'true' || raw === '1') {
+      return true;
+    }
+    if (raw === false || raw === 'false' || raw === '0' || raw === undefined || raw === null) {
+      return false;
+    }
+    return Boolean(raw);
   }
 }
