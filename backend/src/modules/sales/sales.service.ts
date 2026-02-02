@@ -194,6 +194,9 @@ export class SalesService {
       const searchResults =
         await this.mpQueryService.searchPaymentsByExternalReference(externalReference);
       const latestPayment = this.pickLatestPayment(searchResults);
+      if (!latestPayment) {
+        this.logger.log(`MP_SEARCH_NO_PAYMENT saleId=${finalSale.id} message=no payment yet`);
+      }
       if (latestPayment) {
         const paymentId = latestPayment.id ? String(latestPayment.id) : null;
         const mpStatus = typeof latestPayment.status === 'string' ? latestPayment.status : null;
@@ -236,11 +239,16 @@ export class SalesService {
         }
       }
     }
+    const resolvedStatus =
+      updatedSale.status === SaleStatus.CANCELLED ? SaleStatus.CANCELLED : updatedSale.paymentStatus;
     return {
       saleId: finalSale.id,
-      status: updatedSale.paymentStatus,
+      status: resolvedStatus,
       mpStatus: updatedSale.mpStatus,
+      mpStatusDetail: updatedSale.mpStatusDetail,
       paymentId: updatedSale.mpPaymentId ?? undefined,
+      merchantOrderId: updatedSale.mpMerchantOrderId ?? undefined,
+      updatedAt: updatedSale.updatedAt.toISOString(),
       lastCheckedAt: lastCheckedAt?.toISOString(),
     };
   }

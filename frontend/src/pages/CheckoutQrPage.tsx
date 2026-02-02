@@ -24,9 +24,38 @@ const formatTime = (seconds: number) => {
 
 type PaymentStatusResponse = {
   saleId: string;
-  paymentStatus: PaymentStatus;
+  status: PaymentStatus;
   mpStatus?: string | null;
   mpStatusDetail?: string | null;
+  paymentId?: string;
+  merchantOrderId?: string;
+  updatedAt?: string;
+};
+
+const waitingStatuses = new Set<PaymentStatus>([
+  'PENDING',
+  'IN_PROCESS',
+  'WAITING_PAYMENT',
+  'NONE',
+]);
+
+const getStatusMessage = (status: PaymentStatus) => {
+  switch (status) {
+    case 'APPROVED':
+      return 'Pago aprobado.';
+    case 'REJECTED':
+      return 'Pago rechazado.';
+    case 'CANCELLED':
+      return 'Pago cancelado.';
+    case 'EXPIRED':
+      return 'Pago vencido.';
+    case 'PENDING':
+    case 'IN_PROCESS':
+    case 'WAITING_PAYMENT':
+    case 'NONE':
+    default:
+      return 'Esperando pago…';
+  }
 };
 
 export const CheckoutQrPage: React.FC = () => {
@@ -46,6 +75,12 @@ export const CheckoutQrPage: React.FC = () => {
   const pollingRef = useRef<number | null>(null);
   const hasCompletedRef = useRef(false);
 
+  const isWaiting = waitingStatuses.has(status);
+
+  const statusMessage = useMemo(() => {
+    return getStatusMessage(status);
+  }, [status]);
+
   const total = useMemo(
     () => roundToCurrency(items.reduce((acc, item) => acc + item.product.price * item.quantity, 0)),
     [items],
@@ -63,7 +98,7 @@ export const CheckoutQrPage: React.FC = () => {
       if (!saleId || hasCompletedRef.current) {
         return;
       }
-      if (nextStatus === 'OK') {
+      if (nextStatus === 'APPROVED') {
         if (isFinalizing) {
           return;
         }
@@ -81,11 +116,10 @@ export const CheckoutQrPage: React.FC = () => {
         }
         return;
       }
-      if (nextStatus === 'FAILED') {
-        const message = detail || 'El pago fue rechazado.';
+      if (nextStatus === 'REJECTED' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED') {
+        const message = detail || getStatusMessage(nextStatus);
         setErrorMessage(message);
         pushToast(message, 'error');
-        navigate('/checkout/payment');
       }
     },
     [saleId, isFinalizing, clear, pushToast, navigate],
@@ -93,11 +127,13 @@ export const CheckoutQrPage: React.FC = () => {
 
   const handleStatusUpdate = useCallback(
     (payload: PaymentStatusResponse) => {
-      setStatus(payload.paymentStatus);
+      console.info('payment-status response', payload);
+      setStatus(payload.status);
       setMpStatusDetail(payload.mpStatusDetail ?? null);
-      if (payload.paymentStatus !== 'PENDING') {
+      setErrorMessage(null);
+      if (!waitingStatuses.has(payload.status)) {
         stopPolling();
-        void handleTerminalStatus(payload.paymentStatus, payload.mpStatusDetail ?? null);
+        void handleTerminalStatus(payload.status, payload.mpStatusDetail ?? null);
       }
     },
     [handleTerminalStatus],
@@ -125,7 +161,8 @@ export const CheckoutQrPage: React.FC = () => {
         );
         handleStatusUpdate(response.data);
       } catch (error) {
-        setErrorMessage(normalizeApiError(error));
+        console.warn('payment-status error', error);
+        setErrorMessage('No se pudo verificar el pago. Reintentando...');
       }
     };
     void poll();
@@ -148,7 +185,7 @@ export const CheckoutQrPage: React.FC = () => {
   }, [saleId, paymentTimeoutSeconds]);
 
   useEffect(() => {
-    if (timeLeft !== 0 || status !== 'PENDING') {
+    if (timeLeft !== 0 || !isWaiting) {
       return;
     }
     stopPolling();
@@ -156,7 +193,7 @@ export const CheckoutQrPage: React.FC = () => {
     setErrorMessage(message);
     pushToast(message, 'error');
     navigate('/checkout/payment');
-  }, [timeLeft, status, navigate, pushToast]);
+  }, [timeLeft, isWaiting, navigate, pushToast]);
 
   if (!saleId) {
     return (
@@ -173,15 +210,11 @@ export const CheckoutQrPage: React.FC = () => {
           Total: <strong>{formatCurrency(total)}</strong>
         </p>
         <div className="qr-wait">
-          <div className="spinner" aria-hidden="true" />
-          <p>Esperando pago…</p>
+          {isWaiting && <div className="spinner" aria-hidden="true" />}
+          <p>{statusMessage}</p>
           <p className="qr-status">Estado: {status}</p>
           <p className="qr-timer">{formatTime(timeLeft)}</p>
-          {status !== 'PENDING' && (
-            <p className="error-text">
-              {status === 'OK' ? 'Pago aprobado.' : 'Pago rechazado.'}
-            </p>
-          )}
+          {!isWaiting && <p className="error-text">{statusMessage}</p>}
           {mpStatusDetail && <p className="error-text">{mpStatusDetail}</p>}
           {errorMessage && <p className="error-text">{errorMessage}</p>}
         </div>
