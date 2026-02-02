@@ -118,7 +118,7 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 
 - El backend crea/actualiza órdenes Instore QR v2 al iniciar el cobro.
 - Solo puede haber una sesión activa por caja (login único).
-- El webhook valida firma HMAC si `MP_WEBHOOK_SECRET` está definido.
+- El webhook valida firma HMAC con `MP_WEBHOOK_SECRET`. En entornos no productivos, si falta el secreto o la firma es inválida se procesa igual con warning; en producción se rechaza.
 
 ### Flujo de cobro (resumen)
 

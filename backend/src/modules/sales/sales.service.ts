@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { CreateCashSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
+import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 
 @Injectable()
 export class SalesService {
@@ -20,6 +21,7 @@ export class SalesService {
     private prisma: PrismaService,
     private config: ConfigService,
     private mpService: MercadoPagoInstoreService,
+    private mpQueryService: MercadoPagoQueryService,
   ) {}
 
   async createCashSale(userId: string, dto: CreateCashSaleDto) {
@@ -180,11 +182,54 @@ export class SalesService {
     this.assertCanAccessSale(sale, requester, 'GET /sales/:id/payment-status');
     const refreshed = await this.expireIfNeeded(sale);
     const finalSale = refreshed ?? sale;
+    let updatedSale = finalSale;
+    let lastCheckedAt: Date | null = null;
+    if (finalSale.paymentStatus === PaymentStatus.PENDING) {
+      const externalReference = `sale-${finalSale.id}`;
+      lastCheckedAt = new Date();
+      const searchResults =
+        await this.mpQueryService.searchPaymentsByExternalReference(externalReference);
+      const latestPayment = this.pickLatestPayment(searchResults);
+      if (latestPayment) {
+        const paymentId = latestPayment.id ? String(latestPayment.id) : null;
+        const mpStatus = typeof latestPayment.status === 'string' ? latestPayment.status : null;
+        const mpStatusDetail =
+          typeof latestPayment.status_detail === 'string' ? latestPayment.status_detail : null;
+        const mappedPaymentStatus = this.mapPaymentStatus(mpStatus);
+        const mappedSaleStatus = this.mapSaleStatus(mappedPaymentStatus);
+        if (mappedPaymentStatus || mpStatus || paymentId) {
+          updatedSale = await this.prisma.sale.update({
+            where: { id: finalSale.id },
+            data: {
+              paymentStatus: mappedPaymentStatus ?? finalSale.paymentStatus,
+              status:
+                mappedSaleStatus && finalSale.status !== SaleStatus.APPROVED
+                  ? mappedSaleStatus
+                  : finalSale.status,
+              statusUpdatedAt:
+                mappedSaleStatus && finalSale.status !== SaleStatus.APPROVED
+                  ? new Date()
+                  : finalSale.statusUpdatedAt,
+              paidAt:
+                mappedPaymentStatus === PaymentStatus.OK
+                  ? finalSale.paidAt ?? new Date()
+                  : finalSale.paidAt,
+              mpPaymentId: paymentId ?? finalSale.mpPaymentId,
+              mpStatus: mpStatus ?? finalSale.mpStatus,
+              mpStatusDetail: mpStatusDetail ?? finalSale.mpStatusDetail,
+              updatedAt: new Date(),
+            },
+            include: { user: true },
+          });
+        }
+      }
+    }
     return {
       saleId: finalSale.id,
-      paymentStatus: finalSale.paymentStatus,
-      mpStatus: finalSale.mpStatus,
-      mpStatusDetail: finalSale.mpStatusDetail,
+      status: updatedSale.paymentStatus,
+      mpStatus: updatedSale.mpStatus,
+      paymentId: updatedSale.mpPaymentId ?? undefined,
+      lastCheckedAt: lastCheckedAt?.toISOString(),
     };
   }
 
@@ -353,5 +398,62 @@ export class SalesService {
     if (Math.abs(roundedReceived - computedTotal) > 0.009) {
       throw new BadRequestException('El total no coincide con los items');
     }
+  }
+
+  private pickLatestPayment(response: unknown) {
+    if (!response || typeof response !== 'object') {
+      return null;
+    }
+    const results = (response as { results?: Array<Record<string, unknown>> }).results;
+    if (!Array.isArray(results) || results.length === 0) {
+      return null;
+    }
+    return results
+      .slice()
+      .sort((left, right) => {
+        const leftDate =
+          typeof left.date_last_updated === 'string'
+            ? Date.parse(left.date_last_updated)
+            : typeof left.date_created === 'string'
+              ? Date.parse(left.date_created)
+              : 0;
+        const rightDate =
+          typeof right.date_last_updated === 'string'
+            ? Date.parse(right.date_last_updated)
+            : typeof right.date_created === 'string'
+              ? Date.parse(right.date_created)
+              : 0;
+        return rightDate - leftDate;
+      })[0];
+  }
+
+  private mapPaymentStatus(status?: string | null) {
+    const normalized = status?.toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+    if (normalized === 'approved') {
+      return PaymentStatus.OK;
+    }
+    if (normalized === 'rejected' || normalized === 'cancelled') {
+      return PaymentStatus.FAILED;
+    }
+    if (normalized === 'pending' || normalized === 'in_process') {
+      return PaymentStatus.PENDING;
+    }
+    return null;
+  }
+
+  private mapSaleStatus(status: PaymentStatus | null) {
+    if (!status) {
+      return null;
+    }
+    if (status === PaymentStatus.OK) {
+      return SaleStatus.APPROVED;
+    }
+    if (status === PaymentStatus.FAILED) {
+      return SaleStatus.REJECTED;
+    }
+    return SaleStatus.PENDING;
   }
 }

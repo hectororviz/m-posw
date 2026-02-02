@@ -13,6 +13,15 @@ export class MercadoPagoQueryService {
     return this.request('GET', `${this.baseUrl}/v1/payments/${paymentId}`);
   }
 
+  getMerchantOrder(merchantOrderId: string) {
+    return this.request('GET', `${this.baseUrl}/merchant_orders/${merchantOrderId}`);
+  }
+
+  searchPaymentsByExternalReference(externalReference: string) {
+    const encoded = encodeURIComponent(externalReference);
+    return this.request('GET', `${this.baseUrl}/v1/payments/search?external_reference=${encoded}`);
+  }
+
   private async request<T = unknown>(method: string, url: string): Promise<T> {
     const token = this.config.get<string>('MP_ACCESS_TOKEN');
     if (!token) {

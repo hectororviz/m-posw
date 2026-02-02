@@ -1,9 +1,16 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PaymentStatus, SaleStatus } from '@prisma/client';
 import { SalesService } from './sales.service';
 
 describe('SalesService MercadoPago QR auth', () => {
+  const PaymentStatus = {
+    OK: 'OK',
+    PENDING: 'PENDING',
+  } as const;
+  const SaleStatus = {
+    PENDING: 'PENDING',
+    CANCELLED: 'CANCELLED',
+  } as const;
   const baseSale = {
     id: 'sale-1',
     userId: 'owner-1',
@@ -43,11 +50,15 @@ describe('SalesService MercadoPago QR auth', () => {
       createOrUpdateOrder: jest.fn(),
       deleteOrder: jest.fn(),
     };
+    const mpQueryService = {
+      searchPaymentsByExternalReference: jest.fn(),
+    };
 
     return {
-      service: new SalesService(prisma as any, config, mpService as any),
+      service: new SalesService(prisma as any, config, mpService as any, mpQueryService as any),
       prisma,
       mpService,
+      mpQueryService,
     };
   };
 
