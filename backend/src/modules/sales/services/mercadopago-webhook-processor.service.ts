@@ -24,6 +24,7 @@ type WebhookPayload = {
 @Injectable()
 export class MercadoPagoWebhookProcessorService {
   private readonly logger = new Logger(MercadoPagoWebhookProcessorService.name);
+  private readonly paymentRetryDelaysMs = [3000, 10000, 20000];
 
   constructor(
     private prisma: PrismaService,
@@ -84,6 +85,7 @@ export class MercadoPagoWebhookProcessorService {
         await this.handleMerchantOrderWithoutPayments(
           merchantOrderId,
           externalReference,
+          resourceUrl,
           merchantOrderPayload,
           requestId,
         );
@@ -231,6 +233,7 @@ export class MercadoPagoWebhookProcessorService {
   private async handleMerchantOrderWithoutPayments(
     merchantOrderId: string,
     externalReference: string | null,
+    resourceUrl: string | null,
     merchantOrderPayload: Record<string, unknown> | null,
     requestId?: string,
   ) {
@@ -247,6 +250,12 @@ export class MercadoPagoWebhookProcessorService {
       this.logger.warn(
         `WEBHOOK_MP_SALE_NOT_FOUND topic=merchant_order merchantOrderId=${merchantOrderId} requestId=${requestId ?? 'unknown'}`,
       );
+      this.schedulePaymentRetries({
+        merchantOrderId,
+        resourceUrl,
+        externalReference,
+        requestId,
+      });
       return;
     }
 
@@ -283,6 +292,13 @@ export class MercadoPagoWebhookProcessorService {
     this.logger.log(
       `WEBHOOK_MP_STATUS_UPDATED topic=merchant_order saleId=${updatedSale.id} merchantOrderId=${merchantOrderId} paymentId=none status=${updatedSale.status} requestId=${requestId ?? 'unknown'}`,
     );
+
+    this.schedulePaymentRetries({
+      merchantOrderId,
+      resourceUrl,
+      externalReference,
+      requestId,
+    });
   }
 
   private selectPaymentFromMerchantOrder(payments: Array<Record<string, unknown>>) {
@@ -410,5 +426,133 @@ export class MercadoPagoWebhookProcessorService {
       responseText.includes('Mercado Pago error 404') &&
       responseText.includes('Payment not found')
     );
+  }
+
+  private schedulePaymentRetries(input: {
+    merchantOrderId: string;
+    resourceUrl: string | null;
+    externalReference: string | null;
+    requestId?: string;
+  }) {
+    if (!input.merchantOrderId) {
+      return;
+    }
+    const state = { resolved: false };
+    for (const delay of this.paymentRetryDelaysMs) {
+      const timer = setTimeout(() => {
+        void this.retryPaymentConfirmation(state, input, delay);
+      }, delay);
+      if (typeof timer.unref === 'function') {
+        timer.unref();
+      }
+    }
+  }
+
+  private async retryPaymentConfirmation(
+    state: { resolved: boolean },
+    input: {
+      merchantOrderId: string;
+      resourceUrl: string | null;
+      externalReference: string | null;
+      requestId?: string;
+    },
+    delay: number,
+  ) {
+    if (state.resolved) {
+      return;
+    }
+    const { merchantOrderId, resourceUrl, externalReference, requestId } = input;
+
+    const merchantOrderPayload = await this.safeFetchMerchantOrder(
+      resourceUrl,
+      merchantOrderId,
+      requestId,
+      delay,
+    );
+    const payments = Array.isArray(merchantOrderPayload?.payments)
+      ? (merchantOrderPayload?.payments as Array<unknown>).filter(isRecord)
+      : [];
+    let paymentIdValue = this.extractPaymentIdFromPayments(payments);
+
+    if (!paymentIdValue && externalReference) {
+      paymentIdValue = await this.findPaymentIdByExternalReference(
+        externalReference,
+        requestId,
+        delay,
+      );
+    }
+
+    if (!paymentIdValue) {
+      this.logger.log(
+        `WEBHOOK_MP_RETRY_NO_PAYMENT merchantOrderId=${merchantOrderId} delayMs=${delay} requestId=${requestId ?? 'unknown'}`,
+      );
+      return;
+    }
+
+    state.resolved = true;
+    this.logger.log(
+      `WEBHOOK_MP_RETRY_PAYMENT_FOUND merchantOrderId=${merchantOrderId} paymentId=${paymentIdValue} delayMs=${delay} requestId=${requestId ?? 'unknown'}`,
+    );
+    await this.processPayment(paymentIdValue, requestId, merchantOrderId, null, 'payment');
+  }
+
+  private extractPaymentIdFromPayments(payments: Array<Record<string, unknown>>) {
+    const selectedPayment = this.selectPaymentFromMerchantOrder(payments);
+    return selectedPayment?.id ? String(selectedPayment.id) : null;
+  }
+
+  private async safeFetchMerchantOrder(
+    resourceUrl: string | null,
+    merchantOrderId: string,
+    requestId?: string,
+    delayMs?: number,
+  ) {
+    try {
+      const merchantOrder = await this.mpQueryService.getMerchantOrderByResource(
+        resourceUrl,
+        merchantOrderId,
+      );
+      return isRecord(merchantOrder) ? merchantOrder : null;
+    } catch (error) {
+      this.logger.warn(
+        `WEBHOOK_MP_RETRY_MERCHANT_ORDER_FAILED merchantOrderId=${merchantOrderId} delayMs=${delayMs ?? 0} requestId=${requestId ?? 'unknown'}`,
+      );
+      if (error instanceof Error) {
+        this.logger.debug(error.message);
+      }
+      return null;
+    }
+  }
+
+  private async findPaymentIdByExternalReference(
+    externalReference: string,
+    requestId?: string,
+    delayMs?: number,
+  ) {
+    try {
+      const searchResult = await this.mpQueryService.searchPaymentsByExternalReference(
+        externalReference,
+      );
+      const payments = this.extractSearchResults(searchResult);
+      return this.extractPaymentIdFromPayments(payments);
+    } catch (error) {
+      this.logger.warn(
+        `WEBHOOK_MP_RETRY_SEARCH_FAILED externalReference=${externalReference} delayMs=${delayMs ?? 0} requestId=${requestId ?? 'unknown'}`,
+      );
+      if (error instanceof Error) {
+        this.logger.debug(error.message);
+      }
+      return null;
+    }
+  }
+
+  private extractSearchResults(payload: unknown) {
+    if (Array.isArray(payload)) {
+      return payload.filter(isRecord);
+    }
+    if (isRecord(payload) && Array.isArray(payload.results)) {
+      return payload.results.filter(isRecord);
+    }
+    return [];
   }
 }

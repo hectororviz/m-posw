@@ -2,7 +2,7 @@ import { Body, Controller, Headers, Logger, Post, Query, Req, Res } from '@nestj
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import { MercadoPagoWebhookProcessorService } from '../services/mercadopago-webhook-processor.service';
-import { getResourceId, verifySignature } from './mercadopago-webhook.utils';
+import { getManifestId, getResourceId, verifySignature } from './mercadopago-webhook.utils';
 
 @Controller('webhooks')
 export class MercadoPagoWebhookController {
@@ -44,7 +44,8 @@ export class MercadoPagoWebhookController {
       query?.type ||
       'unknown';
 
-    const signatureResult = this.verifySignature({ headers, body }, resourceId, topic);
+    const manifestId = getManifestId({ topic, body, query });
+    const signatureResult = this.verifySignature({ headers, body }, manifestId, resourceId, topic);
     if (!signatureResult.isValid && signatureResult.shouldReject) {
       response.status(401).json({ ok: false });
       return;
@@ -69,6 +70,7 @@ export class MercadoPagoWebhookController {
 
   private verifySignature(
     req: { headers: Record<string, string | string[] | undefined>; body: Record<string, unknown> },
+    manifestId: string | null,
     resourceId: string,
     topic: string,
   ) {
@@ -88,7 +90,7 @@ export class MercadoPagoWebhookController {
       return { isValid: true, requestId: undefined, shouldReject: false };
     }
 
-    const result = verifySignature({ headers: req.headers }, resourceId, secret);
+    const result = verifySignature({ headers: req.headers }, manifestId, secret);
 
     const receivedSignatureSnippet = result.v1?.slice(0, 8) ?? 'unknown';
     const calculatedHashSnippet = result.digest?.slice(0, 8) ?? 'unknown';
@@ -112,6 +114,12 @@ export class MercadoPagoWebhookController {
         requestId: result.requestId,
         shouldReject: topic === 'payment' && strictPayment,
       };
+    }
+
+    if (topic === 'merchant_order') {
+      this.logger.log(
+        `WEBHOOK_MP_SIGNATURE_VALID topic=merchant_order requestId=${result.requestId ?? 'unknown'}`,
+      );
     }
 
     return { isValid: true, requestId: result.requestId, shouldReject: false };
