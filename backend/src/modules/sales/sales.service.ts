@@ -11,6 +11,10 @@ import { PrismaService } from '../common/prisma.service';
 import { CreateCashSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
+import {
+  mapMpPaymentToPaymentStatus,
+  mapSaleStatus,
+} from './webhooks/mercadopago-webhook.utils';
 
 @Injectable()
 export class SalesService {
@@ -40,7 +44,7 @@ export class SalesService {
           userId,
           total: roundedTotal,
           status: SaleStatus.APPROVED,
-          paymentStatus: PaymentStatus.OK,
+          paymentStatus: PaymentStatus.APPROVED,
           paymentMethod: PaymentMethod.CASH,
           cashReceived,
           changeAmount,
@@ -195,13 +199,21 @@ export class SalesService {
         const mpStatus = typeof latestPayment.status === 'string' ? latestPayment.status : null;
         const mpStatusDetail =
           typeof latestPayment.status_detail === 'string' ? latestPayment.status_detail : null;
-        const mappedPaymentStatus = this.mapPaymentStatus(mpStatus);
-        const mappedSaleStatus = this.mapSaleStatus(mappedPaymentStatus);
-        if (mappedPaymentStatus || mpStatus || paymentId) {
+        const mappedPaymentStatus = mapMpPaymentToPaymentStatus(
+          mpStatus,
+          mpStatusDetail,
+          (normalizedStatus, normalizedDetail) => {
+            this.logger.warn(
+              `MP_SEARCH_STATUS_UNKNOWN saleId=${finalSale.id} status=${normalizedStatus ?? 'unknown'} detail=${normalizedDetail ?? 'unknown'}`,
+            );
+          },
+        );
+        const mappedSaleStatus = mapSaleStatus(mappedPaymentStatus);
+        if (mpStatus || mpStatusDetail || paymentId) {
           updatedSale = await this.prisma.sale.update({
             where: { id: finalSale.id },
             data: {
-              paymentStatus: mappedPaymentStatus ?? finalSale.paymentStatus,
+              paymentStatus: mappedPaymentStatus,
               status:
                 mappedSaleStatus && finalSale.status !== SaleStatus.APPROVED
                   ? mappedSaleStatus
@@ -211,7 +223,7 @@ export class SalesService {
                   ? new Date()
                   : finalSale.statusUpdatedAt,
               paidAt:
-                mappedPaymentStatus === PaymentStatus.OK
+                mappedPaymentStatus === PaymentStatus.APPROVED
                   ? finalSale.paidAt ?? new Date()
                   : finalSale.paidAt,
               mpPaymentId: paymentId ?? finalSale.mpPaymentId,
@@ -242,7 +254,7 @@ export class SalesService {
       throw new NotFoundException('Venta no encontrada');
     }
     this.assertCanAccessSale(sale, requester, 'POST /sales/:id/complete');
-    if (sale.paymentStatus !== PaymentStatus.OK) {
+    if (sale.paymentStatus !== PaymentStatus.APPROVED) {
       throw new BadRequestException('La venta todavía no tiene pago aprobado');
     }
     if (sale.status === SaleStatus.APPROVED) {
@@ -292,7 +304,7 @@ export class SalesService {
       where: { id: saleId },
       data: {
         status: SaleStatus.CANCELLED,
-        paymentStatus: PaymentStatus.FAILED,
+        paymentStatus: PaymentStatus.REJECTED,
         statusUpdatedAt: new Date(),
         cancelledAt: new Date(),
       },
@@ -352,7 +364,7 @@ export class SalesService {
       where: { id: sale.id },
       data: {
         status: SaleStatus.EXPIRED,
-        paymentStatus: PaymentStatus.FAILED,
+        paymentStatus: PaymentStatus.EXPIRED,
         statusUpdatedAt: new Date(),
         expiredAt: new Date(),
       },
@@ -427,33 +439,4 @@ export class SalesService {
       })[0];
   }
 
-  private mapPaymentStatus(status?: string | null) {
-    const normalized = status?.toLowerCase();
-    if (!normalized) {
-      return null;
-    }
-    if (normalized === 'approved') {
-      return PaymentStatus.OK;
-    }
-    if (normalized === 'rejected' || normalized === 'cancelled') {
-      return PaymentStatus.FAILED;
-    }
-    if (normalized === 'pending' || normalized === 'in_process') {
-      return PaymentStatus.PENDING;
-    }
-    return null;
-  }
-
-  private mapSaleStatus(status: PaymentStatus | null) {
-    if (!status) {
-      return null;
-    }
-    if (status === PaymentStatus.OK) {
-      return SaleStatus.APPROVED;
-    }
-    if (status === PaymentStatus.FAILED) {
-      return SaleStatus.REJECTED;
-    }
-    return SaleStatus.PENDING;
-  }
 }

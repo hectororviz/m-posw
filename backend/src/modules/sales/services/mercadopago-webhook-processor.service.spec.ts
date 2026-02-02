@@ -6,7 +6,7 @@ import { SalesGateway } from '../websockets/sales.gateway';
 describe('MercadoPagoWebhookProcessorService', () => {
   it('marca la venta como pagada cuando el pago es aprobado', async () => {
     const PaymentStatus = {
-      OK: 'OK',
+      APPROVED: 'APPROVED',
       PENDING: 'PENDING',
     } as const;
     const SaleStatus = {
@@ -25,7 +25,7 @@ describe('MercadoPagoWebhookProcessorService', () => {
         update: jest.fn().mockResolvedValue({
           id: 'sale-1',
           status: SaleStatus.APPROVED,
-          paymentStatus: PaymentStatus.OK,
+          paymentStatus: PaymentStatus.APPROVED,
         }),
         findFirst: jest.fn().mockResolvedValue(null),
       },
