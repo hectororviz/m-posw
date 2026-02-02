@@ -5,6 +5,7 @@ import { SalesService } from './sales.service';
 import { MercadoPagoWebhookController } from './webhooks/mercadopago-webhook.controller';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
+import { MercadoPagoWebhookProcessorService } from './services/mercadopago-webhook-processor.service';
 import { SalesGateway } from './websockets/sales.gateway';
 
 @Module({
@@ -14,6 +15,7 @@ import { SalesGateway } from './websockets/sales.gateway';
     PrismaService,
     MercadoPagoInstoreService,
     MercadoPagoQueryService,
+    MercadoPagoWebhookProcessorService,
     SalesGateway,
   ],
 })

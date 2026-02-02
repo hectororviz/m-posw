@@ -1,26 +1,16 @@
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
-import { PrismaService } from '../../common/prisma.service';
-import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
-import { SalesGateway } from '../websockets/sales.gateway';
+import { MercadoPagoWebhookProcessorService } from '../services/mercadopago-webhook-processor.service';
+import { MercadoPagoWebhookController } from './mercadopago-webhook.controller';
 import {
   buildManifest,
   getResourceId,
-  MercadoPagoWebhookController,
   parseSignatureHeader,
   verifySignature,
-} from './mercadopago-webhook.controller';
+} from './mercadopago-webhook.utils';
 
 describe('MercadoPagoWebhookController', () => {
-  const PaymentStatus = {
-    OK: 'OK',
-    PENDING: 'PENDING',
-  } as const;
-  const SaleStatus = {
-    APPROVED: 'APPROVED',
-    PENDING: 'PENDING',
-  } as const;
-  it('marca la venta como pagada cuando el pago es aprobado', async () => {
+  it('acepta merchant_order sin firma valida y responde 200', async () => {
     const secret = 'secret';
     const config = {
       get: jest.fn((key: string) => {
@@ -29,44 +19,18 @@ describe('MercadoPagoWebhookController', () => {
       }),
     } as unknown as ConfigService;
 
-    const prisma = {
-      sale: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({
-            id: 'sale-1',
-            status: SaleStatus.PENDING,
-            paymentStatus: PaymentStatus.PENDING,
-          }),
-        update: jest.fn().mockResolvedValue({ id: 'sale-1', paymentStatus: PaymentStatus.OK }),
-        findFirst: jest.fn().mockResolvedValue(null),
-      },
-      paymentEvent: {
-        create: jest.fn().mockResolvedValue({ id: 'event-1' }),
-      },
-    } as unknown as PrismaService;
+    const processor = {
+      processWebhook: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MercadoPagoWebhookProcessorService;
 
-    const mpService = {
-      getPayment: jest.fn().mockResolvedValue({
-        external_reference: 'sale-sale-1',
-        status: 'approved',
-        status_detail: 'accredited',
-        date_approved: '2024-01-01T00:00:00.000Z',
-      }),
-    } as unknown as MercadoPagoQueryService;
-
-    const salesGateway = {
-      notifyPaymentStatusChanged: jest.fn(),
-    } as unknown as SalesGateway;
-
-    const controller = new MercadoPagoWebhookController(config, prisma, mpService, salesGateway);
+    const controller = new MercadoPagoWebhookController(config, processor);
 
     const resourceId = '123';
     const requestId = 'req-1';
     const ts = '1700000000';
     const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
     const digest = createHmac('sha256', secret).update(manifest).digest('hex');
-    const signature = `ts=${ts}, v1=${digest}`;
+    const signature = `ts=${ts}, v1=deadbeef`;
 
     const response = {
       status: jest.fn().mockReturnThis(),
@@ -75,18 +39,16 @@ describe('MercadoPagoWebhookController', () => {
 
     await controller.handleWebhook(
       { 'x-request-id': requestId, 'x-signature': signature },
-      { type: 'payment', data: { id: resourceId }, live_mode: true },
-      {},
+      { type: 'merchant_order', data: { id: resourceId }, live_mode: true },
+      { topic: 'merchant_order' },
       { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
       response as any,
     );
+
     await new Promise((resolve) => setImmediate(resolve));
 
-    expect(prisma.sale.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ status: SaleStatus.APPROVED }),
-      }),
-    );
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(processor.processWebhook).toHaveBeenCalled();
   });
 
   it('obtiene resourceId desde data.id y type', () => {
