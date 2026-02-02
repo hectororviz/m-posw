@@ -204,21 +204,25 @@ export class MercadoPagoWebhookProcessorService {
       return;
     }
 
+    const updateData: Prisma.SaleUpdateInput = {
+      paymentStatus: nextPaymentStatus,
+      status: resolvedSaleStatus,
+      paidAt: nextPaymentStatus === PaymentStatus.OK ? approvedAt ?? new Date() : sale.paidAt,
+      mpPaymentId: paymentId,
+      mpMerchantOrderId: finalMerchantOrderId ?? undefined,
+      mpStatus,
+      mpStatusDetail,
+      updatedAt: new Date(),
+      mpRaw: toJsonValue(mpPayload ?? mpData),
+    };
+
+    if (resolvedSaleStatus !== sale.status) {
+      updateData.statusUpdatedAt = new Date();
+    }
+
     const updatedSale = await this.prisma.sale.update({
       where: { id: sale.id },
-      data: {
-        paymentStatus: nextPaymentStatus,
-        status: resolvedSaleStatus,
-        statusUpdatedAt:
-          resolvedSaleStatus !== sale.status ? new Date() : sale.statusUpdatedAt,
-        paidAt: nextPaymentStatus === PaymentStatus.OK ? approvedAt ?? new Date() : sale.paidAt,
-        mpPaymentId: paymentId,
-        mpMerchantOrderId: finalMerchantOrderId ?? undefined,
-        mpStatus,
-        mpStatusDetail,
-        updatedAt: new Date(),
-        mpRaw: toJsonValue(mpPayload ?? mpData),
-      },
+      data: updateData,
     });
 
     this.salesGateway.notifyPaymentStatusChanged({
