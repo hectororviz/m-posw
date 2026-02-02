@@ -17,6 +17,20 @@ export class MercadoPagoQueryService {
     return this.request('GET', `${this.baseUrl}/merchant_orders/${merchantOrderId}`);
   }
 
+  getMerchantOrderByResource(resource: string | null, fallbackId?: string) {
+    const resolvedUrl = this.resolveMerchantOrderUrl(resource);
+    if (resolvedUrl) {
+      return this.request('GET', resolvedUrl);
+    }
+    if (fallbackId) {
+      return this.getMerchantOrder(fallbackId);
+    }
+    throw new HttpException(
+      'Merchant order resource no configurado',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+
   searchPaymentsByExternalReference(externalReference: string) {
     const encoded = encodeURIComponent(externalReference);
     return this.request('GET', `${this.baseUrl}/v1/payments/search?external_reference=${encoded}`);
@@ -56,5 +70,32 @@ export class MercadoPagoQueryService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private resolveMerchantOrderUrl(resource: string | null) {
+    if (!resource) {
+      return null;
+    }
+    const trimmed = resource.trim();
+    if (!trimmed) {
+      return null;
+    }
+    try {
+      const url = new URL(trimmed);
+      if (this.isAllowedMerchantOrderHost(url.hostname) && url.pathname.includes('/merchant_orders/')) {
+        return url.toString();
+      }
+    } catch {
+      // Non URL, fallthrough to parse id.
+    }
+    const match = trimmed.match(/merchant_orders\/(\d+)/);
+    if (match?.[1]) {
+      return `${this.baseUrl}/merchant_orders/${match[1]}`;
+    }
+    return null;
+  }
+
+  private isAllowedMerchantOrderHost(hostname: string) {
+    return hostname.endsWith('mercadopago.com') || hostname.endsWith('mercadolibre.com');
   }
 }

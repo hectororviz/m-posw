@@ -40,7 +40,8 @@ export class MercadoPagoWebhookProcessorService {
     }
 
     if (topic === 'merchant_order') {
-      await this.processMerchantOrder(eventResourceId, requestId);
+      const resourceUrl = typeof payload.body?.resource === 'string' ? payload.body.resource : null;
+      await this.processMerchantOrder(eventResourceId, resourceUrl, requestId);
       return;
     }
 
@@ -52,40 +53,58 @@ export class MercadoPagoWebhookProcessorService {
     await this.processPayment(eventResourceId, requestId, null);
   }
 
-  private async processMerchantOrder(merchantOrderId: string, requestId?: string) {
+  private async processMerchantOrder(
+    merchantOrderId: string,
+    resourceUrl: string | null,
+    requestId?: string,
+  ) {
     if (!merchantOrderId || merchantOrderId === 'unknown') {
       this.logger.warn('WEBHOOK_MP_MERCHANT_ORDER_ID_MISSING');
       return;
     }
 
     try {
-      const merchantOrder = await this.mpQueryService.getMerchantOrder(merchantOrderId);
+      const merchantOrder = await this.mpQueryService.getMerchantOrderByResource(
+        resourceUrl,
+        merchantOrderId,
+      );
       const merchantOrderPayload = isRecord(merchantOrder) ? merchantOrder : null;
       const externalReference = extractExternalReference(merchantOrderPayload);
-      const payments = merchantOrderPayload?.payments as Array<{
-        id?: string | number;
-        status?: string;
-      }>;
-      const paymentId = payments?.find((payment) => payment?.id)?.id;
-      const paymentIdValue = paymentId ? String(paymentId) : null;
+      const payments = Array.isArray(merchantOrderPayload?.payments)
+        ? (merchantOrderPayload?.payments as Array<unknown>).filter(isRecord)
+        : [];
+      const selectedPayment = this.selectPaymentFromMerchantOrder(payments);
+      const paymentIdValue = selectedPayment?.id ? String(selectedPayment.id) : null;
 
-      if (externalReference) {
-        await this.processMerchantOrderByExternalReference(
-          externalReference,
-          paymentIdValue,
+      this.logger.log(
+        `WEBHOOK_MP_MERCHANT_ORDER_FETCHED merchantOrderId=${merchantOrderId} payments_len=${payments.length} requestId=${requestId ?? 'unknown'}`,
+      );
+
+      if (!paymentIdValue) {
+        await this.handleMerchantOrderWithoutPayments(
           merchantOrderId,
+          externalReference,
+          merchantOrderPayload,
           requestId,
         );
         return;
       }
 
-      if (paymentIdValue) {
-        await this.processPayment(paymentIdValue, requestId, merchantOrderId, null, 'merchant_order');
-        return;
-      }
+      this.logger.log(
+        `WEBHOOK_MP_MERCHANT_ORDER_PAYMENT_SELECTED merchantOrderId=${merchantOrderId} paymentId=${paymentIdValue} status=${selectedPayment?.status ?? 'unknown'} requestId=${requestId ?? 'unknown'}`,
+      );
 
-      this.logger.warn(
-        `WEBHOOK_MP_PAYMENT_ID_MISSING merchantOrderId=${merchantOrderId} requestId=${requestId ?? 'unknown'}`,
+      const saleOverride = await this.findSaleForMerchantOrder(
+        externalReference,
+        merchantOrderId,
+        paymentIdValue,
+      );
+      await this.processPayment(
+        paymentIdValue,
+        requestId,
+        merchantOrderId,
+        saleOverride,
+        'merchant_order',
       );
     } catch (error) {
       this.logger.warn(
@@ -95,34 +114,6 @@ export class MercadoPagoWebhookProcessorService {
         this.logger.debug(error.message);
       }
     }
-  }
-
-  private async processMerchantOrderByExternalReference(
-    externalReference: string,
-    paymentId: string | null,
-    merchantOrderId: string,
-    requestId?: string,
-  ) {
-    const sale = await this.findSaleByExternalReference(
-      externalReference,
-      merchantOrderId,
-      paymentId,
-    );
-    if (!sale) {
-      this.logger.warn(
-        `WEBHOOK_MP_SALE_NOT_FOUND topic=merchant_order merchantOrderId=${merchantOrderId} requestId=${requestId ?? 'unknown'}`,
-      );
-      return;
-    }
-
-    if (!paymentId) {
-      this.logger.warn(
-        `WEBHOOK_MP_PAYMENT_ID_MISSING merchantOrderId=${merchantOrderId} saleId=${sale.id} requestId=${requestId ?? 'unknown'}`,
-      );
-      return;
-    }
-
-    await this.processPayment(paymentId, requestId, merchantOrderId, sale, 'merchant_order');
   }
 
   private async processPayment(
@@ -235,6 +226,136 @@ export class MercadoPagoWebhookProcessorService {
     this.logger.log(
       `WEBHOOK_MP_STATUS_UPDATED topic=${contextTopic} saleId=${updatedSale.id} merchantOrderId=${finalMerchantOrderId ?? 'unknown'} paymentId=${paymentId} status=${updatedSale.status} requestId=${requestId ?? 'unknown'}`,
     );
+  }
+
+  private async handleMerchantOrderWithoutPayments(
+    merchantOrderId: string,
+    externalReference: string | null,
+    merchantOrderPayload: Record<string, unknown> | null,
+    requestId?: string,
+  ) {
+    this.logger.log(
+      `WEBHOOK_MP_MERCHANT_ORDER_NO_PAYMENTS merchantOrderId=${merchantOrderId} requestId=${requestId ?? 'unknown'}`,
+    );
+
+    const sale = await this.findSaleForMerchantOrder(
+      externalReference,
+      merchantOrderId,
+      null,
+    );
+    if (!sale) {
+      this.logger.warn(
+        `WEBHOOK_MP_SALE_NOT_FOUND topic=merchant_order merchantOrderId=${merchantOrderId} requestId=${requestId ?? 'unknown'}`,
+      );
+      return;
+    }
+
+    const resolvedSaleStatus =
+      sale.status === SaleStatus.APPROVED ? SaleStatus.APPROVED : SaleStatus.PENDING;
+    const shouldUpdate =
+      sale.paymentStatus !== PaymentStatus.PENDING ||
+      sale.status !== resolvedSaleStatus ||
+      sale.mpMerchantOrderId !== merchantOrderId;
+    if (!shouldUpdate) {
+      this.logger.log(
+        `WEBHOOK_MP_STATUS_IDEMPOTENT topic=merchant_order saleId=${sale.id} status=${sale.status} requestId=${requestId ?? 'unknown'}`,
+      );
+      return;
+    }
+
+    const updateData: Prisma.SaleUpdateInput = {
+      paymentStatus: PaymentStatus.PENDING,
+      status: resolvedSaleStatus,
+      mpMerchantOrderId: merchantOrderId,
+      updatedAt: new Date(),
+      mpRaw: toJsonValue(merchantOrderPayload),
+    };
+
+    if (resolvedSaleStatus !== sale.status) {
+      updateData.statusUpdatedAt = new Date();
+    }
+
+    const updatedSale = await this.prisma.sale.update({
+      where: { id: sale.id },
+      data: updateData,
+    });
+
+    this.logger.log(
+      `WEBHOOK_MP_STATUS_UPDATED topic=merchant_order saleId=${updatedSale.id} merchantOrderId=${merchantOrderId} paymentId=none status=${updatedSale.status} requestId=${requestId ?? 'unknown'}`,
+    );
+  }
+
+  private selectPaymentFromMerchantOrder(payments: Array<Record<string, unknown>>) {
+    const normalizedPayments = payments
+      .map((payment) => ({
+        id: payment?.id,
+        status: typeof payment?.status === 'string' ? payment.status : null,
+        statusDetail: typeof payment?.status_detail === 'string' ? payment.status_detail : null,
+        dateApproved:
+          typeof payment?.date_approved === 'string' ? payment.date_approved : null,
+        dateCreated: typeof payment?.date_created === 'string' ? payment.date_created : null,
+        lastModified:
+          typeof payment?.last_modified === 'string' ? payment.last_modified : null,
+      }))
+      .filter((payment) => payment.id !== undefined && payment.id !== null);
+
+    if (normalizedPayments.length === 0) {
+      return null;
+    }
+
+    const approvedCandidates = normalizedPayments.filter((payment) => {
+      const status = payment.status?.toLowerCase();
+      const detail = payment.statusDetail?.toLowerCase();
+      return status === 'approved' || status === 'accredited' || detail === 'accredited';
+    });
+    const candidates = approvedCandidates.length > 0 ? approvedCandidates : normalizedPayments;
+
+    const sorted = candidates.sort((a, b) => {
+      const timeA = this.resolvePaymentTimestamp(a) ?? 0;
+      const timeB = this.resolvePaymentTimestamp(b) ?? 0;
+      return timeB - timeA;
+    });
+
+    return sorted[0] ?? null;
+  }
+
+  private resolvePaymentTimestamp(payment: {
+    dateApproved: string | null;
+    dateCreated: string | null;
+    lastModified: string | null;
+  }) {
+    const dates = [payment.dateApproved, payment.lastModified, payment.dateCreated];
+    for (const entry of dates) {
+      if (!entry) {
+        continue;
+      }
+      const parsed = Date.parse(entry);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  private async findSaleForMerchantOrder(
+    externalReference: string | null,
+    merchantOrderId: string,
+    paymentId: string | null,
+  ) {
+    if (externalReference) {
+      return this.findSaleByExternalReference(externalReference, merchantOrderId, paymentId);
+    }
+    if (merchantOrderId) {
+      return this.prisma.sale.findFirst({
+        where: { mpMerchantOrderId: merchantOrderId },
+      });
+    }
+    if (paymentId) {
+      return this.prisma.sale.findFirst({
+        where: { mpPaymentId: paymentId },
+      });
+    }
+    return null;
   }
 
   private async findSaleByExternalReference(
