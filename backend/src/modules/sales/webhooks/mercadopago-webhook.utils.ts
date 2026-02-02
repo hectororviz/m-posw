@@ -73,6 +73,26 @@ const normalizeResourceId = (value: unknown) => {
   return null;
 };
 
+export const getManifestId = (input: {
+  topic: string;
+  body?: Record<string, unknown>;
+  query?: Record<string, string | undefined>;
+}) => {
+  const body = input.body ?? {};
+  const query = input.query ?? {};
+  if (input.topic === 'merchant_order') {
+    return typeof body?.resource === 'string' ? body.resource : null;
+  }
+  const dataIdFromBody = normalizeResourceId(
+    body?.data && isRecord(body.data) ? body.data.id : null,
+  );
+  return (
+    dataIdFromBody ??
+    normalizeResourceId(query['data.id']) ??
+    normalizeResourceId(query.id)
+  );
+};
+
 export const getResourceId = (req: {
   query?: Record<string, string | undefined>;
   body?: Record<string, unknown>;
@@ -115,7 +135,7 @@ export const buildManifest = (resourceId: string, requestId: string, ts: string)
 
 export const verifySignature = (
   req: { headers: Record<string, string | string[] | undefined> },
-  resourceId: string,
+  manifestId: string | null,
   secret: string,
 ) => {
   const signatureHeader = resolveHeaderValue(req.headers, 'x-signature');
@@ -124,6 +144,13 @@ export const verifySignature = (
     return {
       isValid: false,
       reason: 'missing_headers',
+    };
+  }
+  if (!manifestId) {
+    return {
+      isValid: false,
+      reason: 'missing_manifest_id',
+      requestId,
     };
   }
   const parsed = parseSignatureHeader(signatureHeader);
@@ -138,7 +165,7 @@ export const verifySignature = (
       v1,
     };
   }
-  const manifest = buildManifest(resourceId, requestId, ts);
+  const manifest = buildManifest(manifestId, requestId, ts);
   const digest = createHmac('sha256', secret).update(manifest).digest('hex');
   const manifestHash = createHash('sha256').update(manifest).digest('hex');
   if (!/^[0-9a-f]+$/i.test(v1) || v1.length % 2 !== 0) {

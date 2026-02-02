@@ -4,6 +4,7 @@ import { MercadoPagoWebhookProcessorService } from '../services/mercadopago-webh
 import { MercadoPagoWebhookController } from './mercadopago-webhook.controller';
 import {
   buildManifest,
+  getManifestId,
   getResourceId,
   parseSignatureHeader,
   verifySignature,
@@ -125,6 +126,16 @@ describe('MercadoPagoWebhookController', () => {
     expect(resourceId).toBe('37735080629');
   });
 
+  it('usa resource URL como manifestId para merchant_order', () => {
+    const manifestId = getManifestId({
+      topic: 'merchant_order',
+      query: { topic: 'merchant_order', id: '37735080629' },
+      body: { resource: 'https://api.mercadopago.com/merchant_orders/37735080629' },
+    });
+
+    expect(manifestId).toBe('https://api.mercadopago.com/merchant_orders/37735080629');
+  });
+
   it('parsea el header x-signature con ts y v1', () => {
     const parsed = parseSignatureHeader('ts=1700000000, v1=abc123');
 
@@ -133,16 +144,16 @@ describe('MercadoPagoWebhookController', () => {
 
   it('verifica firma valida con manifest correcto', () => {
     const secret = 'secret';
-    const resourceId = '123';
+    const manifestId = '123';
     const requestId = 'req-1';
     const ts = '1700000000';
-    const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+    const manifest = `id:${manifestId};request-id:${requestId};ts:${ts};`;
     const digest = createHmac('sha256', secret).update(manifest).digest('hex');
     const signature = `ts=${ts}, v1=${digest}`;
 
     const result = verifySignature(
       { headers: { 'x-request-id': requestId, 'x-signature': signature } },
-      resourceId,
+      manifestId,
       secret,
     );
 
@@ -157,14 +168,14 @@ describe('MercadoPagoWebhookController', () => {
 
   it('marca firma invalida cuando el digest no coincide', () => {
     const secret = 'secret';
-    const resourceId = '123';
+    const manifestId = '123';
     const requestId = 'req-1';
     const ts = '1700000000';
     const signature = `ts=${ts}, v1=deadbeef`;
 
     const result = verifySignature(
       { headers: { 'x-request-id': requestId, 'x-signature': signature } },
-      resourceId,
+      manifestId,
       secret,
     );
 
