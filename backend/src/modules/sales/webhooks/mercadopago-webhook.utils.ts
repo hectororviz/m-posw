@@ -251,32 +251,51 @@ export const extractMerchantOrderId = (payload: Record<string, unknown> | null) 
   return null;
 };
 
-export const mapPaymentStatus = (status?: string | null) => {
-  const normalized = status?.toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  if (normalized === 'approved') {
-    return PaymentStatus.OK;
-  }
-  if (normalized === 'rejected' || normalized === 'cancelled') {
-    return PaymentStatus.FAILED;
-  }
-  if (normalized === 'pending' || normalized === 'in_process') {
+export const mapMpPaymentToPaymentStatus = (
+  status?: string | null,
+  statusDetail?: string | null,
+  onUnknown?: (normalizedStatus: string | null, normalizedDetail: string | null) => void,
+) => {
+  const normalizedStatus = status?.toLowerCase() ?? null;
+  const normalizedDetail = statusDetail?.toLowerCase() ?? null;
+  if (!normalizedStatus && !normalizedDetail) {
+    onUnknown?.(normalizedStatus, normalizedDetail);
     return PaymentStatus.PENDING;
   }
-  return null;
+  if (
+    normalizedStatus === 'approved' ||
+    normalizedStatus === 'accredited' ||
+    normalizedDetail === 'accredited'
+  ) {
+    return PaymentStatus.APPROVED;
+  }
+  if (normalizedStatus === 'pending' || normalizedStatus === 'in_process') {
+    return PaymentStatus.PENDING;
+  }
+  if (
+    normalizedStatus === 'rejected' ||
+    normalizedStatus === 'cancelled' ||
+    normalizedStatus === 'refunded' ||
+    normalizedStatus === 'charged_back'
+  ) {
+    return PaymentStatus.REJECTED;
+  }
+  if (normalizedStatus === 'expired') {
+    return PaymentStatus.EXPIRED;
+  }
+  onUnknown?.(normalizedStatus, normalizedDetail);
+  return PaymentStatus.PENDING;
 };
 
-export const mapSaleStatus = (status: PaymentStatus | null) => {
-  if (!status) {
-    return null;
-  }
-  if (status === PaymentStatus.OK) {
+export const mapSaleStatus = (status: PaymentStatus) => {
+  if (status === PaymentStatus.APPROVED) {
     return SaleStatus.APPROVED;
   }
-  if (status === PaymentStatus.FAILED) {
+  if (status === PaymentStatus.REJECTED) {
     return SaleStatus.REJECTED;
+  }
+  if (status === PaymentStatus.EXPIRED) {
+    return SaleStatus.EXPIRED;
   }
   return SaleStatus.PENDING;
 };

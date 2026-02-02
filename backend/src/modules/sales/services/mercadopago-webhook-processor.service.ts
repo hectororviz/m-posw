@@ -7,7 +7,7 @@ import {
   extractExternalReference,
   extractMerchantOrderId,
   isRecord,
-  mapPaymentStatus,
+  mapMpPaymentToPaymentStatus,
   mapSaleStatus,
   normalizeSaleId,
   toJsonValue,
@@ -174,17 +174,18 @@ export class MercadoPagoWebhookProcessorService {
     const approvedAt =
       typeof mpPayload?.date_approved === 'string' ? new Date(mpPayload.date_approved) : null;
     const merchantOrderIdFromPayment = extractMerchantOrderId(mpPayload);
-    const nextPaymentStatus = mapPaymentStatus(mpStatus);
+    const nextPaymentStatus = mapMpPaymentToPaymentStatus(
+      mpStatus,
+      mpStatusDetail,
+      (normalizedStatus, normalizedDetail) => {
+        this.logger.warn(
+          `WEBHOOK_MP_STATUS_UNKNOWN topic=${contextTopic} paymentId=${paymentId} saleId=${sale.id} status=${normalizedStatus ?? 'unknown'} detail=${normalizedDetail ?? 'unknown'} requestId=${requestId ?? 'unknown'}`,
+        );
+      },
+    );
     const nextSaleStatus = mapSaleStatus(nextPaymentStatus);
     const finalMerchantOrderId =
       merchantOrderId ?? merchantOrderIdFromPayment ?? sale.mpMerchantOrderId ?? null;
-
-    if (!nextPaymentStatus || !nextSaleStatus) {
-      this.logger.warn(
-        `WEBHOOK_MP_STATUS_UNKNOWN topic=${contextTopic} paymentId=${paymentId} saleId=${sale.id} requestId=${requestId ?? 'unknown'}`,
-      );
-      return;
-    }
 
     const resolvedSaleStatus =
       sale.status === SaleStatus.APPROVED ? SaleStatus.APPROVED : nextSaleStatus;
@@ -200,7 +201,10 @@ export class MercadoPagoWebhookProcessorService {
     const updateData: Prisma.SaleUpdateInput = {
       paymentStatus: nextPaymentStatus,
       status: resolvedSaleStatus,
-      paidAt: nextPaymentStatus === PaymentStatus.OK ? approvedAt ?? new Date() : sale.paidAt,
+      paidAt:
+        nextPaymentStatus === PaymentStatus.APPROVED
+          ? approvedAt ?? new Date()
+          : sale.paidAt,
       mpPaymentId: paymentId,
       mpMerchantOrderId: finalMerchantOrderId ?? undefined,
       mpStatus,

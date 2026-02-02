@@ -4,7 +4,7 @@ import { SalesService } from './sales.service';
 
 describe('SalesService MercadoPago QR auth', () => {
   const PaymentStatus = {
-    OK: 'OK',
+    APPROVED: 'APPROVED',
     PENDING: 'PENDING',
   } as const;
   const SaleStatus = {
