@@ -16,6 +16,28 @@ const formatCurrency = (amount: number) =>
 
 const roundToCurrency = (value: number) => Math.round(value * 100) / 100;
 
+const sanitizeCurrencyInput = (value: string) => {
+  const normalized = value.replace(/[^\d.,]/g, '');
+  const lastDot = normalized.lastIndexOf('.');
+  const lastComma = normalized.lastIndexOf(',');
+  const separatorIndex = Math.max(lastDot, lastComma);
+  let integerPart = normalized;
+  let decimalPart = '';
+  if (separatorIndex >= 0) {
+    integerPart = normalized.slice(0, separatorIndex);
+    decimalPart = normalized.slice(separatorIndex + 1);
+  }
+  integerPart = integerPart.replace(/[^\d]/g, '');
+  decimalPart = decimalPart.replace(/[^\d]/g, '').slice(0, 2);
+  if (!integerPart && !decimalPart) {
+    return '';
+  }
+  if (separatorIndex >= 0) {
+    return `${integerPart || '0'}.${decimalPart}`;
+  }
+  return integerPart;
+};
+
 const formatTime = (seconds: number) => {
   const minutes = Math.floor(seconds / 60);
   const remaining = seconds % 60;
@@ -119,6 +141,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleClose, isOpen]);
+
+  const handleCashInputChange = (value: string) => {
+    setCashReceived(sanitizeCurrencyInput(value));
+  };
+
+  const appendCashDigit = (digit: string) => {
+    setCashReceived((prev) => {
+      const [integerPart, decimalPart = ''] = prev.split('.');
+      if (prev.includes('.') && decimalPart.length >= 2) {
+        return prev;
+      }
+      if (!prev && digit === '0') {
+        return '0';
+      }
+      return `${prev}${digit}`;
+    });
+  };
+
+  const appendCashDecimal = () => {
+    setCashReceived((prev) => {
+      if (prev.includes('.')) {
+        return prev;
+      }
+      return prev ? `${prev}.` : '0.';
+    });
+  };
+
+  const handleCashBackspace = () => {
+    setCashReceived((prev) => prev.slice(0, -1));
+  };
+
+  const handleCashClear = () => {
+    setCashReceived('');
+  };
 
   useEffect(() => {
     return () => {
@@ -327,13 +383,37 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
               <label className="input-field">
                 Monto recibido
                 <input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={cashReceived}
-                  onChange={(event) => setCashReceived(event.target.value)}
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9.,]*"
+                  value={formatCurrency(receivedAmount)}
+                  onChange={(event) => handleCashInputChange(event.target.value)}
                 />
               </label>
+              <div className="pin-keypad cash-keypad" aria-label="Teclado numérico">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                  <button
+                    key={digit}
+                    type="button"
+                    className="pin-key"
+                    onClick={() => appendCashDigit(digit)}
+                  >
+                    {digit}
+                  </button>
+                ))}
+                <button type="button" className="pin-key" onClick={appendCashDecimal}>
+                  ,
+                </button>
+                <button type="button" className="pin-key" onClick={() => appendCashDigit('0')}>
+                  0
+                </button>
+                <button type="button" className="pin-key pin-key--secondary" onClick={handleCashBackspace}>
+                  Borrar
+                </button>
+                <button type="button" className="pin-key pin-key--secondary pin-key--wide" onClick={handleCashClear}>
+                  Limpiar
+                </button>
+              </div>
               <div className="cash-summary">
                 {receivedAmount < total ? (
                   <p className="error-text">Falta: {formatCurrency(roundToCurrency(total - receivedAmount))}</p>
