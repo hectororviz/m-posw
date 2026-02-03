@@ -33,14 +33,7 @@ export const HomePage: React.FC = () => {
           return (
             <Link key={category.id} to={`/category/${category.id}`} className="card category-card">
               <div className="card-header" style={{ background: category.colorHex || '#111827' }}>
-                {imageUrl ? (
-                  <img src={imageUrl} alt={category.name} />
-                ) : (
-                  <span className="emoji">{category.iconName || '🧾'}</span>
-                )}
-              </div>
-              <div className="card-body">
-                <h3>{category.name}</h3>
+                {imageUrl ? <img src={imageUrl} alt={category.name} /> : null}
               </div>
             </Link>
           );

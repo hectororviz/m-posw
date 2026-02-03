@@ -38,16 +38,13 @@ export const CategoryPage: React.FC = () => {
                         {iconName}
                       </span>
                     )}
-                  </div>
-                  <div className="product-details">
-                    <h3>{product.name}</h3>
-                    <p className="price">
+                    <span className="price-badge">
                       $
                       {product.price.toLocaleString('es-AR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
-                    </p>
+                    </span>
                   </div>
                 </button>
               );
