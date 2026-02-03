@@ -5,6 +5,7 @@ import { CategoryPage } from './pages/CategoryPage';
 import { AdminLayout } from './pages/AdminLayout';
 import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
 import { AdminProductsPage } from './pages/AdminProductsPage';
+import { AdminSalesPage } from './pages/AdminSalesPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
@@ -76,6 +77,7 @@ export const App: React.FC = () => {
         <Route index element={<Navigate to="/admin/categories" replace />} />
         <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="products" element={<AdminProductsPage />} />
+        <Route path="sales" element={<AdminSalesPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="users" element={<AdminUsersPage />} />
       </Route>

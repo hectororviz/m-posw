@@ -577,6 +577,19 @@ button {
   font-size: 0.8rem;
 }
 
+.admin-sales .table-row {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.admin-sales .table-header {
+  background: #f1f5f9;
+  border-style: dashed;
+}
+
+.admin-sales .row-actions {
+  justify-content: flex-end;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
