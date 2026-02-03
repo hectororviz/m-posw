@@ -700,6 +700,34 @@ button {
   text-align: center;
 }
 
+.qr-result {
+  align-items: center;
+  text-align: center;
+}
+
+.qr-result-animation {
+  width: min(320px, 100%);
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-result-animation > * {
+  width: 100%;
+  height: 100%;
+}
+
+.qr-result-message {
+  font-weight: 600;
+}
+
+.qr-result-actions {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
 .qr-timer {
   font-size: 1.4rem;
   font-weight: 700;

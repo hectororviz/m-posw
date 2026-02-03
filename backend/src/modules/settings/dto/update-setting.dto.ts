@@ -15,6 +15,14 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsString()
+  okAnimationUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  errorAnimationUrl?: string;
+
+  @IsOptional()
+  @IsString()
   @Matches(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/)
   accentColor?: string;
 }

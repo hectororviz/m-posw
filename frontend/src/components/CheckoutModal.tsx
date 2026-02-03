@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiClient, normalizeApiError } from '../api/client';
+import { useNavigate } from 'react-router-dom';
+import Lottie from 'lottie-react';
+import { apiClient, getUploadsBaseUrl, normalizeApiError } from '../api/client';
 import type { PaymentMethod, SaleStatus } from '../api/types';
+import { useSettings } from '../api/queries';
 import { useCart } from '../context/CartContext';
 import { useToast } from './ToastProvider';
 
-type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT';
+type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT' | 'QR_RESULT';
+type QrResultType = 'SUCCESS' | 'ERROR';
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-AR', {
@@ -52,12 +56,18 @@ interface CheckoutModalProps {
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const { items, clear } = useCart();
   const { pushToast } = useToast();
+  const { data: settings } = useSettings();
+  const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>('SELECT_METHOD');
   const [cashReceived, setCashReceived] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saleId, setSaleId] = useState<string | null>(null);
   const [qrStatus, setQrStatus] = useState<SaleStatus | null>(null);
   const [qrMessage, setQrMessage] = useState<string | null>(null);
+  const [qrResult, setQrResult] = useState<QrResultType | null>(null);
+  const [qrResultMessage, setQrResultMessage] = useState<string | null>(null);
+  const [okAnimationData, setOkAnimationData] = useState<Record<string, unknown> | null>(null);
+  const [errorAnimationData, setErrorAnimationData] = useState<Record<string, unknown> | null>(null);
   const [timeLeft, setTimeLeft] = useState(120);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -83,6 +93,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setSaleId(null);
     setQrStatus(null);
     setQrMessage(null);
+    setQrResult(null);
+    setQrResultMessage(null);
+    setOkAnimationData(null);
+    setErrorAnimationData(null);
     setTimeLeft(120);
     setQrLoading(false);
     setQrError(null);
@@ -116,13 +130,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   };
 
   const handleClose = useCallback(() => {
+    if (qrResult) {
+      return;
+    }
     abortQrRequest();
     clearQrTimers();
     if (saleId && step === 'QR_WAIT' && qrStatus === 'PENDING') {
       void cancelQrSale(saleId);
     }
     onClose();
-  }, [saleId, step, qrStatus, onClose]);
+  }, [qrResult, saleId, step, qrStatus, onClose]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -141,6 +158,67 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleClose, isOpen]);
+
+  const resolveAnimationUrl = useCallback((path?: string | null) => {
+    if (!path) {
+      return undefined;
+    }
+    if (path.startsWith('http')) {
+      return path;
+    }
+    const base = getUploadsBaseUrl();
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  }, []);
+
+  useEffect(() => {
+    const url = resolveAnimationUrl(settings?.okAnimationUrl);
+    if (!url) {
+      setOkAnimationData(null);
+      return;
+    }
+    const controller = new AbortController();
+    const loadAnimation = async () => {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error('No se pudo cargar la animación OK');
+        }
+        const data = (await response.json()) as Record<string, unknown>;
+        setOkAnimationData(data);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setOkAnimationData(null);
+        }
+      }
+    };
+    void loadAnimation();
+    return () => controller.abort();
+  }, [resolveAnimationUrl, settings?.okAnimationUrl]);
+
+  useEffect(() => {
+    const url = resolveAnimationUrl(settings?.errorAnimationUrl);
+    if (!url) {
+      setErrorAnimationData(null);
+      return;
+    }
+    const controller = new AbortController();
+    const loadAnimation = async () => {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error('No se pudo cargar la animación Error');
+        }
+        const data = (await response.json()) as Record<string, unknown>;
+        setErrorAnimationData(data);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setErrorAnimationData(null);
+        }
+      }
+    };
+    void loadAnimation();
+    return () => controller.abort();
+  }, [resolveAnimationUrl, settings?.errorAnimationUrl]);
 
   const handleCashInputChange = (value: string) => {
     setCashReceived(sanitizeCurrencyInput(value));
@@ -219,27 +297,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         setQrStatus(status);
         if (status === 'APPROVED') {
           clearQrTimers();
-          pushToast('Pago confirmado', 'success');
           clear();
-          handleClose();
+          setQrResult('SUCCESS');
+          setQrResultMessage('Pago confirmado.');
+          setStep('QR_RESULT');
         } else if (status === 'REJECTED' || status === 'EXPIRED' || status === 'CANCELLED') {
           clearQrTimers();
-          setQrMessage(
+          const message =
             status === 'REJECTED'
               ? 'Pago rechazado.'
               : status === 'EXPIRED'
                 ? 'El pago expiró.'
-                : 'Pago cancelado.',
-          );
+                : 'Pago cancelado.';
+          setQrMessage(message);
+          setQrResult('ERROR');
+          setQrResultMessage(message);
+          setStep('QR_RESULT');
         }
       } catch (error) {
-        setQrError(normalizeApiError(error));
         clearQrTimers();
+        const message = normalizeApiError(error);
+        setQrError(message);
+        setQrResult('ERROR');
+        setQrResultMessage(message);
+        setStep('QR_RESULT');
       } finally {
         pollingInFlight.current = false;
       }
     }, 2000);
-  }, [step, saleId, timeLeft, clear, pushToast, handleClose]);
+  }, [step, saleId, timeLeft, clear, handleClose]);
 
   useEffect(() => {
     if (step !== 'QR_WAIT' || !saleId) {
@@ -247,7 +333,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     }
     if (timeLeft === 0 && qrStatus !== 'APPROVED') {
       clearQrTimers();
-      setQrMessage('Tiempo agotado.');
+      const message = 'Tiempo agotado.';
+      setQrMessage(message);
+      setQrResult('ERROR');
+      setQrResultMessage(message);
+      setStep('QR_RESULT');
     }
   }, [timeLeft, step, saleId, qrStatus]);
 
@@ -315,6 +405,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setQrStatus('PENDING');
     setQrMessage(null);
     setQrError(null);
+    setQrResult(null);
+    setQrResultMessage(null);
   };
 
   const handleRetryQr = () => {
@@ -324,6 +416,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setQrStatus('PENDING');
     setQrMessage(null);
     setQrError(null);
+    setQrResult(null);
+    setQrResultMessage(null);
     setStep('QR_WAIT');
   };
 
@@ -337,7 +431,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setQrStatus(null);
     setQrMessage(null);
     setQrError(null);
+    setQrResult(null);
+    setQrResultMessage(null);
     setStep('SELECT_METHOD');
+  };
+
+  const handleResultOk = async () => {
+    abortQrRequest();
+    clearQrTimers();
+    if (qrResult === 'ERROR' && saleId && qrStatus === 'PENDING') {
+      await cancelQrSale(saleId);
+    }
+    resetState();
+    onClose();
+    navigate('/');
   };
 
   if (!isOpen) {
@@ -345,11 +452,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   }
 
   return (
-    <div className="modal-backdrop" onClick={handleClose} role="presentation">
+    <div className="modal-backdrop" onClick={qrResult ? undefined : handleClose} role="presentation">
       <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h2>Checkout</h2>
-          <button type="button" className="icon-button" onClick={handleClose} aria-label="Cerrar">
+          <button
+            type="button"
+            className="icon-button"
+            onClick={handleClose}
+            aria-label="Cerrar"
+            disabled={Boolean(qrResult)}
+          >
             ✕
           </button>
         </div>
@@ -463,6 +576,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                     Cancelar
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+          {step === 'QR_RESULT' && (
+            <div className="checkout-step qr-result">
+              <div className="qr-result-animation">
+                {qrResult === 'SUCCESS' ? (
+                  okAnimationData ? (
+                    <Lottie animationData={okAnimationData} autoplay loop={false} />
+                  ) : (
+                    <p>Animación OK no configurada.</p>
+                  )
+                ) : errorAnimationData ? (
+                  <Lottie animationData={errorAnimationData} autoplay loop={false} />
+                ) : (
+                  <p>Animación Error no configurada.</p>
+                )}
+              </div>
+              {qrResultMessage && <p className="qr-result-message">{qrResultMessage}</p>}
+              <div className="qr-result-actions">
+                <button type="button" className="primary-button" onClick={handleResultOk}>
+                  OK
+                </button>
               </div>
             </div>
           )}
