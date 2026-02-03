@@ -606,6 +606,12 @@ button {
   flex-wrap: wrap;
 }
 
+.checkout-actions .primary-button,
+.checkout-actions .secondary-button {
+  flex: 1;
+  width: auto;
+}
+
 .input-field {
   display: grid;
   gap: 0.35rem;
