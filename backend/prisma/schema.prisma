@@ -155,6 +155,8 @@ model Setting {
   storeName   String
   logoUrl     String?
   faviconUrl  String?
+  okAnimationUrl String?
+  errorAnimationUrl String?
   accentColor String?  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

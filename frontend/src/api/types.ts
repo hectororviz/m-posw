@@ -78,6 +78,8 @@ export interface Setting {
   storeName?: string | null;
   logoUrl?: string | null;
   faviconUrl?: string | null;
+  okAnimationUrl?: string | null;
+  errorAnimationUrl?: string | null;
   accentColor?: string | null;
 }
 
