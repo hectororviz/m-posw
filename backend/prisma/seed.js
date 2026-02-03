@@ -5,16 +5,23 @@ const prisma = new PrismaClient();
 
 async function main() {
   const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPin = process.env.ADMIN_PIN;
   const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
   const adminName = process.env.ADMIN_NAME || 'admin';
 
-  const passwordHash = await bcrypt.hash(adminPassword, 10);
+  if (!adminEmail) {
+    throw new Error('ADMIN_EMAIL es requerido para el usuario admin.');
+  }
+
+  const adminSecret = adminPin || adminPassword;
+  console.info(`Seed admin: usando ${adminPin ? 'ADMIN_PIN' : 'ADMIN_PASSWORD'}.`);
+  const passwordHash = await bcrypt.hash(adminSecret, 10);
   const adminData = {
     name: adminName,
     password: passwordHash,
     role: Role.ADMIN,
     active: true,
-    ...(adminEmail ? { email: adminEmail } : {}),
+    email: adminEmail,
   };
 
   await prisma.user.upsert({

@@ -86,6 +86,7 @@ export class UsersService {
       where: { active: true },
       select: {
         id: true,
+        email: true,
         name: true,
         role: true,
         active: true,
