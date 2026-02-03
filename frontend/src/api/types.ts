@@ -63,6 +63,12 @@ export interface SaleItem {
   product: Product;
 }
 
+export interface SaleUser {
+  id: string;
+  name: string;
+  email?: string | null;
+}
+
 export interface Sale {
   id: string;
   total: number;
@@ -72,6 +78,7 @@ export interface Sale {
   changeAmount?: number | null;
   createdAt: string;
   items: SaleItem[];
+  user?: SaleUser;
 }
 
 export interface Setting {

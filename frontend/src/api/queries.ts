@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Category, Product, Setting, User } from './types';
+import type { Category, Product, Sale, Setting, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -61,6 +61,15 @@ export const useUsers = () =>
     queryKey: ['users'],
     queryFn: async () => {
       const response = await apiClient.get<User[]>('/users');
+      return response.data;
+    },
+  });
+
+export const useAdminSales = () =>
+  useQuery({
+    queryKey: ['admin-sales'],
+    queryFn: async () => {
+      const response = await apiClient.get<Sale[]>('/sales');
       return response.data;
     },
   });
