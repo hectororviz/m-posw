@@ -8,7 +8,11 @@ import { useAuth } from '../context/AuthContext';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const { data: users, isLoading: usersLoading } = useLoginUsers();
+  const {
+    data: users,
+    isLoading: usersLoading,
+    error: usersError,
+  } = useLoginUsers();
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,25 +61,38 @@ export const LoginPage: React.FC = () => {
     }
   };
 
+  const usersLoadError = usersError ? normalizeApiError(usersError) : null;
+
   return (
     <div className="login-page">
       <form className="card login-card" onSubmit={handleSubmit}>
         <h2>Iniciar sesión</h2>
         <label className="field">
           Usuario
-          <select value={username} onChange={handleUserChange} required>
-            <option value="" disabled>
-              {usersLoading ? 'Cargando usuarios...' : 'Seleccione un usuario'}
-            </option>
-            {availableUsers.map((user) => {
-              const label = user.externalPosId ? `${user.name} (${user.externalPosId})` : user.name;
-              return (
-                <option key={user.id} value={user.name}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
+          {availableUsers.length > 0 ? (
+            <select value={username} onChange={handleUserChange} required>
+              <option value="" disabled>
+                {usersLoading ? 'Cargando usuarios...' : 'Seleccione un usuario'}
+              </option>
+              {availableUsers.map((user) => {
+                const label = user.externalPosId ? `${user.name} (${user.externalPosId})` : user.name;
+                return (
+                  <option key={user.id} value={user.name}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder={usersLoading ? 'Cargando usuarios...' : 'Ingrese su usuario'}
+              required
+            />
+          )}
+          {usersLoadError && <p className="error-text">{usersLoadError}</p>}
         </label>
         <label className="field">
           PIN
