@@ -68,7 +68,7 @@ export const AdminCategoriesPage: React.FC = () => {
   const rendered = useMemo(() => categories ?? [], [categories]);
 
   return (
-    <section className="card">
+    <section className="card admin-products">
       <h2>Categorías</h2>
       <div className="form-grid">
         <input
@@ -156,11 +156,23 @@ export const AdminCategoriesPage: React.FC = () => {
                   accept="image/*"
                   onChange={(event) => handleUpload(category.id, event.target.files?.[0])}
                 />
-                <button type="button" className="secondary-button" onClick={() => handleUpdate(category.id)}>
-                  Guardar
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => handleUpdate(category.id)}
+                  aria-label="Guardar"
+                  title="Guardar"
+                >
+                  <span aria-hidden="true">💾</span>
                 </button>
-                <button type="button" className="ghost-button" onClick={() => handleDelete(category.id)}>
-                  Eliminar
+                <button
+                  type="button"
+                  className="icon-button danger"
+                  onClick={() => handleDelete(category.id)}
+                  aria-label="Eliminar"
+                  title="Eliminar"
+                >
+                  <span aria-hidden="true">🗑️</span>
                 </button>
               </div>
             </div>

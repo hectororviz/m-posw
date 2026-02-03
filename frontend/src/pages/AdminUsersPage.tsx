@@ -71,7 +71,11 @@ export const AdminUsersPage: React.FC = () => {
           type="password"
           placeholder="Contraseña"
           value={newUser.password}
-          onChange={(event) => setNewUser({ ...newUser, password: event.target.value })}
+          inputMode="numeric"
+          pattern="[0-9]*"
+          onChange={(event) =>
+            setNewUser({ ...newUser, password: event.target.value.replace(/\D/g, '') })
+          }
         />
         <select
           value={newUser.role}
@@ -146,12 +150,15 @@ export const AdminUsersPage: React.FC = () => {
               <input
                 type="password"
                 placeholder="Nueva clave"
-                onChange={(event) =>
+                inputMode="numeric"
+                pattern="[0-9]*"
+                onChange={(event) => {
+                  const numericPassword = event.target.value.replace(/\D/g, '');
                   setEdits((prev) => ({
                     ...prev,
-                    [user.id]: { ...draft, password: event.target.value },
-                  }))
-                }
+                    [user.id]: { ...draft, password: numericPassword },
+                  }));
+                }}
               />
               <input
                 type="text"
