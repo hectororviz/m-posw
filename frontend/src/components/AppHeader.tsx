@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
 import { useAuth } from '../context/AuthContext';
@@ -25,12 +25,16 @@ const getInitials = (name?: string | null) => {
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const storeName = settings?.storeName ?? 'm-POSw';
   const logoUrl = buildImageUrl(settings?.logoUrl);
   const [logoError, setLogoError] = useState(false);
   const showSkeleton = isLoading && !settings;
   const initials = getInitials(storeName);
   const showLogo = Boolean(logoUrl) && !logoError;
+  const isPosScreen = location.pathname === '/';
+  const isSettingsScreen = location.pathname.startsWith('/admin/settings');
+  const showConfigToggle = user?.role === 'ADMIN' && (isPosScreen || isSettingsScreen);
 
   useEffect(() => {
     setLogoError(false);
@@ -61,6 +65,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           <span className="user-name" title={user?.name ?? 'Usuario'}>
             {user?.name ?? 'Usuario'}
           </span>
+          {showConfigToggle && (
+            <NavLink
+              to={isPosScreen ? '/admin/settings' : '/'}
+              className="ghost-button header-toggle-button"
+              aria-label={isPosScreen ? 'Configuración' : 'Volver a POS'}
+            >
+              <span aria-hidden="true">{isPosScreen ? '⚙️' : '$'}</span>
+            </NavLink>
+          )}
           <button type="button" onClick={logout} className="ghost-button logout-button" aria-label="Salir">
             <span className="logout-icon" aria-hidden="true">
               ⎋
@@ -69,16 +82,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           </button>
         </div>
       </div>
-      <nav className="app-nav">
-        <NavLink to="/" className={({ isActive }) => (isActive ? 'active' : '')}>
-          POS
-        </NavLink>
-        {user?.role === 'ADMIN' && (
-          <NavLink to="/admin" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Admin
-          </NavLink>
-        )}
-      </nav>
     </header>
   );
 };
