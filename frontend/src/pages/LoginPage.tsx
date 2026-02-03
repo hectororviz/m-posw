@@ -13,7 +13,8 @@ export const LoginPage: React.FC = () => {
     isLoading: usersLoading,
     error: usersError,
   } = useLoginUsers();
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,8 @@ export const LoginPage: React.FC = () => {
   );
 
   const handleUserChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setUsername(event.target.value);
+    setSelectedUserId(event.target.value);
+    setIdentifier('');
     setPin('');
   };
 
@@ -51,7 +53,17 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/login', { username, password: pin });
+      const selectedUser = availableUsers.find((user) => user.id === selectedUserId);
+      const payload =
+        selectedUser?.email
+          ? { email: selectedUser.email, pin }
+          : selectedUser
+            ? { name: selectedUser.name, pin }
+            : identifier.includes('@')
+              ? { email: identifier, pin }
+              : { name: identifier, pin };
+
+      const response = await apiClient.post<AuthResponse>('/auth/login', payload);
       login(response.data);
       navigate('/', { replace: true });
     } catch (err) {
@@ -68,16 +80,19 @@ export const LoginPage: React.FC = () => {
       <form className="card login-card" onSubmit={handleSubmit}>
         <h2>Iniciar sesión</h2>
         <label className="field">
-          Usuario
+          Email o usuario
           {availableUsers.length > 0 ? (
-            <select value={username} onChange={handleUserChange} required>
+            <select value={selectedUserId} onChange={handleUserChange} required>
               <option value="" disabled>
                 {usersLoading ? 'Cargando usuarios...' : 'Seleccione un usuario'}
               </option>
               {availableUsers.map((user) => {
-                const label = user.externalPosId ? `${user.name} (${user.externalPosId})` : user.name;
+                const emailLabel = user.email ? ` - ${user.email}` : '';
+                const label = user.externalPosId
+                  ? `${user.name} (${user.externalPosId})${emailLabel}`
+                  : `${user.name}${emailLabel}`;
                 return (
-                  <option key={user.id} value={user.name}>
+                  <option key={user.id} value={user.id}>
                     {label}
                   </option>
                 );
@@ -86,9 +101,9 @@ export const LoginPage: React.FC = () => {
           ) : (
             <input
               type="text"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder={usersLoading ? 'Cargando usuarios...' : 'Ingrese su usuario'}
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              placeholder={usersLoading ? 'Cargando usuarios...' : 'Ingrese su email o usuario'}
               required
             />
           )}
@@ -132,7 +147,11 @@ export const LoginPage: React.FC = () => {
         <button
           type="submit"
           className="primary-button"
-          disabled={loading || !username || pin.length < pinLength}
+          disabled={
+            loading ||
+            pin.length < pinLength ||
+            (availableUsers.length > 0 ? !selectedUserId : !identifier)
+          }
         >
           {loading ? 'Ingresando...' : 'Entrar'}
         </button>
