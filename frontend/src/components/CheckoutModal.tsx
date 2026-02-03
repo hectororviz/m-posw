@@ -148,7 +148,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
 
   const appendCashDigit = (digit: string) => {
     setCashReceived((prev) => {
-      const [integerPart, decimalPart = ''] = prev.split('.');
+      const [, decimalPart = ''] = prev.split('.');
       if (prev.includes('.') && decimalPart.length >= 2) {
         return prev;
       }
