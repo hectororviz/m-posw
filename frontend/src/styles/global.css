@@ -201,6 +201,14 @@ a {
   font-size: 1rem;
 }
 
+.pin-key--wide {
+  grid-column: span 3;
+}
+
+.cash-keypad {
+  margin-top: 0.75rem;
+}
+
 .card {
   background: #ffffff;
   border-radius: 1.2rem;
