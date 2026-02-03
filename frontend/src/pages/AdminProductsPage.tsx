@@ -68,7 +68,21 @@ export const AdminProductsPage: React.FC = () => {
     }
   };
 
-  const rendered = useMemo(() => products ?? [], [products]);
+  const rendered = useMemo(() => {
+    if (!products) {
+      return [];
+    }
+    const categoryLookup = new Map(categories?.map((category) => [category.id, category.name]));
+    return [...products].sort((a, b) => {
+      const categoryA = categoryLookup.get(a.categoryId) ?? '';
+      const categoryB = categoryLookup.get(b.categoryId) ?? '';
+      const categoryCompare = categoryA.localeCompare(categoryB, 'es', { sensitivity: 'base' });
+      if (categoryCompare !== 0) {
+        return categoryCompare;
+      }
+      return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+  }, [products, categories]);
 
   return (
     <section className="card admin-products">
