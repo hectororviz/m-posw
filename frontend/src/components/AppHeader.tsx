@@ -32,9 +32,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
   const showSkeleton = isLoading && !settings;
   const initials = getInitials(storeName);
   const showLogo = Boolean(logoUrl) && !logoError;
-  const isPosScreen = location.pathname === '/';
-  const isSettingsScreen = location.pathname.startsWith('/admin/settings');
-  const showConfigToggle = user?.role === 'ADMIN' && (isPosScreen || isSettingsScreen);
+  const isPosScreen = location.pathname === '/' || location.pathname.startsWith('/category/');
+  const isAdminScreen = location.pathname.startsWith('/admin');
+  const showConfigToggle = user?.role === 'ADMIN' && (isPosScreen || isAdminScreen);
 
   useEffect(() => {
     setLogoError(false);
