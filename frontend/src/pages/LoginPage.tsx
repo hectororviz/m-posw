@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useUsers } from '../api/queries';
+import { useLoginUsers } from '../api/queries';
 import type { AuthResponse } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const { data: users, isLoading: usersLoading } = useUsers();
+  const { data: users, isLoading: usersLoading } = useLoginUsers();
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
@@ -68,10 +68,9 @@ export const LoginPage: React.FC = () => {
               {usersLoading ? 'Cargando usuarios...' : 'Seleccione un usuario'}
             </option>
             {availableUsers.map((user) => {
-              const value = user.externalPosId ?? user.name;
               const label = user.externalPosId ? `${user.name} (${user.externalPosId})` : user.name;
               return (
-                <option key={user.id} value={value}>
+                <option key={user.id} value={user.name}>
                   {label}
                 </option>
               );

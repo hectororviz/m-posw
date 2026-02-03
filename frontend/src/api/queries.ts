@@ -64,3 +64,12 @@ export const useUsers = () =>
       return response.data;
     },
   });
+
+export const useLoginUsers = () =>
+  useQuery({
+    queryKey: ['login-users'],
+    queryFn: async () => {
+      const response = await apiClient.get<User[]>('/auth/login-users');
+      return response.data;
+    },
+  });
