@@ -579,15 +579,35 @@ button {
 
 .admin-sales .table-row {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 0;
 }
 
 .admin-sales .table-header {
   background: #f1f5f9;
-  border-style: dashed;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 .admin-sales .row-actions {
   justify-content: flex-end;
+}
+
+.admin-sales .table {
+  gap: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.admin-sales .table-row:not(.table-header):nth-child(even) {
+  background: #f8fafc;
+}
+
+.admin-sales .table-row:last-child {
+  border-bottom: none;
 }
 
 .icon-button {

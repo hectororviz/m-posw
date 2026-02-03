@@ -32,7 +32,7 @@ export const AdminSalesPage: React.FC = () => {
         productName: item.product.name,
         total: item.product.price * item.quantity,
         paymentMethod: sale.paymentMethod ?? 'CASH',
-        userName: sale.user?.name ?? 'Sin productor',
+        userName: sale.user?.name ?? 'Sin usuario',
       })),
     );
   }, [sales]);
@@ -60,7 +60,7 @@ export const AdminSalesPage: React.FC = () => {
     if (filteredRows.length === 0) {
       return;
     }
-    const headers = ['Fecha', 'Hora', 'Cantidad', 'Producto', 'Productor', 'Total', 'Forma de pago'];
+    const headers = ['Fecha', 'Hora', 'Cantidad', 'Producto', 'Usuario', 'Total', 'Forma de pago'];
     const data = filteredRows.map((row) => [
       formatDate(row.createdAt),
       formatTime(row.createdAt),
@@ -114,7 +114,7 @@ export const AdminSalesPage: React.FC = () => {
           <strong>Hora</strong>
           <strong>Cantidad</strong>
           <strong>Producto</strong>
-          <strong>Productor</strong>
+          <strong>Usuario</strong>
           <strong>Total</strong>
           <strong>Forma de pago</strong>
         </div>
