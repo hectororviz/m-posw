@@ -1093,6 +1093,26 @@ button {
   gap: 8px;
 }
 
+.ticket-criteria,
+.ticket-summary {
+  display: grid;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.ticket-criteria-row,
+.ticket-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ticket-summary-row strong,
+.ticket-criteria-row strong {
+  font-weight: 800;
+}
+
 .ticket-item {
   display: flex;
   gap: 10px;
