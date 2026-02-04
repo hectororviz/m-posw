@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import { apiClient, getUploadsBaseUrl, normalizeApiError } from '../api/client';
-import type { PaymentMethod, SaleStatus } from '../api/types';
+import type { PaymentMethod, Sale, SaleStatus } from '../api/types';
 import { useSettings } from '../api/queries';
 import { useCart } from '../context/CartContext';
 import { useToast } from './ToastProvider';
+import { maybePrintTicket } from '../utils/ticketPrinting';
 
 type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT' | 'QR_RESULT';
 type QrResultType = 'SUCCESS' | 'ERROR';
@@ -76,11 +77,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const qrPollRef = useRef<number | null>(null);
   const qrTimerRef = useRef<number | null>(null);
   const pollingInFlight = useRef(false);
+  const itemsSnapshotRef = useRef(items);
 
   const total = useMemo(
     () => roundToCurrency(items.reduce((acc, item) => acc + item.product.price * item.quantity, 0)),
     [items],
   );
+
+  useEffect(() => {
+    itemsSnapshotRef.current = items;
+  }, [items]);
 
   const receivedAmount = roundToCurrency(Number(cashReceived || 0));
   const changeAmount = roundToCurrency(receivedAmount - total);
@@ -297,6 +303,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         setQrStatus(status);
         if (status === 'APPROVED') {
           clearQrTimers();
+          await maybePrintTicket({
+            settings,
+            saleId,
+            dateTimeISO: new Date().toISOString(),
+            total,
+            items: itemsSnapshotRef.current.map((item) => ({
+              qty: item.quantity,
+              name: item.product.name,
+            })),
+            onPopupBlocked: () =>
+              pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
+            onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
+            onError: (message) => pushToast(message, 'error'),
+          });
           clear();
           setQrResult('SUCCESS');
           setQrResultMessage('Pago confirmado.');
@@ -325,7 +345,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         pollingInFlight.current = false;
       }
     }, 2000);
-  }, [step, saleId, timeLeft, clear, handleClose]);
+  }, [step, saleId, timeLeft, total, settings, clear, handleClose, pushToast]);
 
   useEffect(() => {
     if (step !== 'QR_WAIT' || !saleId) {
@@ -382,12 +402,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setIsSubmitting(true);
     setCashError(null);
     try {
-      await apiClient.post('/sales/cash', {
+      const response = await apiClient.post<Sale>('/sales/cash', {
         items: items.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
         total,
         paymentMethod: 'CASH' as PaymentMethod,
         cashReceived: receivedAmount,
         changeAmount,
+      });
+      const sale = response.data;
+      await maybePrintTicket({
+        settings,
+        saleId: sale.id,
+        dateTimeISO: sale.paidAt ?? sale.createdAt,
+        total: sale.total,
+        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name })),
+        onPopupBlocked: () =>
+          pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
+        onError: (message) => pushToast(message, 'error'),
       });
       pushToast('Venta registrada', 'success');
       clear();

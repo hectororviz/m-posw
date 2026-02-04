@@ -1,0 +1,1 @@
+ALTER TABLE "Sale" ADD COLUMN "ticketPrintedAt" TIMESTAMP(3);

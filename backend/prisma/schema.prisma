@@ -88,6 +88,7 @@ model Sale {
   statusUpdatedAt DateTime @default(now())
   paymentStartedAt DateTime?
   paidAt    DateTime?
+  ticketPrintedAt DateTime?
   cancelledAt DateTime?
   expiredAt DateTime?
   cashReceived Decimal? @db.Decimal(10, 2)
@@ -153,6 +154,8 @@ model PaymentEvent {
 model Setting {
   id          String   @id @default(uuid()) @db.Uuid
   storeName   String
+  clubName    String   @default("")
+  enableTicketPrinting Boolean @default(false)
   logoUrl     String?
   faviconUrl  String?
   okAnimationUrl String?

@@ -7,9 +7,11 @@ import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
 import { AdminProductsPage } from './pages/AdminProductsPage';
 import { AdminSalesPage } from './pages/AdminSalesPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
+import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
+import { PrintTicketPage } from './pages/PrintTicketPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -32,6 +34,7 @@ export const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/print/ticket" element={<PrintTicketPage />} />
       <Route
         path="/"
         element={
@@ -78,6 +81,7 @@ export const App: React.FC = () => {
         <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="products" element={<AdminProductsPage />} />
         <Route path="sales" element={<AdminSalesPage />} />
+        <Route path="stats" element={<AdminStatsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="users" element={<AdminUsersPage />} />
       </Route>

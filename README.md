@@ -2,6 +2,40 @@
 
 Sistema de punto de venta web (tablet/celular) para jornadas/eventos. Incluye frontend en React + Vite + TypeScript, backend NestJS y base de datos PostgreSQL, todo orquestado con Docker Compose.
 
+## Descripción general (cómo funciona)
+
+El flujo principal es:
+
+1. El usuario ingresa al POS web desde una tablet/celular.
+2. Selecciona categorías y productos para armar el carrito.
+3. Se crea una venta en el backend.
+4. Se procesa el cobro (efectivo o Mercado Pago QR).
+5. Se imprime el ticket y se actualizan reportes/estadísticas.
+
+El frontend se comunica con el backend vía API REST (con proxy `/api` o directo a `VITE_API_BASE_URL`). El backend persiste datos en PostgreSQL usando Prisma y expone endpoints para ventas, usuarios, productos, reportes y pagos con Mercado Pago QR.
+
+## Arquitectura
+
+- **Frontend**: React + Vite + TypeScript.
+- **Backend**: NestJS + Prisma.
+- **DB**: PostgreSQL.
+- **Infra**: Docker Compose (contenedores para frontend, backend y DB).
+- **Integración de pagos**: Mercado Pago Instore QR v2 (webhook de confirmación).
+
+Arquitectura lógica:
+
+```
+Frontend (React/Vite)
+        |
+        |  REST API (/api)
+        v
+Backend (NestJS + Prisma) ----> PostgreSQL
+        |
+        |  Mercado Pago Instore QR v2
+        v
+Mercado Pago (webhook -> /webhooks/mercadopago)
+```
+
 ## Requisitos
 
 - Docker y Docker Compose
@@ -25,6 +59,27 @@ Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma mig
 - Frontend: http://localhost:8080
 - Backend: http://localhost:3000
 
+## Instalación y ejecución (paso a paso)
+
+1. Instalar Docker y Docker Compose.
+2. Clonar el repo y crear el `.env`:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. (Opcional) Ajustar variables en `.env`:
+   - Credenciales de admin.
+   - Configuración de Mercado Pago.
+   - Origen de CORS y base URL del frontend.
+4. Levantar los servicios:
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+5. Acceder al POS en http://localhost:8080.
+
 ## Credenciales iniciales
 
 Se crea un ADMIN inicial desde `.env`:
@@ -44,6 +99,7 @@ También se crea la caja `Caja01` (role USER) con:
 - Roles ADMIN/USER.
 - CRUD de usuarios, categorías, productos.
 - Personalización (nombre, logo, favicon, color).
+- Impresión de ticket térmico 80mm configurable desde Settings (nombre del club y toggle de impresión).
 - Reportes con filtros por fecha y exportación XLSX.
 - Estadísticas con gráficos (últimos 15 días con ventas, últimos 6 meses, promedios diarios).
 
@@ -53,6 +109,35 @@ También se crea la caja `Caja01` (role USER) con:
 - Frontend React consume el backend mediante `/api` (proxy) o URL directa.
 - Mercado Pago QR está integrado para cobro presencial con órdenes Instore QR v2.
 - Persistencia en PostgreSQL con Prisma, incluyendo registros de pagos Mercado Pago y sesiones.
+
+## Lenguajes y stack principal
+
+- **Frontend**: TypeScript (React + Vite).
+- **Backend**: TypeScript (NestJS + Prisma).
+- **DB**: SQL (PostgreSQL).
+- **Infra**: Docker Compose.
+
+## Personalización del sitio y del ticket
+
+### Sitio
+
+Desde el panel de administración:
+
+- Cambiar nombre del club/organización.
+- Subir logo.
+- Definir favicon.
+- Ajustar color principal de la UI.
+
+Estos cambios impactan la identidad visual en todo el frontend (login, POS y reportes).
+
+### Ticket
+
+En Settings se puede:
+
+- Definir el nombre del club/organización que se imprime en el ticket.
+- Activar o desactivar la impresión automática del ticket térmico (80mm).
+
+La impresión está pensada para impresoras térmicas estándar de 80mm.
 
 ## CORS
 
@@ -95,7 +180,9 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 - `MP_DEFAULT_EXTERNAL_POS_ID`: POS por defecto si la caja no define uno.
 - `MP_WEBHOOK_SECRET`: secreto para validar firma del webhook de Mercado Pago.
 
-## Mercado Pago QR estático (cobro presencial)
+## Integración con Mercado Pago (QR presencial)
+
+La integración utiliza **Instore QR v2** para cobros presenciales. El backend crea/actualiza una orden QR al iniciar el cobro y espera la confirmación de pago vía webhook.
 
 ### Datos necesarios para poder cobrar (checklist)
 
@@ -126,6 +213,12 @@ psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID U
 2. El backend arma el payload de la orden Instore QR v2 y la crea/actualiza en MP.
 3. Mercado Pago envía el webhook a `/webhooks/mercadopago` cuando cambia el estado del pago.
 4. El backend registra el pago y marca la venta como `PAID` cuando llega `status=approved`.
+
+### Recomendaciones de configuración (producción)
+
+- Asegurar un endpoint público estable para el webhook.
+- Configurar CORS y proxy `/api` según el dominio del frontend.
+- Registrar correctamente `externalStoreId` y `externalPosId` (external IDs, no IDs numéricos).
 
 ### Endpoints relevantes
 
