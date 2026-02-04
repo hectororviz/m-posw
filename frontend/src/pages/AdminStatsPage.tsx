@@ -10,6 +10,14 @@ const formatDateLabel = (value: string) =>
     month: '2-digit',
   });
 
+const normalizeAmount = (value?: number | string | null) => {
+  if (typeof value === 'number') {
+    return value;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const buildDateTime = (date?: string, time?: string, fallbackTime?: string) => {
   if (!date) {
     return null;
@@ -65,7 +73,8 @@ export const AdminStatsPage: React.FC = () => {
     const totals = new Map<string, number>();
     filteredSales.forEach((sale) => {
       const method = sale.paymentMethod ?? 'CASH';
-      totals.set(method, (totals.get(method) || 0) + sale.total);
+      const amount = normalizeAmount(sale.total);
+      totals.set(method, (totals.get(method) || 0) + amount);
     });
     return Array.from(totals.entries()).map(([method, total]) => ({
       method,
@@ -99,7 +108,8 @@ export const AdminStatsPage: React.FC = () => {
     const totals = new Map<string, number>();
     sales.forEach((sale) => {
       const dateKey = sale.createdAt.slice(0, 10);
-      totals.set(dateKey, (totals.get(dateKey) || 0) + sale.total);
+      const amount = normalizeAmount(sale.total);
+      totals.set(dateKey, (totals.get(dateKey) || 0) + amount);
     });
     const entries = Array.from(totals.entries())
       .map(([date, total]) => ({ date, total }))
