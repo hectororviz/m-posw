@@ -94,6 +94,28 @@ export interface Setting {
   accentColor?: string | null;
 }
 
+export type CashMovementType = 'IN' | 'OUT';
+
+export interface CashMovementUser {
+  id: string;
+  name: string;
+}
+
+export interface CashMovement {
+  id: string;
+  cashSessionId: string;
+  type: CashMovementType;
+  amount: number;
+  reason: string;
+  note?: string | null;
+  createdAt: string;
+  createdBy?: CashMovementUser | null;
+  isVoided: boolean;
+  voidedAt?: string | null;
+  voidedBy?: CashMovementUser | null;
+  voidReason?: string | null;
+}
+
 export interface ApiErrorResponse {
   message?: string | string[];
 }

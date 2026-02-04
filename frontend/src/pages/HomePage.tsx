@@ -27,6 +27,11 @@ export const HomePage: React.FC = () => {
   return (
     <AppLayout title="Categorías">
       {isLoading && <p>Cargando categorías...</p>}
+      <div className="home-actions">
+        <Link to="/cash/movements" className="primary-button home-action">
+          Caja · Movimientos
+        </Link>
+      </div>
       <div className="grid">
         {categories?.map((category) => {
           const imageUrl = buildImageUrl(category.imagePath, category.imageUpdatedAt);

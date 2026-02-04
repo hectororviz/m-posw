@@ -858,6 +858,187 @@ button {
   gap: 0.5rem;
 }
 
+.chip-button {
+  border: 1px solid #cbd5f5;
+  background: #ffffff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-weight: 600;
+}
+
+.chip-button.is-active {
+  border-color: var(--accent-color);
+  color: #fff;
+  background: var(--accent-color);
+}
+
+.home-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
+}
+
+.home-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cash-closed {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 420px;
+}
+
+.cash-movements-page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.cash-movements-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cash-movements-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cash-movements-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cash-movement-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.cash-movement-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cash-movement-card.is-voided {
+  opacity: 0.75;
+  background: #f8fafc;
+}
+
+.cash-movement-card__header {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.movement-type {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.movement-type--in {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.movement-type--out {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.movement-status {
+  color: #b91c1c;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.cash-movement-card__body {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.movement-reason {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.movement-note {
+  color: #475569;
+  margin-bottom: 0.25rem;
+}
+
+.movement-meta {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.movement-amount {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.movement-voided {
+  font-size: 0.9rem;
+  color: #b91c1c;
+}
+
+.cash-movement-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cash-movement-modal {
+  width: min(640px, 100%);
+}
+
+.cash-movement-type {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.cash-movement-type .primary-button,
+.cash-movement-type .secondary-button {
+  width: 100%;
+}
+
+.cash-movement-type .is-active {
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15);
+}
+
+.cash-movement-amount__preview {
+  font-weight: 700;
+  margin-top: 0.35rem;
+}
+
+.cash-movement-reasons {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.cash-movement-reason__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -921,6 +1102,14 @@ button {
   padding: 0.5rem 0.75rem;
   border-radius: 0.75rem;
   border: 1px solid #cbd5f5;
+}
+
+.input-field textarea {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid #cbd5f5;
+  resize: vertical;
+  font-family: inherit;
 }
 
 .cash-summary {

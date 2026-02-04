@@ -12,6 +12,8 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { PrintTicketPage } from './pages/PrintTicketPage';
+import { CashMovementsPage } from './pages/CashMovementsPage';
+import { CashClosedPage } from './pages/CashClosedPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -40,6 +42,22 @@ export const App: React.FC = () => {
         element={
           <ProtectedRoute>
             <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cash/movements"
+        element={
+          <ProtectedRoute>
+            <CashMovementsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cash/closed"
+        element={
+          <ProtectedRoute>
+            <CashClosedPage />
           </ProtectedRoute>
         }
       />

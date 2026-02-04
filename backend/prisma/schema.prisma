@@ -33,6 +33,11 @@ enum PaymentStatus {
   EXPIRED
 }
 
+enum CashMovementType {
+  IN
+  OUT
+}
+
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   email     String?  @unique
@@ -46,6 +51,10 @@ model User {
   updatedAt DateTime @updatedAt
   sales     Sale[]
   sessions  Session[]
+  cashSessionsOpened CashSession[] @relation("CashSessionOpenedBy")
+  cashSessionsClosed CashSession[] @relation("CashSessionClosedBy")
+  cashMovementsCreated CashMovement[] @relation("CashMovementCreatedBy")
+  cashMovementsVoided CashMovement[] @relation("CashMovementVoidedBy")
 }
 
 model Category {
@@ -125,6 +134,41 @@ model Session {
   revokedAt DateTime?
 
   @@index([userId, revokedAt])
+}
+
+model CashSession {
+  id             String   @id @default(uuid()) @db.Uuid
+  openedAt       DateTime @default(now())
+  closedAt       DateTime?
+  openingFloat   Decimal  @default(0) @db.Decimal(10, 2)
+  openingNote    String?
+  openedByUserId String   @db.Uuid
+  closedByUserId String?  @db.Uuid
+  openedBy       User     @relation("CashSessionOpenedBy", fields: [openedByUserId], references: [id])
+  closedBy       User?    @relation("CashSessionClosedBy", fields: [closedByUserId], references: [id])
+  cashMovements  CashMovement[]
+
+  @@index([closedAt])
+}
+
+model CashMovement {
+  id              String           @id @default(uuid()) @db.Uuid
+  cashSessionId   String           @db.Uuid
+  type            CashMovementType
+  amount          Decimal          @db.Decimal(10, 2)
+  reason          String
+  note            String?
+  createdAt       DateTime         @default(now())
+  createdByUserId String           @db.Uuid
+  isVoided        Boolean          @default(false)
+  voidedAt        DateTime?
+  voidedByUserId  String?          @db.Uuid
+  voidReason      String?
+  cashSession     CashSession      @relation(fields: [cashSessionId], references: [id])
+  createdBy       User             @relation("CashMovementCreatedBy", fields: [createdByUserId], references: [id])
+  voidedBy        User?            @relation("CashMovementVoidedBy", fields: [voidedByUserId], references: [id])
+
+  @@index([cashSessionId, createdAt])
 }
 
 model MercadoPagoPayment {
