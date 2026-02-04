@@ -61,21 +61,74 @@ export const AdminSettingsPage: React.FC = () => {
   };
 
   return (
-    <section className="card">
+    <section className="card admin-settings">
       <h2>Settings</h2>
-      <div className="form-grid">
-        <input
-          type="text"
-          placeholder="Nombre del local"
-          value={form.storeName}
-          onChange={(event) => setForm({ ...form, storeName: event.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Nombre del club"
-          value={form.clubName}
-          onChange={(event) => setForm({ ...form, clubName: event.target.value })}
-        />
+      <div className="settings-form">
+        <div className="settings-row">
+          <label htmlFor="store-name">Nombre del local</label>
+          <input
+            id="store-name"
+            type="text"
+            value={form.storeName}
+            onChange={(event) => setForm({ ...form, storeName: event.target.value })}
+          />
+        </div>
+        <div className="settings-row">
+          <label htmlFor="club-name">Nombre del Club/empresa</label>
+          <input
+            id="club-name"
+            type="text"
+            value={form.clubName}
+            onChange={(event) => setForm({ ...form, clubName: event.target.value })}
+          />
+        </div>
+        <div className="settings-row">
+          <label htmlFor="accent-color">Color de personalizacion</label>
+          <input
+            id="accent-color"
+            type="text"
+            value={form.accentColor}
+            onChange={(event) => setForm({ ...form, accentColor: event.target.value })}
+          />
+        </div>
+        <div className="settings-row">
+          <label htmlFor="logo-upload">Logo</label>
+          <input
+            id="logo-upload"
+            type="file"
+            accept="image/*"
+            onChange={(event) => handleUpload('logo', event.target.files?.[0])}
+          />
+        </div>
+        <div className="settings-row">
+          <label htmlFor="favicon-upload">Favicon</label>
+          <input
+            id="favicon-upload"
+            type="file"
+            accept="image/png,image/svg+xml,image/x-icon"
+            onChange={(event) => handleUpload('favicon', event.target.files?.[0])}
+          />
+        </div>
+        <div className="settings-row">
+          <label htmlFor="animation-ok-upload">Animacion OK</label>
+          <input
+            id="animation-ok-upload"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => handleUpload('animation-ok', event.target.files?.[0])}
+          />
+        </div>
+        <div className="settings-row">
+          <label htmlFor="animation-error-upload">Animacion Error</label>
+          <input
+            id="animation-error-upload"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => handleUpload('animation-error', event.target.files?.[0])}
+          />
+        </div>
+      </div>
+      <div className="settings-actions">
         <label className="toggle-field">
           <span>Imprimir ticket al finalizar venta</span>
           <input
@@ -84,47 +137,9 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, enableTicketPrinting: event.target.checked })}
           />
         </label>
-        <input
-          type="text"
-          placeholder="#ff0066"
-          value={form.accentColor}
-          onChange={(event) => setForm({ ...form, accentColor: event.target.value })}
-        />
         <button type="button" className="primary-button" onClick={handleSave}>
           Guardar
         </button>
-      </div>
-      <div className="form-grid">
-        <label className="file-label">
-          Logo
-          <input type="file" accept="image/*" onChange={(event) => handleUpload('logo', event.target.files?.[0])} />
-        </label>
-        <label className="file-label">
-          Favicon
-          <input
-            type="file"
-            accept="image/png,image/svg+xml,image/x-icon"
-            onChange={(event) => handleUpload('favicon', event.target.files?.[0])}
-          />
-        </label>
-      </div>
-      <div className="form-grid">
-        <label className="file-label">
-          Animacion OK
-          <input
-            type="file"
-            accept="application/json,.json"
-            onChange={(event) => handleUpload('animation-ok', event.target.files?.[0])}
-          />
-        </label>
-        <label className="file-label">
-          Animacion Error
-          <input
-            type="file"
-            accept="application/json,.json"
-            onChange={(event) => handleUpload('animation-error', event.target.files?.[0])}
-          />
-        </label>
       </div>
       {error && <p className="error-text">{error}</p>}
     </section>
