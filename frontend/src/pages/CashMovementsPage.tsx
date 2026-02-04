@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CashMovement, CashMovementType } from '../api/types';
+import type { CashActivity, CashMovement, CashMovementType, PaymentMethod } from '../api/types';
 import { getCurrentCashMovements, voidCashMovement } from '../api/cashMovements';
 import { normalizeApiError } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
@@ -26,6 +26,11 @@ const formatTime = (value: string) => {
 const typeLabels: Record<CashMovementType, string> = {
   IN: 'Ingreso',
   OUT: 'Egreso',
+};
+
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+  CASH: 'Efectivo',
+  MP_QR: 'QR',
 };
 
 interface VoidModalState {
@@ -73,7 +78,12 @@ export const CashMovementsPage: React.FC = () => {
     if (filter === 'ALL') {
       return movements;
     }
-    return movements.filter((movement) => movement.type === filter);
+    return movements.filter((movement) => {
+      if (movement.kind === 'SALE') {
+        return filter === 'IN';
+      }
+      return movement.type === filter;
+    });
   }, [filter, movements]);
 
   const handleRefresh = () => {
@@ -117,6 +127,27 @@ export const CashMovementsPage: React.FC = () => {
       <div className="cash-movement-list">
         {filteredMovements.map((movement) => {
           const isAdmin = user?.role === 'ADMIN';
+          if (movement.kind === 'SALE') {
+            return (
+              <div key={movement.id} className="cash-movement-card">
+                <div className="cash-movement-card__header">
+                  <span className="movement-type movement-type--in">Venta</span>
+                  <span className="movement-time">{formatTime(movement.createdAt)}</span>
+                </div>
+                <div className="cash-movement-card__body">
+                  <div>
+                    <p className="movement-reason">
+                      Venta registrada · {paymentMethodLabels[movement.paymentMethod]}
+                    </p>
+                    <p className="movement-meta">
+                      Usuario: {movement.user?.name ?? 'Sin info'}
+                    </p>
+                  </div>
+                  <div className="movement-amount">{formatCurrency(movement.total)}</div>
+                </div>
+              </div>
+            );
+          }
           return (
             <div
               key={movement.id}

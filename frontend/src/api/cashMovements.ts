@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { CashMovement, CashMovementType } from './types';
+import type { CashActivity, CashMovement, CashMovementType } from './types';
 
 export type CreateCashMovementDto = {
   type: CashMovementType;
@@ -10,7 +10,7 @@ export type CreateCashMovementDto = {
 };
 
 export const getCurrentCashMovements = async (includeVoided: boolean) => {
-  const response = await apiClient.get<CashMovement[]>('/cash-movements/current', {
+  const response = await apiClient.get<CashActivity[]>('/cash-movements/current', {
     params: { includeVoided },
   });
   return response.data;
