@@ -141,6 +141,14 @@ export const AdminSalesPage: React.FC = () => {
       return;
     }
 
+    const itemsForPrint = rowsForPrint.reduce((acc, row) => {
+      const existing = acc.get(row.productName) ?? 0;
+      acc.set(row.productName, existing + row.quantity);
+      return acc;
+    }, new Map<string, number>());
+    const items = Array.from(itemsForPrint.entries())
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => (b.qty !== a.qty ? b.qty - a.qty : a.name.localeCompare(b.name)));
     const totalProducts = rowsForPrint.reduce((acc, row) => acc + row.quantity, 0);
     const totalCash = rowsForPrint
       .filter((row) => row.paymentMethod !== 'MP_QR')
@@ -148,11 +156,15 @@ export const AdminSalesPage: React.FC = () => {
     const totalQr = rowsForPrint
       .filter((row) => row.paymentMethod === 'MP_QR')
       .reduce((acc, row) => acc + row.total, 0);
+    const total = totalCash + totalQr;
 
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
       dateTimeISO: new Date().toISOString(),
+      itemsStyle: 'summary',
+      items,
+      total,
       criteria: [
         { label: 'Desde', value: printStart ? formatDateTime(printStart) : 'Sin filtro' },
         { label: 'Hasta', value: printEnd ? formatDateTime(printEnd) : 'Sin filtro' },
@@ -161,6 +173,7 @@ export const AdminSalesPage: React.FC = () => {
         { label: 'Productos vendidos', value: totalProducts.toString() },
         { label: 'Total efectivo', value: formatCurrency(totalCash) },
         { label: 'Total QR', value: formatCurrency(totalQr) },
+        { label: 'Total', value: formatCurrency(total) },
       ],
     };
 

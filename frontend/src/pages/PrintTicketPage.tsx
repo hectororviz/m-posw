@@ -35,6 +35,7 @@ type TicketPayload = {
   criteria?: TicketLine[];
   summary?: TicketLine[];
   items?: TicketItem[];
+  itemsStyle?: 'sale' | 'summary';
   total?: number;
   thanks?: string;
   footer?: string;
@@ -126,6 +127,7 @@ export const PrintTicketPage: React.FC = () => {
   const total = ticket.total ?? 0;
   const criteria = ticket.criteria ?? [];
   const summary = ticket.summary ?? [];
+  const itemsStyle = ticket.itemsStyle ?? 'sale';
   const showItems = items.length > 0;
   const showSummary = summary.length > 0;
   const showCriteria = criteria.length > 0;
@@ -153,6 +155,15 @@ export const PrintTicketPage: React.FC = () => {
           <div className="ticket-divider" />
           <ul className="ticket-items">
             {items.map((item, index) => {
+              if (itemsStyle === 'summary') {
+                const summaryLabel = `${item.qty} - ${item.name}`;
+                const isLong = summaryLabel.length > 18;
+                return (
+                  <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
+                    <span className="ticket-item-name">{summaryLabel}</span>
+                  </li>
+                );
+              }
               const isLong = item.name.length > 14;
               return (
                 <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
@@ -162,11 +173,15 @@ export const PrintTicketPage: React.FC = () => {
               );
             })}
           </ul>
-          <div className="ticket-divider" />
-          <div className="ticket-total">
-            <span>Total</span>
-            <strong>{formatCurrency(total)}</strong>
-          </div>
+          {itemsStyle !== 'summary' && (
+            <>
+              <div className="ticket-divider" />
+              <div className="ticket-total">
+                <span>Total</span>
+                <strong>{formatCurrency(total)}</strong>
+              </div>
+            </>
+          )}
         </>
       )}
       {showSummary && (

@@ -18,6 +18,7 @@ export type TicketPayload = {
   criteria?: TicketLinePayload[];
   summary?: TicketLinePayload[];
   items?: TicketItemPayload[];
+  itemsStyle?: 'sale' | 'summary';
   total?: number;
   thanks?: string;
   footer?: string;
