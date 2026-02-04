@@ -20,6 +20,9 @@ export const AdminLayout: React.FC = () => {
         <NavLink to="/admin/sales" className={({ isActive }) => (isActive ? 'active' : '')}>
           Ventas
         </NavLink>
+        <NavLink to="/admin/stats" className={({ isActive }) => (isActive ? 'active' : '')}>
+          Estadísticas
+        </NavLink>
       </div>
       <Outlet />
     </AppLayout>
