@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, normalizeApiError } from '../api/client';
 import type { PaymentStatus } from '../api/types';
+import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
 import { useToast } from '../components/ToastProvider';
 import { useCart } from '../context/CartContext';
+import { maybePrintTicket } from '../utils/ticketPrinting';
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-AR', {
@@ -63,6 +65,7 @@ export const CheckoutQrPage: React.FC = () => {
   const navigate = useNavigate();
   const { clear, items } = useCart();
   const { pushToast } = useToast();
+  const { data: settings } = useSettings();
   const defaultTimeout = 120;
   const configuredTimeout = Number(import.meta.env.VITE_QR_PAYMENT_TIMEOUT ?? defaultTimeout);
   const paymentTimeoutSeconds =
@@ -74,6 +77,7 @@ export const CheckoutQrPage: React.FC = () => {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const pollingRef = useRef<number | null>(null);
   const hasCompletedRef = useRef(false);
+  const itemsSnapshotRef = useRef(items);
 
   const isWaiting = waitingStatuses.has(status);
 
@@ -85,6 +89,10 @@ export const CheckoutQrPage: React.FC = () => {
     () => roundToCurrency(items.reduce((acc, item) => acc + item.product.price * item.quantity, 0)),
     [items],
   );
+
+  useEffect(() => {
+    itemsSnapshotRef.current = items;
+  }, [items]);
 
   const stopPolling = () => {
     if (pollingRef.current) {
@@ -105,6 +113,20 @@ export const CheckoutQrPage: React.FC = () => {
         setIsFinalizing(true);
         try {
           await apiClient.post(`/sales/${saleId}/complete`);
+          await maybePrintTicket({
+            settings,
+            saleId,
+            dateTimeISO: new Date().toISOString(),
+            total,
+            items: itemsSnapshotRef.current.map((item) => ({
+              qty: item.quantity,
+              name: item.product.name,
+            })),
+            onPopupBlocked: () =>
+              pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
+            onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
+            onError: (message) => pushToast(message, 'error'),
+          });
           hasCompletedRef.current = true;
           clear();
           pushToast('Venta finalizada', 'success');
@@ -122,7 +144,7 @@ export const CheckoutQrPage: React.FC = () => {
         pushToast(message, 'error');
       }
     },
-    [saleId, isFinalizing, clear, pushToast, navigate],
+    [saleId, isFinalizing, settings, total, clear, pushToast, navigate],
   );
 
   const handleStatusUpdate = useCallback(

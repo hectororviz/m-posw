@@ -77,12 +77,16 @@ export interface Sale {
   cashReceived?: number | null;
   changeAmount?: number | null;
   createdAt: string;
+  paidAt?: string | null;
+  ticketPrintedAt?: string | null;
   items: SaleItem[];
   user?: SaleUser;
 }
 
 export interface Setting {
   storeName?: string | null;
+  clubName?: string | null;
+  enableTicketPrinting?: boolean | null;
   logoUrl?: string | null;
   faviconUrl?: string | null;
   okAnimationUrl?: string | null;

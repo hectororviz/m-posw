@@ -1,0 +1,2 @@
+ALTER TABLE "Setting" ADD COLUMN "clubName" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Setting" ADD COLUMN "enableTicketPrinting" BOOLEAN NOT NULL DEFAULT false;

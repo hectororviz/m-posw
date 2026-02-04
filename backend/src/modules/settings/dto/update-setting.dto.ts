@@ -1,9 +1,17 @@
-import { IsOptional, IsString, Matches } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateSettingDto {
   @IsOptional()
   @IsString()
   storeName?: string;
+
+  @IsOptional()
+  @IsString()
+  clubName?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  enableTicketPrinting?: boolean;
 
   @IsOptional()
   @IsString()

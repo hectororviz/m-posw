@@ -5,6 +5,7 @@ import { UpdateSettingDto } from './dto/update-setting.dto';
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
 const DEFAULT_STORE_NAME = 'MiBPS Demo';
 const DEFAULT_ACCENT_COLOR = '#0ea5e9';
+const DEFAULT_CLUB_NAME = '';
 
 @Injectable()
 export class SettingsService {
@@ -16,6 +17,8 @@ export class SettingsService {
       create: {
         id: DEFAULT_SETTING_ID,
         storeName: DEFAULT_STORE_NAME,
+        clubName: DEFAULT_CLUB_NAME,
+        enableTicketPrinting: false,
         logoUrl: null,
         faviconUrl: null,
         okAnimationUrl: null,
@@ -32,6 +35,8 @@ export class SettingsService {
       create: {
         id: DEFAULT_SETTING_ID,
         storeName: dto.storeName ?? DEFAULT_STORE_NAME,
+        clubName: dto.clubName ?? DEFAULT_CLUB_NAME,
+        enableTicketPrinting: dto.enableTicketPrinting ?? false,
         logoUrl: dto.logoUrl ?? null,
         faviconUrl: dto.faviconUrl ?? null,
         okAnimationUrl: dto.okAnimationUrl ?? null,
@@ -40,6 +45,10 @@ export class SettingsService {
       },
       update: {
         ...(dto.storeName !== undefined ? { storeName: dto.storeName } : {}),
+        ...(dto.clubName !== undefined ? { clubName: dto.clubName } : {}),
+        ...(dto.enableTicketPrinting !== undefined
+          ? { enableTicketPrinting: dto.enableTicketPrinting }
+          : {}),
         ...(dto.logoUrl !== undefined ? { logoUrl: dto.logoUrl } : {}),
         ...(dto.faviconUrl !== undefined ? { faviconUrl: dto.faviconUrl } : {}),
         ...(dto.okAnimationUrl !== undefined ? { okAnimationUrl: dto.okAnimationUrl } : {}),
