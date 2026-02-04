@@ -63,111 +63,6 @@ KeyEventResult _handleNumpadInput(
   return KeyEventResult.handled;
 }
 
-String _formatCurrency(double value) => '\$${value.toStringAsFixed(2)}';
-
-String _formatDateTime(DateTime value) {
-  final local = value.toLocal();
-  final day = local.day.toString().padLeft(2, '0');
-  final month = local.month.toString().padLeft(2, '0');
-  final year = local.year.toString();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '$day/$month/$year $hour:$minute';
-}
-
-double _parseAmount(String value) {
-  final normalized = value.replaceAll(',', '.');
-  return double.tryParse(normalized) ?? 0;
-}
-
-String _encodeBase64Url(String value) {
-  final encoded = base64Url.encode(utf8.encode(value));
-  return encoded.replaceAll('=', '');
-}
-
-void _printCashCloseTicket(Setting? setting, CashSessionCloseResult result) {
-  if (setting?.enableTicketPrinting != true) {
-    return;
-  }
-  final summary = result.summary;
-  final payload = {
-    'clubName': setting?.clubName ?? '',
-    'storeName': setting?.storeName ?? 'MiBPS',
-    'dateTimeISO': result.to.toIso8601String(),
-    'criteria': [
-      {'label': 'Desde', 'value': _formatDateTime(result.from)},
-      {'label': 'Hasta', 'value': _formatDateTime(result.to)},
-    ],
-    'summary': [
-      {'label': 'Efectivo', 'value': _formatCurrency(summary.cashTotal)},
-      {'label': 'QR', 'value': _formatCurrency(summary.qrTotal)},
-      {'label': 'Total', 'value': _formatCurrency(summary.grandTotal)},
-      {'label': 'Ventas', 'value': summary.totalSalesCount.toString()},
-      {'label': 'Fondo inicial', 'value': _formatCurrency(result.session.openingFloat)},
-    ],
-    'footer': 'Ticket no fiscal',
-  };
-  final ticketParam = _encodeBase64Url(jsonEncode(payload));
-  final url = '/print/ticket?ticket=$ticketParam&autoPrint=1&autoClose=1';
-  html.window.open(url, '_blank');
-}
-
-class CashSessionState {
-  CashSessionState({required this.open, this.session, this.isLoading = false});
-
-  final bool open;
-  final CashSession? session;
-  final bool isLoading;
-
-  CashSessionState copyWith({bool? open, CashSession? session, bool? isLoading}) {
-    return CashSessionState(
-      open: open ?? this.open,
-      session: session ?? this.session,
-      isLoading: isLoading ?? this.isLoading,
-    );
-  }
-}
-
-class CashSessionController extends ValueNotifier<CashSessionState> {
-  CashSessionController({ApiService? api})
-      : api = api ?? ApiService(),
-        super(CashSessionState(open: false, isLoading: true));
-
-  final ApiService api;
-
-  Future<void> refresh() async {
-    value = value.copyWith(isLoading: true);
-    try {
-      final current = await api.getCurrentCashSession();
-      value = current.copyWith(isLoading: false);
-    } catch (_) {
-      value = value.copyWith(isLoading: false);
-      rethrow;
-    }
-  }
-
-  void setOpenSession(CashSession session) {
-    value = CashSessionState(open: true, session: session);
-  }
-
-  void setClosed() {
-    value = CashSessionState(open: false);
-  }
-}
-
-class CashSessionScope extends InheritedNotifier<CashSessionController> {
-  const CashSessionScope({super.key, required CashSessionController controller, required super.child})
-      : super(notifier: controller);
-
-  static CashSessionController of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<CashSessionScope>();
-    if (scope == null) {
-      throw StateError('CashSessionScope not found in widget tree.');
-    }
-    return scope.notifier!;
-  }
-}
-
 class _SelectedImage {
   _SelectedImage({required this.bytes, required this.filename, required this.mimeType});
 
@@ -326,289 +221,106 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int selectedIndex = 0;
-  late final CashSessionController _cashController;
-
-  @override
-  void initState() {
-    super.initState();
-    _cashController = CashSessionController();
-    _cashController.refresh().catchError((_) {});
-  }
-
-  @override
-  void dispose() {
-    _cashController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
-    return CashSessionScope(
-      controller: _cashController,
-      child: ValueListenableBuilder<String?>(
-        valueListenable: widget.authState,
-        builder: (context, token, _) {
-          final role = _roleFromToken(token);
-          final isAdmin = role == 'ADMIN';
-          final destinations = [
-            _Destination('POS', Icons.storefront, const PosScreen()),
-            if (isAdmin) _Destination('Admin', Icons.admin_panel_settings, const AdminScreen()),
-            if (isAdmin) _Destination('Reportes', Icons.receipt_long, const ReportsScreen()),
-            if (isAdmin) _Destination('Estadísticas', Icons.bar_chart, const StatsScreen()),
-            if (isAdmin)
-              _Destination(
-                'Personalización',
-                Icons.palette,
-                SettingsScreen(settingNotifier: widget.settingNotifier),
-              ),
-          ];
-
-          final maxIndex = destinations.length - 1;
-          final effectiveIndex = selectedIndex.clamp(0, maxIndex);
-          if (effectiveIndex != selectedIndex) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() => selectedIndex = effectiveIndex);
-              }
-            });
-          }
-
-          return ValueListenableBuilder<CashSessionState>(
-            valueListenable: _cashController,
-            builder: (context, cashState, _) {
-              if (cashState.isLoading) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (!cashState.open && !isAdmin) {
-                return CashClosedScreen(
-                  onOpen: () => _handleOpenCash(context),
-                  onLogout: () async {
-                    try {
-                      await ApiService().logout();
-                    } catch (_) {
-                      // Ignore logout failures.
-                    }
-                    await AuthTokenStore.clear();
-                    widget.authState.value = null;
-                  },
-                );
-              }
-
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final isWide = constraints.maxWidth >= 900;
-                  return Scaffold(
-                    appBar: AppBar(
-                      title: ValueListenableBuilder<Setting?>(
-                        valueListenable: widget.settingNotifier,
-                        builder: (context, setting, _) {
-                          final logoUrl = (setting?.logoUrl?.isNotEmpty ?? false)
-                              ? resolveApiUrl(setting!.logoUrl!)
-                              : null;
-                          return Row(
-                            children: [
-                              if (logoUrl != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 12),
-                                  child: CircleAvatar(backgroundImage: NetworkImage(logoUrl)),
-                                ),
-                              Text(setting?.storeName ?? 'MiBPS'),
-                            ],
-                          );
-                        },
-                      ),
-                      actions: [
-                        ValueListenableBuilder<CashSessionState>(
-                          valueListenable: _cashController,
-                          builder: (context, state, _) {
-                            if (state.open) {
-                              return TextButton.icon(
-                                onPressed: () => _handleCloseCash(context),
-                                icon: const Icon(Icons.circle, color: Colors.green, size: 12),
-                                label: const Text('Caja abierta'),
-                              );
-                            }
-                            if (isAdmin) {
-                              return TextButton.icon(
-                                onPressed: () => _handleOpenCash(context),
-                                icon: const Icon(Icons.lock_open),
-                                label: const Text('Abrir caja'),
-                              );
-                            }
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                        TextButton.icon(
-                          onPressed: () async {
-                            try {
-                              await ApiService().logout();
-                            } catch (_) {
-                              // Ignore logout failures.
-                            }
-                            await AuthTokenStore.clear();
-                            widget.authState.value = null;
-                          },
-                          icon: const Icon(Icons.logout),
-                          label: const Text('Salir'),
-                        ),
-                      ],
-                    ),
-                    body: Row(
-                      children: [
-                        if (isWide)
-                          NavigationRail(
-                            selectedIndex: effectiveIndex,
-                            onDestinationSelected: (value) => setState(() => selectedIndex = value),
-                            destinations: destinations
-                                .map((item) => NavigationRailDestination(
-                                      icon: Icon(item.icon),
-                                      label: Text(item.label),
-                                    ))
-                                .toList(),
-                          ),
-                        Expanded(child: destinations[effectiveIndex].screen),
-                      ],
-                    ),
-                    bottomNavigationBar: isWide
-                        ? null
-                        : NavigationBar(
-                            selectedIndex: effectiveIndex,
-                            onDestinationSelected: (value) => setState(() => selectedIndex = value),
-                            destinations: destinations
-                                .map((item) =>
-                                    NavigationDestination(icon: Icon(item.icon), label: item.label))
-                                .toList(),
-                          ),
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _handleOpenCash(BuildContext context) async {
-    final floatController = TextEditingController();
-    final noteController = TextEditingController();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Abrir caja'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Focus(
-                onKeyEvent: (node, event) =>
-                    _handleNumpadInput(floatController, event, allowDecimal: true),
-                child: TextField(
-                  controller: floatController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Cambio inicial'),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteController,
-                decoration: const InputDecoration(labelText: 'Nota (opcional)'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Abrir caja')),
-          ],
-        );
-      },
-    );
-    if (result != true) {
-      floatController.dispose();
-      noteController.dispose();
-      return;
-    }
-    final openingFloat = _parseAmount(floatController.text);
-    try {
-      final session = await ApiService().openCashSession(
-        openingFloat: openingFloat,
-        note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
-      );
-      _cashController.setOpenSession(session);
-    } catch (err) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
-    } finally {
-      floatController.dispose();
-      noteController.dispose();
-    }
-  }
-
-  Future<void> _handleCloseCash(BuildContext context) async {
-    final session = _cashController.value.session;
-    if (session == null) {
-      return;
-    }
-    CashSessionSummaryResponse? preview;
-    try {
-      preview = await ApiService().getCashSessionSummary(session.id);
-    } catch (err) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final summary = preview!.summary;
-        return AlertDialog(
-          title: const Text('Cerrar caja'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Desde: ${_formatDateTime(preview!.from)}'),
-              const SizedBox(height: 4),
-              Text('Efectivo: ${_formatCurrency(summary.cashTotal)}'),
-              Text('QR: ${_formatCurrency(summary.qrTotal)}'),
-              Text('Total: ${_formatCurrency(summary.grandTotal)}'),
-              Text('Ventas: ${summary.totalSalesCount}'),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Confirmar cierre'),
+    return ValueListenableBuilder<String?>(
+      valueListenable: widget.authState,
+      builder: (context, token, _) {
+        final role = _roleFromToken(token);
+        final isAdmin = role == 'ADMIN';
+        final destinations = [
+          _Destination('POS', Icons.storefront, const PosScreen()),
+          if (isAdmin) _Destination('Admin', Icons.admin_panel_settings, const AdminScreen()),
+          if (isAdmin) _Destination('Reportes', Icons.receipt_long, const ReportsScreen()),
+          if (isAdmin) _Destination('Estadísticas', Icons.bar_chart, const StatsScreen()),
+          if (isAdmin)
+            _Destination(
+              'Personalización',
+              Icons.palette,
+              SettingsScreen(settingNotifier: widget.settingNotifier),
             ),
-          ],
+        ];
+
+        final maxIndex = destinations.length - 1;
+        final effectiveIndex = selectedIndex.clamp(0, maxIndex);
+        if (effectiveIndex != selectedIndex) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() => selectedIndex = effectiveIndex);
+            }
+          });
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 900;
+            return Scaffold(
+              appBar: AppBar(
+                title: ValueListenableBuilder<Setting?>(
+                  valueListenable: widget.settingNotifier,
+                  builder: (context, setting, _) {
+                    final logoUrl = (setting?.logoUrl?.isNotEmpty ?? false)
+                        ? resolveApiUrl(setting!.logoUrl!)
+                        : null;
+                    return Row(
+                      children: [
+                        if (logoUrl != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: CircleAvatar(backgroundImage: NetworkImage(logoUrl)),
+                          ),
+                        Text(setting?.storeName ?? 'MiBPS'),
+                      ],
+                    );
+                  },
+                ),
+                actions: [
+                  TextButton.icon(
+                    onPressed: () async {
+                      try {
+                        await ApiService().logout();
+                      } catch (_) {
+                        // Ignore logout failures.
+                      }
+                      await AuthTokenStore.clear();
+                      widget.authState.value = null;
+                    },
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Salir'),
+                  ),
+                ],
+              ),
+              body: Row(
+                children: [
+                  if (isWide)
+                    NavigationRail(
+                      selectedIndex: effectiveIndex,
+                      onDestinationSelected: (value) => setState(() => selectedIndex = value),
+                      destinations: destinations
+                          .map((item) => NavigationRailDestination(
+                                icon: Icon(item.icon),
+                                label: Text(item.label),
+                              ))
+                          .toList(),
+                    ),
+                  Expanded(child: destinations[effectiveIndex].screen),
+                ],
+              ),
+              bottomNavigationBar: isWide
+                  ? null
+                  : NavigationBar(
+                      selectedIndex: effectiveIndex,
+                      onDestinationSelected: (value) => setState(() => selectedIndex = value),
+                      destinations: destinations
+                          .map((item) => NavigationDestination(icon: Icon(item.icon), label: item.label))
+                          .toList(),
+                    ),
+            );
+          },
         );
       },
     );
-    if (confirmed != true) {
-      return;
-    }
-    try {
-      final result = await ApiService().closeCashSession();
-      _cashController.setClosed();
-      if (widget.settingNotifier.value?.enableTicketPrinting == true) {
-        _printCashCloseTicket(widget.settingNotifier.value, result);
-      }
-    } catch (err) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(err.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
-    }
   }
 }
 
@@ -618,48 +330,6 @@ class _Destination {
   final String label;
   final IconData icon;
   final Widget screen;
-}
-
-class CashClosedScreen extends StatelessWidget {
-  const CashClosedScreen({super.key, required this.onOpen, required this.onLogout});
-
-  final VoidCallback onOpen;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Caja cerrada'),
-        actions: [
-          TextButton.icon(
-            onPressed: onLogout,
-            icon: const Icon(Icons.logout),
-            label: const Text('Salir'),
-          ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'CAJA CERRADA',
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: onOpen,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                child: Text('ABRIR CAJA'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class LoginScreen extends StatefulWidget {
@@ -1325,11 +995,6 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _startCheckout(BuildContext context) async {
-    final cashState = CashSessionScope.of(context).value;
-    if (!cashState.open) {
-      _showCashClosedSnack();
-      return;
-    }
     final selected = await _showPaymentSelectionDialog(context);
     if (selected == null) {
       return;
@@ -1345,12 +1010,6 @@ class _PosScreenState extends State<PosScreen> {
     if (selected.type == PaymentMethodType.mercadoPagoQr) {
       await _startMercadoPagoPayment(context);
     }
-  }
-
-  void _showCashClosedSnack() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Caja cerrada')),
-    );
   }
 
   Future<PaymentMethod?> _showPaymentSelectionDialog(BuildContext context) {
@@ -3146,60 +2805,6 @@ class ApiService {
     return Setting.fromJson(data);
   }
 
-  Future<CashSessionState> getCurrentCashSession() async {
-    final response = await apiClient.get(Uri.parse('${AppConfig.apiBaseUrl}/cash-session/current'));
-    if (response.statusCode >= 400) {
-      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo obtener la caja'));
-    }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final open = data['open'] == true;
-    if (!open) {
-      return CashSessionState(open: false);
-    }
-    final session = CashSession.fromJson(data['session'] as Map<String, dynamic>);
-    return CashSessionState(open: true, session: session);
-  }
-
-  Future<CashSession> openCashSession({required double openingFloat, String? note}) async {
-    final response = await apiClient.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/cash-session/open'),
-      body: jsonEncode({
-        'openingFloat': openingFloat,
-        if (note != null) 'note': note,
-      }),
-    );
-    if (response.statusCode >= 400) {
-      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo abrir la caja'));
-    }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return CashSession.fromJson(data);
-  }
-
-  Future<CashSessionCloseResult> closeCashSession({String? note}) async {
-    final response = await apiClient.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/cash-session/close'),
-      body: jsonEncode({
-        if (note != null) 'note': note,
-      }),
-    );
-    if (response.statusCode >= 400) {
-      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo cerrar la caja'));
-    }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return CashSessionCloseResult.fromJson(data);
-  }
-
-  Future<CashSessionSummaryResponse> getCashSessionSummary(String sessionId) async {
-    final response = await apiClient.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/cash-session/$sessionId/summary'),
-    );
-    if (response.statusCode >= 400) {
-      throw Exception(_parseErrorMessage(response, fallback: 'No se pudo obtener el resumen'));
-    }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return CashSessionSummaryResponse.fromJson(data);
-  }
-
   Future<Setting> updateSettings({
     required String storeName,
     required String accentColor,
@@ -3628,141 +3233,18 @@ class ApiService {
 }
 
 class Setting {
-  Setting({
-    required this.storeName,
-    this.clubName,
-    this.logoUrl,
-    this.faviconUrl,
-    this.accentColor,
-    this.enableTicketPrinting,
-  });
+  Setting({required this.storeName, this.logoUrl, this.faviconUrl, this.accentColor});
 
   final String storeName;
-  final String? clubName;
   final String? logoUrl;
   final String? faviconUrl;
   final String? accentColor;
-  final bool? enableTicketPrinting;
 
   factory Setting.fromJson(Map<String, dynamic> json) => Setting(
         storeName: json['storeName'] as String,
-        clubName: json['clubName'] as String?,
         logoUrl: json['logoUrl'] as String?,
         faviconUrl: json['faviconUrl'] as String?,
         accentColor: json['accentColor'] as String?,
-        enableTicketPrinting: json['enableTicketPrinting'] as bool?,
-      );
-}
-
-class CashSession {
-  CashSession({
-    required this.id,
-    required this.openedAt,
-    required this.openingFloat,
-    this.closedAt,
-    this.openingNote,
-    this.closingNote,
-    required this.openedByUserId,
-    this.closedByUserId,
-  });
-
-  final String id;
-  final DateTime openedAt;
-  final DateTime? closedAt;
-  final double openingFloat;
-  final String? openingNote;
-  final String? closingNote;
-  final String openedByUserId;
-  final String? closedByUserId;
-
-  static double _decimalFromJson(dynamic value) {
-    if (value is num) return value.toDouble();
-    if (value is String) return double.parse(value);
-    return 0;
-  }
-
-  factory CashSession.fromJson(Map<String, dynamic> json) => CashSession(
-        id: json['id'] as String,
-        openedAt: DateTime.parse(json['openedAt'] as String),
-        closedAt: json['closedAt'] != null ? DateTime.parse(json['closedAt'] as String) : null,
-        openingFloat: _decimalFromJson(json['openingFloat']),
-        openingNote: json['openingNote'] as String?,
-        closingNote: json['closingNote'] as String?,
-        openedByUserId: json['openedByUserId'] as String,
-        closedByUserId: json['closedByUserId'] as String?,
-      );
-}
-
-class CashSessionSummary {
-  CashSessionSummary({
-    required this.totalSalesCount,
-    required this.cashTotal,
-    required this.qrTotal,
-    required this.grandTotal,
-  });
-
-  final int totalSalesCount;
-  final double cashTotal;
-  final double qrTotal;
-  final double grandTotal;
-
-  factory CashSessionSummary.fromJson(Map<String, dynamic> json) {
-    final totals = json['totalsByPaymentMethod'] as Map<String, dynamic>? ?? {};
-    final cashValue = totals['CASH'];
-    final qrValue = totals['QR'];
-    return CashSessionSummary(
-      totalSalesCount: (json['totalSalesCount'] as num?)?.toInt() ?? 0,
-      cashTotal: (cashValue is num)
-          ? cashValue.toDouble()
-          : cashValue is String
-              ? double.tryParse(cashValue) ?? 0
-              : 0,
-      qrTotal: (qrValue is num)
-          ? qrValue.toDouble()
-          : qrValue is String
-              ? double.tryParse(qrValue) ?? 0
-              : 0,
-      grandTotal: (json['grandTotal'] as num?)?.toDouble() ??
-          (json['grandTotal'] is String ? double.tryParse(json['grandTotal'] as String) ?? 0 : 0),
-    );
-  }
-}
-
-class CashSessionSummaryResponse {
-  CashSessionSummaryResponse({
-    required this.session,
-    required this.summary,
-    required this.from,
-    required this.to,
-  });
-
-  final CashSession session;
-  final CashSessionSummary summary;
-  final DateTime from;
-  final DateTime to;
-
-  factory CashSessionSummaryResponse.fromJson(Map<String, dynamic> json) => CashSessionSummaryResponse(
-        session: CashSession.fromJson(json['session'] as Map<String, dynamic>),
-        summary: CashSessionSummary.fromJson(json['summary'] as Map<String, dynamic>),
-        from: DateTime.parse(json['from'] as String),
-        to: DateTime.parse(json['to'] as String),
-      );
-}
-
-class CashSessionCloseResult extends CashSessionSummaryResponse {
-  CashSessionCloseResult({
-    required super.session,
-    required super.summary,
-    required super.from,
-    required super.to,
-  });
-
-  factory CashSessionCloseResult.fromJson(Map<String, dynamic> json) =>
-      CashSessionCloseResult(
-        session: CashSession.fromJson(json['session'] as Map<String, dynamic>),
-        summary: CashSessionSummary.fromJson(json['summary'] as Map<String, dynamic>),
-        from: DateTime.parse(json['from'] as String),
-        to: DateTime.parse(json['to'] as String),
       );
 }
 

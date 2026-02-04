@@ -46,8 +46,6 @@ model User {
   updatedAt DateTime @updatedAt
   sales     Sale[]
   sessions  Session[]
-  openedCashSessions CashSession[] @relation("CashSessionOpenedBy")
-  closedCashSessions CashSession[] @relation("CashSessionClosedBy")
 }
 
 model Category {
@@ -165,21 +163,4 @@ model Setting {
   accentColor String?  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
-
-model CashSession {
-  id String @id @default(uuid()) @db.Uuid
-  openedAt DateTime @default(now()) @map("opened_at")
-  closedAt DateTime? @map("closed_at")
-  openingFloat Decimal @db.Decimal(10, 2) @map("opening_float")
-  openingNote String? @map("opening_note")
-  closingNote String? @map("closing_note")
-  openedByUserId String @db.Uuid @map("opened_by_user_id")
-  closedByUserId String? @db.Uuid @map("closed_by_user_id")
-  openedBy User @relation("CashSessionOpenedBy", fields: [openedByUserId], references: [id])
-  closedBy User? @relation("CashSessionClosedBy", fields: [closedByUserId], references: [id])
-
-  @@index([openedByUserId])
-  @@index([closedByUserId])
-  @@map("cash_sessions")
 }
