@@ -116,6 +116,19 @@ export interface CashMovement {
   voidReason?: string | null;
 }
 
+export type CashActivityKind = 'MOVEMENT' | 'SALE';
+
+export interface CashSaleActivity {
+  kind: 'SALE';
+  id: string;
+  total: number;
+  createdAt: string;
+  paymentMethod: PaymentMethod;
+  user?: SaleUser | null;
+}
+
+export type CashActivity = (CashMovement & { kind: 'MOVEMENT' }) | CashSaleActivity;
+
 export interface ApiErrorResponse {
   message?: string | string[];
 }

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { SaleStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { CashSessionsService } from '../cash-sessions/cash-sessions.service';
 import { CreateCashMovementDto } from './dto/create-cash-movement.dto';
@@ -21,17 +22,45 @@ export class CashMovementsService {
 
   async listCurrent(includeVoided = false) {
     const session = await this.cashSessionsService.requireOpenSession();
-    return this.prisma.cashMovement.findMany({
-      where: {
-        cashSessionId: session.id,
-        ...(includeVoided ? {} : { isVoided: false }),
-      },
-      include: {
-        createdBy: { select: { id: true, name: true } },
-        voidedBy: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [movements, sales] = await Promise.all([
+      this.prisma.cashMovement.findMany({
+        where: {
+          cashSessionId: session.id,
+          ...(includeVoided ? {} : { isVoided: false }),
+        },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+          voidedBy: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.sale.findMany({
+        where: {
+          createdAt: { gte: session.openedAt },
+          status: SaleStatus.APPROVED,
+        },
+        select: {
+          id: true,
+          total: true,
+          createdAt: true,
+          paymentMethod: true,
+          user: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
+
+    const activity = [
+      ...movements.map((movement) => ({ kind: 'MOVEMENT' as const, ...movement })),
+      ...sales.map((sale) => ({
+        kind: 'SALE' as const,
+        id: sale.id,
+        total: Number(sale.total),
+        createdAt: sale.createdAt,
+        paymentMethod: sale.paymentMethod,
+        user: sale.user,
+      })),
+    ];
+
+    return activity.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   async createMovement(userId: string, dto: CreateCashMovementDto) {
