@@ -533,6 +533,23 @@ button {
   margin-bottom: 1rem;
 }
 
+.toggle-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  font-size: 0.95rem;
+}
+
+.toggle-field input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 .table {
   display: grid;
   gap: 1rem;
@@ -837,5 +854,115 @@ button {
 
   .logout-text {
     display: none;
+  }
+}
+
+@page {
+  size: 80mm auto;
+  margin: 0;
+}
+
+.ticket-print-body {
+  background: #ffffff;
+}
+
+.ticket-page {
+  width: 80mm;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 12px 10px 20px;
+  font-family: 'Inter', 'Arial', sans-serif;
+  color: #111827;
+}
+
+.ticket-club {
+  text-align: center;
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.ticket-title {
+  font-size: 32px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0 0 6px;
+  letter-spacing: 0.5px;
+}
+
+.ticket-date {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.ticket-divider {
+  border-top: 2px solid #111827;
+  margin: 10px 0;
+}
+
+.ticket-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ticket-item {
+  display: flex;
+  gap: 10px;
+  font-size: 30px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ticket-item--long {
+  font-size: 28px;
+}
+
+.ticket-item-qty {
+  min-width: 54px;
+}
+
+.ticket-item-name {
+  flex: 1;
+}
+
+.ticket-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.ticket-thanks {
+  text-align: center;
+  font-size: 22px;
+  margin: 12px 0 4px;
+  font-weight: 600;
+}
+
+.ticket-footer {
+  text-align: center;
+  font-size: 20px;
+  margin: 0 0 12px;
+  font-weight: 500;
+}
+
+.ticket-error {
+  text-align: center;
+  font-size: 18px;
+  margin: 0;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .ticket-page {
+    padding: 0;
   }
 }

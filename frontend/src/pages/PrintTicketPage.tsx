@@ -1,0 +1,151 @@
+import { useEffect, useMemo, useState } from 'react';
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+
+const formatDateTime = (value?: string) => {
+  const date = value ? new Date(value) : new Date();
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear().toString().slice(-2);
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${day}/${month}/${year} - ${hours}:${minutes}`;
+};
+
+type TicketItem = {
+  qty: number;
+  name: string;
+};
+
+type TicketPayload = {
+  clubName?: string;
+  storeName?: string;
+  dateTimeISO?: string;
+  items?: TicketItem[];
+  total?: number;
+  thanks?: string;
+  footer?: string;
+};
+
+declare global {
+  interface Window {
+    __TICKET__?: TicketPayload;
+  }
+}
+
+const decodeBase64Url = (value: string) => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padding = normalized.length % 4;
+  const padded = padding ? `${normalized}${'='.repeat(4 - padding)}` : normalized;
+  const binary = window.atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+};
+
+export const PrintTicketPage: React.FC = () => {
+  const [ticket, setTicket] = useState<TicketPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const autoPrint = searchParams.get('autoPrint') === '1';
+  const autoClose = searchParams.get('autoClose') === '1';
+
+  useEffect(() => {
+    document.body.classList.add('ticket-print-body');
+    return () => {
+      document.body.classList.remove('ticket-print-body');
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      const rawTicket = searchParams.get('ticket');
+      if (rawTicket) {
+        const decoded = decodeBase64Url(rawTicket);
+        setTicket(JSON.parse(decoded) as TicketPayload);
+        return;
+      }
+      if (window.__TICKET__) {
+        setTicket(window.__TICKET__);
+        return;
+      }
+      setError('No se encontraron datos del ticket.');
+    } catch (err) {
+      setError('No se pudo leer el ticket.');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!ticket || !autoPrint) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      window.print();
+    }, 250);
+    const handleAfterPrint = () => {
+      if (autoClose) {
+        window.close();
+      }
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, [ticket, autoPrint, autoClose]);
+
+  if (error) {
+    return (
+      <div className="ticket-page">
+        <p className="ticket-error">{error}</p>
+      </div>
+    );
+  }
+
+  if (!ticket) {
+    return (
+      <div className="ticket-page">
+        <p className="ticket-error">Cargando ticket...</p>
+      </div>
+    );
+  }
+
+  const items = ticket.items ?? [];
+  const total = ticket.total ?? 0;
+
+  return (
+    <div className="ticket-page">
+      {ticket.clubName && <p className="ticket-club">{ticket.clubName}</p>}
+      <h1 className="ticket-title">{ticket.storeName ?? 'SOLER - Bufet'}</h1>
+      <p className="ticket-date">{formatDateTime(ticket.dateTimeISO)}</p>
+      <div className="ticket-divider" />
+      <ul className="ticket-items">
+        {items.map((item, index) => {
+          const isLong = item.name.length > 14;
+          return (
+            <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
+              <span className="ticket-item-qty">{item.qty}x</span>
+              <span className="ticket-item-name">{item.name.toUpperCase()}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="ticket-divider" />
+      <div className="ticket-total">
+        <span>Total</span>
+        <strong>{formatCurrency(total)}</strong>
+      </div>
+      <div className="ticket-divider" />
+      <p className="ticket-thanks">{ticket.thanks ?? 'Gracias por tu compra'}</p>
+      <p className="ticket-footer">{ticket.footer ?? 'Ticket no fiscal'}</p>
+      <button type="button" className="primary-button no-print" onClick={() => window.print()}>
+        Imprimir
+      </button>
+    </div>
+  );
+};

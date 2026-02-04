@@ -3,17 +3,26 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
+import { useToast } from '../components/ToastProvider';
 
 export const AdminSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
-  const [form, setForm] = useState({ storeName: '', accentColor: '' });
+  const { pushToast } = useToast();
+  const [form, setForm] = useState({
+    storeName: '',
+    clubName: '',
+    enableTicketPrinting: false,
+    accentColor: '',
+  });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (settings) {
       setForm({
         storeName: settings.storeName ?? '',
+        clubName: settings.clubName ?? '',
+        enableTicketPrinting: settings.enableTicketPrinting ?? false,
         accentColor: settings.accentColor ?? '',
       });
     }
@@ -25,6 +34,7 @@ export const AdminSettingsPage: React.FC = () => {
       const response = await apiClient.patch<Setting>('/settings', form);
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
+      pushToast('Configuración actualizada', 'success');
     } catch (err) {
       setError(normalizeApiError(err));
     }
@@ -60,6 +70,20 @@ export const AdminSettingsPage: React.FC = () => {
           value={form.storeName}
           onChange={(event) => setForm({ ...form, storeName: event.target.value })}
         />
+        <input
+          type="text"
+          placeholder="Nombre del club"
+          value={form.clubName}
+          onChange={(event) => setForm({ ...form, clubName: event.target.value })}
+        />
+        <label className="toggle-field">
+          <span>Imprimir ticket al finalizar venta</span>
+          <input
+            type="checkbox"
+            checked={form.enableTicketPrinting}
+            onChange={(event) => setForm({ ...form, enableTicketPrinting: event.target.checked })}
+          />
+        </label>
         <input
           type="text"
           placeholder="#ff0066"

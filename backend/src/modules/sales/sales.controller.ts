@@ -80,4 +80,13 @@ export class SalesController {
   ) {
     return this.salesService.cancelQrSale(id, { id: req.user.sub, role: req.user.role });
   }
+
+  @Post(':id/ticket-printed')
+  @Roles(Role.ADMIN, Role.USER)
+  markTicketPrinted(
+    @Req() req: { user: { sub: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.salesService.markTicketPrinted(id, { id: req.user.sub, role: req.user.role });
+  }
 }

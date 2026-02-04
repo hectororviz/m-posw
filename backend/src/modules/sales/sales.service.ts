@@ -279,6 +279,25 @@ export class SalesService {
     });
   }
 
+  async markTicketPrinted(saleId: string, requester: { id: string; role: string }) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: { user: true },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+    this.assertCanAccessSale(sale, requester, 'POST /sales/:id/ticket-printed');
+    if (sale.ticketPrintedAt) {
+      return { saleId: sale.id, ticketPrintedAt: sale.ticketPrintedAt, alreadyPrinted: true };
+    }
+    const updatedSale = await this.prisma.sale.update({
+      where: { id: saleId },
+      data: { ticketPrintedAt: new Date() },
+    });
+    return { saleId: updatedSale.id, ticketPrintedAt: updatedSale.ticketPrintedAt, alreadyPrinted: false };
+  }
+
   async cancelQrSale(saleId: string, requester: { id: string; role: string }) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },

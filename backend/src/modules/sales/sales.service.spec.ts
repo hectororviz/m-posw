@@ -100,4 +100,35 @@ describe('SalesService MercadoPago QR auth', () => {
     expect(result.status).toBe(SaleStatus.CANCELLED);
     expect(mpService.deleteOrder).toHaveBeenCalledTimes(1);
   });
+
+  it('marca el ticket como impreso si no estaba registrado', async () => {
+    const { service, prisma } = buildService();
+    prisma.sale.findUnique.mockResolvedValue({ ...baseSale, ticketPrintedAt: null });
+    const printedAt = new Date('2025-01-01T10:00:00.000Z');
+    prisma.sale.update.mockResolvedValue({ ...baseSale, ticketPrintedAt: printedAt });
+
+    const result = await service.markTicketPrinted(baseSale.id, {
+      id: 'owner-1',
+      role: 'USER',
+    });
+
+    expect(prisma.sale.update).toHaveBeenCalledTimes(1);
+    expect(result.alreadyPrinted).toBe(false);
+    expect(result.ticketPrintedAt).toEqual(printedAt);
+  });
+
+  it('evita volver a marcar el ticket si ya estaba impreso', async () => {
+    const { service, prisma } = buildService();
+    const printedAt = new Date('2025-01-01T10:00:00.000Z');
+    prisma.sale.findUnique.mockResolvedValue({ ...baseSale, ticketPrintedAt: printedAt });
+
+    const result = await service.markTicketPrinted(baseSale.id, {
+      id: 'owner-1',
+      role: 'USER',
+    });
+
+    expect(prisma.sale.update).not.toHaveBeenCalled();
+    expect(result.alreadyPrinted).toBe(true);
+    expect(result.ticketPrintedAt).toEqual(printedAt);
+  });
 });

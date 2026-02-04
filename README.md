@@ -44,6 +44,7 @@ También se crea la caja `Caja01` (role USER) con:
 - Roles ADMIN/USER.
 - CRUD de usuarios, categorías, productos.
 - Personalización (nombre, logo, favicon, color).
+- Impresión de ticket térmico 80mm configurable desde Settings (nombre del club y toggle de impresión).
 - Reportes con filtros por fecha y exportación XLSX.
 - Estadísticas con gráficos (últimos 15 días con ventas, últimos 6 meses, promedios diarios).
 
