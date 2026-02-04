@@ -68,10 +68,24 @@ export const AdminProductsPage: React.FC = () => {
     }
   };
 
-  const rendered = useMemo(() => products ?? [], [products]);
+  const rendered = useMemo(() => {
+    if (!products) {
+      return [];
+    }
+    const categoryLookup = new Map(categories?.map((category) => [category.id, category.name]));
+    return [...products].sort((a, b) => {
+      const categoryA = categoryLookup.get(a.categoryId) ?? '';
+      const categoryB = categoryLookup.get(b.categoryId) ?? '';
+      const categoryCompare = categoryA.localeCompare(categoryB, 'es', { sensitivity: 'base' });
+      if (categoryCompare !== 0) {
+        return categoryCompare;
+      }
+      return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+    });
+  }, [products, categories]);
 
   return (
-    <section className="card">
+    <section className="card admin-products">
       <h2>Productos</h2>
       <div className="form-grid">
         <input
@@ -191,11 +205,23 @@ export const AdminProductsPage: React.FC = () => {
                   accept="image/*"
                   onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
                 />
-                <button type="button" className="secondary-button" onClick={() => handleUpdate(product.id)}>
-                  Guardar
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => handleUpdate(product.id)}
+                  aria-label="Guardar"
+                  title="Guardar"
+                >
+                  <span aria-hidden="true">💾</span>
                 </button>
-                <button type="button" className="ghost-button" onClick={() => handleDelete(product.id)}>
-                  Eliminar
+                <button
+                  type="button"
+                  className="icon-button danger"
+                  onClick={() => handleDelete(product.id)}
+                  aria-label="Eliminar"
+                  title="Eliminar"
+                >
+                  <span aria-hidden="true">🗑️</span>
                 </button>
               </div>
             </div>

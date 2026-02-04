@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -12,8 +12,11 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT') || 3000;
   const corsOrigin = config.get<string>('CORS_ORIGIN') || '*';
+  const webhookSecretLength = config.get<string>('MP_WEBHOOK_SECRET')?.length ?? 0;
+  const logger = new Logger('Bootstrap');
 
   app.enableCors({ origin: corsOrigin });
+  app.getHttpAdapter().getInstance().disable('etag');
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
@@ -22,6 +25,8 @@ async function bootstrap() {
 
   const prismaService = app.get(PrismaService);
   prismaService.enableShutdownHooks(app);
+
+  logger.debug(`MercadoPago webhook secret length: ${webhookSecretLength}`);
 
   await app.listen(port);
 }

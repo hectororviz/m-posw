@@ -53,6 +53,21 @@ export const getUploadsBaseUrl = () => {
   return getApiOrigin();
 };
 
+export const getWsBaseUrl = () => {
+  const envBase = import.meta.env.VITE_WS_BASE_URL as string | undefined;
+  if (envBase) {
+    return envBase.replace(/\/$/, '');
+  }
+  const origin = window.location.origin;
+  if (origin.startsWith('https://')) {
+    return origin.replace('https://', 'wss://');
+  }
+  if (origin.startsWith('http://')) {
+    return origin.replace('http://', 'ws://');
+  }
+  return origin;
+};
+
 export const buildImageUrl = (imagePath?: string | null, imageUpdatedAt?: string | null) => {
   if (!imagePath) {
     return undefined;

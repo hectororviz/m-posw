@@ -1,15 +1,24 @@
 import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SaleStatus } from '@prisma/client';
 import { SalesService } from './sales.service';
 
 describe('SalesService MercadoPago QR auth', () => {
+  const PaymentStatus = {
+    APPROVED: 'APPROVED',
+    PENDING: 'PENDING',
+  } as const;
+  const SaleStatus = {
+    PENDING: 'PENDING',
+    CANCELLED: 'CANCELLED',
+  } as const;
   const baseSale = {
     id: 'sale-1',
     userId: 'owner-1',
     total: 100,
-    status: SaleStatus.OPEN,
+    status: SaleStatus.PENDING,
+    paymentStatus: PaymentStatus.PENDING,
     paymentStartedAt: null,
+    paymentMethod: 'MP_QR',
     items: [
       {
         product: { name: 'Item A', price: 100 },
@@ -41,32 +50,28 @@ describe('SalesService MercadoPago QR auth', () => {
       createOrUpdateOrder: jest.fn(),
       deleteOrder: jest.fn(),
     };
+    const mpQueryService = {
+      searchPaymentsByExternalReference: jest.fn(),
+    };
 
     return {
-      service: new SalesService(prisma as any, config, mpService as any),
+      service: new SalesService(prisma as any, config, mpService as any, mpQueryService as any),
       prisma,
       mpService,
+      mpQueryService,
     };
   };
 
-  it('permite a ADMIN iniciar el cobro aunque no sea owner', async () => {
-    const { service, prisma, mpService } = buildService();
+  it('permite a ADMIN consultar estado aunque no sea owner', async () => {
+    const { service, prisma } = buildService();
     prisma.sale.findUnique.mockResolvedValue(baseSale);
-    const updatedSale = {
-      ...baseSale,
-      status: SaleStatus.PENDING_PAYMENT,
-      paymentStartedAt: new Date(),
-    };
-    prisma.sale.update.mockResolvedValue(updatedSale);
 
-    const result = await service.startMercadoPagoPayment(
-      baseSale.id,
-      { id: 'admin-1', role: 'ADMIN', sub: 'admin-1' },
-      'POST /sales/:id/payments/mercadopago-qr',
-    );
+    const result = await service.getSaleStatus(baseSale.id, {
+      id: 'admin-1',
+      role: 'ADMIN',
+    });
 
-    expect(result.status).toBe(SaleStatus.PENDING_PAYMENT);
-    expect(mpService.createOrUpdateOrder).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe(SaleStatus.PENDING);
   });
 
   it('bloquea a non-admin si intenta cobrar ventas ajenas', async () => {
@@ -74,13 +79,9 @@ describe('SalesService MercadoPago QR auth', () => {
     prisma.sale.findUnique.mockResolvedValue(baseSale);
 
     await expect(
-      service.startMercadoPagoPayment(
-        baseSale.id,
-        { id: 'user-2', role: 'USER', sub: 'user-2' },
-        'POST /sales/:id/payments/mercadopago-qr',
-      ),
+      service.cancelQrSale(baseSale.id, { id: 'user-2', role: 'USER' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(mpService.createOrUpdateOrder).not.toHaveBeenCalled();
+    expect(mpService.deleteOrder).not.toHaveBeenCalled();
   });
 
   it('permite a ADMIN cancelar el cobro aunque no sea owner', async () => {
@@ -91,26 +92,12 @@ describe('SalesService MercadoPago QR auth', () => {
       status: SaleStatus.CANCELLED,
     });
 
-    const result = await service.cancelMercadoPagoPayment(
-      baseSale.id,
-      { id: 'admin-1', role: 'ADMIN', sub: 'admin-1' },
-      'POST /sales/:id/payments/mercadopago-qr/cancel',
-    );
+    const result = await service.cancelQrSale(baseSale.id, {
+      id: 'admin-1',
+      role: 'ADMIN',
+    });
 
     expect(result.status).toBe(SaleStatus.CANCELLED);
     expect(mpService.deleteOrder).toHaveBeenCalledTimes(1);
-  });
-
-  it('falla si se intenta autorizar con sessionId en lugar de userId', async () => {
-    const { service, prisma } = buildService();
-    prisma.sale.findUnique.mockResolvedValue(baseSale);
-
-    await expect(
-      service.cancelMercadoPagoPayment(
-        baseSale.id,
-        { id: 'session-1', role: 'USER', sub: 'session-1' },
-        'POST /sales/:id/payments/mercadopago-qr/cancel',
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

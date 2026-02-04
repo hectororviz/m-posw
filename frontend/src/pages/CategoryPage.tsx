@@ -1,24 +1,28 @@
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { buildImageUrl } from '../api/client';
 import { useCategories, useProductsByCategory } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
+import { CartPanel } from '../components/CartPanel';
+import { CategoryHeader } from '../components/CategoryHeader';
 import { useCart } from '../context/CartContext';
 
 export const CategoryPage: React.FC = () => {
   const { id } = useParams();
   const { data: categories } = useCategories();
   const { data: products, isLoading } = useProductsByCategory(id);
-  const { items, addItem, updateQuantity, removeItem } = useCart();
+  const { addItem } = useCart();
   const category = categories?.find((item) => item.id === id);
 
   return (
-    <AppLayout title={category?.name ?? 'Productos'}>
-      <div className="two-column">
+    <AppLayout>
+      <CategoryHeader title={category?.name ?? 'Productos'} />
+      <div className="two-column category-layout">
         <section>
           {isLoading && <p>Cargando productos...</p>}
-          <div className="grid">
+          <div className="grid product-grid">
             {products?.map((product) => {
               const imageUrl = buildImageUrl(product.imagePath, product.imageUpdatedAt);
+              const iconName = product.iconName?.trim() || 'local_cafe';
               return (
                 <button
                   type="button"
@@ -26,66 +30,28 @@ export const CategoryPage: React.FC = () => {
                   className="card product-card"
                   onClick={() => addItem(product)}
                 >
-                  <div className="card-header" style={{ background: product.colorHex || '#1f2937' }}>
+                  <div className="product-media" style={{ background: product.colorHex || '#1f2937' }}>
                     {imageUrl ? (
                       <img src={imageUrl} alt={product.name} />
                     ) : (
-                      <span className="emoji">{product.iconName || '🍽️'}</span>
+                      <span className="material-symbols-rounded product-icon" aria-hidden="true">
+                        {iconName}
+                      </span>
                     )}
-                  </div>
-                  <div className="card-body">
-                    <h3>{product.name}</h3>
-                    <p className="price">${product.price.toFixed(2)}</p>
+                    <span className="price-badge">
+                      $
+                      {product.price.toLocaleString('es-AR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
                   </div>
                 </button>
               );
             })}
           </div>
         </section>
-        <aside className="cart-panel">
-          <h2>Carrito</h2>
-          {items.length === 0 && <p>Seleccioná productos para empezar.</p>}
-          <ul>
-            {items.map((item) => (
-              <li key={item.product.id}>
-                <div>
-                  <strong>{item.product.name}</strong>
-                  <span>${item.product.price.toFixed(2)}</span>
-                </div>
-                <div className="cart-controls">
-                  <button
-                    type="button"
-                    onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                  >
-                    -
-                  </button>
-                  <input
-                    type="number"
-                    min={1}
-                    value={item.quantity}
-                    onChange={(event) =>
-                      updateQuantity(item.product.id, Number(event.target.value) || 1)
-                    }
-                  />
-                  <button
-                    type="button"
-                    onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                  >
-                    +
-                  </button>
-                  <button type="button" className="ghost-button" onClick={() => removeItem(item.product.id)}>
-                    Quitar
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="cart-footer">
-            <Link to="/checkout" className="primary-button">
-              Ir a cobrar
-            </Link>
-          </div>
-        </aside>
+        <CartPanel />
       </div>
     </AppLayout>
   );

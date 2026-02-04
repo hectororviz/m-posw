@@ -2,12 +2,14 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { CategoryPage } from './pages/CategoryPage';
-import { CheckoutPage } from './pages/CheckoutPage';
 import { AdminLayout } from './pages/AdminLayout';
 import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
 import { AdminProductsPage } from './pages/AdminProductsPage';
+import { AdminSalesPage } from './pages/AdminSalesPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
+import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { useAuth } from './context/AuthContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -47,10 +49,18 @@ export const App: React.FC = () => {
         }
       />
       <Route
-        path="/checkout"
+        path="/checkout/payment"
         element={
           <ProtectedRoute>
-            <CheckoutPage />
+            <CheckoutPaymentPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checkout/qr/:saleId"
+        element={
+          <ProtectedRoute>
+            <CheckoutQrPage />
           </ProtectedRoute>
         }
       />
@@ -67,6 +77,7 @@ export const App: React.FC = () => {
         <Route index element={<Navigate to="/admin/categories" replace />} />
         <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="products" element={<AdminProductsPage />} />
+        <Route path="sales" element={<AdminSalesPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="users" element={<AdminUsersPage />} />
       </Route>

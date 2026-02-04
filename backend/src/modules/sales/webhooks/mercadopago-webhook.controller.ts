@@ -1,138 +1,138 @@
-import { Body, Controller, Post, Query, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Headers, Logger, Post, Query, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, SaleStatus } from '@prisma/client';
-import { PrismaService } from '../../common/prisma.service';
-import { MercadoPagoInstoreService } from '../services/mercadopago-instore.service';
-
-type MpPayment = {
-  external_reference?: string | null;
-  status?: string | null;
-  date_approved?: string | null;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const getStringIdFromBody = (body: unknown): string | null => {
-  if (!isRecord(body)) {
-    return null;
-  }
-
-  const data = body['data'];
-  if (!isRecord(data)) {
-    return null;
-  }
-
-  const id = data['id'];
-  if (typeof id === 'string') {
-    return id;
-  }
-  if (typeof id === 'number') {
-    return String(id);
-  }
-  if (isRecord(id) && typeof id['toString'] === 'function') {
-    return String(id);
-  }
-
-  return null;
-};
-
-const isMpPayment = (value: unknown): value is MpPayment => {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  const props: Array<keyof MpPayment> = ['external_reference', 'status', 'date_approved'];
-  return props.every((prop) => {
-    const propValue = value[prop];
-    return propValue === undefined || propValue === null || typeof propValue === 'string';
-  });
-};
-
-const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
-  if (value === null) {
-    return null;
-  }
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return value;
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => toJsonValue(item));
-  }
-  if (isRecord(value)) {
-    const result: Record<string, Prisma.InputJsonValue> = {};
-    for (const [key, entry] of Object.entries(value)) {
-      if (entry === undefined || typeof entry === 'function') {
-        continue;
-      }
-      result[key] = toJsonValue(entry);
-    }
-    return result;
-  }
-  return String(value);
-};
+import { Request, Response } from 'express';
+import { MercadoPagoWebhookProcessorService } from '../services/mercadopago-webhook-processor.service';
+import { getManifestId, getResourceId, verifySignature } from './mercadopago-webhook.utils';
 
 @Controller('webhooks')
 export class MercadoPagoWebhookController {
+  private readonly logger = new Logger(MercadoPagoWebhookController.name);
+
   constructor(
     private config: ConfigService,
-    private prisma: PrismaService,
-    private mpService: MercadoPagoInstoreService,
+    private processor: MercadoPagoWebhookProcessorService,
   ) {}
 
   @Post('mercadopago')
-  async handleWebhook(@Body() body: Record<string, unknown>, @Query('secret') secret?: string) {
-    const expectedSecret = this.config.get<string>('MP_WEBHOOK_SECRET');
-    if (expectedSecret && secret !== expectedSecret) {
-      throw new UnauthorizedException('Webhook inválido');
+  async handleWebhook(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() body: Record<string, unknown>,
+    @Query() query: Record<string, string>,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    this.logger.log(
+      `WEBHOOK_RECEIVED ${JSON.stringify({
+        method: request.method,
+        url: request.originalUrl ?? request.url,
+        query,
+        headers,
+        body,
+      })}`,
+    );
+
+    const resourceId = getResourceId({ query, body });
+    if (!resourceId) {
+      this.logger.warn('WEBHOOK_MP_PAYMENT_ID_MISSING');
+      response.status(200).json({ ok: true });
+      return;
+    }
+    const topic =
+      (typeof body?.topic === 'string' && body.topic) ||
+      (typeof body?.type === 'string' && body.type) ||
+      query?.topic ||
+      query?.type ||
+      'unknown';
+
+    const manifestId = getManifestId({ topic, body, query });
+    const signatureResult = this.verifySignature({ headers, body }, manifestId, resourceId, topic);
+    if (!signatureResult.isValid && signatureResult.shouldReject) {
+      response.status(401).json({ ok: false });
+      return;
     }
 
-    const paymentId =
-      getStringIdFromBody(body) || body?.payment_id?.toString?.() || body?.id?.toString?.();
-
-    if (!paymentId) {
-      return { received: true };
-    }
-
-    const payment = await this.mpService.getPayment(paymentId);
-    const parsedPayment = isMpPayment(payment) ? payment : null;
-    const externalReference = parsedPayment?.external_reference ?? null;
-    if (!externalReference) {
-      return { received: true };
-    }
-
-    const sale = await this.prisma.sale.findUnique({ where: { id: externalReference } });
-    if (!sale) {
-      return { received: true };
-    }
-
-    const status = parsedPayment?.status ?? 'unknown';
-    const approvedAt = parsedPayment?.date_approved ? new Date(parsedPayment.date_approved) : null;
-
-    await this.prisma.mercadoPagoPayment.create({
-      data: {
-        saleId: sale.id,
-        paymentId: paymentId.toString(),
-        status,
-        approvedAt,
-        payload: toJsonValue(payment),
-      },
+    response.status(200).json({ ok: true });
+    setImmediate(() => {
+      void this.processor
+        .processWebhook({
+          body,
+          query,
+          resourceId,
+          requestId: signatureResult.requestId,
+          topic,
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.stack ?? error.message : String(error);
+          this.logger.error(`WEBHOOK_PROCESSING_FAILED ${message}`);
+        });
     });
+  }
 
-    if (status === 'approved' && sale.status !== SaleStatus.PAID) {
-      await this.prisma.sale.update({
-        where: { id: sale.id },
-        data: {
-          status: SaleStatus.PAID,
-          statusUpdatedAt: new Date(),
-          paidAt: approvedAt ?? new Date(),
-        },
-      });
+  private verifySignature(
+    req: { headers: Record<string, string | string[] | undefined>; body: Record<string, unknown> },
+    manifestId: string | null,
+    resourceId: string,
+    topic: string,
+  ) {
+    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
+    const strictPayment = this.isStrictPaymentEnabled();
+
+    if (!secret) {
+      if (isProduction) {
+        this.logger.error('WEBHOOK_MP_SECRET_MISSING');
+        if (topic === 'payment' && strictPayment) {
+          return { isValid: false, shouldReject: true };
+        }
+        return { isValid: false, shouldReject: false };
+      }
+      this.logger.warn('WEBHOOK_MP_SECRET_MISSING_NON_STRICT');
+      return { isValid: true, requestId: undefined, shouldReject: false };
     }
 
-    return { received: true };
+    const result = verifySignature({ headers: req.headers }, manifestId, secret);
+
+    const receivedSignatureSnippet = result.v1?.slice(0, 8) ?? 'unknown';
+    const calculatedHashSnippet = result.digest?.slice(0, 8) ?? 'unknown';
+    const manifestHash = result.manifestHash ?? null;
+    this.logger.debug(
+      `WEBHOOK_MP_SIGNATURE_DEBUG received=${receivedSignatureSnippet} calculated=${calculatedHashSnippet} manifestSha256=${manifestHash ?? 'unknown'}`,
+    );
+
+    if (!result.isValid) {
+      this.logger.warn(
+        `WEBHOOK_MP_SIGNATURE_INVALID ts=${result.ts ?? 'unknown'} received=${receivedSignatureSnippet} calculated=${calculatedHashSnippet} resourceId=${resourceId} requestId=${result.requestId ?? 'unknown'}`,
+      );
+      if (topic === 'merchant_order') {
+        this.logger.warn(
+          `WEBHOOK_MP_SIGNATURE_INVALID_NON_STRICT topic=merchant_order requestId=${result.requestId ?? 'unknown'}`,
+        );
+        return { isValid: false, requestId: result.requestId, shouldReject: false };
+      }
+      return {
+        isValid: false,
+        requestId: result.requestId,
+        shouldReject: topic === 'payment' && strictPayment,
+      };
+    }
+
+    if (topic === 'merchant_order') {
+      this.logger.log(
+        `WEBHOOK_MP_SIGNATURE_VALID topic=merchant_order requestId=${result.requestId ?? 'unknown'}`,
+      );
+    }
+
+    return { isValid: true, requestId: result.requestId, shouldReject: false };
+  }
+
+  private isStrictPaymentEnabled() {
+    const raw = this.config.get<string | boolean>('MP_WEBHOOK_STRICT_PAYMENT');
+    if (raw === true || raw === 'true' || raw === '1') {
+      return true;
+    }
+    if (raw === false || raw === 'false' || raw === '0' || raw === undefined || raw === null) {
+      return false;
+    }
+    return Boolean(raw);
   }
 }

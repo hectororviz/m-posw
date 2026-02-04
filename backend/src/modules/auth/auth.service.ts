@@ -7,20 +7,29 @@ import { PrismaService } from '../common/prisma.service';
 export class AuthService {
   constructor(private prisma: PrismaService, private jwtService: JwtService) {}
 
-  async validateUser(username: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { name: username } });
+  async validateUser(identifier: { email?: string; name?: string }, credential: string) {
+    if (!identifier.email && !identifier.name) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+    const user = identifier.email
+      ? await this.prisma.user.findUnique({ where: { email: identifier.email } })
+      : await this.prisma.user.findUnique({ where: { name: identifier.name! } });
     if (!user || !user.active) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    const valid = await bcrypt.compare(password, user.password);
+    const valid = await bcrypt.compare(credential, user.password);
     if (!valid) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
     return user;
   }
 
-  async login(username: string, password: string) {
-    const user = await this.validateUser(username, password);
+  async login(dto: { email?: string; name?: string; password?: string; pin?: string }) {
+    const credential = dto.pin ?? dto.password;
+    if (!credential) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+    const user = await this.validateUser({ email: dto.email, name: dto.name }, credential);
     const session = await this.prisma.$transaction(async (tx) => {
       await tx.session.updateMany({
         where: { userId: user.id, revokedAt: null },

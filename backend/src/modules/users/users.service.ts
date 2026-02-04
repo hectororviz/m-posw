@@ -81,6 +81,21 @@ export class UsersService {
     });
   }
 
+  listForLogin() {
+    return this.prisma.user.findMany({
+      where: { active: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        active: true,
+        externalPosId: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async update(id: string, dto: UpdateUserDto) {
     const data: Record<string, unknown> = { ...dto };
     if (dto.password) {

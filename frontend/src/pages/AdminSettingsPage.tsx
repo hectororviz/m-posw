@@ -30,7 +30,10 @@ export const AdminSettingsPage: React.FC = () => {
     }
   };
 
-  const handleUpload = async (type: 'logo' | 'favicon', file?: File | null) => {
+  const handleUpload = async (
+    type: 'logo' | 'favicon' | 'animation-ok' | 'animation-error',
+    file?: File | null,
+  ) => {
     if (!file) {
       return;
     }
@@ -78,6 +81,24 @@ export const AdminSettingsPage: React.FC = () => {
             type="file"
             accept="image/png,image/svg+xml,image/x-icon"
             onChange={(event) => handleUpload('favicon', event.target.files?.[0])}
+          />
+        </label>
+      </div>
+      <div className="form-grid">
+        <label className="file-label">
+          Animacion OK
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => handleUpload('animation-ok', event.target.files?.[0])}
+          />
+        </label>
+        <label className="file-label">
+          Animacion Error
+          <input
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => handleUpload('animation-error', event.target.files?.[0])}
           />
         </label>
       </div>

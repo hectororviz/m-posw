@@ -43,6 +43,18 @@ export interface SaleItemInput {
   quantity: number;
 }
 
+export type PaymentMethod = 'CASH' | 'MP_QR';
+export type SaleStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+export type PaymentStatus =
+  | 'PENDING'
+  | 'IN_PROCESS'
+  | 'WAITING_PAYMENT'
+  | 'NONE'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'EXPIRED';
+
 export interface SaleItem {
   id: string;
   productId: string;
@@ -51,18 +63,30 @@ export interface SaleItem {
   product: Product;
 }
 
+export interface SaleUser {
+  id: string;
+  name: string;
+  email?: string | null;
+}
+
 export interface Sale {
   id: string;
   total: number;
-  status: string;
+  status: SaleStatus;
+  paymentMethod?: PaymentMethod;
+  cashReceived?: number | null;
+  changeAmount?: number | null;
   createdAt: string;
   items: SaleItem[];
+  user?: SaleUser;
 }
 
 export interface Setting {
   storeName?: string | null;
   logoUrl?: string | null;
   faviconUrl?: string | null;
+  okAnimationUrl?: string | null;
+  errorAnimationUrl?: string | null;
   accentColor?: string | null;
 }
 

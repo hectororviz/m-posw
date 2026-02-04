@@ -4,9 +4,19 @@ import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
 import { MercadoPagoWebhookController } from './webhooks/mercadopago-webhook.controller';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
+import { MercadoPagoQueryService } from './services/mercadopago-query.service';
+import { MercadoPagoWebhookProcessorService } from './services/mercadopago-webhook-processor.service';
+import { SalesGateway } from './websockets/sales.gateway';
 
 @Module({
   controllers: [SalesController, MercadoPagoWebhookController],
-  providers: [SalesService, PrismaService, MercadoPagoInstoreService],
+  providers: [
+    SalesService,
+    PrismaService,
+    MercadoPagoInstoreService,
+    MercadoPagoQueryService,
+    MercadoPagoWebhookProcessorService,
+    SalesGateway,
+  ],
 })
 export class SalesModule {}

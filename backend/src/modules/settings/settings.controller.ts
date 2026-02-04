@@ -56,6 +56,20 @@ const faviconUploadOptions = {
   },
 };
 
+const allowedAnimationTypes = new Set(['application/json', 'text/plain', 'application/octet-stream']);
+const animationUploadOptions = {
+  storage: logoUploadOptions.storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req: unknown, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+    const extension = extname(file.originalname).toLowerCase();
+    if (!allowedAnimationTypes.has(file.mimetype) && extension !== '.json') {
+      cb(new BadRequestException('Tipo de archivo inválido para animación'), false);
+      return;
+    }
+    cb(null, true);
+  },
+};
+
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
@@ -93,5 +107,27 @@ export class SettingsController {
       throw new BadRequestException('Favicon requerido');
     }
     return this.settingsService.update({ faviconUrl: `/uploads/${SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
+  }
+
+  @Post('animation-ok')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('file', animationUploadOptions))
+  uploadOkAnimation(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Animación OK requerida');
+    }
+    return this.settingsService.update({ okAnimationUrl: `/uploads/${SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
+  }
+
+  @Post('animation-error')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @UseInterceptors(FileInterceptor('file', animationUploadOptions))
+  uploadErrorAnimation(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Animación Error requerida');
+    }
+    return this.settingsService.update({ errorAnimationUrl: `/uploads/${SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
   }
 }

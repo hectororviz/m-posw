@@ -14,12 +14,23 @@ enum Role {
 }
 
 enum SaleStatus {
-  OPEN
-  PENDING_PAYMENT
-  PAID
-  CANCELLED
+  PENDING
+  APPROVED
+  REJECTED
   EXPIRED
-  FAILED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  MP_QR
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
 }
 
 model User {
@@ -71,13 +82,24 @@ model Sale {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   total     Decimal    @db.Decimal(10, 2)
-  status    SaleStatus @default(OPEN)
+  status    SaleStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod
   statusUpdatedAt DateTime @default(now())
   paymentStartedAt DateTime?
   paidAt    DateTime?
   cancelledAt DateTime?
   expiredAt DateTime?
-  failedAt  DateTime?
+  cashReceived Decimal? @db.Decimal(10, 2)
+  changeAmount Decimal? @db.Decimal(10, 2)
+  mpExternalReference String?
+  mpOrderId String?
+  mpPaymentId String?
+  mpMerchantOrderId String?
+  mpQrData String?
+  mpStatus String?
+  mpStatusDetail String?
+  mpRaw Json?
   userId    String     @db.Uuid
   user      User       @relation(fields: [userId], references: [id])
   items     SaleItem[]
@@ -118,11 +140,23 @@ model MercadoPagoPayment {
   @@index([saleId])
 }
 
+model PaymentEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  provider  String
+  topic     String
+  resourceId String
+  createdAt DateTime @default(now())
+
+  @@unique([provider, topic, resourceId])
+}
+
 model Setting {
   id          String   @id @default(uuid()) @db.Uuid
   storeName   String
   logoUrl     String?
   faviconUrl  String?
+  okAnimationUrl String?
+  errorAnimationUrl String?
   accentColor String?  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
