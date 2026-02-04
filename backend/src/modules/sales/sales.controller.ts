@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs
 import { Role } from '@prisma/client';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
+import { RequireCashOpenGuard } from '../common/require-cash-open.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { CreateCashSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
@@ -14,12 +15,14 @@ export class SalesController {
 
   @Post('cash')
   @Roles(Role.ADMIN, Role.USER)
+  @UseGuards(RequireCashOpenGuard)
   createCash(@Req() req: { user: { sub: string } }, @Body() dto: CreateCashSaleDto) {
     return this.salesService.createCashSale(req.user.sub, dto);
   }
 
   @Post('qr')
   @Roles(Role.ADMIN, Role.USER)
+  @UseGuards(RequireCashOpenGuard)
   createQr(@Req() req: { user: { sub: string } }, @Body() dto: CreateQrSaleDto) {
     return this.salesService.createQrSale(req.user.sub, dto);
   }
@@ -65,6 +68,7 @@ export class SalesController {
 
   @Post(':id/complete')
   @Roles(Role.ADMIN, Role.USER)
+  @UseGuards(RequireCashOpenGuard)
   completeSale(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
