@@ -663,6 +663,154 @@ button {
   border-bottom: none;
 }
 
+.admin-stats__filters {
+  align-items: end;
+}
+
+.admin-stats__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-stats__panel {
+  background: #ffffff;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  padding: 1.25rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-stats__panel header h3 {
+  margin: 0 0 0.25rem;
+}
+
+.admin-stats__panel header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.admin-stats__panel--wide {
+  margin-top: 1rem;
+}
+
+.admin-stats__empty {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  color: #475569;
+  text-align: center;
+}
+
+.admin-stats__bar-chart {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-stats__bar-track {
+  height: 0.65rem;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.admin-stats__bar-fill {
+  height: 100%;
+  background: var(--accent-color);
+  border-radius: 999px;
+}
+
+.admin-stats__bar-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.95rem;
+  margin-top: 0.35rem;
+}
+
+.admin-stats__pie {
+  display: grid;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.admin-stats__pie-chart {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  margin: 0 auto;
+  border: 10px solid #ffffff;
+  box-shadow: inset 0 0 0 1px #e2e8f0;
+}
+
+.admin-stats__legend {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-stats__legend-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.admin-stats__legend-item strong {
+  display: block;
+}
+
+.admin-stats__legend-item span {
+  color: #64748b;
+}
+
+.admin-stats__legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+}
+
+.admin-stats__legend-percent {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.admin-stats__daily-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.admin-stats__daily-bar {
+  display: grid;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.admin-stats__daily-bar-fill {
+  height: 160px;
+  background: #f1f5f9;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: flex-end;
+  padding: 0.4rem;
+}
+
+.admin-stats__daily-bar-fill span {
+  width: 100%;
+  border-radius: 0.5rem;
+  background: #38bdf8;
+}
+
+.admin-stats__daily-meta {
+  display: grid;
+  gap: 0.1rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
