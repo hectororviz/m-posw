@@ -23,10 +23,17 @@ type TicketItem = {
   name: string;
 };
 
+type TicketLine = {
+  label: string;
+  value: string;
+};
+
 type TicketPayload = {
   clubName?: string;
   storeName?: string;
   dateTimeISO?: string;
+  criteria?: TicketLine[];
+  summary?: TicketLine[];
   items?: TicketItem[];
   total?: number;
   thanks?: string;
@@ -117,32 +124,66 @@ export const PrintTicketPage: React.FC = () => {
 
   const items = ticket.items ?? [];
   const total = ticket.total ?? 0;
+  const criteria = ticket.criteria ?? [];
+  const summary = ticket.summary ?? [];
+  const showItems = items.length > 0;
+  const showSummary = summary.length > 0;
+  const showCriteria = criteria.length > 0;
 
   return (
     <div className="ticket-page">
       {ticket.clubName && <p className="ticket-club">{ticket.clubName}</p>}
       <h1 className="ticket-title">{ticket.storeName ?? 'SOLER - Bufet'}</h1>
       <p className="ticket-date">{formatDateTime(ticket.dateTimeISO)}</p>
-      <div className="ticket-divider" />
-      <ul className="ticket-items">
-        {items.map((item, index) => {
-          const isLong = item.name.length > 14;
-          return (
-            <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
-              <span className="ticket-item-qty">{item.qty}x</span>
-              <span className="ticket-item-name">{item.name.toUpperCase()}</span>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="ticket-divider" />
-      <div className="ticket-total">
-        <span>Total</span>
-        <strong>{formatCurrency(total)}</strong>
-      </div>
-      <div className="ticket-divider" />
-      <p className="ticket-thanks">{ticket.thanks ?? 'Gracias por tu compra'}</p>
-      <p className="ticket-footer">{ticket.footer ?? 'Ticket no fiscal'}</p>
+      {showCriteria && (
+        <>
+          <div className="ticket-divider" />
+          <div className="ticket-criteria">
+            {criteria.map((line) => (
+              <div className="ticket-criteria-row" key={`${line.label}-${line.value}`}>
+                <span>{line.label}</span>
+                <strong>{line.value}</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {showItems && (
+        <>
+          <div className="ticket-divider" />
+          <ul className="ticket-items">
+            {items.map((item, index) => {
+              const isLong = item.name.length > 14;
+              return (
+                <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
+                  <span className="ticket-item-qty">{item.qty}x</span>
+                  <span className="ticket-item-name">{item.name.toUpperCase()}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="ticket-divider" />
+          <div className="ticket-total">
+            <span>Total</span>
+            <strong>{formatCurrency(total)}</strong>
+          </div>
+        </>
+      )}
+      {showSummary && (
+        <>
+          <div className="ticket-divider" />
+          <div className="ticket-summary">
+            {summary.map((line) => (
+              <div className="ticket-summary-row" key={`${line.label}-${line.value}`}>
+                <span>{line.label}</span>
+                <strong>{line.value}</strong>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {ticket.thanks && <p className="ticket-thanks">{ticket.thanks}</p>}
+      {ticket.footer && <p className="ticket-footer">{ticket.footer}</p>}
       <button type="button" className="primary-button no-print" onClick={() => window.print()}>
         Imprimir
       </button>

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useAdminSales } from '../api/queries';
+import { useAdminSales, useSettings } from '../api/queries';
+import type { TicketPayload } from '../utils/ticketPrinting';
+import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
   value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
@@ -17,10 +19,35 @@ const formatTime = (value: string) =>
     minute: '2-digit',
   });
 
+const formatDateTime = (value: string) => {
+  const date = new Date(value);
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear().toString().slice(-2);
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${day}/${month}/${year} - ${hours}:${minutes}`;
+};
+
+const encodeBase64Url = (value: string) => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  const base64 = window.btoa(binary);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
 export const AdminSalesPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
+  const { data: settings } = useSettings();
+  const { pushToast } = useToast();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
+  const [printStart, setPrintStart] = useState('');
+  const [printEnd, setPrintEnd] = useState('');
 
   const rows = useMemo(() => {
     return sales.flatMap((sale) =>
@@ -85,6 +112,70 @@ export const AdminSalesPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleOpenPrint = () => {
+    setPrintStart(startDate ? `${startDate}T00:00` : '');
+    setPrintEnd(endDate ? `${endDate}T23:59` : '');
+    setIsPrintOpen(true);
+  };
+
+  const handleClosePrint = () => {
+    setIsPrintOpen(false);
+  };
+
+  const handlePrint = () => {
+    const start = printStart ? new Date(printStart) : null;
+    const end = printEnd ? new Date(printEnd) : null;
+    const rowsForPrint = rows.filter((row) => {
+      const createdAt = new Date(row.createdAt);
+      if (start && createdAt < start) {
+        return false;
+      }
+      if (end && createdAt > end) {
+        return false;
+      }
+      return true;
+    });
+
+    if (rowsForPrint.length === 0) {
+      pushToast('No hay ventas para imprimir con ese rango.', 'error');
+      return;
+    }
+
+    const totalProducts = rowsForPrint.reduce((acc, row) => acc + row.quantity, 0);
+    const totalCash = rowsForPrint
+      .filter((row) => row.paymentMethod !== 'MP_QR')
+      .reduce((acc, row) => acc + row.total, 0);
+    const totalQr = rowsForPrint
+      .filter((row) => row.paymentMethod === 'MP_QR')
+      .reduce((acc, row) => acc + row.total, 0);
+
+    const payload: TicketPayload = {
+      clubName: settings?.clubName ?? '',
+      storeName: settings?.storeName ?? 'SOLER - Bufet',
+      dateTimeISO: new Date().toISOString(),
+      criteria: [
+        { label: 'Desde', value: printStart ? formatDateTime(printStart) : 'Sin filtro' },
+        { label: 'Hasta', value: printEnd ? formatDateTime(printEnd) : 'Sin filtro' },
+      ],
+      summary: [
+        { label: 'Productos vendidos', value: totalProducts.toString() },
+        { label: 'Total efectivo', value: formatCurrency(totalCash) },
+        { label: 'Total QR', value: formatCurrency(totalQr) },
+      ],
+    };
+
+    const ticketParam = encodeBase64Url(JSON.stringify(payload));
+    const url = `/print/ticket?ticket=${ticketParam}&autoPrint=1&autoClose=1`;
+    const popup = window.open(url, '_blank', 'noopener,noreferrer');
+
+    if (!popup) {
+      pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error');
+      return;
+    }
+
+    setIsPrintOpen(false);
+  };
+
   return (
     <section className="card admin-sales">
       <h2>Ventas</h2>
@@ -105,6 +196,9 @@ export const AdminSalesPage: React.FC = () => {
         <div className="row-actions">
           <button className="primary-button" onClick={handleDownload} disabled={filteredRows.length === 0}>
             Descargar Excel
+          </button>
+          <button className="secondary-button" onClick={handleOpenPrint}>
+            Imprimir
           </button>
         </div>
       </div>
@@ -136,6 +230,44 @@ export const AdminSalesPage: React.FC = () => {
           ))
         )}
       </div>
+      {isPrintOpen && (
+        <div className="modal-backdrop" onClick={handleClosePrint} role="presentation">
+          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Imprimir detalle</h2>
+              <button type="button" className="icon-button" onClick={handleClosePrint} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="input-field">
+                Desde
+                <input
+                  type="datetime-local"
+                  value={printStart}
+                  onChange={(event) => setPrintStart(event.target.value)}
+                />
+              </label>
+              <label className="input-field">
+                Hasta
+                <input
+                  type="datetime-local"
+                  value={printEnd}
+                  onChange={(event) => setPrintEnd(event.target.value)}
+                />
+              </label>
+              <div className="checkout-actions">
+                <button type="button" className="secondary-button" onClick={handleClosePrint}>
+                  Cancelar
+                </button>
+                <button type="button" className="primary-button" onClick={handlePrint}>
+                  Imprimir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

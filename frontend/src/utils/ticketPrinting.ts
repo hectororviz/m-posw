@@ -6,14 +6,21 @@ export type TicketItemPayload = {
   name: string;
 };
 
+export type TicketLinePayload = {
+  label: string;
+  value: string;
+};
+
 export type TicketPayload = {
   clubName?: string;
   storeName?: string;
   dateTimeISO?: string;
-  items: TicketItemPayload[];
-  total: number;
-  thanks: string;
-  footer: string;
+  criteria?: TicketLinePayload[];
+  summary?: TicketLinePayload[];
+  items?: TicketItemPayload[];
+  total?: number;
+  thanks?: string;
+  footer?: string;
 };
 
 type PrintTicketInput = {
