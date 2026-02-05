@@ -95,6 +95,7 @@ export const AdminSalesPage: React.FC = () => {
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
   const [isSavingMovement, setIsSavingMovement] = useState(false);
+  const [activeMovementField, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -236,6 +237,7 @@ export const AdminSalesPage: React.FC = () => {
     setMovementType('ENTRADA');
     setMovementAmount('');
     setMovementReason('');
+    setActiveMovementField('amount');
     setIsMovementOpen(true);
   };
 
@@ -268,6 +270,35 @@ export const AdminSalesPage: React.FC = () => {
   };
 
   const isMovementValid = Number(movementAmount) > 0 && movementReason.trim().length > 0;
+
+  const handleAmountKeyPress = (key: string) => {
+    setActiveMovementField('amount');
+    if (key === '⌫') {
+      setMovementAmount((current) => current.slice(0, -1));
+      return;
+    }
+
+    if (key === '.' && movementAmount.includes('.')) {
+      return;
+    }
+
+    setMovementAmount((current) => `${current}${key}`);
+  };
+
+  const handleReasonKeyPress = (key: string) => {
+    setActiveMovementField('reason');
+    if (key === '⌫') {
+      setMovementReason((current) => current.slice(0, -1));
+      return;
+    }
+
+    if (key === 'ESPACIO') {
+      setMovementReason((current) => `${current} `);
+      return;
+    }
+
+    setMovementReason((current) => `${current}${key.toLowerCase()}`);
+  };
 
   const handlePrint = () => {
     const start = printStart ? new Date(printStart) : null;
@@ -565,15 +596,35 @@ export const AdminSalesPage: React.FC = () => {
               <label className="input-field">
                 Monto
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
                   inputMode="decimal"
                   placeholder="0"
                   value={movementAmount}
+                  onFocus={() => setActiveMovementField('amount')}
                   onChange={(event) => setMovementAmount(event.target.value)}
                 />
               </label>
+              <div className="admin-sales__keyboard" aria-label="Teclado numérico para monto">
+                {[
+                  ['1', '2', '3'],
+                  ['4', '5', '6'],
+                  ['7', '8', '9'],
+                  ['.', '0', '⌫'],
+                ].map((row, rowIndex) => (
+                  <div key={`amount-row-${rowIndex}`} className="admin-sales__keyboard-row">
+                    {row.map((key) => (
+                      <button
+                        type="button"
+                        key={key}
+                        className="admin-sales__key"
+                        onClick={() => handleAmountKeyPress(key)}
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
               <label className="input-field">
                 Motivo
                 <input
@@ -581,9 +632,44 @@ export const AdminSalesPage: React.FC = () => {
                   inputMode="text"
                   placeholder="Describí el motivo"
                   value={movementReason}
+                  onFocus={() => setActiveMovementField('reason')}
                   onChange={(event) => setMovementReason(event.target.value)}
                 />
               </label>
+              <div className="admin-sales__mini-keyboard" aria-label="Teclado para motivo">
+                {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map((row) => (
+                  <div key={row} className="admin-sales__keyboard-row">
+                    {row.split('').map((letter) => (
+                      <button
+                        type="button"
+                        key={letter}
+                        className="admin-sales__key admin-sales__key--small"
+                        onClick={() => handleReasonKeyPress(letter)}
+                      >
+                        {letter}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                <div className="admin-sales__keyboard-row">
+                  <button
+                    type="button"
+                    className="admin-sales__key admin-sales__key--wide"
+                    onClick={() => handleReasonKeyPress('ESPACIO')}
+                  >
+                    Espacio
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-sales__key admin-sales__key--small"
+                    onClick={() =>
+                      activeMovementField === 'amount' ? handleAmountKeyPress('⌫') : handleReasonKeyPress('⌫')
+                    }
+                  >
+                    ⌫
+                  </button>
+                </div>
+              </div>
               <div className="checkout-actions">
                 <button type="button" className="secondary-button" onClick={handleCloseMovement}>
                   Cancelar
