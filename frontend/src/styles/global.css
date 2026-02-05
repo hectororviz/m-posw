@@ -803,7 +803,7 @@ button {
   border-color: #166534;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 480px) {
   .admin-sales__movement-main {
     grid-template-columns: 1fr;
   }
@@ -813,7 +813,35 @@ button {
   }
 
   .admin-sales__movement-modal {
-    padding: 1.2rem;
+    width: 100%;
+    padding: 1rem;
+    border-radius: 1.1rem;
+  }
+
+  .admin-sales__movement-type {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .admin-sales__keyboard-row {
+    gap: 0.35rem;
+  }
+
+  .admin-sales__key {
+    flex: 1;
+    min-width: 0;
+    min-height: 2.6rem;
+    padding: 0.5rem;
+  }
+
+  .admin-sales__key--small {
+    min-height: 2.35rem;
+    font-size: 0.8rem;
+  }
+
+  .admin-sales__movement-form .checkout-actions {
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }
 
