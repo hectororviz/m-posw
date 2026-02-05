@@ -123,8 +123,8 @@ a {
   border-radius: 0.75rem;
   border-width: 1px;
   border-style: solid;
-  color: var(--accent-color);
-  background: #ffffff;
+  color: #f9fafb;
+  background: transparent;
   border-color: rgba(255, 255, 255, 0.65);
   font-weight: 700;
   line-height: 1;
