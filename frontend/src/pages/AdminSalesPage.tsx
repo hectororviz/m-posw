@@ -4,11 +4,16 @@ import { useAdminSales, useSettings } from '../api/queries';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 
-const formatCurrency = (value: number) =>
-  `$ ${value.toLocaleString('es-AR', {
+const formatCurrency = (value: number | string) => {
+  const normalizedValue = Number(value);
+  const amount = Number.isFinite(normalizedValue) ? normalizedValue : 0;
+
+  return `$ ${amount.toLocaleString('es-AR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+    useGrouping: true,
   })}`;
+};
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', {
