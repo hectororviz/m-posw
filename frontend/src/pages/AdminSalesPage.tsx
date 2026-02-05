@@ -59,6 +59,10 @@ export const AdminSalesPage: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isPrintOpen, setIsPrintOpen] = useState(false);
+  const [isMovementOpen, setIsMovementOpen] = useState(false);
+  const [movementType, setMovementType] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
+  const [movementAmount, setMovementAmount] = useState('');
+  const [movementReason, setMovementReason] = useState('');
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
@@ -126,6 +130,24 @@ export const AdminSalesPage: React.FC = () => {
   const handleClosePrint = () => {
     setIsPrintOpen(false);
   };
+
+  const handleOpenMovement = () => {
+    setMovementType('ENTRADA');
+    setMovementAmount('');
+    setMovementReason('');
+    setIsMovementOpen(true);
+  };
+
+  const handleCloseMovement = () => {
+    setIsMovementOpen(false);
+  };
+
+  const handleSaveMovement = () => {
+    pushToast('Movimiento agregado correctamente.', 'success');
+    setIsMovementOpen(false);
+  };
+
+  const isMovementValid = Number(movementAmount) > 0 && movementReason.trim().length > 0;
 
   const handlePrint = () => {
     const start = printStart ? new Date(printStart) : null;
@@ -253,6 +275,9 @@ export const AdminSalesPage: React.FC = () => {
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
         <div className="row-actions">
+          <button type="button" className="secondary-button" onClick={handleOpenMovement}>
+            Agregar movimiento
+          </button>
           <button className="primary-button" onClick={handleDownload} disabled={filteredSales.length === 0}>
             Descargar Excel
           </button>
@@ -368,6 +393,77 @@ export const AdminSalesPage: React.FC = () => {
                 </button>
                 <button type="button" className="primary-button" onClick={handlePrint}>
                   Imprimir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isMovementOpen && (
+        <div className="modal-backdrop" onClick={handleCloseMovement} role="presentation">
+          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Agregar movimiento</h2>
+              <button type="button" className="icon-button" onClick={handleCloseMovement} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body admin-sales__movement-form">
+              <fieldset className="admin-sales__movement-type" aria-label="Tipo de movimiento">
+                <label>
+                  <input
+                    type="radio"
+                    name="movement-type"
+                    value="ENTRADA"
+                    checked={movementType === 'ENTRADA'}
+                    onChange={() => setMovementType('ENTRADA')}
+                  />
+                  Entrada
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="movement-type"
+                    value="SALIDA"
+                    checked={movementType === 'SALIDA'}
+                    onChange={() => setMovementType('SALIDA')}
+                  />
+                  Salida
+                </label>
+              </fieldset>
+              <label className="input-field">
+                Monto
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={movementAmount}
+                  onChange={(event) => setMovementAmount(event.target.value)}
+                />
+              </label>
+              <label className="input-field">
+                Motivo
+                <input
+                  type="text"
+                  inputMode="text"
+                  placeholder="Describí el motivo"
+                  value={movementReason}
+                  onChange={(event) => setMovementReason(event.target.value)}
+                />
+              </label>
+              <div className="checkout-actions">
+                <button type="button" className="secondary-button" onClick={handleCloseMovement}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleSaveMovement}
+                  disabled={!isMovementValid}
+                >
+                  Guardar movimiento
                 </button>
               </div>
             </div>
