@@ -83,6 +83,16 @@ export interface Sale {
   user?: SaleUser;
 }
 
+
+export interface ManualMovement {
+  id: string;
+  createdAt: string;
+  type: 'ENTRADA' | 'SALIDA';
+  amount: number;
+  reason: string;
+  userId: string;
+}
+
 export interface Setting {
   storeName?: string | null;
   clubName?: string | null;

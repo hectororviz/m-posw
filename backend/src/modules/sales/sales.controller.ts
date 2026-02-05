@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
+import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
 import { SalesService } from './sales.service';
 
@@ -28,6 +29,22 @@ export class SalesController {
   @Roles(Role.ADMIN, Role.USER)
   list() {
     return this.salesService.listSales();
+  }
+
+
+  @Post('manual-movements')
+  @Roles(Role.ADMIN, Role.USER)
+  createManualMovement(
+    @Req() req: { user: { sub: string } },
+    @Body() dto: CreateManualMovementDto,
+  ) {
+    return this.salesService.createManualMovement(req.user.sub, dto);
+  }
+
+  @Get('manual-movements')
+  @Roles(Role.ADMIN, Role.USER)
+  listManualMovements() {
+    return this.salesService.listManualMovements();
   }
 
   @Get(':id')

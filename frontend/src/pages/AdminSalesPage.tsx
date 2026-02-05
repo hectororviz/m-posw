@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAdminSales, useSettings } from '../api/queries';
+import { useAdminSales, useManualMovements, useSettings } from '../api/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 
@@ -57,14 +58,6 @@ const encodeBase64Url = (value: string) => {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
 
-type ManualMovement = {
-  id: string;
-  createdAt: string;
-  type: 'ENTRADA' | 'SALIDA';
-  amount: number;
-  reason: string;
-};
-
 type SalesTableEntry =
   | {
       kind: 'SALE';
@@ -88,6 +81,8 @@ type SalesTableEntry =
 export const AdminSalesPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
   const { data: settings } = useSettings();
+  const { data: movements = [] } = useManualMovements();
+  const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -99,7 +94,7 @@ export const AdminSalesPage: React.FC = () => {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
-  const [movements, setMovements] = useState<ManualMovement[]>([]);
+  const [isSavingMovement, setIsSavingMovement] = useState(false);
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -248,23 +243,28 @@ export const AdminSalesPage: React.FC = () => {
     setIsMovementOpen(false);
   };
 
-  const handleSaveMovement = () => {
+  const handleSaveMovement = async () => {
     const amount = Number(movementAmount);
-    if (!Number.isFinite(amount) || amount <= 0 || movementReason.trim().length === 0) {
+    const reason = movementReason.trim();
+    if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) {
       return;
     }
-    setMovements((currentMovements) => [
-      {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
+
+    setIsSavingMovement(true);
+    try {
+      await apiClient.post('/sales/manual-movements', {
         type: movementType,
         amount,
-        reason: movementReason.trim(),
-      },
-      ...currentMovements,
-    ]);
-    pushToast('Movimiento agregado correctamente.', 'success');
-    setIsMovementOpen(false);
+        reason,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['manual-movements'] });
+      pushToast('Movimiento agregado correctamente.', 'success');
+      setIsMovementOpen(false);
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    } finally {
+      setIsSavingMovement(false);
+    }
   };
 
   const isMovementValid = Number(movementAmount) > 0 && movementReason.trim().length > 0;
@@ -592,9 +592,9 @@ export const AdminSalesPage: React.FC = () => {
                   type="button"
                   className="primary-button"
                   onClick={handleSaveMovement}
-                  disabled={!isMovementValid}
+                  disabled={!isMovementValid || isSavingMovement}
                 >
-                  Guardar movimiento
+                  {isSavingMovement ? 'Guardando...' : 'Guardar movimiento'}
                 </button>
               </div>
             </div>
