@@ -1,21 +1,102 @@
-import { Injectable } from '@nestjs/common';
-import { PaymentStatus, PaymentMethod, Prisma, SaleStatus } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { MovementType, PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
+
+const ZERO = new Prisma.Decimal(0);
 
 @Injectable()
 export class CashCloseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
+
+  private round(value: Prisma.Decimal) {
+    return new Prisma.Decimal(value.toDecimalPlaces(2));
+  }
+
+  private async getCurrentPeriodBounds(now: Date) {
+    const lastClose = await this.prisma.cashClose.findFirst({ orderBy: { to: 'desc' } });
+    if (lastClose) {
+      return { from: lastClose.to, to: now };
+    }
+
+    const [firstSale, firstMovement] = await Promise.all([
+      this.prisma.sale.findFirst({ select: { createdAt: true }, orderBy: { createdAt: 'asc' } }),
+      this.prisma.manualMovement.findFirst({
+        select: { createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    const firstEvent = [firstSale?.createdAt, firstMovement?.createdAt]
+      .filter((value): value is Date => Boolean(value))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+
+    return { from: firstEvent ?? now, to: now };
+  }
+
+  private async buildSummary(from: Date, to: Date) {
+    const [sales, movements] = await Promise.all([
+      this.prisma.sale.findMany({
+        where: {
+          createdAt: { gte: from, lte: to },
+          OR: [{ status: SaleStatus.APPROVED }, { paymentStatus: PaymentStatus.APPROVED }],
+        },
+        select: {
+          total: true,
+          paymentMethod: true,
+        },
+      }),
+      this.prisma.manualMovement.findMany({
+        where: {
+          createdAt: { gte: from, lte: to },
+        },
+        select: {
+          amount: true,
+          type: true,
+        },
+      }),
+    ]);
+
+    const salesCashTotal = sales
+      .filter((sale) => sale.paymentMethod === 'CASH')
+      .reduce((acc, sale) => acc.add(sale.total), ZERO);
+    const salesQrTotal = sales
+      .filter((sale) => sale.paymentMethod === 'MP_QR')
+      .reduce((acc, sale) => acc.add(sale.total), ZERO);
+    const salesTotal = salesCashTotal.add(salesQrTotal);
+
+    const movementsOutTotal = movements
+      .filter((movement) => movement.type === MovementType.SALIDA)
+      .reduce((acc, movement) => acc.add(movement.amount), ZERO);
+    const movementsInTotal = movements
+      .filter((movement) => movement.type === MovementType.ENTRADA)
+      .reduce((acc, movement) => acc.add(movement.amount), ZERO);
+    const movementsNet = movementsInTotal.sub(movementsOutTotal);
+    const netCashDelta = salesCashTotal.add(movementsNet);
+
+    return {
+      salesCashTotal: this.round(salesCashTotal),
+      salesQrTotal: this.round(salesQrTotal),
+      salesTotal: this.round(salesTotal),
+      salesCount: sales.length,
+      movementsOutTotal: this.round(movementsOutTotal),
+      movementsInTotal: this.round(movementsInTotal),
+      movementsNet: this.round(movementsNet),
+      netCashDelta: this.round(netCashDelta),
+      movementsCount: movements.length,
+    };
+  }
 
   async getCurrentPeriod() {
     const now = new Date();
-    const from = await this.resolveFrom(now);
-    const summary = await this.buildSummary(from, now);
-    return { from, to: now, summary };
+    const { from, to } = await this.getCurrentPeriodBounds(now);
+    const summary = await this.buildSummary(from, to);
+
+    return { from, to, summary };
   }
 
-  async closePeriod(userId: string, note?: string) {
-    const to = new Date();
-    const from = await this.resolveFrom(to);
+  async closeCurrentPeriod(userId: string, note?: string) {
+    const now = new Date();
+    const { from, to } = await this.getCurrentPeriodBounds(now);
     const summary = await this.buildSummary(from, to);
 
     const cashClose = await this.prisma.cashClose.create({
@@ -24,116 +105,31 @@ export class CashCloseService {
         to,
         closedAt: to,
         closedByUserId: userId,
-        note,
-        salesCashTotal: summary.salesCashTotal,
-        salesQrTotal: summary.salesQrTotal,
-        salesTotal: summary.salesTotal,
-        salesCount: summary.salesCount,
-        movementsOutTotal: summary.movementsOutTotal,
-        movementsInTotal: summary.movementsInTotal,
-        movementsNet: summary.movementsNet,
-        netCashDelta: summary.netCashDelta,
-        movementsCount: summary.movementsCount,
+        note: note?.trim() || null,
+        ...summary,
       },
     });
 
     return { cashClose, from, to, summary };
   }
 
-  getById(id: string) {
-    return this.prisma.cashClose.findUnique({ where: { id }, include: { closedBy: { select: { id: true, name: true } } } });
+  async getById(id: string) {
+    const cashClose = await this.prisma.cashClose.findUnique({
+      where: { id },
+      include: { closedBy: { select: { id: true, name: true, role: true } } },
+    });
+    if (!cashClose) {
+      throw new NotFoundException('Cierre no encontrado');
+    }
+    return cashClose;
   }
 
   list(limit = 20, offset = 0) {
     return this.prisma.cashClose.findMany({
+      include: { closedBy: { select: { id: true, name: true, role: true } } },
       orderBy: { to: 'desc' },
       take: Math.min(limit, 100),
-      skip: Math.max(offset, 0),
-      include: { closedBy: { select: { id: true, name: true } } },
+      skip: offset,
     });
-  }
-
-  async getLastCloseTo() {
-    const close = await this.prisma.cashClose.findFirst({ orderBy: { to: 'desc' }, select: { to: true } });
-    return close?.to ?? null;
-  }
-
-  private async resolveFrom(now: Date) {
-    const lastCloseTo = await this.getLastCloseTo();
-    if (lastCloseTo) {
-      return lastCloseTo;
-    }
-
-    const [firstSale, firstMovement] = await Promise.all([
-      this.prisma.sale.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
-      this.prisma.cashMovement.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
-    ]);
-
-    const candidates = [firstSale?.createdAt, firstMovement?.createdAt].filter(Boolean) as Date[];
-    if (candidates.length === 0) {
-      return now;
-    }
-    return candidates.reduce((min, current) => (current < min ? current : min));
-  }
-
-  async buildSummary(from: Date, to: Date) {
-    const saleWhere: Prisma.SaleWhereInput = {
-      createdAt: { gte: from, lte: to },
-      status: SaleStatus.APPROVED,
-      paymentStatus: PaymentStatus.APPROVED,
-    };
-
-    const [salesAgg, salesByMethod, movementAgg, movementsByType] = await Promise.all([
-      this.prisma.sale.aggregate({
-        where: saleWhere,
-        _sum: { total: true },
-        _count: { _all: true },
-      }),
-      this.prisma.sale.groupBy({ by: ['paymentMethod'], where: saleWhere, _sum: { total: true } }),
-      this.prisma.cashMovement.aggregate({
-        where: { createdAt: { gte: from, lte: to }, isVoided: false },
-        _count: { _all: true },
-      }),
-      this.prisma.cashMovement.groupBy({
-        by: ['type'],
-        where: { createdAt: { gte: from, lte: to }, isVoided: false },
-        _sum: { amount: true },
-      }),
-    ]);
-
-    const salesCashTotal = this.toNumber(
-      salesByMethod.find((item) => item.paymentMethod === PaymentMethod.CASH)?._sum.total,
-    );
-    const salesQrTotal = this.toNumber(
-      salesByMethod.find((item) => item.paymentMethod === PaymentMethod.MP_QR)?._sum.total,
-    );
-    const movementsInTotal = this.toNumber(
-      movementsByType.find((item) => item.type === 'IN')?._sum.amount,
-    );
-    const movementsOutTotal = this.toNumber(
-      movementsByType.find((item) => item.type === 'OUT')?._sum.amount,
-    );
-    const movementsNet = this.round(movementsInTotal - movementsOutTotal);
-
-    return {
-      salesCashTotal,
-      salesQrTotal,
-      salesTotal: this.round(salesCashTotal + salesQrTotal),
-      salesCount: salesAgg._count._all,
-      movementsOutTotal,
-      movementsInTotal,
-      movementsNet,
-      netCashDelta: this.round(salesCashTotal + movementsNet),
-      movementsCount: movementAgg._count._all,
-    };
-  }
-
-  private toNumber(value: Prisma.Decimal | number | null | undefined) {
-    if (value == null) return 0;
-    return Number(value);
-  }
-
-  private round(value: number) {
-    return Math.round(value * 100) / 100;
   }
 }

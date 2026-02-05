@@ -1,30 +1,35 @@
 import { useMemo, useState } from 'react';
+import { apiClient, normalizeApiError } from '../api/client';
+import { useAdminSales, useManualMovements, useSettings } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAdminSales, useSettings } from '../api/queries';
-import { apiClient } from '../api/client';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 
-type CashSummary = {
-  salesCashTotal: number;
-  salesQrTotal: number;
-  salesTotal: number;
-  salesCount: number;
-  movementsOutTotal: number;
-  movementsInTotal: number;
-  movementsNet: number;
-  netCashDelta: number;
-  movementsCount: number;
+const formatCurrency = (value: number | string) => {
+  const normalizedValue = Number(value);
+  const amount = Number.isFinite(normalizedValue) ? normalizedValue : 0;
+
+  return `$ ${amount.toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true,
+  })}`;
 };
 
-type CurrentPeriodResponse = {
-  from: string;
-  to: string;
-  summary: CashSummary;
-};
 
-const formatCurrency = (value: number) =>
-  value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+const toAmount = (value: unknown) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const normalized = trimmed.includes(',')
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', {
@@ -37,17 +42,11 @@ const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString('es-AR', {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 
-const formatDateTime = (value: string) => {
-  const date = new Date(value);
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear().toString().slice(-2);
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${day}/${month}/${year} - ${hours}:${minutes}`;
-};
+const getPaymentMethodLabel = (paymentMethod?: string) =>
+  paymentMethod === 'MP_QR' ? 'QR MercadoPago' : 'Efectivo';
 
 const encodeBase64Url = (value: string) => {
   const bytes = new TextEncoder().encode(value);
@@ -59,47 +58,132 @@ const encodeBase64Url = (value: string) => {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
 
+type SalesTableEntry =
+  | {
+      kind: 'SALE';
+      id: string;
+      createdAt: string;
+      total: number;
+      userName: string;
+      paymentLabel: string;
+      saleId: string;
+    }
+  | {
+      kind: 'MOVEMENT';
+      id: string;
+      createdAt: string;
+      total: number;
+      userName: string;
+      paymentLabel: string;
+      reason: string;
+    };
+
 export const AdminSalesPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
   const { data: settings } = useSettings();
+  const { data: movements = [] } = useManualMovements();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isPrintOpen, setIsPrintOpen] = useState(false);
-  const [printStart, setPrintStart] = useState('');
-  const [printEnd, setPrintEnd] = useState('');
   const [isMovementOpen, setIsMovementOpen] = useState(false);
-  const [movementType, setMovementType] = useState<'OUT' | 'IN'>('OUT');
+  const [movementType, setMovementType] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
   const [movementAmount, setMovementAmount] = useState('');
   const [movementReason, setMovementReason] = useState('');
-  const [isCloseOpen, setIsCloseOpen] = useState(false);
-  const [periodPreview, setPeriodPreview] = useState<CurrentPeriodResponse | null>(null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [printStart, setPrintStart] = useState('');
+  const [printEnd, setPrintEnd] = useState('');
+  const [isSavingMovement, setIsSavingMovement] = useState(false);
+  const [isClosingPeriod, setIsClosingPeriod] = useState(false);
+  const [closePreview, setClosePreview] = useState<{
+    from: string;
+    to: string;
+    summary: {
+      salesTotal: number | string;
+      salesCashTotal: number | string;
+      salesQrTotal: number | string;
+      movementsInTotal: number | string;
+      movementsOutTotal: number | string;
+      netCashDelta: number | string;
+    };
+  } | null>(null);
+  const [, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
 
-  const rows = useMemo(() => {
-    return sales.flatMap((sale) =>
-      sale.items.map((item) => ({
-        saleId: sale.id,
-        productId: item.productId,
-        createdAt: sale.createdAt,
-        quantity: item.quantity,
-        productName: item.product.name,
-        total: item.product.price * item.quantity,
-        paymentMethod: sale.paymentMethod ?? 'CASH',
-        userName: sale.user?.name ?? 'Sin usuario',
-      })),
-    );
-  }, [sales]);
+  const selectedSale = useMemo(
+    () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
+    [sales, selectedSaleId],
+  );
 
-  const filteredRows = useMemo(() => {
+  const filteredEntries = useMemo(() => {
     if (!startDate && !endDate) {
-      return rows;
+      return [
+        ...sales.map<SalesTableEntry>((sale) => ({
+          kind: 'SALE',
+          id: `sale-${sale.id}`,
+          createdAt: sale.createdAt,
+          total: sale.total,
+          userName: sale.user?.name ?? 'Sin usuario',
+          paymentLabel: getPaymentMethodLabel(sale.paymentMethod),
+          saleId: sale.id,
+        })),
+        ...movements.map<SalesTableEntry>((movement) => ({
+          kind: 'MOVEMENT',
+          id: `movement-${movement.id}`,
+          createdAt: movement.createdAt,
+          total: movement.type === 'SALIDA' ? movement.amount * -1 : movement.amount,
+          userName: 'Movimiento manual',
+          paymentLabel: movement.type,
+          reason: movement.reason,
+        })),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
     const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
+    const entries: SalesTableEntry[] = [
+      ...sales.map((sale) => ({
+        kind: 'SALE' as const,
+        id: `sale-${sale.id}`,
+        createdAt: sale.createdAt,
+        total: sale.total,
+        userName: sale.user?.name ?? 'Sin usuario',
+        paymentLabel: getPaymentMethodLabel(sale.paymentMethod),
+        saleId: sale.id,
+      })),
+      ...movements.map((movement) => ({
+        kind: 'MOVEMENT' as const,
+        id: `movement-${movement.id}`,
+        createdAt: movement.createdAt,
+        total: movement.type === 'SALIDA' ? movement.amount * -1 : movement.amount,
+        userName: 'Movimiento manual',
+        paymentLabel: movement.type,
+        reason: movement.reason,
+      })),
+    ];
 
-    return rows.filter((row) => {
-      const createdAt = new Date(row.createdAt);
+    return entries
+      .filter((entry) => {
+        const createdAt = new Date(entry.createdAt);
+        if (start && createdAt < start) {
+          return false;
+        }
+        if (end && createdAt > end) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [sales, movements, startDate, endDate]);
+
+  const filteredMovements = useMemo(() => {
+    if (!printStart && !printEnd) {
+      return movements;
+    }
+    const start = printStart ? new Date(printStart) : null;
+    const end = printEnd ? new Date(printEnd) : null;
+
+    return movements.filter((movement) => {
+      const createdAt = new Date(movement.createdAt);
       if (start && createdAt < start) {
         return false;
       }
@@ -108,22 +192,146 @@ export const AdminSalesPage: React.FC = () => {
       }
       return true;
     });
-  }, [rows, startDate, endDate]);
+  }, [movements, printStart, printEnd]);
 
-  const handleDownload = () => {
-    if (filteredRows.length === 0) {
+  const handleClosePeriod = async () => {
+    if (isClosingPeriod) {
       return;
     }
-    const headers = ['Fecha', 'Hora', 'Cantidad', 'Producto', 'Usuario', 'Total', 'Forma de pago'];
-    const data = filteredRows.map((row) => [
-      formatDate(row.createdAt),
-      formatTime(row.createdAt),
-      row.quantity.toString(),
-      row.productName,
-      row.userName,
-      formatCurrency(row.total),
-      row.paymentMethod === 'MP_QR' ? 'QR MercadoPago' : 'Efectivo',
-    ]);
+
+    setIsClosingPeriod(true);
+    try {
+      const previewResponse = await apiClient.get('/cash-close/current-period');
+      const preview = previewResponse.data as {
+        from: string;
+        to: string;
+        summary: {
+          salesTotal: number | string;
+          salesCashTotal: number | string;
+          salesQrTotal: number | string;
+          movementsInTotal: number | string;
+          movementsOutTotal: number | string;
+          netCashDelta: number | string;
+        };
+      };
+      setClosePreview(preview);
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    } finally {
+      setIsClosingPeriod(false);
+    }
+  };
+
+  const handleConfirmClosePeriod = async () => {
+    if (!closePreview || isClosingPeriod) {
+      return;
+    }
+
+    setIsClosingPeriod(true);
+    try {
+      await apiClient.post('/cash-close/close', {});
+
+      const periodStart = new Date(closePreview.from);
+      const periodEnd = new Date(closePreview.to);
+      const firstEntryAfterLastClose = movements
+        .filter((movement) => movement.type === 'ENTRADA')
+        .map((movement) => new Date(movement.createdAt))
+        .filter((createdAt) => createdAt > periodStart && createdAt <= periodEnd)
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      const detailStart = firstEntryAfterLastClose ?? periodStart;
+      const detailEnd = periodEnd;
+
+      const salesForPrint = sales.filter((sale) => {
+        const createdAt = new Date(sale.createdAt);
+        return createdAt >= detailStart && createdAt <= detailEnd;
+      });
+
+      const movementsForPrint = movements.filter((movement) => {
+        const createdAt = new Date(movement.createdAt);
+        return createdAt >= detailStart && createdAt <= detailEnd;
+      });
+
+      const itemsForPrint = salesForPrint.flatMap((sale) => sale.items).reduce((acc, item) => {
+        const existing = acc.get(item.product.name) ?? 0;
+        acc.set(item.product.name, existing + item.quantity);
+        return acc;
+      }, new Map<string, number>());
+
+      const items = Array.from(itemsForPrint.entries())
+        .map(([name, qty]) => ({ name, qty }))
+        .sort((a, b) => (b.qty !== a.qty ? b.qty - a.qty : a.name.localeCompare(b.name)));
+
+      const payload: TicketPayload = {
+        clubName: settings?.clubName ?? '',
+        storeName: settings?.storeName ?? 'SOLER - Bufet',
+        dateTimeISO: detailEnd.toISOString(),
+        itemsStyle: 'summary',
+        items,
+        total: toAmount(closePreview.summary.salesTotal),
+        criteria: [
+          { label: 'Detalle desde:', value: `${formatDate(detailStart.toISOString())} ${formatTime(detailStart.toISOString())}` },
+          { label: 'Hasta:', value: `${formatDate(detailEnd.toISOString())} ${formatTime(detailEnd.toISOString())}` },
+        ],
+        summary: [
+          { label: 'Ventas:', value: formatCurrency(closePreview.summary.salesTotal) },
+          { label: 'Efectivo:', value: formatCurrency(closePreview.summary.salesCashTotal) },
+          { label: 'QR:', value: formatCurrency(closePreview.summary.salesQrTotal) },
+          { label: 'Entradas:', value: formatCurrency(closePreview.summary.movementsInTotal) },
+          { label: 'Salidas:', value: formatCurrency(closePreview.summary.movementsOutTotal) },
+          { label: 'Neto caja:', value: formatCurrency(closePreview.summary.netCashDelta) },
+          { label: 'Movimientos:', value: movementsForPrint.length.toString() },
+          { label: 'Ventas emitidas:', value: salesForPrint.length.toString() },
+        ],
+      };
+
+      const ticketParam = encodeBase64Url(JSON.stringify(payload));
+      const url = `/print/ticket?ticket=${ticketParam}&autoPrint=1&autoClose=1`;
+      const popup = window.open(url, '_blank', 'noopener,noreferrer');
+
+      if (!popup) {
+        pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error');
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-sales'] }),
+        queryClient.invalidateQueries({ queryKey: ['manual-movements'] }),
+      ]);
+      pushToast('Cierre guardado correctamente.', 'success');
+      setClosePreview(null);
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    } finally {
+      setIsClosingPeriod(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (filteredEntries.length === 0) {
+      return;
+    }
+    const headers = ['Fecha', 'Hora', 'Usuario', 'Total', 'Forma de pago', 'Productos'];
+    const data = filteredEntries.map((entry) => {
+      if (entry.kind === 'MOVEMENT') {
+        return [
+          formatDate(entry.createdAt),
+          formatTime(entry.createdAt),
+          entry.userName,
+          formatCurrency(entry.total),
+          entry.paymentLabel,
+          entry.reason,
+        ];
+      }
+
+      const sale = sales.find((item) => item.id === entry.saleId);
+      return [
+        formatDate(entry.createdAt),
+        formatTime(entry.createdAt),
+        entry.userName,
+        formatCurrency(entry.total),
+        entry.paymentLabel,
+        sale?.items.map((item) => `${item.quantity} x ${item.product.name}`).join(' | ') ?? '',
+      ];
+    });
     const csvContent =
       '\uFEFF' +
       [headers, ...data]
@@ -145,11 +353,82 @@ export const AdminSalesPage: React.FC = () => {
     setIsPrintOpen(true);
   };
 
+  const handleClosePrint = () => {
+    setIsPrintOpen(false);
+  };
+
+  const handleOpenMovement = () => {
+    setMovementType('ENTRADA');
+    setMovementAmount('');
+    setMovementReason('');
+    setActiveMovementField('amount');
+    setIsMovementOpen(true);
+  };
+
+  const handleCloseMovement = () => {
+    setIsMovementOpen(false);
+  };
+
+  const handleSaveMovement = async () => {
+    const amount = Number(movementAmount);
+    const reason = movementReason.trim();
+    if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) {
+      return;
+    }
+
+    setIsSavingMovement(true);
+    try {
+      await apiClient.post('/sales/manual-movements', {
+        type: movementType,
+        amount,
+        reason,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['manual-movements'] });
+      pushToast('Movimiento agregado correctamente.', 'success');
+      setIsMovementOpen(false);
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    } finally {
+      setIsSavingMovement(false);
+    }
+  };
+
+  const isMovementValid = Number(movementAmount) > 0 && movementReason.trim().length > 0;
+
+  const handleAmountKeyPress = (key: string) => {
+    setActiveMovementField('amount');
+    if (key === '⌫') {
+      setMovementAmount((current) => current.slice(0, -1));
+      return;
+    }
+
+    if (key === '.' && movementAmount.includes('.')) {
+      return;
+    }
+
+    setMovementAmount((current) => `${current}${key}`);
+  };
+
+  const handleReasonKeyPress = (key: string) => {
+    setActiveMovementField('reason');
+    if (key === '⌫') {
+      setMovementReason((current) => current.slice(0, -1));
+      return;
+    }
+
+    if (key === 'ESPACIO') {
+      setMovementReason((current) => `${current} `);
+      return;
+    }
+
+    setMovementReason((current) => `${current}${key.toLowerCase()}`);
+  };
+
   const handlePrint = () => {
     const start = printStart ? new Date(printStart) : null;
     const end = printEnd ? new Date(printEnd) : null;
-    const rowsForPrint = rows.filter((row) => {
-      const createdAt = new Date(row.createdAt);
+    const salesForPrint = sales.filter((sale) => {
+      const createdAt = new Date(sale.createdAt);
       if (start && createdAt < start) {
         return false;
       }
@@ -159,27 +438,37 @@ export const AdminSalesPage: React.FC = () => {
       return true;
     });
 
-    if (rowsForPrint.length === 0) {
-      pushToast('No hay ventas para imprimir con ese rango.', 'error');
+    if (salesForPrint.length === 0 && filteredMovements.length === 0) {
+      pushToast('No hay movimientos ni ventas para imprimir con ese rango.', 'error');
       return;
     }
 
-    const itemsForPrint = rowsForPrint.reduce((acc, row) => {
-      const existing = acc.get(row.productName) ?? 0;
-      acc.set(row.productName, existing + row.quantity);
+    const itemsForPrint = salesForPrint.flatMap((sale) => sale.items).reduce((acc, item) => {
+      const existing = acc.get(item.product.name) ?? 0;
+      acc.set(item.product.name, existing + item.quantity);
       return acc;
     }, new Map<string, number>());
     const items = Array.from(itemsForPrint.entries())
       .map(([name, qty]) => ({ name, qty }))
       .sort((a, b) => (b.qty !== a.qty ? b.qty - a.qty : a.name.localeCompare(b.name)));
-    const totalProducts = rowsForPrint.reduce((acc, row) => acc + row.quantity, 0);
-    const totalCash = rowsForPrint
-      .filter((row) => row.paymentMethod !== 'MP_QR')
-      .reduce((acc, row) => acc + row.total, 0);
-    const totalQr = rowsForPrint
-      .filter((row) => row.paymentMethod === 'MP_QR')
-      .reduce((acc, row) => acc + row.total, 0);
-    const total = totalCash + totalQr;
+    const totalProducts = salesForPrint.reduce(
+      (acc, sale) => acc + sale.items.reduce((saleAcc, item) => saleAcc + item.quantity, 0),
+      0,
+    );
+    const totalCash = salesForPrint
+      .filter((sale) => sale.paymentMethod !== 'MP_QR')
+      .reduce((acc, sale) => acc + toAmount(sale.total), 0);
+    const totalQr = salesForPrint
+      .filter((sale) => sale.paymentMethod === 'MP_QR')
+      .reduce((acc, sale) => acc + toAmount(sale.total), 0);
+    const total = toAmount(totalCash) + toAmount(totalQr);
+    const totalMovementIn = filteredMovements
+      .filter((movement) => movement.type === 'ENTRADA')
+      .reduce((acc, movement) => acc + toAmount(movement.amount), 0);
+    const totalMovementOut = filteredMovements
+      .filter((movement) => movement.type === 'SALIDA')
+      .reduce((acc, movement) => acc + toAmount(movement.amount), 0);
+    const totalCashInDrawer = totalCash + totalMovementIn - totalMovementOut;
 
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
@@ -188,15 +477,15 @@ export const AdminSalesPage: React.FC = () => {
       itemsStyle: 'summary',
       items,
       total,
-      criteria: [
-        { label: 'Desde', value: printStart ? formatDateTime(printStart) : 'Sin filtro' },
-        { label: 'Hasta', value: printEnd ? formatDateTime(printEnd) : 'Sin filtro' },
-      ],
+      criteria: [],
       summary: [
-        { label: 'Productos vendidos', value: totalProducts.toString() },
-        { label: 'Total efectivo', value: formatCurrency(totalCash) },
-        { label: 'Total QR', value: formatCurrency(totalQr) },
-        { label: 'Total', value: formatCurrency(total) },
+        { label: 'Ventas:', value: formatCurrency(total) },
+        { label: 'Entradas:', value: formatCurrency(totalMovementIn) },
+        { label: 'Salidas:', value: formatCurrency(totalMovementOut) },
+        { label: '', value: '' },
+        { label: 'Efectivo:', value: formatCurrency(totalCashInDrawer) },
+        { label: 'QR:', value: formatCurrency(totalQr) },
+        { label: 'Productos vendidos:', value: totalProducts.toString() },
       ],
     };
 
@@ -212,35 +501,42 @@ export const AdminSalesPage: React.FC = () => {
     setIsPrintOpen(false);
   };
 
-  const handleCreateMovement = async () => {
-    const amount = Number(movementAmount);
-    if (!amount || amount <= 0) {
-      pushToast('Ingresá un monto válido.', 'error');
+  const handleReprintTicket = async (saleId: string) => {
+    const sale = sales.find((entry) => entry.id === saleId);
+    if (!sale) {
       return;
     }
-    await apiClient.post('/cash-movements', {
-      type: movementType,
-      amount,
-      reason: movementReason || undefined,
-    });
-    setIsMovementOpen(false);
-    setMovementAmount('');
-    setMovementReason('');
-    pushToast('Movimiento registrado.', 'success');
-  };
 
-  const handleOpenClosePeriod = async () => {
-    const response = await apiClient.get<CurrentPeriodResponse>('/cash-close/current-period');
-    setPeriodPreview(response.data);
-    setIsCloseOpen(true);
-  };
+    try {
+      await apiClient.post(`/sales/${saleId}/ticket-printed`);
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    }
 
-  const handleClosePeriod = async () => {
-    const response = await apiClient.post('/cash-close/close', {});
-    setIsCloseOpen(false);
-    setPeriodPreview(null);
-    await queryClient.invalidateQueries({ queryKey: ['admin-sales'] });
-    pushToast(`Cierre guardado (${response.data.cashClose?.id ?? ''}).`, 'success');
+    const payload: TicketPayload = {
+      clubName: settings?.clubName ?? '',
+      storeName: settings?.storeName ?? 'SOLER - Bufet',
+      dateTimeISO: sale.createdAt,
+      itemsStyle: 'sale',
+      items: sale.items.map((item) => ({
+        qty: item.quantity,
+        name: item.product.name,
+      })),
+      total: sale.total,
+      thanks: 'Gracias por tu compra',
+      footer: 'Ticket no fiscal',
+    };
+
+    const ticketParam = encodeBase64Url(JSON.stringify(payload));
+    const url = `/print/ticket?ticket=${ticketParam}&autoPrint=1&autoClose=1`;
+    const popup = window.open(url, '_blank', 'noopener,noreferrer');
+
+    if (!popup) {
+      pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error');
+      return;
+    }
+
+    pushToast('Enviando ticket a impresión.', 'success');
   };
 
   return (
@@ -260,15 +556,15 @@ export const AdminSalesPage: React.FC = () => {
           Hasta
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
-        <div className="admin-sales__actions-grid">
-          <button className="primary-button" onClick={() => setIsMovementOpen(true)}>
+        <div className="row-actions admin-sales__actions-grid">
+          <button type="button" className="secondary-button" onClick={handleOpenMovement}>
             Agregar movimiento
           </button>
-          <button className="secondary-button" onClick={handleDownload} disabled={filteredRows.length === 0}>
+          <button className="primary-button" onClick={handleDownload} disabled={filteredEntries.length === 0}>
             Descargar Excel
           </button>
-          <button className="primary-button" onClick={handleOpenClosePeriod}>
-            Cierre parcial
+          <button type="button" className="secondary-button" onClick={handleClosePeriod} disabled={isClosingPeriod}>
+            {isClosingPeriod ? 'Cerrando...' : 'Cierre parcial'}
           </button>
           <button className="secondary-button" onClick={handleOpenPrint}>
             Imprimir
@@ -279,91 +575,82 @@ export const AdminSalesPage: React.FC = () => {
         <div className="table-row table-header">
           <strong>Fecha</strong>
           <strong>Hora</strong>
-          <strong>Cantidad</strong>
-          <strong>Producto</strong>
           <strong>Usuario</strong>
           <strong>Total</strong>
           <strong>Forma de pago</strong>
+          <strong>Acción</strong>
         </div>
-        {filteredRows.length === 0 ? (
+        {filteredEntries.length === 0 ? (
           <div className="table-row">
             <span>No hay ventas para el rango seleccionado.</span>
           </div>
         ) : (
-          filteredRows.map((row) => (
-            <div className="table-row" key={`${row.saleId}-${row.productId}`}>
-              <span>{formatDate(row.createdAt)}</span>
-              <span>{formatTime(row.createdAt)}</span>
-              <span>{row.quantity}</span>
-              <span>{row.productName}</span>
-              <span>{row.userName}</span>
-              <span>{formatCurrency(row.total)}</span>
-              <span>{row.paymentMethod === 'MP_QR' ? 'QR MercadoPago' : 'Efectivo'}</span>
+          filteredEntries.map((entry) => (
+            <div className="table-row" key={entry.id}>
+              <span>{formatDate(entry.createdAt)}</span>
+              <span>{formatTime(entry.createdAt)}</span>
+              <span>{entry.userName}</span>
+              <span>{formatCurrency(entry.total)}</span>
+              <span>{entry.paymentLabel}</span>
+              {entry.kind === 'SALE' ? (
+                <button type="button" className="secondary-button" onClick={() => setSelectedSaleId(entry.saleId)}>
+                  Ver detalle
+                </button>
+              ) : (
+                <span>{entry.reason}</span>
+              )}
             </div>
           ))
         )}
       </div>
-
-      {isMovementOpen && (
-        <div className="modal-backdrop" onClick={() => setIsMovementOpen(false)} role="presentation">
-          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+      {selectedSale && (
+        <div className="modal-backdrop" onClick={() => setSelectedSaleId(null)} role="presentation">
+          <div
+            className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
-              <h2>Agregar movimiento</h2>
-              <button type="button" className="icon-button" onClick={() => setIsMovementOpen(false)} aria-label="Cerrar">
+              <h2>Detalle de venta</h2>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setSelectedSaleId(null)}
+                aria-label="Cerrar"
+              >
                 ✕
               </button>
             </div>
-            <div className="modal-body">
-              <label className="input-field">
-                Tipo
-                <select value={movementType} onChange={(e) => setMovementType(e.target.value as 'OUT' | 'IN')}>
-                  <option value="OUT">Sacar efectivo</option>
-                  <option value="IN">Ingresar efectivo</option>
-                </select>
-              </label>
-              <label className="input-field">
-                Monto
-                <input type="number" min={0.01} step={0.01} value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
-              </label>
-              <label className="input-field">
-                Motivo
-                <input type="text" value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
-              </label>
+            <div className="modal-body admin-sales__detail">
+              <p>
+                <strong>Fecha:</strong> {formatDate(selectedSale.createdAt)} {formatTime(selectedSale.createdAt)}
+              </p>
+              <p>
+                <strong>Total:</strong> {formatCurrency(selectedSale.total)}
+              </p>
+              <p>
+                <strong>Medio de pago:</strong> {getPaymentMethodLabel(selectedSale.paymentMethod)}
+              </p>
+              <div>
+                <strong>Productos</strong>
+                <ul>
+                  {selectedSale.items.map((item) => (
+                    <li key={item.id}>
+                      {item.quantity} x {item.product.name} ({formatCurrency(item.subtotal)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
               <div className="checkout-actions">
-                <button type="button" className="secondary-button" onClick={() => setIsMovementOpen(false)}>Cancelar</button>
-                <button type="button" className="primary-button" onClick={handleCreateMovement}>Guardar</button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => handleReprintTicket(selectedSale.id)}
+                >
+                  🎟️ Reimprimir ticket
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      {isCloseOpen && periodPreview && (
-        <div className="modal-backdrop" onClick={() => setIsCloseOpen(false)} role="presentation">
-          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Confirmar cierre parcial</h2>
-              <button type="button" className="icon-button" onClick={() => setIsCloseOpen(false)} aria-label="Cerrar">✕</button>
-            </div>
-            <div className="modal-body">
-              <p>Desde: {formatDateTime(periodPreview.from)}</p>
-              <p>Hasta: {formatDateTime(periodPreview.to)}</p>
-              <p>Ventas efectivo: {formatCurrency(periodPreview.summary.salesCashTotal)}</p>
-              <p>Ventas QR: {formatCurrency(periodPreview.summary.salesQrTotal)}</p>
-              <p>Total ventas: {formatCurrency(periodPreview.summary.salesTotal)}</p>
-              <p>Ingresos mov.: {formatCurrency(periodPreview.summary.movementsInTotal)}</p>
-              <p>Salidas mov.: {formatCurrency(periodPreview.summary.movementsOutTotal)}</p>
-              <p>Neto mov.: {formatCurrency(periodPreview.summary.movementsNet)}</p>
-              <p>Variación caja: {formatCurrency(periodPreview.summary.netCashDelta)}</p>
-              <div className="checkout-actions">
-                <button type="button" className="secondary-button" onClick={() => setIsCloseOpen(false)}>Cancelar</button>
-                <button type="button" className="primary-button" onClick={handleClosePeriod}>Cerrar período (Z)</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isPrintOpen && (
         <div className="modal-backdrop" onClick={() => setIsPrintOpen(false)} role="presentation">
           <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
@@ -396,6 +683,186 @@ export const AdminSalesPage: React.FC = () => {
                 </button>
                 <button type="button" className="primary-button" onClick={handlePrint}>
                   Imprimir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isMovementOpen && (
+        <div className="modal-backdrop" onClick={handleCloseMovement} role="presentation">
+          <div
+            className="modal admin-sales__movement-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Agregar movimiento</h2>
+              <button type="button" className="icon-button" onClick={handleCloseMovement} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body admin-sales__movement-form">
+              <fieldset className="admin-sales__movement-type" aria-label="Tipo de movimiento">
+                <label>
+                  <input
+                    type="radio"
+                    name="movement-type"
+                    value="ENTRADA"
+                    checked={movementType === 'ENTRADA'}
+                    onChange={() => setMovementType('ENTRADA')}
+                  />
+                  Entrada
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="movement-type"
+                    value="SALIDA"
+                    checked={movementType === 'SALIDA'}
+                    onChange={() => setMovementType('SALIDA')}
+                  />
+                  Salida
+                </label>
+              </fieldset>
+              <div className="admin-sales__movement-main">
+                <label className="input-field">
+                  Monto
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={movementAmount}
+                    onFocus={() => setActiveMovementField('amount')}
+                    onChange={(event) => setMovementAmount(event.target.value)}
+                  />
+                </label>
+                <div className="admin-sales__keyboard" aria-label="Teclado numérico para monto">
+                  {[
+                    ['1', '2', '3'],
+                    ['4', '5', '6'],
+                    ['7', '8', '9'],
+                    ['.', '0', '⌫'],
+                  ].map((row, rowIndex) => (
+                    <div key={`amount-row-${rowIndex}`} className="admin-sales__keyboard-row">
+                      {row.map((key) => (
+                        <button
+                          type="button"
+                          key={key}
+                          className="admin-sales__key"
+                          onClick={() => handleAmountKeyPress(key)}
+                        >
+                          {key}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <label className="input-field">
+                Motivo
+                <textarea
+                  rows={3}
+                  placeholder="Describí el motivo"
+                  value={movementReason}
+                  onFocus={() => setActiveMovementField('reason')}
+                  onChange={(event) => setMovementReason(event.target.value)}
+                />
+              </label>
+              <div className="admin-sales__mini-keyboard" aria-label="Teclado para motivo">
+                {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map((row) => (
+                  <div key={row} className="admin-sales__keyboard-row">
+                    {row.split('').map((letter) => (
+                      <button
+                        type="button"
+                        key={letter}
+                        className="admin-sales__key admin-sales__key--small"
+                        onClick={() => handleReasonKeyPress(letter)}
+                      >
+                        {letter}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                <div className="admin-sales__keyboard-row">
+                  <button
+                    type="button"
+                    className="admin-sales__key admin-sales__key--wide"
+                    onClick={() => handleReasonKeyPress('ESPACIO')}
+                  >
+                    Espacio
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-sales__key admin-sales__key--small"
+                    onClick={() => handleReasonKeyPress('⌫')}
+                  >
+                    ⌫
+                  </button>
+                </div>
+              </div>
+              <div className="checkout-actions">
+                <button type="button" className="secondary-button" onClick={handleCloseMovement}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleSaveMovement}
+                  disabled={!isMovementValid || isSavingMovement}
+                >
+                  {isSavingMovement ? 'Guardando...' : 'Guardar movimiento'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {closePreview && (
+        <div className="modal-backdrop" onClick={() => setClosePreview(null)} role="presentation">
+          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Cierre parcial</h2>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setClosePreview(null)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body admin-sales__detail">
+              <p>
+                <strong>Desde:</strong> {formatDate(closePreview.from)} {formatTime(closePreview.from)}
+              </p>
+              <p>
+                <strong>Hasta:</strong> {formatDate(closePreview.to)} {formatTime(closePreview.to)}
+              </p>
+              <p>
+                <strong>Ventas:</strong> {formatCurrency(closePreview.summary.salesTotal)}
+              </p>
+              <p>
+                <strong>Entradas:</strong> {formatCurrency(closePreview.summary.movementsInTotal)}
+              </p>
+              <p>
+                <strong>Salidas:</strong> {formatCurrency(closePreview.summary.movementsOutTotal)}
+              </p>
+              <p>
+                <strong>Neto caja:</strong> {formatCurrency(closePreview.summary.netCashDelta)}
+              </p>
+              <div className="checkout-actions">
+                <button type="button" className="secondary-button" onClick={() => setClosePreview(null)}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleConfirmClosePeriod}
+                  disabled={isClosingPeriod}
+                >
+                  {isClosingPeriod ? 'Guardando...' : 'OK'}
                 </button>
               </div>
             </div>

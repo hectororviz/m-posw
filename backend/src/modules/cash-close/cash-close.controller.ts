@@ -3,8 +3,9 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
-import { ClosePeriodDto } from './dto/close-period.dto';
 import { CashCloseService } from './cash-close.service';
+import { ClosePeriodDto } from './dto/close-period.dto';
+import { ListCashClosesDto } from './dto/list-cash-closes.dto';
 
 @Controller('cash-close')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -19,14 +20,17 @@ export class CashCloseController {
 
   @Post('close')
   @Roles(Role.ADMIN, Role.USER)
-  closePeriod(@Req() req: { user: { sub: string } }, @Body() dto: ClosePeriodDto) {
-    return this.cashCloseService.closePeriod(req.user.sub, dto.note);
+  closeCurrentPeriod(
+    @Req() req: { user: { sub: string } },
+    @Body() dto: ClosePeriodDto,
+  ) {
+    return this.cashCloseService.closeCurrentPeriod(req.user.sub, dto.note);
   }
 
   @Get('list')
   @Roles(Role.ADMIN, Role.USER)
-  list(@Query('limit') limit?: string, @Query('offset') offset?: string) {
-    return this.cashCloseService.list(Number(limit) || 20, Number(offset) || 0);
+  list(@Query() query: ListCashClosesDto) {
+    return this.cashCloseService.list(query.limit, query.offset);
   }
 
   @Get(':id')

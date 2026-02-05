@@ -34,7 +34,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
   const showLogo = Boolean(logoUrl) && !logoError;
   const isPosScreen = location.pathname === '/' || location.pathname.startsWith('/category/');
   const isAdminScreen = location.pathname.startsWith('/admin');
+  const isSalesScreen = location.pathname === '/sales';
   const showConfigToggle = user?.role === 'ADMIN' && (isPosScreen || isAdminScreen);
+  const showSalesButton = user?.role !== 'ADMIN';
 
   useEffect(() => {
     setLogoError(false);
@@ -65,6 +67,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           <span className="user-name" title={user?.name ?? 'Usuario'}>
             {user?.name ?? 'Usuario'}
           </span>
+          {showSalesButton && (
+            <NavLink
+              to={isSalesScreen ? '/' : '/sales'}
+              className="ghost-button sales-toggle-button"
+              aria-label={isSalesScreen ? 'Volver al POS' : 'Movimientos'}
+            >
+              {isSalesScreen ? 'POS' : 'Movimientos'}
+            </NavLink>
+          )}
           {showConfigToggle && (
             <NavLink
               to={isPosScreen ? '/admin/settings' : '/'}

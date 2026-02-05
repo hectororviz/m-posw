@@ -115,6 +115,21 @@ a {
   border-color: rgba(255, 255, 255, 0.65);
 }
 
+.sales-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  border-width: 1px;
+  border-style: solid;
+  color: #f9fafb;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.65);
+  font-weight: 700;
+  line-height: 1;
+}
+
 .logout-icon {
   font-size: 1rem;
 }
@@ -630,6 +645,31 @@ button {
   font-size: 0.8rem;
 }
 
+
+.admin-sales .form-grid {
+  grid-template-columns: minmax(120px, 180px) minmax(120px, 180px) minmax(340px, 1fr);
+  align-items: end;
+}
+
+.admin-sales .row-actions.admin-sales__actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  justify-content: stretch;
+}
+
+.admin-sales .row-actions.admin-sales__actions-grid button {
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 760px) {
+  .admin-sales .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-sales .table-row {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.5rem;
@@ -686,6 +726,173 @@ button {
 
 .admin-sales .table-row:last-child {
   border-bottom: none;
+}
+
+.admin-sales__detail {
+  gap: 0.75rem;
+}
+
+.admin-sales__detail p {
+  margin: 0;
+}
+
+.admin-sales__detail ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.admin-sales__movement-modal {
+  width: min(760px, 100%);
+  border-radius: 1.6rem;
+  padding: 1.6rem;
+  gap: 1.2rem;
+}
+
+.admin-sales__movement-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-sales__movement-type {
+  border: 1px solid #bfdbfe;
+  border-radius: 0.85rem;
+  margin: 0;
+  padding: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.admin-sales__movement-type label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+}
+
+.admin-sales__movement-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.admin-sales__movement-form .input-field {
+  gap: 0.45rem;
+}
+
+.admin-sales__movement-form .input-field input,
+.admin-sales__movement-form .input-field textarea {
+  border: 2px solid #334155;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.admin-sales__movement-form .input-field textarea {
+  resize: none;
+  min-height: 6rem;
+}
+
+.admin-sales__keyboard,
+.admin-sales__mini-keyboard {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-sales__keyboard-row {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.admin-sales__keyboard .admin-sales__keyboard-row {
+  justify-content: center;
+}
+
+.admin-sales__key {
+  border: 1px solid #93c5fd;
+  border-radius: 0.7rem;
+  background: #eff6ff;
+  color: #0f285b;
+  padding: 0.62rem;
+  min-width: 2.8rem;
+  min-height: 2.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-sales__key:hover {
+  background: #dbeafe;
+}
+
+.admin-sales__key--small {
+  padding: 0.45rem;
+  min-width: 2.2rem;
+  min-height: 2.2rem;
+  font-size: 0.86rem;
+}
+
+.admin-sales__key--wide {
+  flex: 1;
+}
+
+.admin-sales__movement-form .checkout-actions {
+  margin-top: 0.35rem;
+}
+
+.admin-sales__movement-form .checkout-actions .secondary-button {
+  background: #e2e8f0;
+  color: #0f172a;
+  border: none;
+}
+
+.admin-sales__movement-form .checkout-actions .primary-button {
+  background: #15803d;
+  border-color: #166534;
+}
+
+@media (max-width: 480px) {
+  .admin-sales__movement-main {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sales__keyboard {
+    justify-content: start;
+  }
+
+  .admin-sales__movement-modal {
+    width: 100%;
+    padding: 1rem;
+    border-radius: 1.1rem;
+  }
+
+  .admin-sales__movement-type {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .admin-sales__keyboard-row {
+    gap: 0.35rem;
+  }
+
+  .admin-sales__key {
+    flex: 1;
+    min-width: 0;
+    min-height: 2.6rem;
+    padding: 0.5rem;
+  }
+
+  .admin-sales__key--small {
+    min-height: 2.35rem;
+    font-size: 0.8rem;
+  }
+
+  .admin-sales__movement-form .checkout-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-stats__filters {
@@ -1077,17 +1284,21 @@ button {
 
 .ticket-page {
   width: 80mm;
+  box-sizing: border-box;
   min-height: 100%;
   margin: 0 auto;
-  padding: 12px 10px 20px;
+  padding: 10px 8px 16px;
   font-family: 'Inter', 'Arial', sans-serif;
   color: #111827;
+  overflow-wrap: anywhere;
 }
 
 .ticket-club {
   text-align: center;
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1.2;
   margin: 0 0 6px;
+  word-break: break-word;
 }
 
 .ticket-title {
@@ -1110,6 +1321,11 @@ button {
   margin: 10px 0;
 }
 
+
+.ticket-divider--summary {
+  margin: 6px 0;
+}
+
 .ticket-items {
   list-style: none;
   padding: 0;
@@ -1128,14 +1344,25 @@ button {
 
 .ticket-criteria-row,
 .ticket-summary-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.ticket-summary-row span,
+.ticket-criteria-row span {
+  min-width: 0;
 }
 
 .ticket-summary-row strong,
 .ticket-criteria-row strong {
   font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+  max-width: 38mm;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ticket-item {
