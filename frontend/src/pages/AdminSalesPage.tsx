@@ -1,7 +1,27 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAdminSales, useSettings } from '../api/queries';
+import { apiClient } from '../api/client';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
+
+type CashSummary = {
+  salesCashTotal: number;
+  salesQrTotal: number;
+  salesTotal: number;
+  salesCount: number;
+  movementsOutTotal: number;
+  movementsInTotal: number;
+  movementsNet: number;
+  netCashDelta: number;
+  movementsCount: number;
+};
+
+type CurrentPeriodResponse = {
+  from: string;
+  to: string;
+  summary: CashSummary;
+};
 
 const formatCurrency = (value: number) =>
   value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
@@ -42,12 +62,19 @@ const encodeBase64Url = (value: string) => {
 export const AdminSalesPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
   const { data: settings } = useSettings();
+  const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
+  const [isMovementOpen, setIsMovementOpen] = useState(false);
+  const [movementType, setMovementType] = useState<'OUT' | 'IN'>('OUT');
+  const [movementAmount, setMovementAmount] = useState('');
+  const [movementReason, setMovementReason] = useState('');
+  const [isCloseOpen, setIsCloseOpen] = useState(false);
+  const [periodPreview, setPeriodPreview] = useState<CurrentPeriodResponse | null>(null);
 
   const rows = useMemo(() => {
     return sales.flatMap((sale) =>
@@ -118,10 +145,6 @@ export const AdminSalesPage: React.FC = () => {
     setIsPrintOpen(true);
   };
 
-  const handleClosePrint = () => {
-    setIsPrintOpen(false);
-  };
-
   const handlePrint = () => {
     const start = printStart ? new Date(printStart) : null;
     const end = printEnd ? new Date(printEnd) : null;
@@ -189,12 +212,43 @@ export const AdminSalesPage: React.FC = () => {
     setIsPrintOpen(false);
   };
 
+  const handleCreateMovement = async () => {
+    const amount = Number(movementAmount);
+    if (!amount || amount <= 0) {
+      pushToast('Ingresá un monto válido.', 'error');
+      return;
+    }
+    await apiClient.post('/cash-movements', {
+      type: movementType,
+      amount,
+      reason: movementReason || undefined,
+    });
+    setIsMovementOpen(false);
+    setMovementAmount('');
+    setMovementReason('');
+    pushToast('Movimiento registrado.', 'success');
+  };
+
+  const handleOpenClosePeriod = async () => {
+    const response = await apiClient.get<CurrentPeriodResponse>('/cash-close/current-period');
+    setPeriodPreview(response.data);
+    setIsCloseOpen(true);
+  };
+
+  const handleClosePeriod = async () => {
+    const response = await apiClient.post('/cash-close/close', {});
+    setIsCloseOpen(false);
+    setPeriodPreview(null);
+    await queryClient.invalidateQueries({ queryKey: ['admin-sales'] });
+    pushToast(`Cierre guardado (${response.data.cashClose?.id ?? ''}).`, 'success');
+  };
+
   return (
     <section className="card admin-sales">
       <h2>Ventas</h2>
       <p>Revisa el detalle de ventas y exporta el resultado filtrado.</p>
-      <div className="form-grid">
-        <label className="input-field">
+      <div className="form-grid admin-sales__filters">
+        <label className="input-field admin-sales__date-field">
           Desde
           <input
             type="date"
@@ -202,13 +256,19 @@ export const AdminSalesPage: React.FC = () => {
             onChange={(event) => setStartDate(event.target.value)}
           />
         </label>
-        <label className="input-field">
+        <label className="input-field admin-sales__date-field">
           Hasta
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
-        <div className="row-actions">
-          <button className="primary-button" onClick={handleDownload} disabled={filteredRows.length === 0}>
+        <div className="admin-sales__actions-grid">
+          <button className="primary-button" onClick={() => setIsMovementOpen(true)}>
+            Agregar movimiento
+          </button>
+          <button className="secondary-button" onClick={handleDownload} disabled={filteredRows.length === 0}>
             Descargar Excel
+          </button>
+          <button className="primary-button" onClick={handleOpenClosePeriod}>
+            Cierre parcial
           </button>
           <button className="secondary-button" onClick={handleOpenPrint}>
             Imprimir
@@ -243,12 +303,73 @@ export const AdminSalesPage: React.FC = () => {
           ))
         )}
       </div>
+
+      {isMovementOpen && (
+        <div className="modal-backdrop" onClick={() => setIsMovementOpen(false)} role="presentation">
+          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Agregar movimiento</h2>
+              <button type="button" className="icon-button" onClick={() => setIsMovementOpen(false)} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="input-field">
+                Tipo
+                <select value={movementType} onChange={(e) => setMovementType(e.target.value as 'OUT' | 'IN')}>
+                  <option value="OUT">Sacar efectivo</option>
+                  <option value="IN">Ingresar efectivo</option>
+                </select>
+              </label>
+              <label className="input-field">
+                Monto
+                <input type="number" min={0.01} step={0.01} value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
+              </label>
+              <label className="input-field">
+                Motivo
+                <input type="text" value={movementReason} onChange={(e) => setMovementReason(e.target.value)} />
+              </label>
+              <div className="checkout-actions">
+                <button type="button" className="secondary-button" onClick={() => setIsMovementOpen(false)}>Cancelar</button>
+                <button type="button" className="primary-button" onClick={handleCreateMovement}>Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCloseOpen && periodPreview && (
+        <div className="modal-backdrop" onClick={() => setIsCloseOpen(false)} role="presentation">
+          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Confirmar cierre parcial</h2>
+              <button type="button" className="icon-button" onClick={() => setIsCloseOpen(false)} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body">
+              <p>Desde: {formatDateTime(periodPreview.from)}</p>
+              <p>Hasta: {formatDateTime(periodPreview.to)}</p>
+              <p>Ventas efectivo: {formatCurrency(periodPreview.summary.salesCashTotal)}</p>
+              <p>Ventas QR: {formatCurrency(periodPreview.summary.salesQrTotal)}</p>
+              <p>Total ventas: {formatCurrency(periodPreview.summary.salesTotal)}</p>
+              <p>Ingresos mov.: {formatCurrency(periodPreview.summary.movementsInTotal)}</p>
+              <p>Salidas mov.: {formatCurrency(periodPreview.summary.movementsOutTotal)}</p>
+              <p>Neto mov.: {formatCurrency(periodPreview.summary.movementsNet)}</p>
+              <p>Variación caja: {formatCurrency(periodPreview.summary.netCashDelta)}</p>
+              <div className="checkout-actions">
+                <button type="button" className="secondary-button" onClick={() => setIsCloseOpen(false)}>Cancelar</button>
+                <button type="button" className="primary-button" onClick={handleClosePeriod}>Cerrar período (Z)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPrintOpen && (
-        <div className="modal-backdrop" onClick={handleClosePrint} role="presentation">
+        <div className="modal-backdrop" onClick={() => setIsPrintOpen(false)} role="presentation">
           <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <h2>Imprimir detalle</h2>
-              <button type="button" className="icon-button" onClick={handleClosePrint} aria-label="Cerrar">
+              <button type="button" className="icon-button" onClick={() => setIsPrintOpen(false)} aria-label="Cerrar">
                 ✕
               </button>
             </div>
@@ -270,7 +391,7 @@ export const AdminSalesPage: React.FC = () => {
                 />
               </label>
               <div className="checkout-actions">
-                <button type="button" className="secondary-button" onClick={handleClosePrint}>
+                <button type="button" className="secondary-button" onClick={() => setIsPrintOpen(false)}>
                   Cancelar
                 </button>
                 <button type="button" className="primary-button" onClick={handlePrint}>
