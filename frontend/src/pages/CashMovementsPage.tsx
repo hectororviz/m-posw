@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CashActivity, CashMovement, CashMovementType, PaymentMethod } from '../api/types';
+import type { CashMovement, CashMovementType, PaymentMethod } from '../api/types';
 import { getCurrentCashMovements, voidCashMovement } from '../api/cashMovements';
 import { normalizeApiError } from '../api/client';
 import { AppLayout } from '../components/AppLayout';
