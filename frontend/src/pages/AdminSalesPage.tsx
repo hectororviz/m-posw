@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAdminSales, useSettings } from '../api/queries';
+import { useAdminSales, useManualMovements, useSettings } from '../api/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 
@@ -57,47 +58,6 @@ const encodeBase64Url = (value: string) => {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
 
-type ManualMovement = {
-  id: string;
-  createdAt: string;
-  type: 'ENTRADA' | 'SALIDA';
-  amount: number;
-  reason: string;
-};
-
-const MANUAL_MOVEMENTS_STORAGE_KEY = 'adminSalesManualMovements';
-
-const loadManualMovements = (): ManualMovement[] => {
-  const storedMovements = localStorage.getItem(MANUAL_MOVEMENTS_STORAGE_KEY);
-  if (!storedMovements) {
-    return [];
-  }
-
-  try {
-    const parsedMovements = JSON.parse(storedMovements);
-    if (!Array.isArray(parsedMovements)) {
-      return [];
-    }
-
-    return parsedMovements.filter((movement): movement is ManualMovement => {
-      if (!movement || typeof movement !== 'object') {
-        return false;
-      }
-      const candidate = movement as Record<string, unknown>;
-      return (
-        typeof candidate.id === 'string' &&
-        typeof candidate.createdAt === 'string' &&
-        (candidate.type === 'ENTRADA' || candidate.type === 'SALIDA') &&
-        typeof candidate.amount === 'number' &&
-        Number.isFinite(candidate.amount) &&
-        typeof candidate.reason === 'string'
-      );
-    });
-  } catch {
-    return [];
-  }
-};
-
 type SalesTableEntry =
   | {
       kind: 'SALE';
@@ -121,6 +81,8 @@ type SalesTableEntry =
 export const AdminSalesPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
   const { data: settings } = useSettings();
+  const { data: movements = [] } = useManualMovements();
+  const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -132,11 +94,7 @@ export const AdminSalesPage: React.FC = () => {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
-  const [movements, setMovements] = useState<ManualMovement[]>(() => loadManualMovements());
-
-  useEffect(() => {
-    localStorage.setItem(MANUAL_MOVEMENTS_STORAGE_KEY, JSON.stringify(movements));
-  }, [movements]);
+  const [isSavingMovement, setIsSavingMovement] = useState(false);
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -285,23 +243,28 @@ export const AdminSalesPage: React.FC = () => {
     setIsMovementOpen(false);
   };
 
-  const handleSaveMovement = () => {
+  const handleSaveMovement = async () => {
     const amount = Number(movementAmount);
-    if (!Number.isFinite(amount) || amount <= 0 || movementReason.trim().length === 0) {
+    const reason = movementReason.trim();
+    if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) {
       return;
     }
-    setMovements((currentMovements) => [
-      {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
+
+    setIsSavingMovement(true);
+    try {
+      await apiClient.post('/sales/manual-movements', {
         type: movementType,
         amount,
-        reason: movementReason.trim(),
-      },
-      ...currentMovements,
-    ]);
-    pushToast('Movimiento agregado correctamente.', 'success');
-    setIsMovementOpen(false);
+        reason,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['manual-movements'] });
+      pushToast('Movimiento agregado correctamente.', 'success');
+      setIsMovementOpen(false);
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    } finally {
+      setIsSavingMovement(false);
+    }
   };
 
   const isMovementValid = Number(movementAmount) > 0 && movementReason.trim().length > 0;
@@ -629,9 +592,9 @@ export const AdminSalesPage: React.FC = () => {
                   type="button"
                   className="primary-button"
                   onClick={handleSaveMovement}
-                  disabled={!isMovementValid}
+                  disabled={!isMovementValid || isSavingMovement}
                 >
-                  Guardar movimiento
+                  {isSavingMovement ? 'Guardando...' : 'Guardar movimiento'}
                 </button>
               </div>
             </div>

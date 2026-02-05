@@ -5,9 +5,10 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PaymentMethod, PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
+import { MovementType, PaymentMethod, PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
+import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
@@ -139,6 +140,29 @@ export class SalesService {
         items: { include: { product: true } },
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+
+  listManualMovements() {
+    return this.prisma.manualMovement.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  createManualMovement(userId: string, dto: CreateManualMovementDto) {
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new BadRequestException('El motivo es obligatorio');
+    }
+
+    return this.prisma.manualMovement.create({
+      data: {
+        userId,
+        type: dto.type as MovementType,
+        amount: this.roundToCurrency(dto.amount),
+        reason,
+      },
     });
   }
 

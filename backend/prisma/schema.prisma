@@ -33,6 +33,11 @@ enum PaymentStatus {
   EXPIRED
 }
 
+enum MovementType {
+  ENTRADA
+  SALIDA
+}
+
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   email     String?  @unique
@@ -46,6 +51,7 @@ model User {
   updatedAt DateTime @updatedAt
   sales     Sale[]
   sessions  Session[]
+  manualMovements ManualMovement[]
 }
 
 model Category {
@@ -75,6 +81,20 @@ model Product {
   saleItems  SaleItem[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+
+model ManualMovement {
+  id        String       @id @default(uuid()) @db.Uuid
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  type      MovementType
+  amount    Decimal      @db.Decimal(10, 2)
+  reason    String
+  userId    String       @db.Uuid
+  user      User         @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
 }
 
 model Sale {
