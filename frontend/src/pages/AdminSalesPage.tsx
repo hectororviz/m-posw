@@ -96,6 +96,18 @@ export const AdminSalesPage: React.FC = () => {
   const [printEnd, setPrintEnd] = useState('');
   const [isSavingMovement, setIsSavingMovement] = useState(false);
   const [isClosingPeriod, setIsClosingPeriod] = useState(false);
+  const [closePreview, setClosePreview] = useState<{
+    from: string;
+    to: string;
+    summary: {
+      salesTotal: number | string;
+      salesCashTotal: number | string;
+      salesQrTotal: number | string;
+      movementsInTotal: number | string;
+      movementsOutTotal: number | string;
+      netCashDelta: number | string;
+    };
+  } | null>(null);
   const [, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
 
   const selectedSale = useMemo(
@@ -195,34 +207,97 @@ export const AdminSalesPage: React.FC = () => {
         to: string;
         summary: {
           salesTotal: number | string;
+          salesCashTotal: number | string;
+          salesQrTotal: number | string;
           movementsInTotal: number | string;
           movementsOutTotal: number | string;
           netCashDelta: number | string;
         };
       };
+      setClosePreview(preview);
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    } finally {
+      setIsClosingPeriod(false);
+    }
+  };
 
-      const confirmed = window.confirm(
-        [
-          '¿Confirmás cierre parcial?',
-          `Desde: ${formatDate(preview.from)} ${formatTime(preview.from)}`,
-          `Hasta: ${formatDate(preview.to)} ${formatTime(preview.to)}`,
-          `Ventas: ${formatCurrency(preview.summary.salesTotal)}`,
-          `Entradas: ${formatCurrency(preview.summary.movementsInTotal)}`,
-          `Salidas: ${formatCurrency(preview.summary.movementsOutTotal)}`,
-          `Neto caja: ${formatCurrency(preview.summary.netCashDelta)}`,
-        ].join('\n'),
-      );
+  const handleConfirmClosePeriod = async () => {
+    if (!closePreview || isClosingPeriod) {
+      return;
+    }
 
-      if (!confirmed) {
-        return;
+    setIsClosingPeriod(true);
+    try {
+      await apiClient.post('/cash-close/close', {});
+
+      const periodStart = new Date(closePreview.from);
+      const periodEnd = new Date(closePreview.to);
+      const firstEntryAfterLastClose = movements
+        .filter((movement) => movement.type === 'ENTRADA')
+        .map((movement) => new Date(movement.createdAt))
+        .filter((createdAt) => createdAt > periodStart && createdAt <= periodEnd)
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      const detailStart = firstEntryAfterLastClose ?? periodStart;
+      const detailEnd = periodEnd;
+
+      const salesForPrint = sales.filter((sale) => {
+        const createdAt = new Date(sale.createdAt);
+        return createdAt >= detailStart && createdAt <= detailEnd;
+      });
+
+      const movementsForPrint = movements.filter((movement) => {
+        const createdAt = new Date(movement.createdAt);
+        return createdAt >= detailStart && createdAt <= detailEnd;
+      });
+
+      const itemsForPrint = salesForPrint.flatMap((sale) => sale.items).reduce((acc, item) => {
+        const existing = acc.get(item.product.name) ?? 0;
+        acc.set(item.product.name, existing + item.quantity);
+        return acc;
+      }, new Map<string, number>());
+
+      const items = Array.from(itemsForPrint.entries())
+        .map(([name, qty]) => ({ name, qty }))
+        .sort((a, b) => (b.qty !== a.qty ? b.qty - a.qty : a.name.localeCompare(b.name)));
+
+      const payload: TicketPayload = {
+        clubName: settings?.clubName ?? '',
+        storeName: settings?.storeName ?? 'SOLER - Bufet',
+        dateTimeISO: detailEnd.toISOString(),
+        itemsStyle: 'summary',
+        items,
+        total: toAmount(closePreview.summary.salesTotal),
+        criteria: [
+          { label: 'Detalle desde:', value: `${formatDate(detailStart.toISOString())} ${formatTime(detailStart.toISOString())}` },
+          { label: 'Hasta:', value: `${formatDate(detailEnd.toISOString())} ${formatTime(detailEnd.toISOString())}` },
+        ],
+        summary: [
+          { label: 'Ventas:', value: formatCurrency(closePreview.summary.salesTotal) },
+          { label: 'Efectivo:', value: formatCurrency(closePreview.summary.salesCashTotal) },
+          { label: 'QR:', value: formatCurrency(closePreview.summary.salesQrTotal) },
+          { label: 'Entradas:', value: formatCurrency(closePreview.summary.movementsInTotal) },
+          { label: 'Salidas:', value: formatCurrency(closePreview.summary.movementsOutTotal) },
+          { label: 'Neto caja:', value: formatCurrency(closePreview.summary.netCashDelta) },
+          { label: 'Movimientos:', value: movementsForPrint.length.toString() },
+          { label: 'Ventas emitidas:', value: salesForPrint.length.toString() },
+        ],
+      };
+
+      const ticketParam = encodeBase64Url(JSON.stringify(payload));
+      const url = `/print/ticket?ticket=${ticketParam}&autoPrint=1&autoClose=1`;
+      const popup = window.open(url, '_blank', 'noopener,noreferrer');
+
+      if (!popup) {
+        pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error');
       }
 
-      await apiClient.post('/cash-close/close', {});
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin-sales'] }),
         queryClient.invalidateQueries({ queryKey: ['manual-movements'] }),
       ]);
       pushToast('Cierre guardado correctamente.', 'success');
+      setClosePreview(null);
     } catch (error) {
       pushToast(normalizeApiError(error), 'error');
     } finally {
@@ -738,6 +813,56 @@ export const AdminSalesPage: React.FC = () => {
                   disabled={!isMovementValid || isSavingMovement}
                 >
                   {isSavingMovement ? 'Guardando...' : 'Guardar movimiento'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {closePreview && (
+        <div className="modal-backdrop" onClick={() => setClosePreview(null)} role="presentation">
+          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Cierre parcial</h2>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setClosePreview(null)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body admin-sales__detail">
+              <p>
+                <strong>Desde:</strong> {formatDate(closePreview.from)} {formatTime(closePreview.from)}
+              </p>
+              <p>
+                <strong>Hasta:</strong> {formatDate(closePreview.to)} {formatTime(closePreview.to)}
+              </p>
+              <p>
+                <strong>Ventas:</strong> {formatCurrency(closePreview.summary.salesTotal)}
+              </p>
+              <p>
+                <strong>Entradas:</strong> {formatCurrency(closePreview.summary.movementsInTotal)}
+              </p>
+              <p>
+                <strong>Salidas:</strong> {formatCurrency(closePreview.summary.movementsOutTotal)}
+              </p>
+              <p>
+                <strong>Neto caja:</strong> {formatCurrency(closePreview.summary.netCashDelta)}
+              </p>
+              <div className="checkout-actions">
+                <button type="button" className="secondary-button" onClick={() => setClosePreview(null)}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleConfirmClosePeriod}
+                  disabled={isClosingPeriod}
+                >
+                  {isClosingPeriod ? 'Guardando...' : 'OK'}
                 </button>
               </div>
             </div>

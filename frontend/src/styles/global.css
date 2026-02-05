@@ -666,10 +666,6 @@ button {
   .admin-sales .form-grid {
     grid-template-columns: 1fr;
   }
-
-  .admin-sales__actions-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .admin-sales .table-row {
