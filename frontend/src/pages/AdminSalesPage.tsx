@@ -95,6 +95,7 @@ export const AdminSalesPage: React.FC = () => {
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
   const [isSavingMovement, setIsSavingMovement] = useState(false);
+  const [isClosingPeriod, setIsClosingPeriod] = useState(false);
   const [, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
 
   const selectedSale = useMemo(
@@ -180,6 +181,54 @@ export const AdminSalesPage: React.FC = () => {
       return true;
     });
   }, [movements, printStart, printEnd]);
+
+  const handleClosePeriod = async () => {
+    if (isClosingPeriod) {
+      return;
+    }
+
+    setIsClosingPeriod(true);
+    try {
+      const previewResponse = await apiClient.get('/cash-close/current-period');
+      const preview = previewResponse.data as {
+        from: string;
+        to: string;
+        summary: {
+          salesTotal: number | string;
+          movementsInTotal: number | string;
+          movementsOutTotal: number | string;
+          netCashDelta: number | string;
+        };
+      };
+
+      const confirmed = window.confirm(
+        [
+          '¿Confirmás cierre parcial?',
+          `Desde: ${formatDate(preview.from)} ${formatTime(preview.from)}`,
+          `Hasta: ${formatDate(preview.to)} ${formatTime(preview.to)}`,
+          `Ventas: ${formatCurrency(preview.summary.salesTotal)}`,
+          `Entradas: ${formatCurrency(preview.summary.movementsInTotal)}`,
+          `Salidas: ${formatCurrency(preview.summary.movementsOutTotal)}`,
+          `Neto caja: ${formatCurrency(preview.summary.netCashDelta)}`,
+        ].join('\n'),
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      await apiClient.post('/cash-close/close', {});
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-sales'] }),
+        queryClient.invalidateQueries({ queryKey: ['manual-movements'] }),
+      ]);
+      pushToast('Cierre guardado correctamente.', 'success');
+    } catch (error) {
+      pushToast(normalizeApiError(error), 'error');
+    } finally {
+      setIsClosingPeriod(false);
+    }
+  };
 
   const handleDownload = () => {
     if (filteredEntries.length === 0) {
@@ -432,12 +481,15 @@ export const AdminSalesPage: React.FC = () => {
           Hasta
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
-        <div className="row-actions">
+        <div className="row-actions admin-sales__actions-grid">
           <button type="button" className="secondary-button" onClick={handleOpenMovement}>
             Agregar movimiento
           </button>
           <button className="primary-button" onClick={handleDownload} disabled={filteredEntries.length === 0}>
             Descargar Excel
+          </button>
+          <button type="button" className="secondary-button" onClick={handleClosePeriod} disabled={isClosingPeriod}>
+            {isClosingPeriod ? 'Cerrando...' : 'Cierre parcial'}
           </button>
           <button className="secondary-button" onClick={handleOpenPrint}>
             Imprimir

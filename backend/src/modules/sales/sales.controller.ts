@@ -27,10 +27,9 @@ export class SalesController {
 
   @Get()
   @Roles(Role.ADMIN, Role.USER)
-  list() {
-    return this.salesService.listSales();
+  list(@Req() req: { user: { sub: string; role: Role } }) {
+    return this.salesService.listSales({ id: req.user.sub, role: req.user.role });
   }
-
 
   @Post('manual-movements')
   @Roles(Role.ADMIN, Role.USER)
@@ -43,8 +42,8 @@ export class SalesController {
 
   @Get('manual-movements')
   @Roles(Role.ADMIN, Role.USER)
-  listManualMovements() {
-    return this.salesService.listManualMovements();
+  listManualMovements(@Req() req: { user: { sub: string; role: Role } }) {
+    return this.salesService.listManualMovements({ id: req.user.sub, role: req.user.role });
   }
 
   @Get(':id')
