@@ -25,7 +25,7 @@ export class SalesController {
   }
 
   @Get()
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
   list() {
     return this.salesService.listSales();
   }
