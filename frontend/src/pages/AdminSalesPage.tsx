@@ -5,7 +5,12 @@ import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
-  value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+  value.toLocaleString('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: 2,
+  });
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', {
@@ -18,6 +23,7 @@ const formatTime = (value: string) =>
   new Date(value).toLocaleTimeString('es-AR', {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 
 const getPaymentMethodLabel = (paymentMethod?: string) =>
