@@ -52,6 +52,34 @@ const encodeBase64Url = (value: string) => {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
 
+type ManualMovement = {
+  id: string;
+  createdAt: string;
+  type: 'ENTRADA' | 'SALIDA';
+  amount: number;
+  reason: string;
+};
+
+type SalesTableEntry =
+  | {
+      kind: 'SALE';
+      id: string;
+      createdAt: string;
+      total: number;
+      userName: string;
+      paymentLabel: string;
+      saleId: string;
+    }
+  | {
+      kind: 'MOVEMENT';
+      id: string;
+      createdAt: string;
+      total: number;
+      userName: string;
+      paymentLabel: string;
+      reason: string;
+    };
+
 export const AdminSalesPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
   const { data: settings } = useSettings();
@@ -66,21 +94,82 @@ export const AdminSalesPage: React.FC = () => {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
+  const [movements, setMovements] = useState<ManualMovement[]>([]);
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
     [sales, selectedSaleId],
   );
 
-  const filteredSales = useMemo(() => {
+  const filteredEntries = useMemo(() => {
     if (!startDate && !endDate) {
-      return sales;
+      return [
+        ...sales.map<SalesTableEntry>((sale) => ({
+          kind: 'SALE',
+          id: `sale-${sale.id}`,
+          createdAt: sale.createdAt,
+          total: sale.total,
+          userName: sale.user?.name ?? 'Sin usuario',
+          paymentLabel: getPaymentMethodLabel(sale.paymentMethod),
+          saleId: sale.id,
+        })),
+        ...movements.map<SalesTableEntry>((movement) => ({
+          kind: 'MOVEMENT',
+          id: `movement-${movement.id}`,
+          createdAt: movement.createdAt,
+          total: movement.type === 'SALIDA' ? movement.amount * -1 : movement.amount,
+          userName: 'Movimiento manual',
+          paymentLabel: movement.type,
+          reason: movement.reason,
+        })),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
     const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
+    const entries: SalesTableEntry[] = [
+      ...sales.map((sale) => ({
+        kind: 'SALE' as const,
+        id: `sale-${sale.id}`,
+        createdAt: sale.createdAt,
+        total: sale.total,
+        userName: sale.user?.name ?? 'Sin usuario',
+        paymentLabel: getPaymentMethodLabel(sale.paymentMethod),
+        saleId: sale.id,
+      })),
+      ...movements.map((movement) => ({
+        kind: 'MOVEMENT' as const,
+        id: `movement-${movement.id}`,
+        createdAt: movement.createdAt,
+        total: movement.type === 'SALIDA' ? movement.amount * -1 : movement.amount,
+        userName: 'Movimiento manual',
+        paymentLabel: movement.type,
+        reason: movement.reason,
+      })),
+    ];
 
-    return sales.filter((sale) => {
-      const createdAt = new Date(sale.createdAt);
+    return entries
+      .filter((entry) => {
+        const createdAt = new Date(entry.createdAt);
+        if (start && createdAt < start) {
+          return false;
+        }
+        if (end && createdAt > end) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [sales, movements, startDate, endDate]);
+
+  const filteredMovements = useMemo(() => {
+    if (!printStart && !printEnd) {
+      return movements;
+    }
+    const start = printStart ? new Date(printStart) : null;
+    const end = printEnd ? new Date(printEnd) : null;
+
+    return movements.filter((movement) => {
+      const createdAt = new Date(movement.createdAt);
       if (start && createdAt < start) {
         return false;
       }
@@ -89,23 +178,35 @@ export const AdminSalesPage: React.FC = () => {
       }
       return true;
     });
-  }, [sales, startDate, endDate]);
+  }, [movements, printStart, printEnd]);
 
   const handleDownload = () => {
-    if (filteredSales.length === 0) {
+    if (filteredEntries.length === 0) {
       return;
     }
     const headers = ['Fecha', 'Hora', 'Usuario', 'Total', 'Forma de pago', 'Productos'];
-    const data = filteredSales.map((sale) => [
-      formatDate(sale.createdAt),
-      formatTime(sale.createdAt),
-      sale.user?.name ?? 'Sin usuario',
-      formatCurrency(sale.total),
-      getPaymentMethodLabel(sale.paymentMethod),
-      sale.items
-        .map((item) => `${item.quantity} x ${item.product.name}`)
-        .join(' | '),
-    ]);
+    const data = filteredEntries.map((entry) => {
+      if (entry.kind === 'MOVEMENT') {
+        return [
+          formatDate(entry.createdAt),
+          formatTime(entry.createdAt),
+          entry.userName,
+          formatCurrency(entry.total),
+          entry.paymentLabel,
+          entry.reason,
+        ];
+      }
+
+      const sale = sales.find((item) => item.id === entry.saleId);
+      return [
+        formatDate(entry.createdAt),
+        formatTime(entry.createdAt),
+        entry.userName,
+        formatCurrency(entry.total),
+        entry.paymentLabel,
+        sale?.items.map((item) => `${item.quantity} x ${item.product.name}`).join(' | ') ?? '',
+      ];
+    });
     const csvContent =
       '\uFEFF' +
       [headers, ...data]
@@ -143,6 +244,20 @@ export const AdminSalesPage: React.FC = () => {
   };
 
   const handleSaveMovement = () => {
+    const amount = Number(movementAmount);
+    if (!Number.isFinite(amount) || amount <= 0 || movementReason.trim().length === 0) {
+      return;
+    }
+    setMovements((currentMovements) => [
+      {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        type: movementType,
+        amount,
+        reason: movementReason.trim(),
+      },
+      ...currentMovements,
+    ]);
     pushToast('Movimiento agregado correctamente.', 'success');
     setIsMovementOpen(false);
   };
@@ -163,8 +278,8 @@ export const AdminSalesPage: React.FC = () => {
       return true;
     });
 
-    if (salesForPrint.length === 0) {
-      pushToast('No hay ventas para imprimir con ese rango.', 'error');
+    if (salesForPrint.length === 0 && filteredMovements.length === 0) {
+      pushToast('No hay movimientos ni ventas para imprimir con ese rango.', 'error');
       return;
     }
 
@@ -187,13 +302,23 @@ export const AdminSalesPage: React.FC = () => {
       .filter((sale) => sale.paymentMethod === 'MP_QR')
       .reduce((acc, sale) => acc + sale.total, 0);
     const total = totalCash + totalQr;
+    const movementItems = filteredMovements.map((movement) => ({
+      qty: movement.type === 'SALIDA' ? -1 : 1,
+      name: `${movement.type} ${formatCurrency(movement.amount)} · ${movement.reason}`,
+    }));
+    const totalMovementIn = filteredMovements
+      .filter((movement) => movement.type === 'ENTRADA')
+      .reduce((acc, movement) => acc + movement.amount, 0);
+    const totalMovementOut = filteredMovements
+      .filter((movement) => movement.type === 'SALIDA')
+      .reduce((acc, movement) => acc + movement.amount, 0);
 
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
       dateTimeISO: new Date().toISOString(),
       itemsStyle: 'summary',
-      items,
+      items: [...items, ...movementItems],
       total,
       criteria: [
         { label: 'Desde', value: printStart ? formatDateTime(printStart) : 'Sin filtro' },
@@ -201,9 +326,11 @@ export const AdminSalesPage: React.FC = () => {
       ],
       summary: [
         { label: 'Productos vendidos', value: totalProducts.toString() },
+        { label: 'Entradas', value: formatCurrency(totalMovementIn) },
+        { label: 'Salidas', value: formatCurrency(totalMovementOut * -1) },
         { label: 'Total efectivo', value: formatCurrency(totalCash) },
         { label: 'Total QR', value: formatCurrency(totalQr) },
-        { label: 'Total', value: formatCurrency(total) },
+        { label: 'Total ventas', value: formatCurrency(total) },
       ],
     };
 
@@ -278,7 +405,7 @@ export const AdminSalesPage: React.FC = () => {
           <button type="button" className="secondary-button" onClick={handleOpenMovement}>
             Agregar movimiento
           </button>
-          <button className="primary-button" onClick={handleDownload} disabled={filteredSales.length === 0}>
+          <button className="primary-button" onClick={handleDownload} disabled={filteredEntries.length === 0}>
             Descargar Excel
           </button>
           <button className="secondary-button" onClick={handleOpenPrint}>
@@ -295,21 +422,25 @@ export const AdminSalesPage: React.FC = () => {
           <strong>Forma de pago</strong>
           <strong>Acción</strong>
         </div>
-        {filteredSales.length === 0 ? (
+        {filteredEntries.length === 0 ? (
           <div className="table-row">
             <span>No hay ventas para el rango seleccionado.</span>
           </div>
         ) : (
-          filteredSales.map((sale) => (
-            <div className="table-row" key={sale.id}>
-              <span>{formatDate(sale.createdAt)}</span>
-              <span>{formatTime(sale.createdAt)}</span>
-              <span>{sale.user?.name ?? 'Sin usuario'}</span>
-              <span>{formatCurrency(sale.total)}</span>
-              <span>{getPaymentMethodLabel(sale.paymentMethod)}</span>
-              <button type="button" className="secondary-button" onClick={() => setSelectedSaleId(sale.id)}>
-                Ver detalle
-              </button>
+          filteredEntries.map((entry) => (
+            <div className="table-row" key={entry.id}>
+              <span>{formatDate(entry.createdAt)}</span>
+              <span>{formatTime(entry.createdAt)}</span>
+              <span>{entry.userName}</span>
+              <span>{formatCurrency(entry.total)}</span>
+              <span>{entry.paymentLabel}</span>
+              {entry.kind === 'SALE' ? (
+                <button type="button" className="secondary-button" onClick={() => setSelectedSaleId(entry.saleId)}>
+                  Ver detalle
+                </button>
+              ) : (
+                <span>{entry.reason}</span>
+              )}
             </div>
           ))
         )}
