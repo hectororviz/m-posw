@@ -1,4 +1,4 @@
-# MiBPS (Mini POS Web)
+# m-POSW (Mini POS Web)
 
 Sistema de punto de venta web (tablet/celular) para jornadas/eventos. Incluye frontend en React + Vite + TypeScript, backend NestJS y base de datos PostgreSQL, todo orquestado con Docker Compose.
 
@@ -320,3 +320,6 @@ pos.csdsoler.com.ar {
   }
 }
 ```
+
+
+Proyecto integramente desarrollado con vive-coding (Codex)
