@@ -115,6 +115,13 @@ a {
   border-color: rgba(255, 255, 255, 0.65);
 }
 
+.sales-toggle-button {
+  color: var(--accent-color);
+  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.65);
+  font-weight: 700;
+}
+
 .logout-icon {
   font-size: 1rem;
 }
