@@ -188,12 +188,20 @@ export const PrintTicketPage: React.FC = () => {
         <>
           <div className="ticket-divider" />
           <div className="ticket-summary">
-            {summary.map((line) => (
-              <div className="ticket-summary-row" key={`${line.label}-${line.value}`}>
-                <span>{line.label}</span>
-                <strong>{line.value}</strong>
-              </div>
-            ))}
+            {summary.map((line, index) => {
+              const isDivider = line.label.trim().length === 0 && line.value.trim().length === 0;
+
+              if (isDivider) {
+                return <div className="ticket-divider ticket-divider--summary" key={`divider-${index}`} />;
+              }
+
+              return (
+                <div className="ticket-summary-row" key={`${line.label}-${line.value}-${index}`}>
+                  <span>{line.label}</span>
+                  <strong>{line.value}</strong>
+                </div>
+              );
+            })}
           </div>
         </>
       )}

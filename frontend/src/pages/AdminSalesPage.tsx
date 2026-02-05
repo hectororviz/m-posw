@@ -15,6 +15,21 @@ const formatCurrency = (value: number | string) => {
   })}`;
 };
 
+
+const toAmount = (value: unknown) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const normalized = trimmed.includes(',')
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', {
     year: 'numeric',
@@ -31,16 +46,6 @@ const formatTime = (value: string) =>
 
 const getPaymentMethodLabel = (paymentMethod?: string) =>
   paymentMethod === 'MP_QR' ? 'QR MercadoPago' : 'Efectivo';
-
-const formatDateTime = (value: string) => {
-  const date = new Date(value);
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear().toString().slice(-2);
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${day}/${month}/${year} - ${hours}:${minutes}`;
-};
 
 const encodeBase64Url = (value: string) => {
   const bytes = new TextEncoder().encode(value);
@@ -297,40 +302,35 @@ export const AdminSalesPage: React.FC = () => {
     );
     const totalCash = salesForPrint
       .filter((sale) => sale.paymentMethod !== 'MP_QR')
-      .reduce((acc, sale) => acc + sale.total, 0);
+      .reduce((acc, sale) => acc + toAmount(sale.total), 0);
     const totalQr = salesForPrint
       .filter((sale) => sale.paymentMethod === 'MP_QR')
-      .reduce((acc, sale) => acc + sale.total, 0);
-    const total = totalCash + totalQr;
-    const movementItems = filteredMovements.map((movement) => ({
-      qty: movement.type === 'SALIDA' ? -1 : 1,
-      name: `${movement.type} ${formatCurrency(movement.amount)} · ${movement.reason}`,
-    }));
+      .reduce((acc, sale) => acc + toAmount(sale.total), 0);
+    const total = toAmount(totalCash) + toAmount(totalQr);
     const totalMovementIn = filteredMovements
       .filter((movement) => movement.type === 'ENTRADA')
-      .reduce((acc, movement) => acc + movement.amount, 0);
+      .reduce((acc, movement) => acc + toAmount(movement.amount), 0);
     const totalMovementOut = filteredMovements
       .filter((movement) => movement.type === 'SALIDA')
-      .reduce((acc, movement) => acc + movement.amount, 0);
+      .reduce((acc, movement) => acc + toAmount(movement.amount), 0);
+    const totalCashInDrawer = totalCash + totalMovementIn - totalMovementOut;
 
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
       dateTimeISO: new Date().toISOString(),
       itemsStyle: 'summary',
-      items: [...items, ...movementItems],
+      items,
       total,
-      criteria: [
-        { label: 'Desde', value: printStart ? formatDateTime(printStart) : 'Sin filtro' },
-        { label: 'Hasta', value: printEnd ? formatDateTime(printEnd) : 'Sin filtro' },
-      ],
+      criteria: [],
       summary: [
-        { label: 'Productos vendidos', value: totalProducts.toString() },
-        { label: 'Entradas', value: formatCurrency(totalMovementIn) },
-        { label: 'Salidas', value: formatCurrency(totalMovementOut * -1) },
-        { label: 'Total efectivo', value: formatCurrency(totalCash) },
-        { label: 'Total QR', value: formatCurrency(totalQr) },
-        { label: 'Total ventas', value: formatCurrency(total) },
+        { label: 'Ventas:', value: formatCurrency(total) },
+        { label: 'Entradas:', value: formatCurrency(totalMovementIn) },
+        { label: 'Salidas:', value: formatCurrency(totalMovementOut) },
+        { label: '', value: '' },
+        { label: 'Efectivo:', value: formatCurrency(totalCashInDrawer) },
+        { label: 'QR:', value: formatCurrency(totalQr) },
+        { label: 'Productos vendidos:', value: totalProducts.toString() },
       ],
     };
 

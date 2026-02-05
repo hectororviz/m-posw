@@ -1101,17 +1101,21 @@ button {
 
 .ticket-page {
   width: 80mm;
+  box-sizing: border-box;
   min-height: 100%;
   margin: 0 auto;
-  padding: 12px 10px 20px;
+  padding: 10px 8px 16px;
   font-family: 'Inter', 'Arial', sans-serif;
   color: #111827;
+  overflow-wrap: anywhere;
 }
 
 .ticket-club {
   text-align: center;
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1.2;
   margin: 0 0 6px;
+  word-break: break-word;
 }
 
 .ticket-title {
@@ -1134,6 +1138,11 @@ button {
   margin: 10px 0;
 }
 
+
+.ticket-divider--summary {
+  margin: 6px 0;
+}
+
 .ticket-items {
   list-style: none;
   padding: 0;
@@ -1152,14 +1161,25 @@ button {
 
 .ticket-criteria-row,
 .ticket-summary-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.ticket-summary-row span,
+.ticket-criteria-row span {
+  min-width: 0;
 }
 
 .ticket-summary-row strong,
 .ticket-criteria-row strong {
   font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+  max-width: 38mm;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ticket-item {
