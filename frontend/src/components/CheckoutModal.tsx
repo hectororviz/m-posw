@@ -101,8 +101,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setQrMessage(null);
     setQrResult(null);
     setQrResultMessage(null);
-    setOkAnimationData(null);
-    setErrorAnimationData(null);
     setTimeLeft(120);
     setQrLoading(false);
     setQrError(null);
