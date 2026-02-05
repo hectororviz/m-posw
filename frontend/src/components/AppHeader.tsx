@@ -70,7 +70,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           {showSalesButton && (
             <NavLink
               to={isSalesScreen ? '/' : '/sales'}
-              className="ghost-button"
+              className="ghost-button sales-toggle-button"
               aria-label={isSalesScreen ? 'Volver al POS' : 'Movimientos'}
             >
               {isSalesScreen ? 'POS' : 'Movimientos'}

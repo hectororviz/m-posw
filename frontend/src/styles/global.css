@@ -115,6 +115,21 @@ a {
   border-color: rgba(255, 255, 255, 0.65);
 }
 
+.sales-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  border-width: 1px;
+  border-style: solid;
+  color: #f9fafb;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.65);
+  font-weight: 700;
+  line-height: 1;
+}
+
 .logout-icon {
   font-size: 1rem;
 }
