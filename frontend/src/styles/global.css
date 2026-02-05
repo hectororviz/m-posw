@@ -645,6 +645,33 @@ button {
   font-size: 0.8rem;
 }
 
+
+.admin-sales .form-grid {
+  grid-template-columns: minmax(120px, 180px) minmax(120px, 180px) minmax(340px, 1fr);
+  align-items: end;
+}
+
+.admin-sales__actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 0.45rem;
+  justify-content: stretch;
+}
+
+.admin-sales__actions-grid button {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .admin-sales .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sales__actions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-sales .table-row {
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.5rem;
