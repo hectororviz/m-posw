@@ -712,6 +712,42 @@ button {
   gap: 0.35rem;
 }
 
+.admin-sales__keyboard,
+.admin-sales__mini-keyboard {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-sales__keyboard-row {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.admin-sales__key {
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 0.6rem;
+  min-width: 2.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-sales__key:hover {
+  background: #eef2ff;
+}
+
+.admin-sales__key--small {
+  padding: 0.45rem;
+  min-width: 2.2rem;
+  font-size: 0.8rem;
+}
+
+.admin-sales__key--wide {
+  flex: 1;
+}
+
 .admin-stats__filters {
   align-items: end;
 }
