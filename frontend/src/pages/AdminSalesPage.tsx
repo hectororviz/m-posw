@@ -543,8 +543,8 @@ export const AdminSalesPage: React.FC = () => {
     <section className="card admin-sales">
       <h2>Ventas</h2>
       <p>Revisa el detalle de ventas y exporta el resultado filtrado.</p>
-      <div className="form-grid">
-        <label className="input-field">
+      <div className="form-grid admin-sales__filters">
+        <label className="input-field admin-sales__date-field">
           Desde
           <input
             type="date"
@@ -552,7 +552,7 @@ export const AdminSalesPage: React.FC = () => {
             onChange={(event) => setStartDate(event.target.value)}
           />
         </label>
-        <label className="input-field">
+        <label className="input-field admin-sales__date-field">
           Hasta
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
@@ -652,11 +652,11 @@ export const AdminSalesPage: React.FC = () => {
         </div>
       )}
       {isPrintOpen && (
-        <div className="modal-backdrop" onClick={handleClosePrint} role="presentation">
+        <div className="modal-backdrop" onClick={() => setIsPrintOpen(false)} role="presentation">
           <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <h2>Imprimir detalle</h2>
-              <button type="button" className="icon-button" onClick={handleClosePrint} aria-label="Cerrar">
+              <button type="button" className="icon-button" onClick={() => setIsPrintOpen(false)} aria-label="Cerrar">
                 ✕
               </button>
             </div>
@@ -678,7 +678,7 @@ export const AdminSalesPage: React.FC = () => {
                 />
               </label>
               <div className="checkout-actions">
-                <button type="button" className="secondary-button" onClick={handleClosePrint}>
+                <button type="button" className="secondary-button" onClick={() => setIsPrintOpen(false)}>
                   Cancelar
                 </button>
                 <button type="button" className="primary-button" onClick={handlePrint}>

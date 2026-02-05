@@ -688,6 +688,31 @@ button {
   justify-content: flex-end;
 }
 
+.admin-sales__filters {
+  grid-template-columns: minmax(140px, 180px) minmax(140px, 180px) minmax(280px, 1fr);
+  align-items: end;
+}
+
+.admin-sales__date-field input {
+  max-width: 180px;
+}
+
+.admin-sales__actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .admin-sales__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sales__date-field input {
+    max-width: 100%;
+  }
+}
+
 .admin-sales .table {
   gap: 0;
   border: 1px solid #e2e8f0;
