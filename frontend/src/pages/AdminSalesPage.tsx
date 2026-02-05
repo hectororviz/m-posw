@@ -5,12 +5,10 @@ import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
-  value.toLocaleString('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    currencyDisplay: 'narrowSymbol',
+  `$ ${value.toLocaleString('es-AR', {
     minimumFractionDigits: 2,
-  });
+    maximumFractionDigits: 2,
+  })}`;
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', {
