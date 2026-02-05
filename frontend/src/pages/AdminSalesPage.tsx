@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAdminSales, useSettings } from '../api/queries';
 import type { TicketPayload } from '../utils/ticketPrinting';
@@ -65,6 +65,39 @@ type ManualMovement = {
   reason: string;
 };
 
+const MANUAL_MOVEMENTS_STORAGE_KEY = 'adminSalesManualMovements';
+
+const loadManualMovements = (): ManualMovement[] => {
+  const storedMovements = localStorage.getItem(MANUAL_MOVEMENTS_STORAGE_KEY);
+  if (!storedMovements) {
+    return [];
+  }
+
+  try {
+    const parsedMovements = JSON.parse(storedMovements);
+    if (!Array.isArray(parsedMovements)) {
+      return [];
+    }
+
+    return parsedMovements.filter((movement): movement is ManualMovement => {
+      if (!movement || typeof movement !== 'object') {
+        return false;
+      }
+      const candidate = movement as Record<string, unknown>;
+      return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.createdAt === 'string' &&
+        (candidate.type === 'ENTRADA' || candidate.type === 'SALIDA') &&
+        typeof candidate.amount === 'number' &&
+        Number.isFinite(candidate.amount) &&
+        typeof candidate.reason === 'string'
+      );
+    });
+  } catch {
+    return [];
+  }
+};
+
 type SalesTableEntry =
   | {
       kind: 'SALE';
@@ -99,7 +132,11 @@ export const AdminSalesPage: React.FC = () => {
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
-  const [movements, setMovements] = useState<ManualMovement[]>([]);
+  const [movements, setMovements] = useState<ManualMovement[]>(() => loadManualMovements());
+
+  useEffect(() => {
+    localStorage.setItem(MANUAL_MOVEMENTS_STORAGE_KEY, JSON.stringify(movements));
+  }, [movements]);
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
