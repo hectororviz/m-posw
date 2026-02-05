@@ -1134,6 +1134,11 @@ button {
   margin: 10px 0;
 }
 
+
+.ticket-divider--summary {
+  margin: 6px 0;
+}
+
 .ticket-items {
   list-style: none;
   padding: 0;
