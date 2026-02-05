@@ -651,15 +651,17 @@ button {
   align-items: end;
 }
 
-.admin-sales__actions-grid {
+.admin-sales .row-actions.admin-sales__actions-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.45rem;
   justify-content: stretch;
 }
 
-.admin-sales__actions-grid button {
+.admin-sales .row-actions.admin-sales__actions-grid button {
   width: 100%;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.9rem;
 }
 
 @media (max-width: 760px) {
