@@ -25,9 +25,9 @@ export class SalesController {
   }
 
   @Get()
-  @Roles(Role.ADMIN)
-  list() {
-    return this.salesService.listSales();
+  @Roles(Role.ADMIN, Role.USER)
+  list(@Req() req: { user: { sub: string; role: string } }) {
+    return this.salesService.listSales(req.user);
   }
 
   @Get(':id')

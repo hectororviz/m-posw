@@ -132,8 +132,20 @@ export class SalesService {
     };
   }
 
-  listSales() {
+  async listSales(requester: { sub: string; role: string }) {
+    const where: Prisma.SaleWhereInput = {};
+    if (requester.role !== 'ADMIN') {
+      const lastClose = await this.prisma.cashClose.findFirst({
+        orderBy: { to: 'desc' },
+        select: { to: true },
+      });
+      if (lastClose?.to) {
+        where.createdAt = { gte: lastClose.to };
+      }
+    }
+
     return this.prisma.sale.findMany({
+      where,
       include: {
         user: { select: { id: true, name: true, email: true } },
         items: { include: { product: true } },
