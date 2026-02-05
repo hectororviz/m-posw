@@ -95,7 +95,7 @@ export const AdminSalesPage: React.FC = () => {
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
   const [isSavingMovement, setIsSavingMovement] = useState(false);
-  const [activeMovementField, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
+  const [, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -478,7 +478,8 @@ export const AdminSalesPage: React.FC = () => {
       </div>
       {selectedSale && (
         <div className="modal-backdrop" onClick={() => setSelectedSaleId(null)} role="presentation">
-          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <h2>Detalle de venta</h2>
               <button
@@ -563,7 +564,12 @@ export const AdminSalesPage: React.FC = () => {
       )}
       {isMovementOpen && (
         <div className="modal-backdrop" onClick={handleCloseMovement} role="presentation">
-          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="modal admin-sales__movement-modal"
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="modal-header">
               <h2>Agregar movimiento</h2>
               <button type="button" className="icon-button" onClick={handleCloseMovement} aria-label="Cerrar">
@@ -593,43 +599,44 @@ export const AdminSalesPage: React.FC = () => {
                   Salida
                 </label>
               </fieldset>
-              <label className="input-field">
-                Monto
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  placeholder="0"
-                  value={movementAmount}
-                  onFocus={() => setActiveMovementField('amount')}
-                  onChange={(event) => setMovementAmount(event.target.value)}
-                />
-              </label>
-              <div className="admin-sales__keyboard" aria-label="Teclado numérico para monto">
-                {[
-                  ['1', '2', '3'],
-                  ['4', '5', '6'],
-                  ['7', '8', '9'],
-                  ['.', '0', '⌫'],
-                ].map((row, rowIndex) => (
-                  <div key={`amount-row-${rowIndex}`} className="admin-sales__keyboard-row">
-                    {row.map((key) => (
-                      <button
-                        type="button"
-                        key={key}
-                        className="admin-sales__key"
-                        onClick={() => handleAmountKeyPress(key)}
-                      >
-                        {key}
-                      </button>
-                    ))}
-                  </div>
-                ))}
+              <div className="admin-sales__movement-main">
+                <label className="input-field">
+                  Monto
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={movementAmount}
+                    onFocus={() => setActiveMovementField('amount')}
+                    onChange={(event) => setMovementAmount(event.target.value)}
+                  />
+                </label>
+                <div className="admin-sales__keyboard" aria-label="Teclado numérico para monto">
+                  {[
+                    ['1', '2', '3'],
+                    ['4', '5', '6'],
+                    ['7', '8', '9'],
+                    ['.', '0', '⌫'],
+                  ].map((row, rowIndex) => (
+                    <div key={`amount-row-${rowIndex}`} className="admin-sales__keyboard-row">
+                      {row.map((key) => (
+                        <button
+                          type="button"
+                          key={key}
+                          className="admin-sales__key"
+                          onClick={() => handleAmountKeyPress(key)}
+                        >
+                          {key}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </div>
               <label className="input-field">
                 Motivo
-                <input
-                  type="text"
-                  inputMode="text"
+                <textarea
+                  rows={3}
                   placeholder="Describí el motivo"
                   value={movementReason}
                   onFocus={() => setActiveMovementField('reason')}
@@ -662,9 +669,7 @@ export const AdminSalesPage: React.FC = () => {
                   <button
                     type="button"
                     className="admin-sales__key admin-sales__key--small"
-                    onClick={() =>
-                      activeMovementField === 'amount' ? handleAmountKeyPress('⌫') : handleReasonKeyPress('⌫')
-                    }
+                    onClick={() => handleReasonKeyPress('⌫')}
                   >
                     ⌫
                   </button>
