@@ -663,6 +663,19 @@ button {
   border-bottom: none;
 }
 
+.admin-sales__detail {
+  gap: 0.75rem;
+}
+
+.admin-sales__detail p {
+  margin: 0;
+}
+
+.admin-sales__detail ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
 .admin-stats__filters {
   align-items: end;
 }
