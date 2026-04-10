@@ -353,10 +353,6 @@ export const AdminSalesPage: React.FC = () => {
     setIsPrintOpen(true);
   };
 
-  const handleClosePrint = () => {
-    setIsPrintOpen(false);
-  };
-
   const handleOpenMovement = () => {
     setMovementType('ENTRADA');
     setMovementAmount('');
