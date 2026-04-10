@@ -539,7 +539,7 @@ export const AdminSalesPage: React.FC = () => {
     <section className="card admin-products">
       <h2>Ventas</h2>
       <p className="admin-sales__subtitle">Revisa el detalle de ventas y exporta el resultado filtrado.</p>
-      <div className="product-form-row">
+      <div className="product-form-row product-form-row--inline">
         <label className="input-field">
           Desde
           <input

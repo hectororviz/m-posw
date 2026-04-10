@@ -70,24 +70,12 @@ export const AdminCategoriesPage: React.FC = () => {
   return (
     <section className="card admin-products">
       <h2>Categorías</h2>
-      <div className="product-form-row">
+      <div className="product-form-row product-form-row--inline">
         <input
           type="text"
           placeholder="Nombre"
           value={newCategory.name}
           onChange={(event) => setNewCategory({ ...newCategory, name: event.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Icono"
-          value={newCategory.iconName}
-          onChange={(event) => setNewCategory({ ...newCategory, iconName: event.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="#111827"
-          value={newCategory.colorHex}
-          onChange={(event) => setNewCategory({ ...newCategory, colorHex: event.target.value })}
         />
         <label className="switch">
           <input
@@ -103,10 +91,8 @@ export const AdminCategoriesPage: React.FC = () => {
       </div>
       {error && <p className="error-text">{error}</p>}
       <div className="product-table">
-        <div className="product-table-header product-table-header--5">
+        <div className="product-table-header product-table-header--3">
           <span>Nombre</span>
-          <span>Icono</span>
-          <span>Color</span>
           <span>Activa</span>
           <span>Imagen</span>
           <span>Acciones</span>
@@ -114,7 +100,15 @@ export const AdminCategoriesPage: React.FC = () => {
         {rendered.map((category) => {
           const draft = edits[category.id] ?? {};
           return (
-            <div key={category.id} className="product-table-row product-table-row--5">
+            <div key={category.id} className="product-table-row product-table-row--3">
+          <span>Activa</span>
+          <span>Imagen</span>
+          <span>Acciones</span>
+        </div>
+        {rendered.map((category) => {
+          const draft = edits[category.id] ?? {};
+          return (
+            <div key={category.id} className="product-table-row product-table-row--3">
               <input
                 type="text"
                 value={draft.name ?? category.name}
@@ -122,26 +116,6 @@ export const AdminCategoriesPage: React.FC = () => {
                   setEdits((prev) => ({
                     ...prev,
                     [category.id]: { ...draft, name: event.target.value },
-                  }))
-                }
-              />
-              <input
-                type="text"
-                value={draft.iconName ?? category.iconName}
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [category.id]: { ...draft, iconName: event.target.value },
-                  }))
-                }
-              />
-              <input
-                type="text"
-                value={draft.colorHex ?? category.colorHex}
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [category.id]: { ...draft, colorHex: event.target.value },
                   }))
                 }
               />

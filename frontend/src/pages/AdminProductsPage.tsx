@@ -114,12 +114,15 @@ export const AdminProductsPage: React.FC = () => {
           value={newProduct.name}
           onChange={(event) => setNewProduct({ ...newProduct, name: event.target.value })}
         />
-        <input
-          type="number"
-          placeholder="Precio"
-          value={formatCurrencyInput(Number(newProduct.price) || 0)}
-          onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
-        />
+        <div className="price-input-wrapper">
+          <span className="price-input-symbol">$</span>
+          <input
+            type="text"
+            placeholder="Precio"
+            value={newProduct.price}
+            onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
+          />
+        </div>
         <select
           value={newProduct.categoryId}
           onChange={(event) => setNewProduct({ ...newProduct, categoryId: event.target.value })}
@@ -173,16 +176,19 @@ export const AdminProductsPage: React.FC = () => {
                   }))
                 }
               />
-              <input
-                type="text"
-                value={formatCurrencyInput(draft.price ?? product.price)}
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
-                  }))
-                }
-              />
+              <div className="price-input-wrapper">
+                <span className="price-input-symbol">$</span>
+                <input
+                  type="text"
+                  value={formatCurrencyInput(draft.price ?? product.price)}
+                  onChange={(event) =>
+                    setEdits((prev) => ({
+                      ...prev,
+                      [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
+                    }))
+                  }
+                />
+              </div>
               <select
                 value={draft.categoryId ?? product.categoryId}
                 onChange={(event) =>
