@@ -101,14 +101,6 @@ export const AdminCategoriesPage: React.FC = () => {
           const draft = edits[category.id] ?? {};
           return (
             <div key={category.id} className="product-table-row product-table-row--3">
-          <span>Activa</span>
-          <span>Imagen</span>
-          <span>Acciones</span>
-        </div>
-        {rendered.map((category) => {
-          const draft = edits[category.id] ?? {};
-          return (
-            <div key={category.id} className="product-table-row product-table-row--3">
               <input
                 type="text"
                 value={draft.name ?? category.name}
