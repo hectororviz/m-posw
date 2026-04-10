@@ -536,11 +536,11 @@ export const AdminSalesPage: React.FC = () => {
   };
 
   return (
-    <section className="card admin-sales">
+    <section className="card admin-products">
       <h2>Ventas</h2>
-      <p>Revisa el detalle de ventas y exporta el resultado filtrado.</p>
-      <div className="form-grid admin-sales__filters">
-        <label className="input-field admin-sales__date-field">
+      <p className="admin-sales__subtitle">Revisa el detalle de ventas y exporta el resultado filtrado.</p>
+      <div className="product-form-row">
+        <label className="input-field">
           Desde
           <input
             type="date"
@@ -548,41 +548,39 @@ export const AdminSalesPage: React.FC = () => {
             onChange={(event) => setStartDate(event.target.value)}
           />
         </label>
-        <label className="input-field admin-sales__date-field">
+        <label className="input-field">
           Hasta
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
-        <div className="row-actions admin-sales__actions-grid">
-          <button type="button" className="secondary-button" onClick={handleOpenMovement}>
-            Agregar movimiento
-          </button>
-          <button className="primary-button" onClick={handleDownload} disabled={filteredEntries.length === 0}>
-            Descargar Excel
-          </button>
-          <button type="button" className="secondary-button" onClick={handleClosePeriod} disabled={isClosingPeriod}>
-            {isClosingPeriod ? 'Cerrando...' : 'Cierre parcial'}
-          </button>
-          <button className="secondary-button" onClick={handleOpenPrint}>
-            Imprimir
-          </button>
-        </div>
+        <button type="button" className="secondary-button" onClick={handleOpenMovement}>
+          Agregar movimiento
+        </button>
+        <button className="primary-button" onClick={handleDownload} disabled={filteredEntries.length === 0}>
+          Descargar Excel
+        </button>
+        <button type="button" className="secondary-button" onClick={handleClosePeriod} disabled={isClosingPeriod}>
+          {isClosingPeriod ? 'Cerrando...' : 'Cierre parcial'}
+        </button>
+        <button className="secondary-button" onClick={handleOpenPrint}>
+          Imprimir
+        </button>
       </div>
-      <div className="table">
-        <div className="table-row table-header">
-          <strong>Fecha</strong>
-          <strong>Hora</strong>
-          <strong>Usuario</strong>
-          <strong>Total</strong>
-          <strong>Forma de pago</strong>
-          <strong>Acción</strong>
+      <div className="product-table">
+        <div className="product-table-header product-table-header--6">
+          <span>Fecha</span>
+          <span>Hora</span>
+          <span>Usuario</span>
+          <span>Total</span>
+          <span>Forma de pago</span>
+          <span>Acción</span>
         </div>
         {filteredEntries.length === 0 ? (
-          <div className="table-row">
+          <div className="product-table-row product-table-row--6">
             <span>No hay ventas para el rango seleccionado.</span>
           </div>
         ) : (
           filteredEntries.map((entry) => (
-            <div className="table-row" key={entry.id}>
+            <div className="product-table-row product-table-row--6" key={entry.id}>
               <span>{formatDate(entry.createdAt)}</span>
               <span>{formatTime(entry.createdAt)}</span>
               <span>{entry.userName}</span>

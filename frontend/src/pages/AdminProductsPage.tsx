@@ -4,6 +4,29 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useAdminCategories, useAdminProducts } from '../api/queries';
 import type { Product } from '../api/types';
 
+const formatCurrency = (value: number | string) => {
+  const normalizedValue = Number(value);
+  const amount = Number.isFinite(normalizedValue) ? normalizedValue : 0;
+  return `$ ${amount.toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: true,
+  })}`;
+};
+
+const toAmount = (value: unknown) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const normalized = trimmed.includes(',')
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
 export const AdminProductsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: categories } = useAdminCategories();
@@ -11,18 +34,39 @@ export const AdminProductsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [newProduct, setNewProduct] = useState({
     name: '',
-    price: 0,
+    price: '',
     categoryId: '',
     iconName: '🍽️',
     active: true,
   });
   const [edits, setEdits] = useState<Record<string, Partial<Product>>>({});
 
+  const formatCurrencyInput = (value: number) => {
+    return value.toLocaleString('es-AR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      useGrouping: true,
+    });
+  };
+
+  const parseCurrencyInput = (value: string): number => {
+    if (!value) return 0;
+    const normalized = value.replace(/\./g, '').replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const handleCreate = async () => {
     setError(null);
     try {
-      await apiClient.post('/products', newProduct);
-      setNewProduct({ name: '', price: 0, categoryId: '', iconName: '🍽️', active: true });
+      await apiClient.post('/products', {
+        name: newProduct.name,
+        price: parseCurrencyInput(newProduct.price),
+        categoryId: newProduct.categoryId,
+        iconName: newProduct.iconName,
+        active: newProduct.active,
+      });
+      setNewProduct({ name: '', price: '', categoryId: '', iconName: '🍽️', active: true });
       await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -96,8 +140,8 @@ export const AdminProductsPage: React.FC = () => {
         <input
           type="number"
           placeholder="Precio"
-          value={newProduct.price}
-          onChange={(event) => setNewProduct({ ...newProduct, price: Number(event.target.value) })}
+          value={formatCurrencyInput(Number(newProduct.price) || 0)}
+          onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
         />
         <select
           value={newProduct.categoryId}
@@ -153,12 +197,12 @@ export const AdminProductsPage: React.FC = () => {
                 }
               />
               <input
-                type="number"
-                value={draft.price ?? product.price}
+                type="text"
+                value={formatCurrencyInput(draft.price ?? product.price)}
                 onChange={(event) =>
                   setEdits((prev) => ({
                     ...prev,
-                    [product.id]: { ...draft, price: Number(event.target.value) },
+                    [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
                   }))
                 }
               />

@@ -653,7 +653,6 @@ button {
 
 .product-table-header {
   display: grid;
-  grid-template-columns: 1.5fr 0.8fr 1fr 0.8fr 0.5fr 0.7fr;
   gap: 0.5rem;
   padding: 0.4rem 0.5rem;
   background: #f1f5f9;
@@ -661,15 +660,40 @@ button {
   font-size: 0.8rem;
   font-weight: 600;
   color: #475569;
+  grid-template-columns: 1.5fr 0.8fr 1fr 0.8fr 0.5fr 0.7fr;
+}
+
+.product-table-header--5 {
+  grid-template-columns: 1.2fr 0.8fr 1fr 0.8fr 1fr;
+}
+
+.product-table-header--6 {
+  grid-template-columns: 1.2fr 0.8fr 0.8fr 0.6fr 1fr 0.8fr;
+}
+
+.product-table-header--7 {
+  grid-template-columns: 1.2fr 0.6fr 0.5fr 0.8fr 0.8fr 0.8fr 0.7fr;
 }
 
 .product-table-row {
   display: grid;
-  grid-template-columns: 1.5fr 0.8fr 1fr 0.8fr 0.5fr 0.7fr;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
   border-bottom: 1px solid #e2e8f0;
   align-items: center;
+  grid-template-columns: 1.5fr 0.8fr 1fr 0.8fr 0.5fr 0.7fr;
+}
+
+.product-table-row--5 {
+  grid-template-columns: 1.2fr 0.8fr 1fr 0.8fr 1fr;
+}
+
+.product-table-row--6 {
+  grid-template-columns: 1.2fr 0.8fr 0.8fr 0.6fr 1fr 0.8fr;
+}
+
+.product-table-row--7 {
+  grid-template-columns: 1.2fr 0.6fr 0.5fr 0.8fr 0.8fr 0.8fr 0.7fr;
 }
 
 .product-table-row:last-child {

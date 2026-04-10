@@ -52,9 +52,9 @@ export const AdminUsersPage: React.FC = () => {
   const rendered = useMemo(() => users ?? [], [users]);
 
   return (
-    <section className="card">
+    <section className="card admin-products">
       <h2>Usuarios</h2>
-      <div className="form-grid">
+      <div className="product-form-row">
         <input
           type="text"
           placeholder="Nombre"
@@ -104,11 +104,20 @@ export const AdminUsersPage: React.FC = () => {
         </button>
       </div>
       {error && <p className="error-text">{error}</p>}
-      <div className="table">
+      <div className="product-table">
+        <div className="product-table-header product-table-header--7">
+          <span>Nombre</span>
+          <span>Rol</span>
+          <span>Activo</span>
+          <span>Clave</span>
+          <span>externalPosId</span>
+          <span>externalStoreId</span>
+          <span>Acción</span>
+        </div>
         {rendered.map((user) => {
           const draft = edits[user.id] ?? {};
           return (
-            <div key={user.id} className="table-row">
+            <div key={user.id} className="product-table-row product-table-row--7">
               <input
                 type="text"
                 value={draft.name ?? user.name}
@@ -134,7 +143,7 @@ export const AdminUsersPage: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <label className="switch">
+              <label className="switch switch-sm">
                 <input
                   type="checkbox"
                   checked={draft.active ?? user.active ?? true}
@@ -145,7 +154,6 @@ export const AdminUsersPage: React.FC = () => {
                     }))
                   }
                 />
-                Activo
               </label>
               <input
                 type="password"

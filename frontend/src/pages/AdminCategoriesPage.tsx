@@ -70,7 +70,7 @@ export const AdminCategoriesPage: React.FC = () => {
   return (
     <section className="card admin-products">
       <h2>Categorías</h2>
-      <div className="form-grid">
+      <div className="product-form-row">
         <input
           type="text"
           placeholder="Nombre"
@@ -102,11 +102,19 @@ export const AdminCategoriesPage: React.FC = () => {
         </button>
       </div>
       {error && <p className="error-text">{error}</p>}
-      <div className="table">
+      <div className="product-table">
+        <div className="product-table-header product-table-header--5">
+          <span>Nombre</span>
+          <span>Icono</span>
+          <span>Color</span>
+          <span>Activa</span>
+          <span>Imagen</span>
+          <span>Acciones</span>
+        </div>
         {rendered.map((category) => {
           const draft = edits[category.id] ?? {};
           return (
-            <div key={category.id} className="table-row">
+            <div key={category.id} className="product-table-row product-table-row--5">
               <input
                 type="text"
                 value={draft.name ?? category.name}
@@ -137,7 +145,7 @@ export const AdminCategoriesPage: React.FC = () => {
                   }))
                 }
               />
-              <label className="switch">
+              <label className="switch switch-sm">
                 <input
                   type="checkbox"
                   checked={draft.active ?? category.active}
@@ -148,14 +156,13 @@ export const AdminCategoriesPage: React.FC = () => {
                     }))
                   }
                 />
-                Activa
               </label>
-              <div className="row-actions">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => handleUpload(category.id, event.target.files?.[0])}
-                />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => handleUpload(category.id, event.target.files?.[0])}
+              />
+              <div className="product-actions">
                 <button
                   type="button"
                   className="icon-button"

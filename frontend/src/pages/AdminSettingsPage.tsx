@@ -61,9 +61,9 @@ export const AdminSettingsPage: React.FC = () => {
   };
 
   return (
-    <section className="card admin-settings">
+    <section className="card admin-products">
       <h2>Settings</h2>
-      <div className="settings-form">
+      <div className="product-form-row">
         <div className="settings-row">
           <label htmlFor="store-name">Nombre del local</label>
           <input
@@ -127,15 +127,13 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('animation-error', event.target.files?.[0])}
           />
         </div>
-      </div>
-      <div className="settings-actions">
-        <label className="toggle-field">
-          <span>Imprimir ticket al finalizar venta</span>
+        <label className="switch">
           <input
             type="checkbox"
             checked={form.enableTicketPrinting}
             onChange={(event) => setForm({ ...form, enableTicketPrinting: event.target.checked })}
           />
+          Imprimir ticket
         </label>
         <button type="button" className="primary-button" onClick={handleSave}>
           Guardar
