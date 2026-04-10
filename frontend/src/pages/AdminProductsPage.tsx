@@ -13,7 +13,6 @@ export const AdminProductsPage: React.FC = () => {
     name: '',
     price: 0,
     categoryId: '',
-    colorHex: '#1f2937',
     iconName: '🍽️',
     active: true,
   });
@@ -23,7 +22,7 @@ export const AdminProductsPage: React.FC = () => {
     setError(null);
     try {
       await apiClient.post('/products', newProduct);
-      setNewProduct({ name: '', price: 0, categoryId: '', colorHex: '#1f2937', iconName: '🍽️', active: true });
+      setNewProduct({ name: '', price: 0, categoryId: '', iconName: '🍽️', active: true });
       await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -87,7 +86,7 @@ export const AdminProductsPage: React.FC = () => {
   return (
     <section className="card admin-products">
       <h2>Productos</h2>
-      <div className="form-grid">
+      <div className="product-form-row">
         <input
           type="text"
           placeholder="Nombre"
@@ -113,12 +112,6 @@ export const AdminProductsPage: React.FC = () => {
         </select>
         <input
           type="text"
-          placeholder="#1f2937"
-          value={newProduct.colorHex}
-          onChange={(event) => setNewProduct({ ...newProduct, colorHex: event.target.value })}
-        />
-        <input
-          type="text"
           placeholder="Icono"
           value={newProduct.iconName}
           onChange={(event) => setNewProduct({ ...newProduct, iconName: event.target.value })}
@@ -136,11 +129,19 @@ export const AdminProductsPage: React.FC = () => {
         </button>
       </div>
       {error && <p className="error-text">{error}</p>}
-      <div className="table">
+      <div className="product-table">
+        <div className="product-table-header">
+          <span>Nombre</span>
+          <span>Precio</span>
+          <span>Categoría</span>
+          <span>Imagen</span>
+          <span>Activo</span>
+          <span>Acciones</span>
+        </div>
         {rendered.map((product) => {
           const draft = edits[product.id] ?? {};
           return (
-            <div key={product.id} className="table-row">
+            <div key={product.id} className="product-table-row">
               <input
                 type="text"
                 value={draft.name ?? product.name}
@@ -177,16 +178,11 @@ export const AdminProductsPage: React.FC = () => {
                 ))}
               </select>
               <input
-                type="text"
-                value={draft.colorHex ?? product.colorHex ?? ''}
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [product.id]: { ...draft, colorHex: event.target.value },
-                  }))
-                }
+                type="file"
+                accept="image/*"
+                onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
               />
-              <label className="switch">
+              <label className="switch switch-sm">
                 <input
                   type="checkbox"
                   checked={draft.active ?? product.active}
@@ -197,14 +193,8 @@ export const AdminProductsPage: React.FC = () => {
                     }))
                   }
                 />
-                Activo
               </label>
-              <div className="row-actions">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
-                />
+              <div className="product-actions">
                 <button
                   type="button"
                   className="icon-button"
