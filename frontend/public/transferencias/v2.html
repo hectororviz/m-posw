@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CSD Soler – Pagos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --rojo: #AA0000;
+    --rojo-oscuro: #7a0000;
+    --rojo-brillante: #cc1111;
+    --verde: #0C7800;
+    --dorado: #C9A84C;
+    --negro: #050505;
+    --gris-oscuro: #111111;
+    --gris: #1c1c1c;
+    --gris-medio: #2a2a2a;
+    --texto: #f0f0f0;
+    --texto-suave: #888;
+  }
+
+  body.dia {
+    --negro: #f5f5f5;
+    --gris-oscuro: #e8e8e8;
+    --gris: #dcdcdc;
+    --gris-medio: #cccccc;
+    --texto: #111111;
+    --texto-suave: #666666;
+  }
+
+  body.dia #main {
+    border-right-color: #ddd;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(170,0,0,0.05) 0%, transparent 65%),
+      var(--negro);
+  }
+
+  body.dia #lista-pagos::-webkit-scrollbar-thumb { background: #bbb; }
+  body.dia .pago-item { border-bottom-color: #d8d8d8; }
+  body.dia #sidebar-header { border-bottom-color: #d0d0d0; }
+  body.dia .pago-item-hora { color: #999; }
+  body.dia #overlay { background: rgba(255,255,255,0.97); }
+  body.dia #overlay-monto { color: #111; text-shadow: 0 0 60px rgba(170,0,0,0.3), 0 0 120px rgba(170,0,0,0.15); }
+
+  /* ─── BOTÓN MODO ─────────────────────────────── */
+  #btn-modo {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    z-index: 200;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid #333;
+    background: var(--gris-medio);
+    color: var(--texto-suave);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s, border-color 0.3s, color 0.3s, transform 0.2s;
+    line-height: 1;
+  }
+
+  #btn-modo:hover {
+    transform: scale(1.12);
+    border-color: var(--rojo);
+    color: var(--texto);
+  }
+
+  body.dia #btn-modo {
+    border-color: #bbb;
+    background: #e0e0e0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--negro);
+    color: var(--texto);
+    font-family: 'Barlow', sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ─── LAYOUT ─────────────────────────────── */
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* ─── PANEL PRINCIPAL (idle) ──────────────── */
+  #main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-right: 1px solid #1e1e1e;
+    background:
+      radial-gradient(ellipse at 50% 30%, rgba(170,0,0,0.08) 0%, transparent 65%),
+      var(--negro);
+  }
+
+  /* linea decorativa top */
+  #main::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--rojo), transparent);
+  }
+
+  #escudo-wrap {
+    position: relative;
+    margin-bottom: 28px;
+  }
+
+  #escudo {
+    width: 180px;
+    height: 180px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 24px rgba(170,0,0,0.45));
+    animation: pulso 4s ease-in-out infinite;
+  }
+
+  @keyframes pulso {
+    0%, 100% { filter: drop-shadow(0 0 24px rgba(170,0,0,0.45)); }
+    50%       { filter: drop-shadow(0 0 40px rgba(170,0,0,0.7)); }
+  }
+
+  #club-nombre {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 4px;
+    color: var(--texto);
+    text-align: center;
+    line-height: 1;
+  }
+
+  #club-sub {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 6px;
+    color: var(--verde);
+    text-align: center;
+    margin-top: 6px;
+    text-transform: uppercase;
+  }
+
+  #reloj {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 5.5rem;
+    letter-spacing: 6px;
+    color: var(--texto);
+    line-height: 1;
+    margin-top: 36px;
+    text-shadow: 0 0 40px rgba(255,255,255,0.06);
+  }
+
+  #fecha {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.95rem;
+    letter-spacing: 3px;
+    color: var(--texto-suave);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* línea separadora */
+  .sep {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--rojo), transparent);
+    margin: 28px auto;
+  }
+
+  /* total del día (main) */
+  #total-dia-wrap {
+    text-align: center;
+  }
+
+  #total-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 4px;
+    color: var(--texto-suave);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  #total-monto {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.6rem;
+    letter-spacing: 2px;
+    color: var(--verde);
+  }
+
+  #total-ops {
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.75rem;
+    color: var(--texto-suave);
+    margin-top: 2px;
+  }
+
+  /* ─── BARRA LATERAL ───────────────────────── */
+  #sidebar {
+    display: flex;
+    flex-direction: column;
+    background: var(--gris-oscuro);
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid #222;
+  }
+
+  #sidebar-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 4px;
+    color: var(--texto-suave);
+    text-transform: uppercase;
+  }
+
+  #lista-pagos {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+  }
+
+  #lista-pagos::-webkit-scrollbar { width: 4px; }
+  #lista-pagos::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+  .pago-item {
+    padding: 12px 18px;
+    border-bottom: 1px solid #191919;
+    animation: slideIn 0.35s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(16px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .pago-item-monto {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--texto);
+    line-height: 1;
+  }
+
+  .pago-item-pagador {
+    font-size: 0.72rem;
+    color: var(--texto-suave);
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pago-item-hora {
+    font-size: 0.65rem;
+    color: #555;
+    margin-top: 2px;
+  }
+
+  .pago-item-tipo {
+    display: inline-block;
+    font-size: 0.58rem;
+    font-family: 'Barlow Condensed', sans-serif;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-top: 5px;
+  }
+
+  .tipo-bank { background: rgba(12,120,0,0.2); color: var(--verde); }
+  .tipo-mp   { background: rgba(170,0,0,0.2); color: #cc4444; }
+
+  #sin-pagos {
+    padding: 24px 18px;
+    font-size: 0.75rem;
+    color: #444;
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* ─── OVERLAY NOTIFICACIÓN ────────────────── */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.96);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+
+  #overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  /* fondo rojo pulsante */
+  #overlay-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 50%, rgba(170,0,0,0.22) 0%, transparent 70%);
+    animation: bgPulso 1.2s ease-in-out infinite alternate;
+  }
+
+  @keyframes bgPulso {
+    from { opacity: 0.6; }
+    to   { opacity: 1; }
+  }
+
+  /* líneas decorativas */
+  #overlay::before, #overlay::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--rojo), transparent);
+  }
+  #overlay::before { top: 60px; }
+  #overlay::after  { bottom: 60px; }
+
+  #overlay-content {
+    position: relative;
+    text-align: center;
+    z-index: 1;
+  }
+
+  #overlay-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 6px;
+    color: var(--verde);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    animation: fadeUp 0.5s ease 0.1s both;
+  }
+
+  #overlay-monto {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(5rem, 14vw, 10rem);
+    line-height: 1;
+    color: #fff;
+    letter-spacing: 2px;
+    text-shadow:
+      0 0 60px rgba(170,0,0,0.6),
+      0 0 120px rgba(170,0,0,0.3);
+    animation: fadeUp 0.5s ease 0.2s both, escala 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both;
+  }
+
+  @keyframes escala {
+    from { transform: scale(0.7); }
+    to   { transform: scale(1); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  #overlay-pagador {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.2rem;
+    color: var(--texto-suave);
+    margin-top: 12px;
+    letter-spacing: 1px;
+    animation: fadeUp 0.5s ease 0.35s both;
+  }
+
+  #overlay-tipo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--rojo-brillante);
+    margin-top: 8px;
+    animation: fadeUp 0.5s ease 0.45s both;
+  }
+
+  /* barra de progreso */
+  #overlay-barra-wrap {
+    position: absolute;
+    bottom: 30px;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #222;
+    border-radius: 2px;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  #overlay-barra {
+    height: 100%;
+    background: var(--rojo);
+    width: 100%;
+    transform-origin: left;
+    border-radius: 2px;
+  }
+
+  /* estado de conexión */
+  #estado-dot {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--verde);
+    z-index: 200;
+    transition: background 0.3s;
+  }
+
+  #estado-dot.error { background: var(--rojo-brillante); animation: parpadeo 1s ease infinite; }
+
+  @keyframes parpadeo {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.2; }
+  }
+
+  /* notif badge sidebar */
+  #badge {
+    display: none;
+    background: var(--rojo);
+    color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<div id="estado-dot" title="Conexión"></div>
+<button id="btn-modo" title="Cambiar modo">🌙</button>
+
+<div id="app">
+  <!-- PANEL PRINCIPAL -->
+  <div id="main">
+    <div id="escudo-wrap">
+      <img id="escudo" src="Soler.png" alt="CSD Soler">
+    </div>
+
+    <div id="club-nombre">CSD SOLER</div>
+    <div id="club-sub">Sistema de Pagos</div>
+
+    <div id="reloj">00:00:00</div>
+    <div id="fecha"></div>
+
+    <div class="sep"></div>
+
+    <div id="total-dia-wrap">
+      <div id="total-label">Total del día</div>
+      <div id="total-monto">$ 0</div>
+      <div id="total-ops">0 operaciones</div>
+    </div>
+  </div>
+
+  <!-- BARRA LATERAL -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <div id="sidebar-title">Últimos pagos <span id="badge"></span></div>
+    </div>
+    <div id="lista-pagos">
+      <div id="sin-pagos">Sin pagos registrados</div>
+    </div>
+  </div>
+</div>
+
+<!-- OVERLAY NOTIFICACIÓN -->
+<div id="overlay">
+  <div id="overlay-bg"></div>
+  <div id="overlay-content">
+    <div id="overlay-label">✓ Pago recibido</div>
+    <div id="overlay-monto">$ 0</div>
+    <div id="overlay-pagador"></div>
+    <div id="overlay-tipo"></div>
+  </div>
+  <div id="overlay-barra-wrap">
+    <div id="overlay-barra"></div>
+  </div>
+</div>
+
+<!-- AUDIO: beep sintético -->
+<script>
+// ─── CONFIGURACIÓN ───────────────────────────────────────────────────────────
+const ENDPOINT    = 'https://automat.csdsoler.com.ar/webhook/pendiente';
+const POLL_MS     = 5000;
+const OVERLAY_SEG = 30;
+const MAX_LISTA   = 20;
+
+// ─── ESTADO ──────────────────────────────────────────────────────────────────
+let totalDia   = 0;
+let cantOps    = 0;
+let pagos      = [];       // historial local
+let mostrando  = false;
+let overlayTimer, barraAnim;
+
+// ─── REFS DOM ─────────────────────────────────────────────────────────────────
+const elReloj       = document.getElementById('reloj');
+const elFecha       = document.getElementById('fecha');
+const elTotalMonto  = document.getElementById('total-monto');
+const elTotalOps    = document.getElementById('total-ops');
+const elLista       = document.getElementById('lista-pagos');
+const elSinPagos    = document.getElementById('sin-pagos');
+const elOverlay     = document.getElementById('overlay');
+const elOMonto      = document.getElementById('overlay-monto');
+const elOPagador    = document.getElementById('overlay-pagador');
+const elOTipo       = document.getElementById('overlay-tipo');
+const elBarra       = document.getElementById('overlay-barra');
+const elDot         = document.getElementById('estado-dot');
+
+// ─── RELOJ ───────────────────────────────────────────────────────────────────
+const DIAS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function actualizarReloj() {
+  const ahora = new Date();
+  const h = String(ahora.getHours()).padStart(2,'0');
+  const m = String(ahora.getMinutes()).padStart(2,'0');
+  const s = String(ahora.getSeconds()).padStart(2,'0');
+  elReloj.textContent = `${h}:${m}:${s}`;
+  elFecha.textContent = `${DIAS[ahora.getDay()]}, ${ahora.getDate()} de ${MESES[ahora.getMonth()]} de ${ahora.getFullYear()}`;
+}
+setInterval(actualizarReloj, 1000);
+actualizarReloj();
+
+// ─── AUDIO ───────────────────────────────────────────────────────────────────
+function sonar() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notas = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    notas.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.12;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.4, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t);
+      osc.stop(t + 0.35);
+    });
+  } catch(e) {}
+}
+
+// ─── FORMATO ─────────────────────────────────────────────────────────────────
+function formatMonto(n) {
+  return '$ ' + Number(n).toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+}
+
+function formatHora(fechaStr) {
+  const d = new Date(fechaStr);
+  return isNaN(d) ? '' : `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function tipoLabel(tipo) {
+  if (tipo === 'bank_transfer') return { txt: 'Transferencia bancaria', cls: 'tipo-bank' };
+  if (tipo === 'account_money') return { txt: 'Mercado Pago', cls: 'tipo-mp' };
+  return { txt: tipo || 'Pago', cls: 'tipo-mp' };
+}
+
+// ─── LISTA LATERAL ───────────────────────────────────────────────────────────
+function agregarALista(pago) {
+  elSinPagos.style.display = 'none';
+  const t = tipoLabel(pago.tipo);
+  const div = document.createElement('div');
+  div.className = 'pago-item';
+  const ref = pago.referencia ? `<div class="pago-item-pagador">Ref: ${pago.referencia}</div>` : '';
+  div.innerHTML = `
+    <div class="pago-item-monto">${formatMonto(pago.monto)}</div>
+    ${ref}
+    <div class="pago-item-hora">${formatHora(pago.fecha)}</div>
+    <span class="pago-item-tipo ${t.cls}">${t.txt}</span>
+  `;
+  elLista.insertBefore(div, elLista.firstChild);
+
+  // limitar cantidad
+  const items = elLista.querySelectorAll('.pago-item');
+  if (items.length > MAX_LISTA) items[items.length - 1].remove();
+}
+
+// ─── TOTAL ───────────────────────────────────────────────────────────────────
+function actualizarTotal(monto) {
+  totalDia += Number(monto);
+  cantOps  += 1;
+  elTotalMonto.textContent = formatMonto(totalDia);
+  elTotalOps.textContent   = `${cantOps} operación${cantOps !== 1 ? 'es' : ''}`;
+}
+
+// ─── OVERLAY ─────────────────────────────────────────────────────────────────
+function mostrarOverlay(pago) {
+  mostrando = true;
+  const t = tipoLabel(pago.tipo);
+
+  elOMonto.textContent   = formatMonto(pago.monto);
+  elOPagador.textContent = pago.referencia ? `Ref: ${pago.referencia}` : '';
+  elOTipo.textContent    = t.txt;
+
+  elOverlay.classList.add('visible');
+
+  // barra de progreso
+  elBarra.style.transition = 'none';
+  elBarra.style.transform  = 'scaleX(1)';
+  requestAnimationFrame(() => {
+    elBarra.style.transition = `transform ${OVERLAY_SEG}s linear`;
+    elBarra.style.transform  = 'scaleX(0)';
+  });
+
+  clearTimeout(overlayTimer);
+  overlayTimer = setTimeout(ocultarOverlay, OVERLAY_SEG * 1000);
+}
+
+function ocultarOverlay() {
+  elOverlay.classList.remove('visible');
+  clearTimeout(overlayTimer);
+  elBarra.style.transition = 'none';
+  elBarra.style.transform  = 'scaleX(1)';
+  mostrando = false;
+}
+
+// cerrar con click
+elOverlay.addEventListener('click', ocultarOverlay);
+
+// ─── MODO DÍA / NOCHE ────────────────────────────────────────────────────────
+const btnModo = document.getElementById('btn-modo');
+let modoNoche = true;
+
+btnModo.addEventListener('click', () => {
+  modoNoche = !modoNoche;
+  document.body.classList.toggle('dia', !modoNoche);
+  btnModo.textContent = modoNoche ? '🌙' : '☀️';
+});
+
+// ─── POLLING ─────────────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    const res  = await fetch(ENDPOINT, { cache: 'no-store' });
+    const raw  = await res.json();
+    const data = Array.isArray(raw) ? raw[0] : raw;
+
+    elDot.classList.remove('error');
+
+    if (data && data.hay_pago === true) {
+      console.log("Pago recibido:", data); // 👈 DEBUG
+
+      // normalizar: si n8n no manda 'referencia', intentar con campo legacy
+      if (!data.referencia && data.pagador) data.referencia = data.pagador;
+
+      sonar();
+      actualizarTotal(data.monto);
+      agregarALista(data);
+      if (!mostrando) mostrarOverlay(data);
+    }
+
+  } catch(e) {
+    console.error(e); // 👈 DEBUG
+    elDot.classList.add('error');
+  }
+}
+setInterval(poll, POLL_MS);
+poll(); // primera consulta inmediata
+</script>
+</body>
+</html>
