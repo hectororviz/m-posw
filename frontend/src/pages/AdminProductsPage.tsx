@@ -4,29 +4,6 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useAdminCategories, useAdminProducts } from '../api/queries';
 import type { Product } from '../api/types';
 
-const formatCurrency = (value: number | string) => {
-  const normalizedValue = Number(value);
-  const amount = Number.isFinite(normalizedValue) ? normalizedValue : 0;
-  return `$ ${amount.toLocaleString('es-AR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    useGrouping: true,
-  })}`;
-};
-
-const toAmount = (value: unknown) => {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    const normalized = trimmed.includes(',')
-      ? trimmed.replace(/\./g, '').replace(',', '.')
-      : trimmed;
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  const amount = Number(value);
-  return Number.isFinite(amount) ? amount : 0;
-};
-
 export const AdminProductsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: categories } = useAdminCategories();
