@@ -63,8 +63,8 @@ export const AdminSettingsPage: React.FC = () => {
   return (
     <section className="card admin-products">
       <h2>Settings</h2>
-      <div className="product-form-row">
-        <div className="settings-row">
+      <div className="settings-form-vertical">
+        <div className="settings-field">
           <label htmlFor="store-name">Nombre del local</label>
           <input
             id="store-name"
@@ -73,7 +73,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, storeName: event.target.value })}
           />
         </div>
-        <div className="settings-row">
+        <div className="settings-field">
           <label htmlFor="club-name">Nombre del Club/empresa</label>
           <input
             id="club-name"
@@ -82,7 +82,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, clubName: event.target.value })}
           />
         </div>
-        <div className="settings-row">
+        <div className="settings-field">
           <label htmlFor="accent-color">Color de personalizacion</label>
           <input
             id="accent-color"
@@ -91,7 +91,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, accentColor: event.target.value })}
           />
         </div>
-        <div className="settings-row">
+        <div className="settings-field">
           <label htmlFor="logo-upload">Logo</label>
           <input
             id="logo-upload"
@@ -100,7 +100,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('logo', event.target.files?.[0])}
           />
         </div>
-        <div className="settings-row">
+        <div className="settings-field">
           <label htmlFor="favicon-upload">Favicon</label>
           <input
             id="favicon-upload"
@@ -109,7 +109,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('favicon', event.target.files?.[0])}
           />
         </div>
-        <div className="settings-row">
+        <div className="settings-field">
           <label htmlFor="animation-ok-upload">Animacion OK</label>
           <input
             id="animation-ok-upload"
@@ -118,7 +118,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('animation-ok', event.target.files?.[0])}
           />
         </div>
-        <div className="settings-row">
+        <div className="settings-field">
           <label htmlFor="animation-error-upload">Animacion Error</label>
           <input
             id="animation-error-upload"
@@ -135,10 +135,10 @@ export const AdminSettingsPage: React.FC = () => {
           />
           Imprimir ticket
         </label>
-        <button type="button" className="primary-button" onClick={handleSave}>
-          Guardar
-        </button>
       </div>
+      <button type="button" className="primary-button" onClick={handleSave}>
+        Guardar
+      </button>
       {error && <p className="error-text">{error}</p>}
     </section>
   );
