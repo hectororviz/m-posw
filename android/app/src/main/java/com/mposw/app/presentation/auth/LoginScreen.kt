@@ -62,6 +62,10 @@ fun LoginScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Usuario") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MPOSwTheme.colors().textPrimary,
+                            unfocusedTextColor = MPOSwTheme.colors().textPrimary
+                        ),
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                         modifier = Modifier.menuAnchor().fillMaxWidth()
                     )
@@ -71,7 +75,7 @@ fun LoginScreen(
                     ) {
                         uiState.users.filter { it.active != false }.forEach { user ->
                             DropdownMenuItem(
-                                text = { Text(user.name) },
+                                text = { Text(user.name, color = MPOSwTheme.colors().textPrimary) },
                                 onClick = { viewModel.selectUser(user); expanded = false }
                             )
                         }
@@ -83,10 +87,12 @@ fun LoginScreen(
                 value = uiState.pin,
                 onValueChange = { viewModel.updatePin(it) },
                 label = { Text("PIN") },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = MPOSwTheme.colors().textPrimary,
+                    unfocusedTextColor = MPOSwTheme.colors().textPrimary
+                ),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                visualTransformation = PasswordVisualTransformation(),
-                readOnly = false,
                 singleLine = true
             )
 
