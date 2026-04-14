@@ -23,7 +23,7 @@ class PreferencesManager(private val context: Context) {
         private val BLUETOOTH_PRINTER_ADDRESS = stringPreferencesKey("bluetooth_printer_address")
         private val BLUETOOTH_PRINTER_NAME = stringPreferencesKey("bluetooth_printer_name")
 
-        const val DEFAULT_API_URL = "https://pos.csdsoler.com.ar/"
+        const val DEFAULT_API_URL = "https://pos.csdsoler.com.ar/api/"
     }
 
     val authToken: String? get() = runCatching {

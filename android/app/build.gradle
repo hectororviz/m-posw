@@ -21,7 +21,7 @@ android {
             useSupportLibrary true
         }
 
-        buildConfigField "String", "DEFAULT_API_URL", '"https://pos.csdsoler.com.ar/"'
+        buildConfigField "String", "DEFAULT_API_URL", '"https://pos.csdsoler.com.ar/api/"'
     }
 
     buildTypes {
