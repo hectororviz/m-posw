@@ -6,6 +6,7 @@ import { join } from 'path';
 import { AppModule } from './modules/app.module';
 import { PrismaService } from './modules/common/prisma.service';
 import { UPLOADS_DIR } from './modules/common/upload.constants';
+import { GlobalExceptionFilter } from './modules/common/global-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -20,6 +21,10 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
+  
+  // Global exception filter to ensure JSON responses
+  app.useGlobalFilters(new GlobalExceptionFilter());
+  
   app.useStaticAssets(UPLOADS_DIR, { prefix: '/uploads' });
   app.useStaticAssets(join(process.cwd(), 'public'));
 
