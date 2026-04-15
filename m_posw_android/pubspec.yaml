@@ -32,3 +32,4 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/logo_pos.png"
   adaptive_icon_background: "#0EA5E9"
   remove_alpha_ios: true
+  keep_name: true

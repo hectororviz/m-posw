@@ -1515,6 +1515,12 @@ button {
   min-width: 54px;
 }
 
+.ticket-item-category {
+  font-size: 18px;
+  color: #666;
+  margin-right: 4px;
+}
+
 .ticket-item-name {
   flex: 1;
 }

@@ -21,6 +21,7 @@ const formatDateTime = (value?: string) => {
 type TicketItem = {
   qty: number;
   name: string;
+  category?: string;
 };
 
 type TicketLine = {
@@ -60,8 +61,9 @@ export const PrintTicketPage: React.FC = () => {
   const [ticket, setTicket] = useState<TicketPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
-  const autoPrint = searchParams.get('autoPrint') === '1';
-  const autoClose = searchParams.get('autoClose') === '1';
+  const rawTicket = searchParams.get('ticket') || searchParams.get('data');
+  const autoPrint = searchParams.get('autoPrint') === '1' || (rawTicket != null && searchParams.get('autoPrint') !== '0');
+  const autoClose = searchParams.get('autoClose') === '1' || (rawTicket != null && searchParams.get('autoClose') !== '0');
 
   useEffect(() => {
     document.body.classList.add('ticket-print-body');
@@ -72,7 +74,7 @@ export const PrintTicketPage: React.FC = () => {
 
   useEffect(() => {
     try {
-      const rawTicket = searchParams.get('ticket');
+      const rawTicket = searchParams.get('ticket') || searchParams.get('data');
       if (rawTicket) {
         const decoded = decodeBase64Url(rawTicket);
         setTicket(JSON.parse(decoded) as TicketPayload);
@@ -156,7 +158,7 @@ export const PrintTicketPage: React.FC = () => {
           <ul className="ticket-items">
             {items.map((item, index) => {
               if (itemsStyle === 'summary') {
-                const summaryLabel = `${item.qty} - ${item.name}`;
+                const summaryLabel = item.category ? `[${item.category}] ${item.qty} - ${item.name}` : `${item.qty} - ${item.name}`;
                 const isLong = summaryLabel.length > 18;
                 return (
                   <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
@@ -167,6 +169,7 @@ export const PrintTicketPage: React.FC = () => {
               const isLong = item.name.length > 14;
               return (
                 <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
+                  {item.category && <span className="ticket-item-category">[{item.category}]</span>}
                   <span className="ticket-item-qty">{item.qty}x</span>
                   <span className="ticket-item-name">{item.name.toUpperCase()}</span>
                 </li>

@@ -20,6 +20,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'm-POSw',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
@@ -156,7 +157,13 @@ class _HomePageState extends State<HomePage> {
       for (final item in payload['items'] as List) {
         final qty = item['qty'] as int? ?? 1;
         final name = item['name'] as String? ?? '';
+        final category = item['category'] as String?;
         final nameUpper = name.toUpperCase();
+
+        if (category != null && category.isNotEmpty) {
+          lines.add('[${category.toUpperCase()}]');
+        }
+
         if (nameUpper.length > 40) {
           lines.add('${qty}x ${nameUpper.substring(0, 40)}');
           if (nameUpper.length > 80) {
@@ -342,17 +349,16 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           Positioned(
-            top: 0,
-            left: 0,
+            bottom: 16,
+            left: 16,
             child: GestureDetector(
               onTap: () => setState(() => _isSidebarOpen = !_isSidebarOpen),
               child: Container(
-                width: 48,
-                height: 48,
-                margin: const EdgeInsets.all(8),
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
@@ -362,6 +368,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Icon(
                   _isSidebarOpen ? Icons.close : Icons.menu,
+                  size: 20,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
