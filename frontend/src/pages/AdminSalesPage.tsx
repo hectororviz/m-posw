@@ -517,6 +517,7 @@ export const AdminSalesPage: React.FC = () => {
       items: sale.items.map((item) => ({
         qty: item.quantity,
         name: item.product.name,
+        category: item.product.category?.name,
       })),
       total: sale.total,
       thanks: 'Gracias por tu compra',

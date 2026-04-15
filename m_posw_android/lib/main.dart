@@ -157,7 +157,13 @@ class _HomePageState extends State<HomePage> {
       for (final item in payload['items'] as List) {
         final qty = item['qty'] as int? ?? 1;
         final name = item['name'] as String? ?? '';
+        final category = item['category'] as String?;
         final nameUpper = name.toUpperCase();
+
+        if (category != null && category.isNotEmpty) {
+          lines.add('[${category.toUpperCase()}]');
+        }
+
         if (nameUpper.length > 40) {
           lines.add('${qty}x ${nameUpper.substring(0, 40)}');
           if (nameUpper.length > 80) {

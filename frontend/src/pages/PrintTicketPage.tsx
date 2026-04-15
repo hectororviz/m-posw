@@ -21,6 +21,7 @@ const formatDateTime = (value?: string) => {
 type TicketItem = {
   qty: number;
   name: string;
+  category?: string;
 };
 
 type TicketLine = {
@@ -157,7 +158,7 @@ export const PrintTicketPage: React.FC = () => {
           <ul className="ticket-items">
             {items.map((item, index) => {
               if (itemsStyle === 'summary') {
-                const summaryLabel = `${item.qty} - ${item.name}`;
+                const summaryLabel = item.category ? `[${item.category}] ${item.qty} - ${item.name}` : `${item.qty} - ${item.name}`;
                 const isLong = summaryLabel.length > 18;
                 return (
                   <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
@@ -168,6 +169,7 @@ export const PrintTicketPage: React.FC = () => {
               const isLong = item.name.length > 14;
               return (
                 <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
+                  {item.category && <span className="ticket-item-category">[{item.category}]</span>}
                   <span className="ticket-item-qty">{item.qty}x</span>
                   <span className="ticket-item-name">{item.name.toUpperCase()}</span>
                 </li>

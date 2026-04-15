@@ -309,6 +309,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             items: itemsSnapshotRef.current.map((item) => ({
               qty: item.quantity,
               name: item.product.name,
+              category: item.product.category?.name,
             })),
             onPopupBlocked: () =>
               pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
@@ -413,7 +414,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         saleId: sale.id,
         dateTimeISO: sale.paidAt ?? sale.createdAt,
         total: sale.total,
-        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name })),
+        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name })),
         onPopupBlocked: () =>
           pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
         onError: (message) => pushToast(message, 'error'),

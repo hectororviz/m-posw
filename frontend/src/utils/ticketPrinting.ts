@@ -4,6 +4,7 @@ import type { Setting } from '../api/types';
 export type TicketItemPayload = {
   qty: number;
   name: string;
+  category?: string;
 };
 
 export type TicketLinePayload = {
