@@ -1,9 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useLoginUsers } from '../api/queries';
 import type { AuthResponse } from '../api/types';
 import { useAuth } from '../context/AuthContext';
+
+const EMBEDDED_KEYBOARD_KEY = 'm-posw:embedded-keyboard';
+
+const getEmbeddedKeyboardPreference = (): boolean => {
+  const stored = localStorage.getItem(EMBEDDED_KEYBOARD_KEY);
+  return stored ? stored === 'true' : true;
+};
+
+const setEmbeddedKeyboardPreference = (value: boolean) => {
+  localStorage.setItem(EMBEDDED_KEYBOARD_KEY, value.toString());
+};
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,7 +29,12 @@ export const LoginPage: React.FC = () => {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEmbeddedKeyboard, setShowEmbeddedKeyboard] = useState(() => getEmbeddedKeyboardPreference());
   const pinLength = 6;
+
+  useEffect(() => {
+    setEmbeddedKeyboardPreference(showEmbeddedKeyboard);
+  }, [showEmbeddedKeyboard]);
 
   const availableUsers = useMemo(
     () => (users ?? []).filter((user) => user.active !== false),
@@ -122,27 +138,37 @@ export const LoginPage: React.FC = () => {
             required
           />
         </label>
-        <div className="pin-keypad" aria-label="Teclado numérico">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-            <button
-              key={digit}
-              type="button"
-              className="pin-key"
-              onClick={() => appendDigit(digit)}
-            >
-              {digit}
+        <label className="switch" style={{ justifyContent: 'center', marginTop: '0.5rem' }}>
+          <input
+            type="checkbox"
+            checked={showEmbeddedKeyboard}
+            onChange={(e) => setShowEmbeddedKeyboard(e.target.checked)}
+          />
+          Teclado embebido
+        </label>
+        {showEmbeddedKeyboard && (
+          <div className="pin-keypad" aria-label="Teclado numérico">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+              <button
+                key={digit}
+                type="button"
+                className="pin-key"
+                onClick={() => appendDigit(digit)}
+              >
+                {digit}
+              </button>
+            ))}
+            <button type="button" className="pin-key pin-key--secondary" onClick={handleClear}>
+              Limpiar
             </button>
-          ))}
-          <button type="button" className="pin-key pin-key--secondary" onClick={handleClear}>
-            Limpiar
-          </button>
-          <button type="button" className="pin-key" onClick={() => appendDigit('0')}>
-            0
-          </button>
-          <button type="button" className="pin-key pin-key--secondary" onClick={handleBackspace}>
-            Borrar
-          </button>
-        </div>
+            <button type="button" className="pin-key" onClick={() => appendDigit('0')}>
+              0
+            </button>
+            <button type="button" className="pin-key pin-key--secondary" onClick={handleBackspace}>
+              Borrar
+            </button>
+          </div>
+        )}
         {error && <p className="error-text">{error}</p>}
         <button
           type="submit"

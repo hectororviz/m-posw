@@ -1,9 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAdminSales, useManualMovements, useSettings } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
+
+const EMBEDDED_KEYBOARD_KEY = 'm-posw:embedded-keyboard';
+
+const getEmbeddedKeyboardPreference = (): boolean => {
+  const stored = localStorage.getItem(EMBEDDED_KEYBOARD_KEY);
+  return stored ? stored === 'true' : true;
+};
+
+const setEmbeddedKeyboardPreference = (value: boolean) => {
+  localStorage.setItem(EMBEDDED_KEYBOARD_KEY, value.toString());
+};
 
 const formatCurrency = (value: number | string) => {
   const normalizedValue = Number(value);
@@ -109,6 +120,11 @@ export const AdminSalesPage: React.FC = () => {
     };
   } | null>(null);
   const [, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
+  const [showEmbeddedKeyboard, setShowEmbeddedKeyboard] = useState(() => getEmbeddedKeyboardPreference());
+
+  useEffect(() => {
+    setEmbeddedKeyboardPreference(showEmbeddedKeyboard);
+  }, [showEmbeddedKeyboard]);
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -722,6 +738,14 @@ export const AdminSalesPage: React.FC = () => {
                   Salida
                 </label>
               </fieldset>
+              <label className="switch" style={{ marginTop: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  checked={showEmbeddedKeyboard}
+                  onChange={(e) => setShowEmbeddedKeyboard(e.target.checked)}
+                />
+                Teclado embebido
+              </label>
               <div className="admin-sales__movement-main">
                 <label className="input-field">
                   Monto
@@ -734,27 +758,29 @@ export const AdminSalesPage: React.FC = () => {
                     onChange={(event) => setMovementAmount(event.target.value)}
                   />
                 </label>
-                <div className="admin-sales__keyboard" aria-label="Teclado numérico para monto">
-                  {[
-                    ['1', '2', '3'],
-                    ['4', '5', '6'],
-                    ['7', '8', '9'],
-                    ['.', '0', '⌫'],
-                  ].map((row, rowIndex) => (
-                    <div key={`amount-row-${rowIndex}`} className="admin-sales__keyboard-row">
-                      {row.map((key) => (
-                        <button
-                          type="button"
-                          key={key}
-                          className="admin-sales__key"
-                          onClick={() => handleAmountKeyPress(key)}
-                        >
-                          {key}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
+                {showEmbeddedKeyboard && (
+                  <div className="admin-sales__keyboard" aria-label="Teclado numérico para monto">
+                    {[
+                      ['1', '2', '3'],
+                      ['4', '5', '6'],
+                      ['7', '8', '9'],
+                      ['.', '0', '⌫'],
+                    ].map((row, rowIndex) => (
+                      <div key={`amount-row-${rowIndex}`} className="admin-sales__keyboard-row">
+                        {row.map((key) => (
+                          <button
+                            type="button"
+                            key={key}
+                            className="admin-sales__key"
+                            onClick={() => handleAmountKeyPress(key)}
+                          >
+                            {key}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <label className="input-field">
                 Motivo
@@ -766,38 +792,40 @@ export const AdminSalesPage: React.FC = () => {
                   onChange={(event) => setMovementReason(event.target.value)}
                 />
               </label>
-              <div className="admin-sales__mini-keyboard" aria-label="Teclado para motivo">
-                {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map((row) => (
-                  <div key={row} className="admin-sales__keyboard-row">
-                    {row.split('').map((letter) => (
-                      <button
-                        type="button"
-                        key={letter}
-                        className="admin-sales__key admin-sales__key--small"
-                        onClick={() => handleReasonKeyPress(letter)}
-                      >
-                        {letter}
-                      </button>
-                    ))}
+              {showEmbeddedKeyboard && (
+                <div className="admin-sales__mini-keyboard" aria-label="Teclado para motivo">
+                  {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map((row) => (
+                    <div key={row} className="admin-sales__keyboard-row">
+                      {row.split('').map((letter) => (
+                        <button
+                          type="button"
+                          key={letter}
+                          className="admin-sales__key admin-sales__key--small"
+                          onClick={() => handleReasonKeyPress(letter)}
+                        >
+                          {letter}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                  <div className="admin-sales__keyboard-row">
+                    <button
+                      type="button"
+                      className="admin-sales__key admin-sales__key--wide"
+                      onClick={() => handleReasonKeyPress('ESPACIO')}
+                    >
+                      Espacio
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-sales__key admin-sales__key--small"
+                      onClick={() => handleReasonKeyPress('⌫')}
+                    >
+                      ⌫
+                    </button>
                   </div>
-                ))}
-                <div className="admin-sales__keyboard-row">
-                  <button
-                    type="button"
-                    className="admin-sales__key admin-sales__key--wide"
-                    onClick={() => handleReasonKeyPress('ESPACIO')}
-                  >
-                    Espacio
-                  </button>
-                  <button
-                    type="button"
-                    className="admin-sales__key admin-sales__key--small"
-                    onClick={() => handleReasonKeyPress('⌫')}
-                  >
-                    ⌫
-                  </button>
                 </div>
-              </div>
+              )}
               <div className="checkout-actions">
                 <button type="button" className="secondary-button" onClick={handleCloseMovement}>
                   Cancelar
