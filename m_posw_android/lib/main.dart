@@ -179,26 +179,21 @@ class _HomePageState extends State<HomePage> {
       final baseOrderNumber = payload['orderNumber'] as int? ?? 0;
 
       for (var i = 0; i < items.length; i++) {
-        if (i > 0) {
-          lines.add(separator);
-        }
+        lines.add(separator);
+
         final item = items[i];
         final qty = item['qty'] as int? ?? 1;
         final name = item['name'] as String? ?? '';
-        final category = item['category'] as String?;
         final nameUpper = name.toUpperCase();
         final orderNum = (baseOrderNumber + i).toString().padLeft(3, '0');
 
-        if (category != null && category.isNotEmpty) {
-          lines.add('[${category.toUpperCase()}]');
-        }
-
-        final productLine = '${qty}x $nameUpper';
-        lines.add(productLine);
+        lines.add('${qty}x $nameUpper');
 
         final orderLine = orderNum.padLeft(maxLineWidth);
         lines.add(orderLine);
       }
+
+      lines.add(separator);
     }
 
     if (payload['thanks'] != null) {

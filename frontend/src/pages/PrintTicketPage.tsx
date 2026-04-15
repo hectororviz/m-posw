@@ -197,21 +197,21 @@ export const PrintTicketPage: React.FC = () => {
             <span>Total</span>
             <strong>{formatCurrency(total)}</strong>
           </div>
-          <div className="ticket-divider" />
-          <ul className="ticket-items">
-            {sortedItems.map((item, index) => (
-              <li key={`${item.name}-${index}`} className="ticket-item-row">
+          {sortedItems.map((item, index) => (
+            <>
+              <div className="ticket-divider" key={`divider-${index}`} />
+              <div key={`${item.name}-${index}`} className="ticket-item-row">
                 <div className="ticket-item-line">
                   <span className="ticket-item-qty">{item.qty}x</span>
-                  {item.category && <span className="ticket-item-category">[{item.category}]</span>}
                   <span className={`ticket-item-name ${item.name.length > 14 ? 'ticket-item-name--long' : ''}`}>{item.name.toUpperCase()}</span>
                 </div>
                 {orderNumber !== undefined && (
                   <span className="ticket-item-order">{(orderNumber + index).toString().padStart(3, '0')}</span>
                 )}
-              </li>
-            ))}
-          </ul>
+              </div>
+            </>
+          ))}
+          <div className="ticket-divider" />
         </>
       )}
       {ticket.thanks && <p className="ticket-thanks">{ticket.thanks}</p>}
