@@ -638,6 +638,45 @@ button {
   flex-shrink: 0;
 }
 
+@media (max-width: 768px) {
+  .admin-products .product-form-row--inline {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 0.5rem;
+  }
+
+  .admin-products .product-form-row--inline > * {
+    flex-shrink: 1;
+    flex: 1 1 auto;
+    min-width: 120px;
+  }
+
+  .admin-products .product-form-row--inline .primary-button,
+  .admin-products .product-form-row--inline .secondary-button {
+    width: auto;
+    min-width: 100px;
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-products .product-form-row--inline > * {
+    min-width: 100px;
+  }
+
+  .admin-products .product-form-row--inline .primary-button,
+  .admin-products .product-form-row--inline .secondary-button {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .admin-products .product-form-row input,
+  .admin-products .product-form-row select {
+    min-width: 100%;
+    flex: 1 1 100%;
+  }
+}
+
 .admin-products .product-form-row input,
 .admin-products .product-form-row select {
   padding: 0.3rem 0.4rem;
