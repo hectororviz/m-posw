@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiClient, normalizeApiError } from '../api/client';
-import type { PaymentStatus } from '../api/types';
+import type { PaymentStatus, Sale } from '../api/types';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
 import { useToast } from '../components/ToastProvider';
@@ -26,7 +26,6 @@ const formatTime = (seconds: number) => {
 
 type PaymentStatusResponse = {
   saleId: string;
-  orderNumber: number;
   status: PaymentStatus;
   mpStatus?: string | null;
   mpStatusDetail?: string | null;
@@ -72,7 +71,6 @@ export const CheckoutQrPage: React.FC = () => {
   const paymentTimeoutSeconds =
     Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : defaultTimeout;
   const [status, setStatus] = useState<PaymentStatus>('PENDING');
-  const [orderNumber, setOrderNumber] = useState<number | null>(null);
   const [mpStatusDetail, setMpStatusDetail] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(paymentTimeoutSeconds);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -115,16 +113,18 @@ export const CheckoutQrPage: React.FC = () => {
         setIsFinalizing(true);
         try {
           await apiClient.post(`/sales/${saleId}/complete`);
+          const saleResponse = await apiClient.get<Sale>(`/sales/${saleId}`);
+          const sale = saleResponse.data;
           await maybePrintTicket({
             settings,
             saleId,
             dateTimeISO: new Date().toISOString(),
             total,
-            orderNumber: orderNumber ?? undefined,
-            items: itemsSnapshotRef.current.map((item) => ({
+            items: sale.items.map((item) => ({
               qty: item.quantity,
               name: item.product.name,
               category: item.product.category?.name,
+              orderNumber: item.orderNumber,
             })),
             onPopupBlocked: () =>
               pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
@@ -148,15 +148,12 @@ export const CheckoutQrPage: React.FC = () => {
         pushToast(message, 'error');
       }
     },
-    [saleId, isFinalizing, settings, total, orderNumber, clear, pushToast, navigate],
+    [saleId, isFinalizing, settings, total, clear, pushToast, navigate],
   );
 
   const handleStatusUpdate = useCallback(
     (payload: PaymentStatusResponse) => {
       console.info('payment-status response', payload);
-      if (orderNumber === null && payload.orderNumber !== undefined) {
-        setOrderNumber(payload.orderNumber);
-      }
       setStatus(payload.status);
       setMpStatusDetail(payload.mpStatusDetail ?? null);
       setErrorMessage(null);
@@ -165,7 +162,7 @@ export const CheckoutQrPage: React.FC = () => {
         void handleTerminalStatus(payload.status, payload.mpStatusDetail ?? null);
       }
     },
-    [handleTerminalStatus, orderNumber],
+    [handleTerminalStatus],
   );
 
   useEffect(() => {

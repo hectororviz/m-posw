@@ -57,6 +57,7 @@ export type PaymentStatus =
 
 export interface SaleItem {
   id: string;
+  orderNumber: number;
   productId: string;
   quantity: number;
   subtotal: number;

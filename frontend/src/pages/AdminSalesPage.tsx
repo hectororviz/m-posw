@@ -513,12 +513,12 @@ export const AdminSalesPage: React.FC = () => {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
       dateTimeISO: sale.createdAt,
-      orderNumber: sale.orderNumber,
       itemsStyle: 'sale',
       items: sale.items.map((item) => ({
         qty: item.quantity,
         name: item.product.name,
         category: item.product.category?.name,
+        orderNumber: item.orderNumber,
       })),
       total: sale.total,
       thanks: 'Gracias por tu compra',
