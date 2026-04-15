@@ -99,8 +99,8 @@ export const AdminUsersPage: React.FC = () => {
           value={newUser.externalStoreId}
           onChange={(event) => setNewUser({ ...newUser, externalStoreId: event.target.value })}
         />
-        <button type="button" className="primary-button" onClick={handleCreate}>
-          Crear usuario
+        <button type="button" className="icon-button primary-button" onClick={handleCreate} aria-label="Crear usuario" title="Crear usuario">
+          <span aria-hidden="true">+</span>
         </button>
       </div>
       {error && <p className="error-text">{error}</p>}

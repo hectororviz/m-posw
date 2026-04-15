@@ -541,7 +541,7 @@ export const AdminSalesPage: React.FC = () => {
     <section className="card admin-products">
       <h2>Ventas</h2>
       <p className="admin-sales__subtitle">Revisa el detalle de ventas y exporta el resultado filtrado.</p>
-      <div className="product-form-row product-form-row--inline">
+      <div className="product-form-row product-form-row--inline admin-sales__top-actions">
         <label className="input-field">
           Desde
           <input
@@ -554,17 +554,17 @@ export const AdminSalesPage: React.FC = () => {
           Hasta
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
-        <button type="button" className="secondary-button" onClick={handleOpenMovement}>
-          Agregar movimiento
+        <button type="button" className="secondary-button btn-compact" onClick={handleOpenMovement}>
+          + Movimiento
         </button>
-        <button className="primary-button" onClick={handleDownload} disabled={filteredEntries.length === 0}>
-          Descargar Excel
+        <button className="primary-button btn-compact" onClick={handleDownload} disabled={filteredEntries.length === 0}>
+          ↓ Excel
         </button>
-        <button type="button" className="secondary-button" onClick={handleClosePeriod} disabled={isClosingPeriod}>
-          {isClosingPeriod ? 'Cerrando...' : 'Cierre parcial'}
+        <button type="button" className="secondary-button btn-compact" onClick={handleClosePeriod} disabled={isClosingPeriod}>
+          {isClosingPeriod ? '...' : 'Cierre'}
         </button>
-        <button className="secondary-button" onClick={handleOpenPrint}>
-          Imprimir
+        <button className="secondary-button btn-compact" onClick={handleOpenPrint}>
+          🖨️ Imprimir
         </button>
       </div>
       <div className="product-table">

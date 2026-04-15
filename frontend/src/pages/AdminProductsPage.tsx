@@ -148,8 +148,8 @@ export const AdminProductsPage: React.FC = () => {
           />
           Activo
         </label>
-        <button type="button" className="primary-button" onClick={handleCreate}>
-          Crear
+        <button type="button" className="icon-button primary-button" onClick={handleCreate} aria-label="Crear" title="Crear">
+          <span aria-hidden="true">+</span>
         </button>
       </div>
       {error && <p className="error-text">{error}</p>}
