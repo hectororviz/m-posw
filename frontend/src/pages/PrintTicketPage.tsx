@@ -136,10 +136,16 @@ export const PrintTicketPage: React.FC = () => {
   const showCriteria = criteria.length > 0;
 
   const sortedItems = [...items].sort((a, b) => {
-    const aIsComida = a.category?.toLowerCase() === 'comida';
-    const bIsComida = b.category?.toLowerCase() === 'comida';
-    if (aIsComida && !bIsComida) return -1;
-    if (!aIsComida && bIsComida) return 1;
+    const aCat = a.category?.toLowerCase() ?? '';
+    const bCat = b.category?.toLowerCase() ?? '';
+    const aIsBebida = aCat === 'bebida' || aCat === 'bebidas';
+    const bIsBebida = bCat === 'bebida' || bCat === 'bebidas';
+    const aIsComida = aCat === 'comida';
+    const bIsComida = bCat === 'comida';
+    if (aIsBebida && !bIsBebida) return -1;
+    if (!aIsBebida && bIsBebida) return 1;
+    if (aIsComida && !bIsComida) return 1;
+    if (!aIsComida && bIsComida) return -1;
     return 0;
   });
 
@@ -191,6 +197,7 @@ export const PrintTicketPage: React.FC = () => {
             <span>Total</span>
             <strong>{formatCurrency(total)}</strong>
           </div>
+          <div className="ticket-divider" />
           <ul className="ticket-items">
             {sortedItems.map((item, index) => (
               <li key={`${item.name}-${index}`} className="ticket-item-row">

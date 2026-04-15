@@ -157,10 +157,14 @@ class _HomePageState extends State<HomePage> {
       items.sort((a, b) {
         final aCat = (a['category'] as String?)?.toLowerCase() ?? '';
         final bCat = (b['category'] as String?)?.toLowerCase() ?? '';
+        final aIsBebida = aCat == 'bebida' || aCat == 'bebidas';
+        final bIsBebida = bCat == 'bebida' || bCat == 'bebidas';
         final aIsComida = aCat == 'comida';
         final bIsComida = bCat == 'comida';
-        if (aIsComida && !bIsComida) return -1;
-        if (!aIsComida && bIsComida) return 1;
+        if (aIsBebida && !bIsBebida) return -1;
+        if (!aIsBebida && bIsBebida) return 1;
+        if (aIsComida && !bIsComida) return 1;
+        if (!aIsComida && bIsComida) return -1;
         return 0;
       });
 
@@ -175,6 +179,9 @@ class _HomePageState extends State<HomePage> {
       final baseOrderNumber = payload['orderNumber'] as int? ?? 0;
 
       for (var i = 0; i < items.length; i++) {
+        if (i > 0) {
+          lines.add(separator);
+        }
         final item = items[i];
         final qty = item['qty'] as int? ?? 1;
         final name = item['name'] as String? ?? '';
