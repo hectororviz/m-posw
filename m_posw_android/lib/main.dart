@@ -121,9 +121,58 @@ class _HomePageState extends State<HomePage> {
 
   List<String> _formatPayloadToLines(Map<String, dynamic> payload) {
     final lines = <String>[];
+    const separator = '----------------------------';
+    const maxChars = 32;
+
+    if (payload['items'] != null) {
+      final items = List<Map<String, dynamic>>.from(payload['items'] as List);
+      items.sort((a, b) {
+        final aCat = (a['category'] as String?)?.toLowerCase() ?? '';
+        final bCat = (b['category'] as String?)?.toLowerCase() ?? '';
+        final aIsComida = aCat == 'comida';
+        final bIsComida = bCat == 'comida';
+        if (aIsComida && !bIsComida) return -1;
+        if (!aIsComida && bIsComida) return 1;
+        return 0;
+      });
+
+      for (var i = 0; i < items.length; i++) {
+        lines.add('');
+        lines.add(separator);
+        lines.add('');
+
+        final item = items[i];
+        final qty = item['qty'] as int? ?? 1;
+        final name = item['name'] as String? ?? '';
+        final category = item['category'] as String?;
+        final nameUpper = name.toUpperCase();
+
+        if (category != null && category.isNotEmpty) {
+          lines.add('[${category.toUpperCase()}]');
+        }
+
+        if (nameUpper.length > maxChars) {
+          lines.add('${qty}x ${nameUpper.substring(0, maxChars)}');
+          if (nameUpper.length > maxChars * 2) {
+            lines.add(nameUpper.substring(maxChars, maxChars * 2));
+          }
+        } else {
+          lines.add('${qty}x $nameUpper');
+        }
+      }
+
+      final total = payload['total'] as num?;
+      if (total != null) {
+        lines.add('');
+        lines.add(separator);
+        lines.add('');
+        lines.add('TOTAL: \$${total.toStringAsFixed(2)}');
+      }
+    }
 
     if (payload['clubName'] != null &&
         (payload['clubName'] as String).isNotEmpty) {
+      lines.add('');
       lines.add(payload['clubName'] as String);
     }
 
@@ -141,45 +190,13 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    lines.add('----------------------------');
-
     if (payload['criteria'] != null) {
+      lines.add(separator);
       for (final item in payload['criteria'] as List) {
         final label = item['label'] as String? ?? '';
         final value = item['value'] as String? ?? '';
         lines.add('$label: $value');
       }
-    }
-
-    lines.add('----------------------------');
-
-    if (payload['items'] != null) {
-      for (final item in payload['items'] as List) {
-        final qty = item['qty'] as int? ?? 1;
-        final name = item['name'] as String? ?? '';
-        final category = item['category'] as String?;
-        final nameUpper = name.toUpperCase();
-
-        if (category != null && category.isNotEmpty) {
-          lines.add('[${category.toUpperCase()}]');
-        }
-
-        if (nameUpper.length > 40) {
-          lines.add('${qty}x ${nameUpper.substring(0, 40)}');
-          if (nameUpper.length > 80) {
-            lines.add(nameUpper.substring(40, 80));
-          }
-        } else {
-          lines.add('${qty}x $nameUpper');
-        }
-      }
-    }
-
-    lines.add('----------------------------');
-
-    final total = payload['total'] as num?;
-    if (total != null) {
-      lines.add('TOTAL: \$${total.toStringAsFixed(2)}');
     }
 
     if (payload['thanks'] != null) {

@@ -134,8 +134,47 @@ export const PrintTicketPage: React.FC = () => {
   const showSummary = summary.length > 0;
   const showCriteria = criteria.length > 0;
 
+  const sortedItems = [...items].sort((a, b) => {
+    const aIsComida = a.category?.toLowerCase() === 'comida';
+    const bIsComida = b.category?.toLowerCase() === 'comida';
+    if (aIsComida && !bIsComida) return -1;
+    if (!aIsComida && bIsComida) return 1;
+    return 0;
+  });
+
   return (
     <div className="ticket-page">
+      {showItems && (
+        <ul className="ticket-items">
+          {sortedItems.map((item, index) => (
+            <li key={`${item.name}-${index}`}>
+              <div className="ticket-item-separator" />
+              <div className={`ticket-item ${item.name.length > 14 ? 'ticket-item--long' : ''}`}>
+                {itemsStyle === 'summary' ? (
+                  <span className="ticket-item-name">
+                    {item.category ? `[${item.category}] ` : ''}{item.qty} - {item.name}
+                  </span>
+                ) : (
+                  <>
+                    {item.category && <span className="ticket-item-category">[{item.category}]</span>}
+                    <span className="ticket-item-qty">{item.qty}x</span>
+                    <span className="ticket-item-name">{item.name.toUpperCase()}</span>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+          <li>
+            <div className="ticket-item-separator" />
+            {itemsStyle !== 'summary' && (
+              <div className="ticket-total">
+                <span>Total</span>
+                <strong>{formatCurrency(total)}</strong>
+              </div>
+            )}
+          </li>
+        </ul>
+      )}
       {ticket.clubName && <p className="ticket-club">{ticket.clubName}</p>}
       <h1 className="ticket-title">{ticket.storeName ?? 'SOLER - Bufet'}</h1>
       <p className="ticket-date">{formatDateTime(ticket.dateTimeISO)}</p>
@@ -150,41 +189,6 @@ export const PrintTicketPage: React.FC = () => {
               </div>
             ))}
           </div>
-        </>
-      )}
-      {showItems && (
-        <>
-          <div className="ticket-divider" />
-          <ul className="ticket-items">
-            {items.map((item, index) => {
-              if (itemsStyle === 'summary') {
-                const summaryLabel = item.category ? `[${item.category}] ${item.qty} - ${item.name}` : `${item.qty} - ${item.name}`;
-                const isLong = summaryLabel.length > 18;
-                return (
-                  <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
-                    <span className="ticket-item-name">{summaryLabel}</span>
-                  </li>
-                );
-              }
-              const isLong = item.name.length > 14;
-              return (
-                <li key={`${item.name}-${index}`} className={`ticket-item ${isLong ? 'ticket-item--long' : ''}`}>
-                  {item.category && <span className="ticket-item-category">[{item.category}]</span>}
-                  <span className="ticket-item-qty">{item.qty}x</span>
-                  <span className="ticket-item-name">{item.name.toUpperCase()}</span>
-                </li>
-              );
-            })}
-          </ul>
-          {itemsStyle !== 'summary' && (
-            <>
-              <div className="ticket-divider" />
-              <div className="ticket-total">
-                <span>Total</span>
-                <strong>{formatCurrency(total)}</strong>
-              </div>
-            </>
-          )}
         </>
       )}
       {showSummary && (
