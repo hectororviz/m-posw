@@ -26,6 +26,7 @@ const formatTime = (seconds: number) => {
 
 type PaymentStatusResponse = {
   saleId: string;
+  orderNumber: number;
   status: PaymentStatus;
   mpStatus?: string | null;
   mpStatusDetail?: string | null;
@@ -71,6 +72,7 @@ export const CheckoutQrPage: React.FC = () => {
   const paymentTimeoutSeconds =
     Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : defaultTimeout;
   const [status, setStatus] = useState<PaymentStatus>('PENDING');
+  const [orderNumber, setOrderNumber] = useState<number | null>(null);
   const [mpStatusDetail, setMpStatusDetail] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(paymentTimeoutSeconds);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export const CheckoutQrPage: React.FC = () => {
             saleId,
             dateTimeISO: new Date().toISOString(),
             total,
+            orderNumber: orderNumber ?? undefined,
             items: itemsSnapshotRef.current.map((item) => ({
               qty: item.quantity,
               name: item.product.name,
@@ -145,12 +148,15 @@ export const CheckoutQrPage: React.FC = () => {
         pushToast(message, 'error');
       }
     },
-    [saleId, isFinalizing, settings, total, clear, pushToast, navigate],
+    [saleId, isFinalizing, settings, total, orderNumber, clear, pushToast, navigate],
   );
 
   const handleStatusUpdate = useCallback(
     (payload: PaymentStatusResponse) => {
       console.info('payment-status response', payload);
+      if (orderNumber === null && payload.orderNumber !== undefined) {
+        setOrderNumber(payload.orderNumber);
+      }
       setStatus(payload.status);
       setMpStatusDetail(payload.mpStatusDetail ?? null);
       setErrorMessage(null);
@@ -159,7 +165,7 @@ export const CheckoutQrPage: React.FC = () => {
         void handleTerminalStatus(payload.status, payload.mpStatusDetail ?? null);
       }
     },
-    [handleTerminalStatus],
+    [handleTerminalStatus, orderNumber],
   );
 
   useEffect(() => {

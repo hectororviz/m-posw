@@ -71,6 +71,7 @@ export interface SaleUser {
 
 export interface Sale {
   id: string;
+  orderNumber: number;
   total: number;
   status: SaleStatus;
   paymentMethod?: PaymentMethod;

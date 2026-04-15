@@ -128,6 +128,7 @@ export class SalesService {
 
     return {
       saleId: saleWithReference.id,
+      orderNumber: saleWithReference.orderNumber,
       status: saleWithReference.status,
       startedAt: saleWithReference.paymentStartedAt,
     };
@@ -216,7 +217,7 @@ export class SalesService {
     this.assertCanAccessSale(sale, requester, 'GET /sales/:id/status');
     const refreshed = await this.expireIfNeeded(sale);
     const finalSale = refreshed ?? sale;
-    return { saleId: finalSale.id, status: finalSale.status, updatedAt: finalSale.statusUpdatedAt };
+    return { saleId: finalSale.id, orderNumber: finalSale.orderNumber, status: finalSale.status, updatedAt: finalSale.statusUpdatedAt };
   }
 
   async getPaymentStatus(saleId: string, requester: { id: string; role: string }) {
@@ -287,6 +288,7 @@ export class SalesService {
       updatedSale.status === SaleStatus.CANCELLED ? SaleStatus.CANCELLED : updatedSale.paymentStatus;
     return {
       saleId: finalSale.id,
+      orderNumber: finalSale.orderNumber,
       status: resolvedStatus,
       mpStatus: updatedSale.mpStatus,
       mpStatusDetail: updatedSale.mpStatusDetail,

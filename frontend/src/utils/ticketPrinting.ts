@@ -16,6 +16,7 @@ export type TicketPayload = {
   clubName?: string;
   storeName?: string;
   dateTimeISO?: string;
+  orderNumber?: number;
   criteria?: TicketLinePayload[];
   summary?: TicketLinePayload[];
   items?: TicketItemPayload[];
@@ -32,6 +33,7 @@ type PrintTicketInput = {
   total: number;
   items: TicketItemPayload[];
   saleId?: string;
+  orderNumber?: number;
   onPopupBlocked?: () => void;
   onAlreadyPrinted?: () => void;
   onError?: (message: string) => void;
@@ -54,6 +56,7 @@ export const maybePrintTicket = async ({
   total,
   items,
   saleId,
+  orderNumber,
   onPopupBlocked,
   onAlreadyPrinted,
   onError,
@@ -79,6 +82,7 @@ export const maybePrintTicket = async ({
     clubName: settings.clubName ?? '',
     storeName: settings.storeName ?? storeFallback,
     dateTimeISO: dateTimeISO ?? undefined,
+    orderNumber,
     items,
     total,
     thanks: 'Gracias por tu compra',

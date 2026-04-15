@@ -33,6 +33,7 @@ type TicketPayload = {
   clubName?: string;
   storeName?: string;
   dateTimeISO?: string;
+  orderNumber?: number;
   criteria?: TicketLine[];
   summary?: TicketLine[];
   items?: TicketItem[];
@@ -142,6 +143,8 @@ export const PrintTicketPage: React.FC = () => {
     return 0;
   });
 
+  const orderNumber = ticket.orderNumber;
+
   return (
     <div className="ticket-page">
       {showItems && (
@@ -150,6 +153,9 @@ export const PrintTicketPage: React.FC = () => {
             <li key={`${item.name}-${index}`}>
               <div className="ticket-item-separator" />
               <div className={`ticket-item ${item.name.length > 14 ? 'ticket-item--long' : ''}`}>
+                {orderNumber !== undefined && (
+                  <span className="ticket-item-order">{(orderNumber + index).toString().padStart(3, '0')}</span>
+                )}
                 {itemsStyle === 'summary' ? (
                   <span className="ticket-item-name">
                     {item.category ? `[${item.category}] ` : ''}{item.qty} - {item.name}
