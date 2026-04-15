@@ -187,10 +187,20 @@ class _HomePageState extends State<HomePage> {
         final nameUpper = name.toUpperCase();
         final orderNum = (baseOrderNumber + i).toString().padLeft(3, '0');
 
-        lines.add('${qty}x $nameUpper');
+        final productWithQty = '${qty}x $nameUpper';
+        final orderNumStr = ' $orderNum';
 
-        final orderLine = orderNum.padLeft(maxLineWidth);
-        lines.add(orderLine);
+        if (productWithQty.length + orderNumStr.length <= maxLineWidth) {
+          lines.add(productWithQty + orderNumStr);
+        } else {
+          lines.add(
+            productWithQty.substring(0, maxLineWidth - orderNumStr.length),
+          );
+          final remaining = productWithQty.substring(
+            maxLineWidth - orderNumStr.length,
+          );
+          lines.add(remaining + orderNumStr);
+        }
       }
 
       lines.add(separator);
