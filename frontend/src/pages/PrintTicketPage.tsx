@@ -147,40 +147,6 @@ export const PrintTicketPage: React.FC = () => {
 
   return (
     <div className="ticket-page">
-      {showItems && (
-        <ul className="ticket-items">
-          {sortedItems.map((item, index) => (
-            <li key={`${item.name}-${index}`}>
-              <div className="ticket-item-separator" />
-              <div className={`ticket-item ${item.name.length > 14 ? 'ticket-item--long' : ''}`}>
-                {orderNumber !== undefined && (
-                  <span className="ticket-item-order">{(orderNumber + index).toString().padStart(3, '0')}</span>
-                )}
-                {itemsStyle === 'summary' ? (
-                  <span className="ticket-item-name">
-                    {item.category ? `[${item.category}] ` : ''}{item.qty} - {item.name}
-                  </span>
-                ) : (
-                  <>
-                    {item.category && <span className="ticket-item-category">[{item.category}]</span>}
-                    <span className="ticket-item-qty">{item.qty}x</span>
-                    <span className="ticket-item-name">{item.name.toUpperCase()}</span>
-                  </>
-                )}
-              </div>
-            </li>
-          ))}
-          <li>
-            <div className="ticket-item-separator" />
-            {itemsStyle !== 'summary' && (
-              <div className="ticket-total">
-                <span>Total</span>
-                <strong>{formatCurrency(total)}</strong>
-              </div>
-            )}
-          </li>
-        </ul>
-      )}
       {ticket.clubName && <p className="ticket-club">{ticket.clubName}</p>}
       <h1 className="ticket-title">{ticket.storeName ?? 'SOLER - Bufet'}</h1>
       <p className="ticket-date">{formatDateTime(ticket.dateTimeISO)}</p>
@@ -216,6 +182,29 @@ export const PrintTicketPage: React.FC = () => {
               );
             })}
           </div>
+        </>
+      )}
+      {showItems && itemsStyle !== 'summary' && (
+        <>
+          <div className="ticket-divider" />
+          <div className="ticket-total">
+            <span>Total</span>
+            <strong>{formatCurrency(total)}</strong>
+          </div>
+          <ul className="ticket-items">
+            {sortedItems.map((item, index) => (
+              <li key={`${item.name}-${index}`} className="ticket-item-row">
+                <div className="ticket-item-line">
+                  <span className="ticket-item-qty">{item.qty}x</span>
+                  {item.category && <span className="ticket-item-category">[{item.category}]</span>}
+                  <span className={`ticket-item-name ${item.name.length > 14 ? 'ticket-item-name--long' : ''}`}>{item.name.toUpperCase()}</span>
+                </div>
+                {orderNumber !== undefined && (
+                  <span className="ticket-item-order">{(orderNumber + index).toString().padStart(3, '0')}</span>
+                )}
+              </li>
+            ))}
+          </ul>
         </>
       )}
       {ticket.thanks && <p className="ticket-thanks">{ticket.thanks}</p>}

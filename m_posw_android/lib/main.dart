@@ -122,61 +122,10 @@ class _HomePageState extends State<HomePage> {
   List<String> _formatPayloadToLines(Map<String, dynamic> payload) {
     final lines = <String>[];
     const separator = '----------------------------';
-    const maxChars = 28;
-
-    if (payload['items'] != null) {
-      final items = List<Map<String, dynamic>>.from(payload['items'] as List);
-      items.sort((a, b) {
-        final aCat = (a['category'] as String?)?.toLowerCase() ?? '';
-        final bCat = (b['category'] as String?)?.toLowerCase() ?? '';
-        final aIsComida = aCat == 'comida';
-        final bIsComida = bCat == 'comida';
-        if (aIsComida && !bIsComida) return -1;
-        if (!aIsComida && bIsComida) return 1;
-        return 0;
-      });
-
-      final baseOrderNumber = payload['orderNumber'] as int? ?? 0;
-
-      for (var i = 0; i < items.length; i++) {
-        lines.add('');
-        lines.add(separator);
-        lines.add('');
-
-        final item = items[i];
-        final qty = item['qty'] as int? ?? 1;
-        final name = item['name'] as String? ?? '';
-        final category = item['category'] as String?;
-        final nameUpper = name.toUpperCase();
-        final orderNum = (baseOrderNumber + i).toString().padLeft(3, '0');
-
-        if (category != null && category.isNotEmpty) {
-          lines.add('[${category.toUpperCase()}]');
-        }
-
-        final productLine = '${orderNum} - ${qty}x $nameUpper';
-        if (productLine.length > maxChars + 7) {
-          lines.add(productLine.substring(0, maxChars + 7));
-          if (productLine.length > (maxChars + 7) * 2) {
-            lines.add(productLine.substring(maxChars + 7, (maxChars + 7) * 2));
-          }
-        } else {
-          lines.add(productLine);
-        }
-      }
-
-      final total = payload['total'] as num?;
-      if (total != null) {
-        lines.add('');
-        lines.add(separator);
-        lines.add('');
-        lines.add('TOTAL: \$${total.toStringAsFixed(2)}');
-      }
-    }
+    const maxLineWidth = 32;
 
     if (payload['clubName'] != null &&
         (payload['clubName'] as String).isNotEmpty) {
-      lines.add('');
       lines.add(payload['clubName'] as String);
     }
 
@@ -200,6 +149,48 @@ class _HomePageState extends State<HomePage> {
         final label = item['label'] as String? ?? '';
         final value = item['value'] as String? ?? '';
         lines.add('$label: $value');
+      }
+    }
+
+    if (payload['items'] != null) {
+      final items = List<Map<String, dynamic>>.from(payload['items'] as List);
+      items.sort((a, b) {
+        final aCat = (a['category'] as String?)?.toLowerCase() ?? '';
+        final bCat = (b['category'] as String?)?.toLowerCase() ?? '';
+        final aIsComida = aCat == 'comida';
+        final bIsComida = bCat == 'comida';
+        if (aIsComida && !bIsComida) return -1;
+        if (!aIsComida && bIsComida) return 1;
+        return 0;
+      });
+
+      final total = payload['total'] as num?;
+      if (total != null) {
+        lines.add(separator);
+        lines.add('TOTAL: \$${total.toStringAsFixed(2)}');
+      }
+
+      lines.add(separator);
+
+      final baseOrderNumber = payload['orderNumber'] as int? ?? 0;
+
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        final qty = item['qty'] as int? ?? 1;
+        final name = item['name'] as String? ?? '';
+        final category = item['category'] as String?;
+        final nameUpper = name.toUpperCase();
+        final orderNum = (baseOrderNumber + i).toString().padLeft(3, '0');
+
+        if (category != null && category.isNotEmpty) {
+          lines.add('[${category.toUpperCase()}]');
+        }
+
+        final productLine = '${qty}x $nameUpper';
+        lines.add(productLine);
+
+        final orderLine = orderNum.padLeft(maxLineWidth);
+        lines.add(orderLine);
       }
     }
 
