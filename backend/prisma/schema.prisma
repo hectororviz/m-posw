@@ -124,6 +124,7 @@ model ManualMovement {
 
 model Sale {
   id        String     @id @default(uuid()) @db.Uuid
+  orderNumber Int      @default(autoincrement())
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   total     Decimal    @db.Decimal(10, 2)

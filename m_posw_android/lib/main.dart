@@ -122,7 +122,7 @@ class _HomePageState extends State<HomePage> {
   List<String> _formatPayloadToLines(Map<String, dynamic> payload) {
     final lines = <String>[];
     const separator = '----------------------------';
-    const maxChars = 32;
+    const maxChars = 28;
 
     if (payload['items'] != null) {
       final items = List<Map<String, dynamic>>.from(payload['items'] as List);
@@ -136,6 +136,8 @@ class _HomePageState extends State<HomePage> {
         return 0;
       });
 
+      final baseOrderNumber = payload['orderNumber'] as int? ?? 0;
+
       for (var i = 0; i < items.length; i++) {
         lines.add('');
         lines.add(separator);
@@ -146,18 +148,20 @@ class _HomePageState extends State<HomePage> {
         final name = item['name'] as String? ?? '';
         final category = item['category'] as String?;
         final nameUpper = name.toUpperCase();
+        final orderNum = (baseOrderNumber + i).toString().padLeft(3, '0');
 
         if (category != null && category.isNotEmpty) {
           lines.add('[${category.toUpperCase()}]');
         }
 
-        if (nameUpper.length > maxChars) {
-          lines.add('${qty}x ${nameUpper.substring(0, maxChars)}');
-          if (nameUpper.length > maxChars * 2) {
-            lines.add(nameUpper.substring(maxChars, maxChars * 2));
+        final productLine = '${orderNum} - ${qty}x $nameUpper';
+        if (productLine.length > maxChars + 7) {
+          lines.add(productLine.substring(0, maxChars + 7));
+          if (productLine.length > (maxChars + 7) * 2) {
+            lines.add(productLine.substring(maxChars + 7, (maxChars + 7) * 2));
           }
         } else {
-          lines.add('${qty}x $nameUpper');
+          lines.add(productLine);
         }
       }
 

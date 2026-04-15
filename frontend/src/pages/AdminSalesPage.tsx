@@ -513,6 +513,7 @@ export const AdminSalesPage: React.FC = () => {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
       dateTimeISO: sale.createdAt,
+      orderNumber: sale.orderNumber,
       itemsStyle: 'sale',
       items: sale.items.map((item) => ({
         qty: item.quantity,
