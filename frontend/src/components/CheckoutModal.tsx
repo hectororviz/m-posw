@@ -7,17 +7,7 @@ import { useSettings } from '../api/queries';
 import { useCart } from '../context/CartContext';
 import { useToast } from './ToastProvider';
 import { maybePrintTicket } from '../utils/ticketPrinting';
-
-const EMBEDDED_KEYBOARD_KEY = 'm-posw:embedded-keyboard';
-
-const getEmbeddedKeyboardPreference = (): boolean => {
-  const stored = localStorage.getItem(EMBEDDED_KEYBOARD_KEY);
-  return stored ? stored === 'true' : true;
-};
-
-const setEmbeddedKeyboardPreference = (value: boolean) => {
-  localStorage.setItem(EMBEDDED_KEYBOARD_KEY, value.toString());
-};
+import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
 type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT' | 'QR_RESULT';
 type QrResultType = 'SUCCESS' | 'ERROR';
@@ -84,7 +74,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [cashError, setCashError] = useState<string | null>(null);
-  const [showEmbeddedKeyboard, setShowEmbeddedKeyboard] = useState(() => getEmbeddedKeyboardPreference());
+  const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
   const qrRequestRef = useRef<AbortController | null>(null);
   const qrPollRef = useRef<number | null>(null);
   const qrTimerRef = useRef<number | null>(null);
@@ -276,10 +266,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
       clearQrTimers();
     };
   }, []);
-
-  useEffect(() => {
-    setEmbeddedKeyboardPreference(showEmbeddedKeyboard);
-  }, [showEmbeddedKeyboard]);
 
   useEffect(() => {
     if (step !== 'QR_WAIT' || !saleId) {
@@ -551,14 +537,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                   value={formatCurrency(receivedAmount)}
                   onChange={(event) => handleCashInputChange(event.target.value)}
                 />
-              </label>
-              <label className="switch" style={{ marginTop: '0.5rem' }}>
-                <input
-                  type="checkbox"
-                  checked={showEmbeddedKeyboard}
-                  onChange={(e) => setShowEmbeddedKeyboard(e.target.checked)}
-                />
-                Teclado embebido
               </label>
               {showEmbeddedKeyboard && (
                 <div className="pin-keypad cash-keypad" aria-label="Teclado numérico">

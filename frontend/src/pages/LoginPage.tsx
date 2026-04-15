@@ -1,20 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useLoginUsers } from '../api/queries';
 import type { AuthResponse } from '../api/types';
 import { useAuth } from '../context/AuthContext';
-
-const EMBEDDED_KEYBOARD_KEY = 'm-posw:embedded-keyboard';
-
-const getEmbeddedKeyboardPreference = (): boolean => {
-  const stored = localStorage.getItem(EMBEDDED_KEYBOARD_KEY);
-  return stored ? stored === 'true' : true;
-};
-
-const setEmbeddedKeyboardPreference = (value: boolean) => {
-  localStorage.setItem(EMBEDDED_KEYBOARD_KEY, value.toString());
-};
+import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -29,12 +19,11 @@ export const LoginPage: React.FC = () => {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showEmbeddedKeyboard, setShowEmbeddedKeyboard] = useState(() => getEmbeddedKeyboardPreference());
+  const [showTempKeyboard, setShowTempKeyboard] = useState(false);
+  const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
   const pinLength = 6;
 
-  useEffect(() => {
-    setEmbeddedKeyboardPreference(showEmbeddedKeyboard);
-  }, [showEmbeddedKeyboard]);
+  const shouldShowKeyboard = showEmbeddedKeyboard || showTempKeyboard;
 
   const availableUsers = useMemo(
     () => (users ?? []).filter((user) => user.active !== false),
@@ -138,15 +127,17 @@ export const LoginPage: React.FC = () => {
             required
           />
         </label>
-        <label className="switch" style={{ justifyContent: 'center', marginTop: '0.5rem' }}>
-          <input
-            type="checkbox"
-            checked={showEmbeddedKeyboard}
-            onChange={(e) => setShowEmbeddedKeyboard(e.target.checked)}
-          />
-          Teclado embebido
-        </label>
-        {showEmbeddedKeyboard && (
+        {!showEmbeddedKeyboard && (
+          <button
+            type="button"
+            className="secondary-button"
+            style={{ marginTop: '0.5rem', width: 'auto' }}
+            onClick={() => setShowTempKeyboard(!showTempKeyboard)}
+          >
+            {showTempKeyboard ? 'Ocultar teclado' : 'Mostrar teclado'}
+          </button>
+        )}
+        {shouldShowKeyboard && (
           <div className="pin-keypad" aria-label="Teclado numérico">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
               <button

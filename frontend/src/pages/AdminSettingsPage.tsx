@@ -4,11 +4,13 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
 export const AdminSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
   const { pushToast } = useToast();
+  const { showEmbeddedKeyboard, setShowEmbeddedKeyboard } = useEmbeddedKeyboard();
   const [form, setForm] = useState({
     storeName: '',
     clubName: '',
@@ -134,6 +136,14 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, enableTicketPrinting: event.target.checked })}
           />
           Imprimir ticket
+        </label>
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={showEmbeddedKeyboard}
+            onChange={(event) => setShowEmbeddedKeyboard(event.target.checked)}
+          />
+          Teclado embebido
         </label>
       </div>
       <button type="button" className="primary-button" onClick={handleSave}>

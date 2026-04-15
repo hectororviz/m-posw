@@ -1,20 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAdminSales, useManualMovements, useSettings } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
-
-const EMBEDDED_KEYBOARD_KEY = 'm-posw:embedded-keyboard';
-
-const getEmbeddedKeyboardPreference = (): boolean => {
-  const stored = localStorage.getItem(EMBEDDED_KEYBOARD_KEY);
-  return stored ? stored === 'true' : true;
-};
-
-const setEmbeddedKeyboardPreference = (value: boolean) => {
-  localStorage.setItem(EMBEDDED_KEYBOARD_KEY, value.toString());
-};
+import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
 const formatCurrency = (value: number | string) => {
   const normalizedValue = Number(value);
@@ -120,11 +110,7 @@ export const AdminSalesPage: React.FC = () => {
     };
   } | null>(null);
   const [, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
-  const [showEmbeddedKeyboard, setShowEmbeddedKeyboard] = useState(() => getEmbeddedKeyboardPreference());
-
-  useEffect(() => {
-    setEmbeddedKeyboardPreference(showEmbeddedKeyboard);
-  }, [showEmbeddedKeyboard]);
+  const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
 
   const selectedSale = useMemo(
     () => sales.find((sale) => sale.id === selectedSaleId) ?? null,
@@ -738,14 +724,6 @@ export const AdminSalesPage: React.FC = () => {
                   Salida
                 </label>
               </fieldset>
-              <label className="switch" style={{ marginTop: '0.5rem' }}>
-                <input
-                  type="checkbox"
-                  checked={showEmbeddedKeyboard}
-                  onChange={(e) => setShowEmbeddedKeyboard(e.target.checked)}
-                />
-                Teclado embebido
-              </label>
               <div className="admin-sales__movement-main">
                 <label className="input-field">
                   Monto
