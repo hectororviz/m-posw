@@ -85,7 +85,7 @@ export const maybePrintTicket = async ({
   };
 
   const ticketParam = encodeBase64Url(JSON.stringify(payload));
-  const url = `/print/ticket?ticket=${ticketParam}&autoPrint=1&autoClose=1`;
+  const url = `/printticket?data=${ticketParam}`;
   const popup = window.open(url, '_blank', 'noopener,noreferrer');
 
   if (!popup) {
