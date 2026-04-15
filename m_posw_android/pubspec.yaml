@@ -1,0 +1,23 @@
+name: m_posw_android
+description: "App POS para Android con WebView e impresión Bluetooth"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_inappwebview: ^6.1.5
+  bluetooth_print_plus: ^2.4.6
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
