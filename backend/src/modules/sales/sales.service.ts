@@ -458,16 +458,27 @@ export class SalesService {
       throw new BadRequestException('Producto inválido o inactivo');
     }
 
-    const saleItems = items.map((item) => {
+    // Get or create counters for each product and assign order numbers
+    const saleItems = [];
+    for (const item of items) {
       const product = products.find((p) => p.id === item.productId);
       const price = Number(product.price);
       const subtotal = this.roundToCurrency(price * item.quantity);
-      return {
+
+      // Get or create counter for this product
+      const counter = await this.prisma.productOrderCounter.upsert({
+        where: { productId: item.productId },
+        update: { lastOrderNumber: { increment: 1 } },
+        create: { productId: item.productId, lastOrderNumber: 1 },
+      });
+
+      saleItems.push({
         productId: item.productId,
         quantity: item.quantity,
         subtotal,
-      };
-    });
+        orderNumber: counter.lastOrderNumber,
+      });
+    }
 
     const total = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
 
