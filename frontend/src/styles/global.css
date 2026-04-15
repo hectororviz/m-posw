@@ -1533,9 +1533,6 @@ button {
 }
 
 .ticket-item-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
   font-size: 22px;
   font-weight: 700;
   text-transform: uppercase;
@@ -1543,17 +1540,26 @@ button {
 }
 
 .ticket-item-line {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
+  display: block;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: calc(58mm - 50px);
+}
+
+.ticket-item-qty {
+  margin-right: 8px;
 }
 
 .ticket-item-order {
   font-weight: 900;
   color: #000;
-  white-space: nowrap;
-  margin-left: 8px;
+  float: right;
+  clear: right;
+}
+
+.ticket-item-row::after {
+  content: '';
+  display: table;
 }
 
 .ticket-total {

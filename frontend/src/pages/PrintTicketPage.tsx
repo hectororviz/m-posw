@@ -201,10 +201,10 @@ export const PrintTicketPage: React.FC = () => {
             <>
               <div className="ticket-divider" key={`divider-${index}`} />
               <div key={`${item.name}-${index}`} className="ticket-item-row">
-                <div className="ticket-item-line">
+                <span className="ticket-item-line">
                   <span className="ticket-item-qty">{item.qty}x</span>
                   <span className={`ticket-item-name ${item.name.length > 14 ? 'ticket-item-name--long' : ''}`}>{item.name.toUpperCase()}</span>
-                </div>
+                </span>
                 {orderNumber !== undefined && (
                   <span className="ticket-item-order">{(orderNumber + index).toString().padStart(3, '0')}</span>
                 )}
