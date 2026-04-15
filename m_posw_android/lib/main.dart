@@ -176,8 +176,6 @@ class _HomePageState extends State<HomePage> {
 
       lines.add(separator);
 
-      final baseOrderNumber = payload['orderNumber'] as int? ?? 0;
-
       for (var i = 0; i < items.length; i++) {
         lines.add(separator);
 
@@ -185,22 +183,13 @@ class _HomePageState extends State<HomePage> {
         final qty = item['qty'] as int? ?? 1;
         final name = item['name'] as String? ?? '';
         final nameUpper = name.toUpperCase();
-        final orderNum = (baseOrderNumber + i).toString().padLeft(3, '0');
+        final orderNum = (item['orderNumber'] as int? ?? 0).toString().padLeft(
+          3,
+          '0',
+        );
 
-        final productWithQty = '${qty}x $nameUpper';
-        final orderNumStr = ' $orderNum';
-
-        if (productWithQty.length + orderNumStr.length <= maxLineWidth) {
-          lines.add(productWithQty + orderNumStr);
-        } else {
-          lines.add(
-            productWithQty.substring(0, maxLineWidth - orderNumStr.length),
-          );
-          final remaining = productWithQty.substring(
-            maxLineWidth - orderNumStr.length,
-          );
-          lines.add(remaining + orderNumStr);
-        }
+        lines.add('${qty}x $nameUpper');
+        lines.add(orderNum.padLeft(maxLineWidth));
       }
 
       lines.add(separator);

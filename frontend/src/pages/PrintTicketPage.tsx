@@ -22,6 +22,7 @@ type TicketItem = {
   qty: number;
   name: string;
   category?: string;
+  orderNumber?: number;
 };
 
 type TicketLine = {
@@ -33,7 +34,6 @@ type TicketPayload = {
   clubName?: string;
   storeName?: string;
   dateTimeISO?: string;
-  orderNumber?: number;
   criteria?: TicketLine[];
   summary?: TicketLine[];
   items?: TicketItem[];
@@ -149,8 +149,6 @@ export const PrintTicketPage: React.FC = () => {
     return 0;
   });
 
-  const orderNumber = ticket.orderNumber;
-
   return (
     <div className="ticket-page">
       {ticket.clubName && <p className="ticket-club">{ticket.clubName}</p>}
@@ -205,8 +203,8 @@ export const PrintTicketPage: React.FC = () => {
                   <span className="ticket-item-qty">{item.qty}x</span>
                   <span className={`ticket-item-name ${item.name.length > 14 ? 'ticket-item-name--long' : ''}`}>{item.name.toUpperCase()}</span>
                 </span>
-                {orderNumber !== undefined && (
-                  <span className="ticket-item-order">{(orderNumber + index).toString().padStart(3, '0')}</span>
+                {item.orderNumber !== undefined && (
+                  <span className="ticket-item-order">{item.orderNumber.toString().padStart(3, '0')}</span>
                 )}
               </div>
             </>

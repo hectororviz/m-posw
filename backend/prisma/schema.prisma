@@ -155,6 +155,7 @@ model Sale {
 
 model SaleItem {
   id        String   @id @default(uuid()) @db.Uuid
+  orderNumber Int    @default(autoincrement())
   saleId    String   @db.Uuid
   productId String   @db.Uuid
   quantity  Int

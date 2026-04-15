@@ -1536,14 +1536,13 @@ button {
   font-size: 22px;
   font-weight: 700;
   text-transform: uppercase;
-  margin: 12px 0;
+  margin: 8px 0;
 }
 
 .ticket-item-line {
   display: block;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  max-width: calc(58mm - 50px);
 }
 
 .ticket-item-qty {
@@ -1551,15 +1550,12 @@ button {
 }
 
 .ticket-item-order {
+  display: block;
   font-weight: 900;
   color: #000;
-  float: right;
-  clear: right;
-}
-
-.ticket-item-row::after {
-  content: '';
-  display: table;
+  text-align: right;
+  font-size: 22px;
+  margin-top: 4px;
 }
 
 .ticket-total {

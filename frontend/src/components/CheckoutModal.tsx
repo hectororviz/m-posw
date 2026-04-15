@@ -63,7 +63,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const [cashReceived, setCashReceived] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saleId, setSaleId] = useState<string | null>(null);
-  const [orderNumber, setOrderNumber] = useState<number | null>(null);
   const [qrStatus, setQrStatus] = useState<SaleStatus | null>(null);
   const [qrMessage, setQrMessage] = useState<string | null>(null);
   const [qrResult, setQrResult] = useState<QrResultType | null>(null);
@@ -98,7 +97,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setCashReceived('');
     setIsSubmitting(false);
     setSaleId(null);
-    setOrderNumber(null);
     setQrStatus(null);
     setQrMessage(null);
     setQrResult(null);
@@ -298,24 +296,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
       }
       pollingInFlight.current = true;
       try {
-        const response = await apiClient.get<{ saleId: string; orderNumber: number; status: SaleStatus }>(`/sales/${saleId}/status`);
+        const response = await apiClient.get<{ saleId: string; status: SaleStatus }>(`/sales/${saleId}/status`);
         const status = response.data.status;
         setQrStatus(status);
-        if (orderNumber === null && response.data.orderNumber !== undefined) {
-          setOrderNumber(response.data.orderNumber);
-        }
         if (status === 'APPROVED') {
           clearQrTimers();
+          const saleResponse = await apiClient.get<Sale>(`/sales/${saleId}`);
+          const sale = saleResponse.data;
           await maybePrintTicket({
             settings,
             saleId,
             dateTimeISO: new Date().toISOString(),
             total,
-            orderNumber: orderNumber ?? response.data.orderNumber,
-            items: itemsSnapshotRef.current.map((item) => ({
+            items: sale.items.map((item) => ({
               qty: item.quantity,
               name: item.product.name,
               category: item.product.category?.name,
+              orderNumber: item.orderNumber,
             })),
             onPopupBlocked: () =>
               pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
@@ -377,7 +374,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
       const controller = new AbortController();
       qrRequestRef.current = controller;
       try {
-        const response = await apiClient.post<{ saleId: string; orderNumber: number; status: SaleStatus }>(
+        const response = await apiClient.post<{ saleId: string; status: SaleStatus }>(
           '/sales/qr',
           {
             items: items.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
@@ -387,7 +384,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
           { signal: controller.signal },
         );
         setSaleId(response.data.saleId);
-        setOrderNumber(response.data.orderNumber);
         setQrStatus(response.data.status);
       } catch (error) {
         if (!controller.signal.aborted) {
@@ -421,8 +417,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         saleId: sale.id,
         dateTimeISO: sale.paidAt ?? sale.createdAt,
         total: sale.total,
-        orderNumber: sale.orderNumber,
-        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name })),
+        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber })),
         onPopupBlocked: () =>
           pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
         onError: (message) => pushToast(message, 'error'),
