@@ -5,11 +5,13 @@ import { CashCloseModule } from './cash-close/cash-close.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CashMovementsModule } from './cash-movements/cash-movements.module';
 import { IconsModule } from './icons/icons.module';
+import { PaymentsModule } from './payments/payments.module';
 import { ProductsModule } from './products/products.module';
 import { ReportsModule } from './reports/reports.module';
 import { SalesModule } from './sales/sales.module';
 import { SettingsModule } from './settings/settings.module';
 import { StatsModule } from './stats/stats.module';
+import { StockModule } from './stock/stock.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -21,11 +23,13 @@ import { UsersModule } from './users/users.module';
     CategoriesModule,
     CashMovementsModule,
     IconsModule,
+    PaymentsModule,
     ProductsModule,
     SalesModule,
     ReportsModule,
     StatsModule,
     SettingsModule,
+    StockModule,
   ],
 })
 export class AppModule {}

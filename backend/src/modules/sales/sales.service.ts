@@ -40,7 +40,7 @@ export class SalesService {
     const changeAmount = this.roundToCurrency(cashReceived - roundedTotal);
 
     try {
-      return await this.prisma.sale.create({
+      const sale = await this.prisma.sale.create({
         data: {
           userId,
           total: roundedTotal,
@@ -57,6 +57,11 @@ export class SalesService {
         },
         include: { items: { include: { product: true } } },
       });
+
+      // Decrementar stock por cada producto vendido
+      await this.decrementStockForSale(sale.id);
+
+      return sale;
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta en efectivo');
     }
@@ -314,7 +319,7 @@ export class SalesService {
     if (sale.status === SaleStatus.APPROVED) {
       return sale;
     }
-    return this.prisma.sale.update({
+    const updatedSale = await this.prisma.sale.update({
       where: { id: saleId },
       data: {
         status: SaleStatus.APPROVED,
@@ -323,6 +328,11 @@ export class SalesService {
       },
       include: { items: { include: { product: true } } },
     });
+
+    // Decrementar stock por cada producto vendido
+    await this.decrementStockForSale(saleId);
+
+    return updatedSale;
   }
 
   async markTicketPrinted(saleId: string, requester: { id: string; role: string }) {
@@ -483,6 +493,20 @@ export class SalesService {
     const total = saleItems.reduce((sum, item) => sum + item.subtotal, 0);
 
     return { items: saleItems, total };
+  }
+
+  async decrementStockForSale(saleId: string) {
+    const saleItems = await this.prisma.saleItem.findMany({
+      where: { saleId },
+      select: { productId: true, quantity: true },
+    });
+
+    for (const item of saleItems) {
+      await this.prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { decrement: item.quantity } },
+      });
+    }
   }
 
   private roundToCurrency(value: number) {

@@ -198,6 +198,8 @@ export class MercadoPagoWebhookProcessorService {
       return;
     }
 
+    const wasNotApproved = sale.status !== SaleStatus.APPROVED;
+
     const updateData: Prisma.SaleUpdateInput = {
       paymentStatus: nextPaymentStatus,
       status: resolvedSaleStatus,
@@ -221,6 +223,11 @@ export class MercadoPagoWebhookProcessorService {
       where: { id: sale.id },
       data: updateData,
     });
+
+    // Decrementar stock si la venta acaba de ser aprobada
+    if (wasNotApproved && resolvedSaleStatus === SaleStatus.APPROVED) {
+      await this.decrementStockForSale(sale.id);
+    }
 
     this.salesGateway.notifyPaymentStatusChanged({
       saleId: updatedSale.id,
@@ -558,5 +565,19 @@ export class MercadoPagoWebhookProcessorService {
       return payload.results.filter(isRecord);
     }
     return [];
+  }
+
+  private async decrementStockForSale(saleId: string) {
+    const saleItems = await this.prisma.saleItem.findMany({
+      where: { saleId },
+      select: { productId: true, quantity: true },
+    });
+
+    for (const item of saleItems) {
+      await this.prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { decrement: item.quantity } },
+      });
+    }
   }
 }

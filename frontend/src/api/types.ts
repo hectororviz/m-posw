@@ -29,6 +29,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  stock: number;
   iconName?: string | null;
   colorHex?: string | null;
   imagePath?: string | null;
@@ -38,12 +39,27 @@ export interface Product {
   category?: Category;
 }
 
+export interface StockProduct {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  categoryId: string;
+}
+
+export interface StockCategory {
+  id: string;
+  name: string;
+  colorHex: string;
+  products: StockProduct[];
+}
+
 export interface SaleItemInput {
   productId: string;
   quantity: number;
 }
 
-export type PaymentMethod = 'CASH' | 'MP_QR';
+export type PaymentMethod = 'CASH' | 'MP_QR' | 'TRANSFER';
 export type SaleStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
 export type PaymentStatus =
   | 'PENDING'
@@ -109,3 +125,33 @@ export interface Setting {
 export interface ApiErrorResponse {
   message?: string | string[];
 }
+
+// Transfer payment types
+export interface PollTransferRequest {
+  monto_esperado: number;
+}
+
+export interface PollTransferResponse {
+  hay_pago: boolean;
+  monto?: number;
+  pagador?: string;
+  tipo?: string;
+  fecha?: string;
+  payment_id?: string;
+}
+
+export interface ConfirmTransferRequest {
+  payment_id: string;
+  monto_recibido: number;
+  monto_esperado: number;
+  items: { productId: string; quantity: number }[];
+}
+
+export interface ConfirmTransferResponse {
+  success: boolean;
+  saleId?: string;
+  orderNumber?: number;
+  message?: string;
+}
+
+export type TransferStatus = 'WAITING' | 'EXACT' | 'MORE' | 'LESS' | 'TIMEOUT' | 'CONFIRMED' | 'ERROR';

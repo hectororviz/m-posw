@@ -2,15 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import { apiClient, getUploadsBaseUrl, normalizeApiError } from '../api/client';
-import type { PaymentMethod, Sale, SaleStatus } from '../api/types';
+import type { PaymentMethod, Sale, SaleStatus, PollTransferResponse, ConfirmTransferResponse } from '../api/types';
 import { useSettings } from '../api/queries';
 import { useCart } from '../context/CartContext';
 import { useToast } from './ToastProvider';
 import { maybePrintTicket } from '../utils/ticketPrinting';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
-type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT' | 'QR_RESULT';
+type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT' | 'QR_RESULT' | 'TRANSFER_WAIT' | 'TRANSFER_RESULT';
 type QrResultType = 'SUCCESS' | 'ERROR';
+type TransferStatus = 'WAITING' | 'EXACT' | 'MORE' | 'LESS' | 'TIMEOUT' | 'ERROR';
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-AR', {
@@ -74,10 +75,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [cashError, setCashError] = useState<string | null>(null);
+  
+  // Transfer payment state
+  const [transferStatus, setTransferStatus] = useState<TransferStatus>('WAITING');
+  const [transferPayment, setTransferPayment] = useState<PollTransferResponse | null>(null);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferResult, setTransferResult] = useState<QrResultType | null>(null);
+  const [transferResultMessage, setTransferResultMessage] = useState<string | null>(null);
+  
   const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
   const qrRequestRef = useRef<AbortController | null>(null);
   const qrPollRef = useRef<number | null>(null);
   const qrTimerRef = useRef<number | null>(null);
+  const transferPollRef = useRef<number | null>(null);
+  const transferTimerRef = useRef<number | null>(null);
   const pollingInFlight = useRef(false);
   const itemsSnapshotRef = useRef(items);
 
@@ -107,6 +118,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setQrLoading(false);
     setQrError(null);
     setCashError(null);
+    // Reset transfer state
+    setTransferStatus('WAITING');
+    setTransferPayment(null);
+    setTransferError(null);
+    setTransferResult(null);
+    setTransferResultMessage(null);
   };
 
   const clearQrTimers = () => {
@@ -117,6 +134,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     if (qrTimerRef.current) {
       window.clearInterval(qrTimerRef.current);
       qrTimerRef.current = null;
+    }
+  };
+
+  const clearTransferTimers = () => {
+    if (transferPollRef.current) {
+      window.clearInterval(transferPollRef.current);
+      transferPollRef.current = null;
+    }
+    if (transferTimerRef.current) {
+      window.clearInterval(transferTimerRef.current);
+      transferTimerRef.current = null;
     }
   };
 
@@ -136,21 +164,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   };
 
   const handleClose = useCallback(() => {
-    if (qrResult) {
+    if (qrResult || transferResult) {
       return;
     }
     abortQrRequest();
     clearQrTimers();
+    clearTransferTimers();
     if (saleId && step === 'QR_WAIT' && qrStatus === 'PENDING') {
       void cancelQrSale(saleId);
     }
     onClose();
-  }, [qrResult, saleId, step, qrStatus, onClose]);
+  }, [qrResult, transferResult, saleId, step, qrStatus, onClose]);
 
   useEffect(() => {
     if (!isOpen) {
       abortQrRequest();
       clearQrTimers();
+      clearTransferTimers();
       resetState();
       return;
     }
@@ -264,9 +294,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     return () => {
       abortQrRequest();
       clearQrTimers();
+      clearTransferTimers();
     };
   }, []);
 
+  // QR Payment Effects
   useEffect(() => {
     if (step !== 'QR_WAIT' || !saleId) {
       return;
@@ -399,6 +431,143 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     void createQrSale();
   }, [step, saleId, items, total]);
 
+  // Transfer Payment Effects
+  useEffect(() => {
+    if (step !== 'TRANSFER_WAIT') {
+      return;
+    }
+    setTimeLeft(120);
+    setTransferStatus('WAITING');
+    setTransferPayment(null);
+    setTransferError(null);
+    
+    if (!transferTimerRef.current) {
+      transferTimerRef.current = window.setInterval(() => {
+        setTimeLeft((prev) => Math.max(prev - 1, 0));
+      }, 1000);
+    }
+    
+    return () => {
+      if (transferTimerRef.current) {
+        window.clearInterval(transferTimerRef.current);
+        transferTimerRef.current = null;
+      }
+    };
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 'TRANSFER_WAIT') {
+      return;
+    }
+    if (transferPollRef.current) {
+      return;
+    }
+    
+    transferPollRef.current = window.setInterval(async () => {
+      if (pollingInFlight.current || timeLeft <= 0 || transferStatus !== 'WAITING') {
+        return;
+      }
+      pollingInFlight.current = true;
+      
+      try {
+        const response = await apiClient.post<PollTransferResponse>('/payments/poll-transfer', {
+          monto_esperado: total,
+        });
+        
+        const data = response.data;
+        
+        if (data.hay_pago && data.monto !== undefined && data.payment_id) {
+          setTransferPayment(data);
+          const receivedAmount = roundToCurrency(data.monto);
+          const expectedAmount = roundToCurrency(total);
+          
+          if (Math.abs(receivedAmount - expectedAmount) < 0.01) {
+            // Exact amount - auto confirm
+            setTransferStatus('EXACT');
+            clearTransferTimers();
+            await confirmTransfer(data.payment_id, receivedAmount, expectedAmount);
+          } else if (receivedAmount > expectedAmount) {
+            // More than expected - show confirmation
+            setTransferStatus('MORE');
+            clearTransferTimers();
+          } else {
+            // Less than expected - show confirmation
+            setTransferStatus('LESS');
+            clearTransferTimers();
+          }
+        }
+      } catch (error) {
+        console.error('Error polling transfer:', error);
+        // Don't stop polling on error, just log it
+      } finally {
+        pollingInFlight.current = false;
+      }
+    }, 5000); // Poll every 5 seconds
+  }, [step, timeLeft, transferStatus, total]);
+
+  useEffect(() => {
+    if (step !== 'TRANSFER_WAIT') {
+      return;
+    }
+    if (timeLeft === 0 && transferStatus === 'WAITING') {
+      clearTransferTimers();
+      setTransferStatus('TIMEOUT');
+      setTransferError('Tiempo agotado. No se recibió el pago.');
+    }
+  }, [timeLeft, step, transferStatus]);
+
+  const confirmTransfer = async (paymentId: string, montoRecibido: number, montoEsperado: number) => {
+    setIsSubmitting(true);
+    try {
+      const response = await apiClient.post<ConfirmTransferResponse>('/payments/confirm-transfer', {
+        payment_id: paymentId,
+        monto_recibido: montoRecibido,
+        monto_esperado: montoEsperado,
+        items: items.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
+      });
+      
+      const data = response.data;
+      
+      if (data.success && data.saleId) {
+        // Print ticket
+        const saleResponse = await apiClient.get<Sale>(`/sales/${data.saleId}`);
+        const sale = saleResponse.data;
+        
+        await maybePrintTicket({
+          settings,
+          saleId: data.saleId,
+          dateTimeISO: new Date().toISOString(),
+          total: montoEsperado,
+          items: sale.items.map((item) => ({
+            qty: item.quantity,
+            name: item.product.name,
+            category: item.product.category?.name,
+            orderNumber: item.orderNumber,
+          })),
+          onPopupBlocked: () =>
+            pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
+          onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
+          onError: (message) => pushToast(message, 'error'),
+        });
+        
+        clear();
+        setTransferResult('SUCCESS');
+        setTransferResultMessage(`Pago confirmado. Venta #${data.orderNumber}`);
+        setStep('TRANSFER_RESULT');
+      } else {
+        throw new Error(data.message || 'Error al confirmar el pago');
+      }
+    } catch (error) {
+      const message = normalizeApiError(error);
+      setTransferError(message);
+      setTransferResult('ERROR');
+      setTransferResultMessage(message);
+      setStep('TRANSFER_RESULT');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCashConfirm = async () => {
     if (!isCashValid) {
       return;
@@ -444,6 +613,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setQrResultMessage(null);
   };
 
+  const handleStartTransfer = () => {
+    setStep('TRANSFER_WAIT');
+    setTransferStatus('WAITING');
+    setTransferPayment(null);
+    setTransferError(null);
+    setTransferResult(null);
+    setTransferResultMessage(null);
+    setTimeLeft(120);
+  };
+
   const handleRetryQr = () => {
     clearQrTimers();
     abortQrRequest();
@@ -454,6 +633,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setQrResult(null);
     setQrResultMessage(null);
     setStep('QR_WAIT');
+  };
+
+  const handleRetryTransfer = () => {
+    clearTransferTimers();
+    setTransferStatus('WAITING');
+    setTransferPayment(null);
+    setTransferError(null);
+    setTransferResult(null);
+    setTransferResultMessage(null);
+    setTimeLeft(120);
   };
 
   const handleCancelQr = async () => {
@@ -471,9 +660,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setStep('SELECT_METHOD');
   };
 
+  const handleCancelTransfer = () => {
+    clearTransferTimers();
+    setTransferStatus('WAITING');
+    setTransferPayment(null);
+    setTransferError(null);
+    setStep('SELECT_METHOD');
+  };
+
   const handleResultOk = async () => {
     abortQrRequest();
     clearQrTimers();
+    clearTransferTimers();
     if (qrResult === 'ERROR' && saleId && qrStatus === 'PENDING') {
       await cancelQrSale(saleId);
     }
@@ -482,12 +680,65 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     navigate('/');
   };
 
+  const handleAcceptDifferentAmount = async () => {
+    if (transferPayment?.payment_id && transferPayment?.monto) {
+      await confirmTransfer(transferPayment.payment_id, transferPayment.monto, total);
+    }
+  };
+
+  const handleRejectDifferentAmount = () => {
+    // Continue waiting - reject this payment
+    setTransferStatus('WAITING');
+    setTransferPayment(null);
+    setTimeLeft((prev) => Math.max(prev, 30)); // Ensure at least 30 seconds left
+    
+    // Restart polling
+    if (!transferPollRef.current) {
+      transferPollRef.current = window.setInterval(async () => {
+        if (pollingInFlight.current || timeLeft <= 0 || transferStatus !== 'WAITING') {
+          return;
+        }
+        pollingInFlight.current = true;
+        
+        try {
+          const response = await apiClient.post<PollTransferResponse>('/payments/poll-transfer', {
+            monto_esperado: total,
+          });
+          
+          const data = response.data;
+          
+          if (data.hay_pago && data.monto !== undefined && data.payment_id) {
+            setTransferPayment(data);
+            const receivedAmount = roundToCurrency(data.monto);
+            const expectedAmount = roundToCurrency(total);
+            
+            if (Math.abs(receivedAmount - expectedAmount) < 0.01) {
+              setTransferStatus('EXACT');
+              clearTransferTimers();
+              await confirmTransfer(data.payment_id, receivedAmount, expectedAmount);
+            } else if (receivedAmount > expectedAmount) {
+              setTransferStatus('MORE');
+              clearTransferTimers();
+            } else {
+              setTransferStatus('LESS');
+              clearTransferTimers();
+            }
+          }
+        } catch (error) {
+          console.error('Error polling transfer:', error);
+        } finally {
+          pollingInFlight.current = false;
+        }
+      }, 5000);
+    }
+  };
+
   if (!isOpen) {
     return null;
   }
 
   return (
-    <div className="modal-backdrop" onClick={qrResult ? undefined : handleClose} role="presentation">
+    <div className="modal-backdrop" onClick={qrResult || transferResult ? undefined : handleClose} role="presentation">
       <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h2>Checkout</h2>
@@ -496,7 +747,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             className="icon-button"
             onClick={handleClose}
             aria-label="Cerrar"
-            disabled={Boolean(qrResult)}
+            disabled={Boolean(qrResult || transferResult)}
           >
             ✕
           </button>
@@ -505,7 +756,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
           {step === 'SELECT_METHOD' && (
             <div className="checkout-step">
               <p className="checkout-total">Total: <strong>{formatCurrency(total)}</strong></p>
-              <div className="checkout-actions">
+              <div className="checkout-actions checkout-actions--three">
                 <button
                   type="button"
                   className="primary-button"
@@ -521,6 +772,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                   disabled={items.length === 0}
                 >
                   QR
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handleStartTransfer}
+                  disabled={items.length === 0}
+                >
+                  Transferencia
                 </button>
               </div>
             </div>
@@ -632,6 +891,118 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                 )}
               </div>
               {qrResultMessage && <p className="qr-result-message">{qrResultMessage}</p>}
+              <div className="qr-result-actions">
+                <button type="button" className="primary-button" onClick={handleResultOk}>
+                  OK
+                </button>
+              </div>
+            </div>
+          )}
+          {step === 'TRANSFER_WAIT' && (
+            <div className="checkout-step">
+              <p className="checkout-total">Total: <strong>{formatCurrency(total)}</strong></p>
+              
+              {transferStatus === 'WAITING' && (
+                <div className="qr-wait">
+                  <div className="spinner" aria-hidden="true" />
+                  <p>Esperando transferencia…</p>
+                  <p className="qr-timer">{formatTime(timeLeft)}</p>
+                  <p className="transfer-instructions">
+                    Realice una transferencia CVU/MP por el monto exacto.
+                  </p>
+                  {transferError && <p className="error-text">{transferError}</p>}
+                </div>
+              )}
+              
+              {transferStatus === 'MORE' && transferPayment && (
+                <div className="transfer-confirmation">
+                  <p className="transfer-received-amount">
+                    Transferencia recibida:<br />
+                    <strong>{formatCurrency(transferPayment.monto || 0)}</strong>
+                  </p>
+                  <p className="transfer-expected-amount">
+                    Monto esperado: {formatCurrency(total)}
+                  </p>
+                  <p className="transfer-difference success-text">
+                    Diferencia a favor: {formatCurrency(roundToCurrency((transferPayment.monto || 0) - total))}
+                  </p>
+                  <p>¿Desea aceptar esta transferencia?</p>
+                </div>
+              )}
+              
+              {transferStatus === 'LESS' && transferPayment && (
+                <div className="transfer-confirmation">
+                  <p className="transfer-received-amount">
+                    Transferencia recibida:<br />
+                    <strong className="error-text">{formatCurrency(transferPayment.monto || 0)}</strong>
+                  </p>
+                  <p className="transfer-expected-amount">
+                    Monto esperado: {formatCurrency(total)}
+                  </p>
+                  <p className="transfer-difference error-text">
+                    Faltante: {formatCurrency(roundToCurrency(total - (transferPayment.monto || 0)))}
+                  </p>
+                  <p>¿Desea aceptar este pago parcial?</p>
+                </div>
+              )}
+              
+              {transferStatus === 'TIMEOUT' && (
+                <div className="transfer-timeout">
+                  <p className="error-text">Tiempo agotado</p>
+                  <p>No se recibió ninguna transferencia en el tiempo límite.</p>
+                </div>
+              )}
+              
+              <div className="checkout-actions">
+                {transferStatus === 'WAITING' && (
+                  <button type="button" className="ghost-button" onClick={handleCancelTransfer}>
+                    Cancelar
+                  </button>
+                )}
+                {(transferStatus === 'MORE' || transferStatus === 'LESS') && (
+                  <>
+                    <button type="button" className="ghost-button" onClick={handleRejectDifferentAmount}>
+                      No, seguir esperando
+                    </button>
+                    <button 
+                      type="button" 
+                      className="primary-button" 
+                      onClick={handleAcceptDifferentAmount}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Procesando...' : 'Sí, aceptar'}
+                    </button>
+                  </>
+                )}
+                {transferStatus === 'TIMEOUT' && (
+                  <>
+                    <button type="button" className="ghost-button" onClick={handleCancelTransfer}>
+                      Volver
+                    </button>
+                    <button type="button" className="primary-button" onClick={handleRetryTransfer}>
+                      Reintentar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          {step === 'TRANSFER_RESULT' && (
+            <div className="checkout-step qr-result">
+              <div className="qr-result-animation">
+                {transferResult === 'SUCCESS' ? (
+                  okAnimationData ? (
+                    <Lottie animationData={okAnimationData} autoplay loop={false} />
+                  ) : (
+                    <p>Animación OK no configurada.</p>
+                  )
+                ) : errorAnimationData ? (
+                  <Lottie animationData={errorAnimationData} autoplay loop={false} />
+                ) : (
+                  <p>Animación Error no configurada.</p>
+                )}
+              </div>
+              {transferResultMessage && <p className="qr-result-message">{transferResultMessage}</p>}
               <div className="qr-result-actions">
                 <button type="button" className="primary-button" onClick={handleResultOk}>
                   OK

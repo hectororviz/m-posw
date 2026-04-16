@@ -24,6 +24,7 @@ enum SaleStatus {
 enum PaymentMethod {
   CASH
   MP_QR
+  TRANSFER
 }
 
 enum PaymentStatus {
@@ -96,6 +97,7 @@ model Product {
   id            String                @id @default(uuid()) @db.Uuid
   name          String
   price         Decimal               @db.Decimal(10, 2)
+  stock         Int                   @default(0)
   iconName      String?
   colorHex      String?
   imagePath     String?
@@ -152,6 +154,7 @@ model Sale {
   user      User       @relation(fields: [userId], references: [id])
   items     SaleItem[]
   mercadoPagoPayments MercadoPagoPayment[]
+  movimientosMP MovimientoMP[]
 }
 
 model SaleItem {
@@ -237,4 +240,25 @@ model CashMovement {
 enum CashMovementType {
   INCOME
   EXPENSE
+}
+
+model MovimientoMP {
+  id            String   @id @default(uuid()) @db.Uuid
+  saleId        String?  @db.Uuid
+  sale          Sale?    @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  paymentId     String   @unique
+  monto         Decimal  @db.Decimal(10, 2)
+  montoEsperado Decimal  @db.Decimal(10, 2)
+  pagador       String?
+  tipo          String?
+  fecha         DateTime
+  notificado    Boolean  @default(false)
+  procesado     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([saleId])
+  @@index([paymentId])
+  @@index([notificado])
+  @@index([createdAt])
 }

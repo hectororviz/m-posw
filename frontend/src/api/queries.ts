@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Category, ManualMovement, Product, Sale, Setting, User } from './types';
+import type { Category, ManualMovement, Product, Sale, Setting, StockCategory, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -89,6 +89,15 @@ export const useLoginUsers = () =>
     queryKey: ['login-users'],
     queryFn: async () => {
       const response = await apiClient.get<User[]>('/auth/login-users');
+      return response.data;
+    },
+  });
+
+export const useStock = () =>
+  useQuery({
+    queryKey: ['stock'],
+    queryFn: async () => {
+      const response = await apiClient.get<StockCategory[]>('/stock');
       return response.data;
     },
   });

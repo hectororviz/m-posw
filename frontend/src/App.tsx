@@ -8,6 +8,7 @@ import { AdminProductsPage } from './pages/AdminProductsPage';
 import { AdminSalesPage } from './pages/AdminSalesPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
+import { AdminStockPage } from './pages/AdminStockPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
@@ -93,6 +94,7 @@ export const App: React.FC = () => {
         <Route path="sales" element={<AdminSalesPage />} />
         <Route path="stats" element={<AdminStatsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
+        <Route path="stock" element={<AdminStockPage />} />
         <Route path="users" element={<AdminUsersPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
