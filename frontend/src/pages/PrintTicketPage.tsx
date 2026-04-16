@@ -231,7 +231,9 @@ export const PrintTicketPage: React.FC = () => {
             
             return Array.from(grouped.entries()).map(([category, categoryItems]) => (
               <div key={category} className="ticket-stock-category">
-                <div className="ticket-stock-category-name">{category.toUpperCase()}</div>
+                {category !== 'Sin categoría' && (
+                  <div className="ticket-stock-category-name">{category.toUpperCase()}</div>
+                )}
                 {categoryItems
                   .sort((a, b) => a.qty - b.qty)
                   .map((item, idx) => (
