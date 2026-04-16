@@ -254,14 +254,18 @@ export const AdminSalesPage: React.FC = () => {
       });
 
       const itemsForPrint = salesForPrint.flatMap((sale) => sale.items).reduce((acc, item) => {
-        const existing = acc.get(item.product.name) ?? 0;
-        acc.set(item.product.name, existing + item.quantity);
+        const key = `${item.product.name}|${item.product.category?.name ?? 'Sin categoría'}`;
+        const existing = acc.get(key) ?? 0;
+        acc.set(key, existing + item.quantity);
         return acc;
       }, new Map<string, number>());
 
       const items = Array.from(itemsForPrint.entries())
-        .map(([name, qty]) => ({ name, qty }))
-        .sort((a, b) => (b.qty !== a.qty ? b.qty - a.qty : a.name.localeCompare(b.name)));
+        .map(([key, qty]) => {
+          const [name, category] = key.split('|');
+          return { name, qty, category };
+        })
+        .sort((a, b) => (a.qty !== b.qty ? a.qty - b.qty : a.name.localeCompare(b.name)));
 
       const payload: TicketPayload = {
         clubName: settings?.clubName ?? '',

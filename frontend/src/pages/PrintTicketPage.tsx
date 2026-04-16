@@ -215,7 +215,7 @@ export const PrintTicketPage: React.FC = () => {
       {showItems && itemsStyle === 'summary' && (
         <>
           <div className="ticket-divider" />
-          <div className="ticket-stock-title">STOCK</div>
+          <div className="ticket-stock-title">Ventas</div>
           <div className="ticket-divider" />
           {(() => {
             // Agrupar items por categoría
