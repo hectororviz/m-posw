@@ -1730,6 +1730,51 @@ button {
   }
 }
 
+/* Ticket Stock Styles */
+.ticket-stock-title {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  margin: 8px 0;
+  letter-spacing: 2px;
+}
+
+.ticket-stock-category {
+  margin: 12px 0;
+}
+
+.ticket-stock-category-name {
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 8px 0 4px 0;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #111827;
+}
+
+.ticket-stock-item {
+  display: flex;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 2px 0;
+}
+
+.ticket-stock-qty {
+  font-family: monospace;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: right;
+}
+
+.ticket-stock-separator {
+  margin: 0 4px;
+}
+
+.ticket-stock-name {
+  flex: 1;
+}
+
 @media print {
   .no-print {
     display: none !important;

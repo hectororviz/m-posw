@@ -212,6 +212,40 @@ export const PrintTicketPage: React.FC = () => {
           <div className="ticket-divider" />
         </>
       )}
+      {showItems && itemsStyle === 'summary' && (
+        <>
+          <div className="ticket-divider" />
+          <div className="ticket-stock-title">STOCK</div>
+          <div className="ticket-divider" />
+          {(() => {
+            // Agrupar items por categoría
+            const grouped = new Map<string, typeof items>();
+            items.forEach((item) => {
+              const cat = item.category ?? 'Sin categoría';
+              if (!grouped.has(cat)) {
+                grouped.set(cat, []);
+              }
+              grouped.get(cat)?.push(item);
+            });
+            
+            return Array.from(grouped.entries()).map(([category, categoryItems]) => (
+              <div key={category} className="ticket-stock-category">
+                <div className="ticket-stock-category-name">{category.toUpperCase()}</div>
+                {categoryItems
+                  .sort((a, b) => a.qty - b.qty)
+                  .map((item, idx) => (
+                    <div key={`${item.name}-${idx}`} className="ticket-stock-item">
+                      <span className="ticket-stock-qty">{item.qty.toString().padStart(2, ' ')}</span>
+                      <span className="ticket-stock-separator"> - </span>
+                      <span className="ticket-stock-name">{item.name}</span>
+                    </div>
+                  ))}
+              </div>
+            ));
+          })()}
+          <div className="ticket-divider" />
+        </>
+      )}
       {ticket.thanks && <p className="ticket-thanks">{ticket.thanks}</p>}
       {ticket.footer && <p className="ticket-footer">{ticket.footer}</p>}
       <button type="button" className="primary-button no-print" onClick={() => window.print()}>

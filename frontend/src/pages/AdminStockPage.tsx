@@ -61,14 +61,13 @@ export const AdminStockPage: React.FC = () => {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
       dateTimeISO,
-      items: stockCategories.flatMap((category) => [
-        { qty: 0, name: `--- ${category.name} ---`, category: category.name },
-        ...category.products.map((product) => ({
+      items: stockCategories.flatMap((category) =>
+        category.products.map((product) => ({
           qty: product.stock,
           name: product.name,
           category: category.name,
-        })),
-      ]),
+        }))
+      ),
       itemsStyle: 'summary',
       thanks: '',
       footer: 'Ticket de Stock',
