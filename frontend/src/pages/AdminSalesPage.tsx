@@ -46,8 +46,11 @@ const formatTime = (value: string) =>
     hour12: false,
   });
 
-const getPaymentMethodLabel = (paymentMethod?: string) =>
-  paymentMethod === 'MP_QR' ? 'QR MercadoPago' : 'Efectivo';
+const getPaymentMethodLabel = (paymentMethod?: string) => {
+  if (paymentMethod === 'MP_QR') return 'QR MercadoPago';
+  if (paymentMethod === 'TRANSFER') return 'Transferencia';
+  return 'Efectivo';
+};
 
 const encodeBase64Url = (value: string) => {
   const bytes = new TextEncoder().encode(value);
@@ -104,6 +107,7 @@ export const AdminSalesPage: React.FC = () => {
       salesTotal: number | string;
       salesCashTotal: number | string;
       salesQrTotal: number | string;
+      salesTransferTotal?: number | string;
       movementsInTotal: number | string;
       movementsOutTotal: number | string;
       netCashDelta: number | string;
@@ -211,6 +215,7 @@ export const AdminSalesPage: React.FC = () => {
           salesTotal: number | string;
           salesCashTotal: number | string;
           salesQrTotal: number | string;
+          salesTransferTotal?: number | string;
           movementsInTotal: number | string;
           movementsOutTotal: number | string;
           netCashDelta: number | string;
@@ -283,6 +288,7 @@ export const AdminSalesPage: React.FC = () => {
           { label: 'Ventas:', value: formatCurrency(closePreview.summary.salesTotal) },
           { label: 'Efectivo:', value: formatCurrency(closePreview.summary.salesCashTotal) },
           { label: 'QR:', value: formatCurrency(closePreview.summary.salesQrTotal) },
+          { label: 'Transferencia:', value: formatCurrency(closePreview.summary.salesTransferTotal ?? 0) },
           { label: 'Entradas:', value: formatCurrency(closePreview.summary.movementsInTotal) },
           { label: 'Salidas:', value: formatCurrency(closePreview.summary.movementsOutTotal) },
           { label: 'Neto caja:', value: formatCurrency(closePreview.summary.netCashDelta) },
@@ -459,12 +465,15 @@ export const AdminSalesPage: React.FC = () => {
       0,
     );
     const totalCash = salesForPrint
-      .filter((sale) => sale.paymentMethod !== 'MP_QR')
+      .filter((sale) => sale.paymentMethod === 'CASH')
       .reduce((acc, sale) => acc + toAmount(sale.total), 0);
     const totalQr = salesForPrint
       .filter((sale) => sale.paymentMethod === 'MP_QR')
       .reduce((acc, sale) => acc + toAmount(sale.total), 0);
-    const total = toAmount(totalCash) + toAmount(totalQr);
+    const totalTransfer = salesForPrint
+      .filter((sale) => sale.paymentMethod === 'TRANSFER')
+      .reduce((acc, sale) => acc + toAmount(sale.total), 0);
+    const total = toAmount(totalCash) + toAmount(totalQr) + toAmount(totalTransfer);
     const totalMovementIn = filteredMovements
       .filter((movement) => movement.type === 'ENTRADA')
       .reduce((acc, movement) => acc + toAmount(movement.amount), 0);
@@ -488,6 +497,7 @@ export const AdminSalesPage: React.FC = () => {
         { label: '', value: '' },
         { label: 'Efectivo:', value: formatCurrency(totalCashInDrawer) },
         { label: 'QR:', value: formatCurrency(totalQr) },
+        { label: 'Transferencia:', value: formatCurrency(totalTransfer) },
         { label: 'Productos vendidos:', value: totalProducts.toString() },
       ],
     };
@@ -850,6 +860,11 @@ export const AdminSalesPage: React.FC = () => {
               <p>
                 <strong>Ventas:</strong> {formatCurrency(closePreview.summary.salesTotal)}
               </p>
+              <ul className="admin-sales__payment-breakdown" style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                <li>Efectivo: {formatCurrency(closePreview.summary.salesCashTotal)}</li>
+                <li>QR: {formatCurrency(closePreview.summary.salesQrTotal)}</li>
+                <li>Transferencia: {formatCurrency(closePreview.summary.salesTransferTotal ?? 0)}</li>
+              </ul>
               <p>
                 <strong>Entradas:</strong> {formatCurrency(closePreview.summary.movementsInTotal)}
               </p>

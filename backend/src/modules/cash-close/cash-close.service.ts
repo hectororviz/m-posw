@@ -62,7 +62,10 @@ export class CashCloseService {
     const salesQrTotal = sales
       .filter((sale) => sale.paymentMethod === 'MP_QR')
       .reduce((acc, sale) => acc.add(sale.total), ZERO);
-    const salesTotal = salesCashTotal.add(salesQrTotal);
+    const salesTransferTotal = sales
+      .filter((sale) => sale.paymentMethod === 'TRANSFER')
+      .reduce((acc, sale) => acc.add(sale.total), ZERO);
+    const salesTotal = salesCashTotal.add(salesQrTotal).add(salesTransferTotal);
 
     const movementsOutTotal = movements
       .filter((movement) => movement.type === MovementType.SALIDA)
@@ -76,6 +79,7 @@ export class CashCloseService {
     return {
       salesCashTotal: this.round(salesCashTotal),
       salesQrTotal: this.round(salesQrTotal),
+      salesTransferTotal: this.round(salesTransferTotal),
       salesTotal: this.round(salesTotal),
       salesCount: sales.length,
       movementsOutTotal: this.round(movementsOutTotal),

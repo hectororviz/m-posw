@@ -66,6 +66,7 @@ model CashClose {
   note              String?
   salesCashTotal    Decimal  @default(0) @db.Decimal(10, 2)
   salesQrTotal      Decimal  @default(0) @db.Decimal(10, 2)
+  salesTransferTotal Decimal @default(0) @db.Decimal(10, 2)
   salesTotal        Decimal  @default(0) @db.Decimal(10, 2)
   salesCount        Int      @default(0)
   movementsOutTotal Decimal  @default(0) @db.Decimal(10, 2)

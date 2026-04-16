@@ -7,13 +7,13 @@ Sistema de punto de venta web (tablet/celular) para jornadas/eventos. Incluye fr
 
 El flujo principal es:
 
-1. El usuario ingresa al POS web desde una tablet/celular.
+1. El usuario ingresa al POS web desde una tablet/celular o aplicación Android.
 2. Selecciona categorías y productos para armar el carrito.
 3. Se crea una venta en el backend.
-4. Se procesa el cobro (efectivo o Mercado Pago QR).
+4. Se procesa el cobro (**efectivo, Mercado Pago QR o transferencia**).
 5. Se imprime el ticket y se actualizan reportes/estadísticas.
 
-El frontend se comunica con el backend vía API REST (con proxy `/api` o directo a `VITE_API_BASE_URL`). El backend persiste datos en PostgreSQL usando Prisma y expone endpoints para ventas, usuarios, productos, reportes y pagos con Mercado Pago QR.
+El frontend se comunica con el backend vía API REST (con proxy `/api` o directo a `VITE_API_BASE_URL`). El backend persiste datos en PostgreSQL usando Prisma y expone endpoints para ventas, usuarios, productos, reportes y pagos.
 
 ## Arquitectura
 
@@ -21,30 +21,62 @@ El frontend se comunica con el backend vía API REST (con proxy `/api` o directo
 - **Backend**: NestJS + Prisma.
 - **DB**: PostgreSQL.
 - **Infra**: Docker Compose (contenedores para frontend, backend y DB).
-- **Integración de pagos**: Mercado Pago Instore QR v2 (webhook de confirmación).
+- **Integración de pagos**: Mercado Pago Instore QR v2 (webhook de confirmación), Transferencias bancarias (polling de pagos).
+- **App Android**: WebView que carga la aplicación web + impresión Bluetooth nativa.
 
 Arquitectura lógica:
 
 ```
-Frontend (React/Vite)
-        |
-        |  REST API (/api)
-        v
-Backend (NestJS + Prisma) ----> PostgreSQL
-        |
-        |  Mercado Pago Instore QR v2
-        v
-Mercado Pago (webhook -> /webhooks/mercadopago)
+┌─────────────────────────────────────────────────────────────┐
+│                        Clientes                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Tablet     │  │   Celular    │  │   APK Android │     │
+│  │  (Browser)   │  │  (Browser)   │  │  (WebView)   │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            │ HTTPS
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Proxy / CDN                            │
+│                  (Caddy / Nginx)                            │
+└─────────────────────────────────────────────────────────────┘
+                            │
+           ┌────────────────┼────────────────┐
+           │                │                │
+           ▼                ▼                ▼
+   ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+   │  Frontend    │ │   Backend    │ │  Bluetooth   │
+   │   (Nginx)    │ │  (NestJS)    │ │  (APK native)│
+   │  :80         │ │  :3000       │ │              │
+   └──────────────┘ └──────────────┘ └──────────────┘
+                           │
+                           │ Prisma
+                           ▼
+                  ┌──────────────┐
+                  │  PostgreSQL  │
+                  │    :5432     │
+                  └──────────────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+              ▼                         ▼
+     ┌──────────────┐          ┌──────────────┐
+     │ MercadoPago  │          │ Transferencia│
+     │    (QR)      │          │  (CVU/Alias) │
+     └──────────────┘          └──────────────┘
 ```
 
 ## Requisitos
 
 - Docker y Docker Compose
+- (Opcional) Android Studio para compilar la APK
 
 ## Configuración rápida
 
 ```bash
 cp .env.example .env
+# Editar .env con tus credenciales
 ```
 
 Luego levantar todo:
@@ -53,7 +85,7 @@ Luego levantar todo:
 docker compose up -d --build
 ```
 
-Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma migrate deploy` para aplicar migraciones pendientes. Esto mantiene la base alineada con el schema. Para verificar si hay desincronización entre la base y el schema podés ejecutar `npx prisma migrate status` desde `backend/`. 
+Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma migrate deploy` para aplicar migraciones pendientes.
 
 ## URLs
 
@@ -66,13 +98,18 @@ Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma mig
 2. Clonar el repo y crear el `.env`:
 
    ```bash
+   git clone <repo-url>
+   cd m-posw
    cp .env.example .env
    ```
 
-3. (Opcional) Ajustar variables en `.env`:
-   - Credenciales de admin.
-   - Configuración de Mercado Pago.
-   - Origen de CORS y base URL del frontend.
+3. Configurar variables en `.env`:
+   - Credenciales de PostgreSQL (DB)
+   - Credenciales de admin (ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_PIN)
+   - Caja01 password (CAJA01_PASSWORD)
+   - Configuración de Mercado Pago (MP_ACCESS_TOKEN, MP_COLLECTOR_ID, etc.)
+   - Origen de CORS y base URL del frontend
+
 4. Levantar los servicios:
 
    ```bash
@@ -83,40 +120,93 @@ Al iniciar el contenedor del backend se ejecuta automáticamente `npx prisma mig
 
 ## Credenciales iniciales
 
-Se crea un ADMIN inicial desde `.env`:
+Se crea un **ADMIN** inicial desde `.env`:
 
 - `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
+- `ADMIN_PASSWORD` o `ADMIN_PIN` (si ambos están definidos, usa PIN)
 
-También se crea la caja `Caja01` (role USER) con:
+También se crea la caja **Caja01** (role USER) con:
 
-- `CAJA01_PASSWORD` (por defecto `Caja01!`)
-- `externalPosId=SOLER_POS_001`
-- `externalStoreId=SOLER_STORE_001`
+- `CAJA01_PASSWORD`
+- `externalPosId` y `externalStoreId` (definidos en seed o per-caja en la BD)
+
+## Métodos de pago soportados
+
+El sistema soporta **tres métodos de pago**:
+
+### 1. Efectivo
+- Cobro directo en efectivo.
+- Se registra el monto recibido y el vuelto calculado.
+- Incluido en el neto de caja.
+
+### 2. Mercado Pago QR (Instore v2)
+- Genera un código QR dinámico vía API de Mercado Pago.
+- El cliente escanea con su app de MP y paga.
+- Confirmación vía webhook (`/webhooks/mercadopago`).
+- Requiere configurar `externalStoreId` y `externalPosId` en la caja.
+
+### 3. Transferencia (CVU/Alias)
+- Polling automático de pagos recientes en la cuenta de Mercado Pago.
+- Detecta transferencias por CVU o `money_transfer`.
+- El sistema verifica que el monto coincida y permite confirmar la venta.
+- **No usa webhooks**, consulta la API de MP cada X segundos.
 
 ## Características principales
 
-- POS táctil: categorías → productos → carrito → venta.
-- Roles ADMIN/USER.
-- CRUD de usuarios, categorías, productos.
-- Personalización (nombre, logo, favicon, color).
-- Impresión de ticket térmico 80mm configurable desde Settings (nombre del club y toggle de impresión).
-- Reportes con filtros por fecha y exportación XLSX.
-- Estadísticas con gráficos (últimos 15 días con ventas, últimos 6 meses, promedios diarios).
+- **POS táctil**: categorías → productos → carrito → venta.
+- **Múltiples métodos de pago**: Efectivo, QR MP, Transferencia.
+- **Roles ADMIN/USER** con permisos diferenciados.
+- **CRUD** de usuarios, categorías, productos.
+- **Personalización** (nombre, logo, favicon, color de la UI).
+- **Impresión de ticket térmico 80mm** configurable desde Settings.
+- **Impresión Bluetooth nativa** desde la APK Android.
+- **Cierre de caja** con desglose por método de pago (Efectivo, QR, Transferencia).
+- **Reportes** con filtros por fecha y exportación XLSX.
+- **Estadísticas** con gráficos (últimos 15 días, últimos 6 meses, promedios).
 
 ## Estado actual del proyecto (resumen funcional)
 
-- Backend NestJS expone endpoints de ventas, usuarios, productos, categorías y reportes.
+- Backend NestJS expone endpoints de ventas, usuarios, productos, categorías, reportes y pagos.
 - Frontend React consume el backend mediante `/api` (proxy) o URL directa.
-- Mercado Pago QR está integrado para cobro presencial con órdenes Instore QR v2.
-- Persistencia en PostgreSQL con Prisma, incluyendo registros de pagos Mercado Pago y sesiones.
+- **Mercado Pago QR** integrado para cobro presencial con órdenes Instore QR v2.
+- **Transferencias** integradas con polling de pagos de MP.
+- **APK Android** disponible para impresión Bluetooth nativa.
+- Persistencia en PostgreSQL con Prisma, incluyendo registros de pagos y cierres de caja.
 
 ## Lenguajes y stack principal
 
 - **Frontend**: TypeScript (React + Vite).
 - **Backend**: TypeScript (NestJS + Prisma).
 - **DB**: SQL (PostgreSQL).
+- **App Android**: Flutter (Dart) + WebView + Bluetooth.
 - **Infra**: Docker Compose.
+
+## App Android (APK)
+
+La aplicación Android es un **WebView** que carga la interfaz web desde el servidor, pero agrega funcionalidad nativa para impresión Bluetooth.
+
+### Características de la APK
+- Carga automática de la URL configurada (`https://pos.csdsoler.com.ar` por defecto).
+- **Impresión térmica Bluetooth** nativa (80mm).
+- Botón de impresión integrado en la interfaz web.
+- Modo inmersivo (pantalla completa).
+
+### Cómo usar la APK
+1. Descargar `app.apk` desde el repositorio.
+2. Instalar en tablet/celular Android (permitir "fuentes desconocidas").
+3. Al abrir la app, cargará automáticamente el POS web.
+4. Desde cualquier pantalla de ticket, presionar el botón de impresora para imprimir vía Bluetooth.
+
+### Desarrollo de la APK
+La APK se encuentra en `/m_posw_android/` y usa Flutter + `flutter_inappwebview` + `bluetooth_print_plus`.
+
+Para compilar:
+```bash
+cd m_posw_android
+flutter build apk --release
+```
+
+**Nota**: La APK no incluye el código web, solo lo carga desde el servidor. Cualquier cambio en el frontend se refleja inmediatamente sin recompilar la APK.
 
 ## Personalización del sitio y del ticket
 
@@ -160,109 +250,78 @@ cd backend
 npx prisma migrate reset --force
 ```
 
-Si necesitás conservar datos y ya hay una migración fallida, podés resolverla manualmente y ajustar la columna con:
+## Variables de entorno
 
+Ver archivo `.env.example` para ver todas las variables disponibles con descripciones.
+
+### Variables principales
+
+| Variable | Descripción | Requerida |
+|----------|-------------|-----------|
+| `DATABASE_URL` | Conexión a PostgreSQL | ✅ |
+| `JWT_SECRET` | Firma de tokens JWT | ✅ |
+| `ADMIN_EMAIL` | Email del admin inicial | ✅ |
+| `ADMIN_PASSWORD` | Password del admin inicial | ✅ |
+| `CAJA01_PASSWORD` | Password de la caja inicial | ✅ |
+| `CORS_ORIGIN` | Origen permitido para CORS | ✅ |
+| `VITE_API_BASE_URL` | Base URL del backend (`/api` o URL completa) | ✅ |
+| `MP_ACCESS_TOKEN` | Token privado de Mercado Pago | Solo para QR/Transfer |
+| `MP_COLLECTOR_ID` | ID del collector de MP | Solo para QR |
+| `MP_DEFAULT_EXTERNAL_STORE_ID` | Store ID externo de MP (fallback) | Solo para QR |
+| `MP_DEFAULT_EXTERNAL_POS_ID` | POS ID externo de MP (fallback) | Solo para QR |
+| `MP_WEBHOOK_SECRET` | Secreto para validar webhooks de MP | Recomendado en prod |
+| `MP_WEBHOOK_STRICT_PAYMENT` | Rechazar webhooks sin firma (`true`/`false`) | Opcional |
+
+## Integración con Mercado Pago
+
+### QR (Instore v2)
+
+El sistema utiliza **Instore QR v2** para cobros presenciales:
+
+1. Se crea una orden QR al iniciar el cobro.
+2. MP muestra el QR al cliente.
+3. Cliente escanea y paga desde su app.
+4. MP envía webhook a `/webhooks/mercadopago`.
+5. Sistema marca la venta como pagada.
+
+### Transferencia (CVU/Alias)
+
+Para cobros por transferencia bancaria:
+
+1. El sistema consulta periódicamente la API de MP.
+2. Busca pagos recientes con `payment_method_id=cvu` o `operation_type=money_transfer`.
+3. Si encuentra un pago del monto esperado, permite confirmar la venta.
+4. No requiere webhook, funciona por polling.
+
+### Checklist de configuración para MP
+
+**En Mercado Pago (dashboard):**
+- Crear Store y POS con sus `external_id`.
+- Configurar webhook apuntando a `https://tudominio.com/api/webhooks/mercadopago`.
+- Obtener Access Token y Collector ID.
+
+**En `.env`:**
 ```bash
-cd backend
-npx prisma migrate resolve --applied 20260315000000_add_mp_qr_and_sessions
-psql "$DATABASE_URL" -c 'ALTER TABLE "Session" ALTER COLUMN "userId" TYPE UUID USING "userId"::uuid;'
+MP_ACCESS_TOKEN=APP_USR-xxxxxxxxxxxxxx
+MP_COLLECTOR_ID=xxxxxxxxxx
+MP_DEFAULT_EXTERNAL_STORE_ID=MI_TIENDA_001
+MP_DEFAULT_EXTERNAL_POS_ID=MI_CAJA_001
+MP_WEBHOOK_SECRET=tu_secreto_aqui
+MP_WEBHOOK_STRICT_PAYMENT=true  # en producción
 ```
 
-## Variables de entorno relevantes
+**Por caja/usuario (en la BD):**
+- `externalStoreId`: Debe coincidir con el external_id del Store en MP.
+- `externalPosId`: Debe coincidir con el external_id del POS en MP.
+- ⚠️ **Importante**: Estos IDs deben ser strings alfanuméricos, NO números.
 
-- `DATABASE_URL`: conexión a PostgreSQL (usada por Prisma).
-- `JWT_SECRET`: firma de tokens.
-- `VITE_API_BASE_URL`: base del backend para el frontend (modo proxy: `/api`, modo directo: `https://backend-host`).
-- `VITE_UPLOADS_BASE_URL`: base opcional para imágenes de `/uploads` (si no se define, se usa el ORIGIN de `VITE_API_BASE_URL`).
-- `MP_ACCESS_TOKEN`: token privado de Mercado Pago (solo backend).
-- `MP_COLLECTOR_ID`: collector ID de la cuenta MP.
-- `MP_CURRENCY_ID`: moneda para items/órdenes MP (default `ARS`).
-- `MP_DEFAULT_EXTERNAL_STORE_ID`: store por defecto si la caja no define uno.
-- `MP_DEFAULT_EXTERNAL_POS_ID`: POS por defecto si la caja no define uno.
-- `MP_WEBHOOK_SECRET`: secreto para validar firma del webhook de Mercado Pago.
+### Endpoints relevantes de MP
 
-## Integración con Mercado Pago (QR presencial)
-
-La integración utiliza **Instore QR v2** para cobros presenciales. El backend crea/actualiza una orden QR al iniciar el cobro y espera la confirmación de pago vía webhook.
-
-### Datos necesarios para poder cobrar (checklist)
-
-**Configuración en `.env` (backend):**
-
-- `MP_ACCESS_TOKEN`: token privado (Access Token) de la cuenta Mercado Pago.
-- `MP_COLLECTOR_ID`: ID del collector (vendedor) asociado a la cuenta.
-- `MP_CURRENCY_ID`: moneda de los items (por defecto `ARS`).
-- `MP_DEFAULT_EXTERNAL_STORE_ID` / `MP_DEFAULT_EXTERNAL_POS_ID` (opcionales): valores de fallback si la caja/usuario no tiene configurados sus external IDs.
-- `MP_WEBHOOK_SECRET`: secreto compartido para validar la firma del webhook.
-
-**Configuración por caja/usuario:**
-
-- `externalStoreId`: `external_id` del Store configurado en Mercado Pago.
-- `externalPosId`: `external_id` del POS configurado en Mercado Pago.
-
-> Importante: el backend valida que estos IDs NO sean numéricos (deben ser `external_id` string, no el ID interno de MP).
-
-### Notas operativas
-
-- El backend crea/actualiza órdenes Instore QR v2 al iniciar el cobro.
-- Solo puede haber una sesión activa por caja (login único).
-- El webhook valida firma HMAC con `MP_WEBHOOK_SECRET`. En entornos no productivos, si falta el secreto o la firma es inválida se procesa igual con warning; en producción se rechaza.
-
-### Flujo de cobro (resumen)
-
-1. El POS crea una venta y ejecuta `POST /sales/:id/payments/mercadopago-qr`.
-2. El backend arma el payload de la orden Instore QR v2 y la crea/actualiza en MP.
-3. Mercado Pago envía el webhook a `/webhooks/mercadopago` cuando cambia el estado del pago.
-4. El backend registra el pago y marca la venta como `PAID` cuando llega `status=approved`.
-
-### Recomendaciones de configuración (producción)
-
-- Asegurar un endpoint público estable para el webhook.
-- Configurar CORS y proxy `/api` según el dominio del frontend.
-- Registrar correctamente `externalStoreId` y `externalPosId` (external IDs, no IDs numéricos).
-
-### Endpoints relevantes
-
-- `POST /sales/:id/payments/mercadopago-qr`
-- `POST /sales/:id/payments/mercadopago-qr/cancel`
-- `POST /webhooks/mercadopago`
-- `GET /sales/:id` (polling de estado)
-
-### Webhook de Mercado Pago
-
-- Endpoint interno (backend): `POST /webhooks/mercadopago`
-- Endpoint público recomendado (con proxy `/api`): `https://pos.csdsoler.com.ar/api/webhooks/mercadopago`
-
-Prueba manual desde afuera:
-
-```bash
-curl -i -X POST https://pos.csdsoler.com.ar/api/webhooks/mercadopago \
-  -H "Content-Type: application/json" \
-  -d '{"type":"payment","data":{"id":"123456"}}'
-```
-
-Si el `curl` devuelve **502 Bad Gateway**:
-
-- Revisar el reverse proxy (Caddy/Nginx) y el upstream al backend.
-- Verificar que el servicio/host del backend sea el correcto (por ejemplo, `pos-backend:3000`)
-  y que el contenedor esté arriba.
-- Revisar logs del proxy para confirmar el motivo exacto del 502 (upstream no resuelve, puerto incorrecto, etc.).
-
-### Probar con curl
-
-> Requiere que el usuario/caja tenga `externalPosId` y `externalStoreId` configurados con los external IDs de Mercado Pago (no IDs numéricos).
-
-```bash
-curl -X POST "http://localhost:3000/sales/<SALE_ID>/payments/mercadopago-qr" \
-  -H "Authorization: Bearer <JWT_TOKEN>"
-```
-
-Para cancelar la orden:
-
-```bash
-curl -X POST "http://localhost:3000/sales/<SALE_ID>/payments/mercadopago-qr/cancel" \
-  -H "Authorization: Bearer <JWT_TOKEN>"
-```
+- `POST /sales/:id/payments/mercadopago-qr` - Crear orden QR
+- `POST /sales/:id/payments/mercadopago-qr/cancel` - Cancelar orden QR
+- `POST /payments/transfer/poll` - Buscar transferencias pendientes
+- `POST /payments/transfer/confirm` - Confirmar pago por transferencia
+- `POST /webhooks/mercadopago` - Webhook de MP
 
 ## Frontend (React + Vite)
 
@@ -275,37 +334,13 @@ VITE_API_BASE_URL=/api
 VITE_UPLOADS_BASE_URL=http://localhost:3000
 ```
 
-- **Modo proxy**: `VITE_API_BASE_URL=/api` y Nginx proxya `/api` hacia el backend.
+- **Modo proxy**: `VITE_API_BASE_URL=/api` y Nginx/Caddy proxya `/api` hacia el backend.
 - **Modo directo**: `VITE_API_BASE_URL=https://backend-host` (sin proxy).
-
-### Ejemplo Nginx (proxy /api + /uploads)
-
-```nginx
-server {
-  listen 80;
-  server_name _;
-
-  location /api/ {
-    proxy_pass http://backend:3000/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-  }
-
-  location /uploads/ {
-    proxy_pass http://backend:3000/uploads/;
-    proxy_set_header Host $host;
-  }
-
-  location / {
-    try_files $uri /index.html;
-  }
-}
-```
 
 ### Ejemplo Caddy (proxy /api + /uploads)
 
 ```caddy
-pos.csdsoler.com.ar {
+tudominio.com {
   encode gzip
 
   handle_path /api/* {
@@ -322,4 +357,53 @@ pos.csdsoler.com.ar {
 }
 ```
 
-Programa confeccionado integramente con IA (Codex)
+## Desarrollo
+
+### Estructura del proyecto
+
+```
+m-posw/
+├── backend/           # NestJS + Prisma
+│   ├── src/
+│   ├── prisma/
+│   └── Dockerfile
+├── frontend/          # React + Vite
+│   ├── src/
+│   ├── dist/
+│   └── Dockerfile
+├── m_posw_android/    # Flutter APK
+│   ├── android/
+│   └── lib/
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+### Comandos útiles
+
+```bash
+# Levantar todo
+docker compose up -d --build
+
+# Ver logs
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Rebuild solo frontend
+docker compose up -d --build frontend
+
+# Reiniciar backend
+docker compose restart backend
+
+# Acceder a la DB
+docker compose exec db psql -U $POSTGRES_USER -d $POSTGRES_DB
+
+# Prisma (desde backend/)
+npx prisma migrate dev     # Crear migración
+npx prisma migrate deploy  # Aplicar migraciones
+npx prisma studio          # GUI de Prisma
+```
+
+## Licencia
+
+Programa confeccionado íntegramente con IA (Codex)

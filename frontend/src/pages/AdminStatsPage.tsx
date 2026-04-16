@@ -29,6 +29,7 @@ const buildDateTime = (date?: string, time?: string, fallbackTime?: string) => {
 const paymentLabels: Record<string, string> = {
   CASH: 'Efectivo',
   MP_QR: 'QR MercadoPago',
+  TRANSFER: 'Transferencia',
 };
 
 export const AdminStatsPage: React.FC = () => {
