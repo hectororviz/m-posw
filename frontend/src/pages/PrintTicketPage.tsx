@@ -41,6 +41,7 @@ type TicketPayload = {
   total?: number;
   thanks?: string;
   footer?: string;
+  title?: string;
 };
 
 declare global {
@@ -215,7 +216,7 @@ export const PrintTicketPage: React.FC = () => {
       {showItems && itemsStyle === 'summary' && (
         <>
           <div className="ticket-divider" />
-          <div className="ticket-stock-title">Ventas</div>
+          <div className="ticket-stock-title">{ticket.title || 'Resumen'}</div>
           <div className="ticket-divider" />
           {(() => {
             // Agrupar items por categoría

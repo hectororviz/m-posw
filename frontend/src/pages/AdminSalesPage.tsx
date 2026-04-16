@@ -272,6 +272,7 @@ export const AdminSalesPage: React.FC = () => {
         storeName: settings?.storeName ?? 'SOLER - Bufet',
         dateTimeISO: detailEnd.toISOString(),
         itemsStyle: 'summary',
+        title: 'Ventas',
         items,
         total: toAmount(closePreview.summary.salesTotal),
         criteria: [

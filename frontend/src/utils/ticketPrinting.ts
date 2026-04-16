@@ -24,6 +24,7 @@ export type TicketPayload = {
   total?: number;
   thanks?: string;
   footer?: string;
+  title?: string;
 };
 
 type PrintTicketInput = {

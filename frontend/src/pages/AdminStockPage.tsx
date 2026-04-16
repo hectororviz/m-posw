@@ -69,6 +69,7 @@ export const AdminStockPage: React.FC = () => {
         }))
       ),
       itemsStyle: 'summary',
+      title: 'STOCK',
       thanks: '',
       footer: 'Ticket de Stock',
     };
