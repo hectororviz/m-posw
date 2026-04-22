@@ -1484,7 +1484,7 @@ button {
 }
 
 @page {
-  size: 58mm auto;
+  size: 56mm auto;
   margin: 0;
 }
 
@@ -1493,11 +1493,11 @@ button {
 }
 
 .ticket-page {
-  width: 58mm;
+  width: 56mm;
   box-sizing: border-box;
   min-height: 100%;
   margin: 0 auto;
-  padding: 10px 8px 16px;
+  padding: 10px 8px 35px;
   font-family: 'Inter', 'Arial', sans-serif;
   color: #111827;
   overflow-wrap: anywhere;

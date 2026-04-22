@@ -101,9 +101,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     itemsSnapshotRef.current = items;
   }, [items]);
 
-  const receivedAmount = roundToCurrency(Number(cashReceived || 0));
+  const receivedAmount = cashReceived === '' ? total : roundToCurrency(Number(cashReceived));
   const changeAmount = roundToCurrency(receivedAmount - total);
-  const isCashValid = items.length > 0 && receivedAmount >= total;
+  const isCashValid = items.length > 0 && (cashReceived === '' || receivedAmount >= total);
 
   const resetState = () => {
     setStep('SELECT_METHOD');
@@ -793,7 +793,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9.,]*"
-                  value={formatCurrency(receivedAmount)}
+                  value={cashReceived}
+                  placeholder="Monto justo"
                   onChange={(event) => handleCashInputChange(event.target.value)}
                 />
               </label>

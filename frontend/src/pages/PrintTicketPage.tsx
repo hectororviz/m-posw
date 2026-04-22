@@ -50,11 +50,10 @@ declare global {
   }
 }
 
-const decodeBase64Url = (value: string) => {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padding = normalized.length % 4;
-  const padded = padding ? `${normalized}${'='.repeat(4 - padding)}` : normalized;
-  const binary = window.atob(padded);
+const decodeBase64 = (value: string) => {
+  // First decode URL encoding, then decode base64
+  const base64 = decodeURIComponent(value);
+  const binary = window.atob(base64);
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 };
@@ -78,7 +77,7 @@ export const PrintTicketPage: React.FC = () => {
     try {
       const rawTicket = searchParams.get('ticket') || searchParams.get('data');
       if (rawTicket) {
-        const decoded = decodeBase64Url(rawTicket);
+        const decoded = decodeBase64(rawTicket);
         setTicket(JSON.parse(decoded) as TicketPayload);
         return;
       }

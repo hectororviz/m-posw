@@ -401,11 +401,11 @@ export class SalesService {
     requester: { id: string; role: string; sub?: string },
     endpoint: string,
   ) {
-    const requesterSub = requester.sub ?? requester.id;
+    const requesterId = requester.sub ?? requester.id;
     this.logger.debug(
-      `${endpoint} auth check saleUserId=${sale.userId} requesterId=${requester.id} requesterSub=${requesterSub} requesterRole=${requester.role}`,
+      `${endpoint} auth check saleUserId=${sale.userId} requesterId=${requester.id} requesterSub=${requester.sub} resolvedId=${requesterId} requesterRole=${requester.role}`,
     );
-    if (requester.role !== 'ADMIN' && sale.userId !== requester.id) {
+    if (requester.role !== 'ADMIN' && sale.userId !== requesterId) {
       throw new ForbiddenException('No tienes acceso a esta venta');
     }
   }

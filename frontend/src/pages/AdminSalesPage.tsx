@@ -52,14 +52,13 @@ const getPaymentMethodLabel = (paymentMethod?: string) => {
   return 'Efectivo';
 };
 
-const encodeBase64Url = (value: string) => {
+const encodeBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
   bytes.forEach((byte) => {
     binary += String.fromCharCode(byte);
   });
-  const base64 = window.btoa(binary);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return window.btoa(binary);
 };
 
 type SalesTableEntry =
@@ -297,7 +296,7 @@ export const AdminSalesPage: React.FC = () => {
         ],
       };
 
-      const ticketParam = encodeBase64Url(JSON.stringify(payload));
+      const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
       const url = `/printticket?data=${ticketParam}`;
       const popup = window.open(url, '_blank', 'noopener,noreferrer');
 
@@ -502,7 +501,7 @@ export const AdminSalesPage: React.FC = () => {
       ],
     };
 
-    const ticketParam = encodeBase64Url(JSON.stringify(payload));
+    const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
     const url = `/printticket?data=${ticketParam}`;
     const popup = window.open(url, '_blank', 'noopener,noreferrer');
 
@@ -542,7 +541,7 @@ export const AdminSalesPage: React.FC = () => {
       footer: 'Ticket no fiscal',
     };
 
-    const ticketParam = encodeBase64Url(JSON.stringify(payload));
+    const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
     const url = `/printticket?data=${ticketParam}`;
     const popup = window.open(url, '_blank', 'noopener,noreferrer');
 

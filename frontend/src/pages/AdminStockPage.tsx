@@ -5,14 +5,13 @@ import { useSettings, useStock } from '../api/queries';
 import type { StockCategory, StockProduct } from '../api/types';
 import type { TicketPayload } from '../utils/ticketPrinting';
 
-const encodeBase64Url = (value: string) => {
+const encodeBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
   bytes.forEach((byte) => {
     binary += String.fromCharCode(byte);
   });
-  const base64 = window.btoa(binary);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return window.btoa(binary);
 };
 
 export const AdminStockPage: React.FC = () => {
@@ -74,7 +73,7 @@ export const AdminStockPage: React.FC = () => {
       footer: 'Ticket de Stock',
     };
 
-    const ticketParam = encodeBase64Url(JSON.stringify(payload));
+    const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
     const url = `/printticket?data=${ticketParam}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
