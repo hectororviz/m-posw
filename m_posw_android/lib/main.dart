@@ -92,9 +92,9 @@ class _HomePageState extends State<HomePage> {
       await BluetoothPrintPlus.connect(_selectedDevice!);
       await Future.delayed(const Duration(milliseconds: 500));
 
-      final jsonStr = utf8.decode(
-        base64Url.decode(base64Data.replaceAll('-', '+').replaceAll('_', '/')),
-      );
+      // URL decode first, then base64 decode (server sends standard base64 + URL encoding)
+      final decodedBase64 = Uri.decodeComponent(base64Data);
+      final jsonStr = utf8.decode(base64.decode(decodedBase64));
       final payload = jsonDecode(jsonStr) as Map<String, dynamic>;
 
       final lines = _formatPayloadToLines(payload);
@@ -180,13 +180,15 @@ class _HomePageState extends State<HomePage> {
         lines.add(separator);
 
         final item = items[i];
-        final qty = item['qty'] as int? ?? 1;
+        // Safely convert qty to int
+        final qtyVal = item['qty'];
+        final qty = qtyVal is int ? qtyVal : (qtyVal is num ? qtyVal.toInt() : 1);
         final name = item['name'] as String? ?? '';
         final nameUpper = name.toUpperCase();
-        final orderNum = (item['orderNumber'] as int? ?? 0).toString().padLeft(
-          3,
-          '0',
-        );
+        // Safely convert orderNumber to int
+        final orderNumVal = item['orderNumber'];
+        final orderNumInt = orderNumVal is int ? orderNumVal : (orderNumVal is num ? orderNumVal.toInt() : 0);
+        final orderNum = orderNumInt.toString().padLeft(3, '0');
 
         lines.add('${qty}x $nameUpper');
         lines.add(orderNum.padLeft(maxLineWidth));
