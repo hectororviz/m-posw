@@ -298,18 +298,17 @@ export const AdminSalesPage: React.FC = () => {
 
       const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
       const url = `/printticket?data=${ticketParam}`;
-      const popup = window.open(url, '_blank', 'noopener,noreferrer');
-
-      if (!popup) {
-        pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error');
-      }
-
+      
+      // Execute cleanup before navigation
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin-sales'] }),
         queryClient.invalidateQueries({ queryKey: ['manual-movements'] }),
       ]);
       pushToast('Cierre guardado correctamente.', 'success');
       setClosePreview(null);
+      
+      // Navigate to ticket page (works better in WebView than popup)
+      window.location.href = url;
     } catch (error) {
       pushToast(normalizeApiError(error), 'error');
     } finally {
@@ -503,14 +502,10 @@ export const AdminSalesPage: React.FC = () => {
 
     const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
     const url = `/printticket?data=${ticketParam}`;
-    const popup = window.open(url, '_blank', 'noopener,noreferrer');
-
-    if (!popup) {
-      pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error');
-      return;
-    }
-
+    
     setIsPrintOpen(false);
+    // Navigate to ticket page (works better in WebView than popup)
+    window.location.href = url;
   };
 
   const handleReprintTicket = async (saleId: string) => {
@@ -543,14 +538,10 @@ export const AdminSalesPage: React.FC = () => {
 
     const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
     const url = `/printticket?data=${ticketParam}`;
-    const popup = window.open(url, '_blank', 'noopener,noreferrer');
-
-    if (!popup) {
-      pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error');
-      return;
-    }
-
+    
     pushToast('Enviando ticket a impresión.', 'success');
+    // Navigate to ticket page (works better in WebView than popup)
+    window.location.href = url;
   };
 
   return (

@@ -75,7 +75,8 @@ export const AdminStockPage: React.FC = () => {
 
     const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
     const url = `/printticket?data=${ticketParam}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    // Navigate to ticket page (works better in WebView than popup)
+    window.location.href = url;
   };
 
   const getStockAlertClass = (stock: number): string => {

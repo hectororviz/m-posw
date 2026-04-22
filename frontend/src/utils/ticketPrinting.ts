@@ -48,6 +48,17 @@ const encodeBase64 = (value: string) => {
   return window.btoa(binary);
 };
 
+// Clean object removing undefined values for JSON serialization
+const cleanPayload = (obj: Record<string, unknown>): Record<string, unknown> => {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+};
+
 export const maybePrintTicket = async ({
   settings,
   storeFallback = 'SOLER - Bufet',
@@ -55,7 +66,6 @@ export const maybePrintTicket = async ({
   total,
   items,
   saleId,
-  onPopupBlocked,
   onAlreadyPrinted,
   onError,
 }: PrintTicketInput) => {
@@ -76,24 +86,27 @@ export const maybePrintTicket = async ({
     }
   }
 
-  const payload: TicketPayload = {
-    clubName: settings.clubName ?? '',
-    storeName: settings.storeName ?? storeFallback,
-    dateTimeISO: dateTimeISO ?? undefined,
-    items,
-    total,
+  // Build payload ensuring all numeric fields are actual numbers
+  const payload = cleanPayload({
+    clubName: settings.clubName || '',
+    storeName: settings.storeName || storeFallback,
+    dateTimeISO: dateTimeISO || undefined,
+    items: items.map(item => cleanPayload({
+      qty: Number(item.qty),
+      name: String(item.name),
+      category: item.category,
+      orderNumber: item.orderNumber !== undefined ? Number(item.orderNumber) : undefined,
+    })),
+    total: Number(total),
     thanks: 'Gracias por tu compra',
     footer: 'Ticket no fiscal',
-  };
+  });
 
   const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
   const url = `/printticket?data=${ticketParam}`;
-  const popup = window.open(url, '_blank', 'noopener,noreferrer');
-
-  if (!popup) {
-    onPopupBlocked?.();
-    return { skipped: false, opened: false } as const;
-  }
-
+  
+  // Use location.href instead of window.open to avoid popup blockers in WebView
+  window.location.href = url;
+  
   return { skipped: false, opened: true } as const;
 };
