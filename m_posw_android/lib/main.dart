@@ -207,14 +207,12 @@ class _HomePageState extends State<HomePage> {
     const separator = '------------------------------';
     const maxLineWidth = 32;
 
-    // CLUB NAME (centrado, grande si existe)
+    // CLUB NAME (centrado, tamaño normal)
     if (payload['clubName'] != null && (payload['clubName'] as String).isNotEmpty) {
       bytes += generator.text(
         payload['clubName'] as String,
         styles: const PosStyles(
           align: PosAlign.center,
-          height: PosTextSize.size2,
-          width: PosTextSize.size2,
           bold: true,
         ),
       );
@@ -233,13 +231,23 @@ class _HomePageState extends State<HomePage> {
     // FECHA Y HORA
     if (payload['dateTimeISO'] != null) {
       final dateStr = payload['dateTimeISO'] as String;
-      final dateMatch = RegExp(
-        r'(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})',
-      ).firstMatch(dateStr);
-      if (dateMatch != null) {
-        final formatted = '${dateMatch.group(3)}/${dateMatch.group(2)}/${dateMatch.group(1)} ${dateMatch.group(4)}:${dateMatch.group(5)}';
+      try {
+        // Parsear ISO 8601 y convertir a hora local
+        final dateTime = DateTime.parse(dateStr).toLocal();
+        final day = dateTime.day.toString().padLeft(2, '0');
+        final month = dateTime.month.toString().padLeft(2, '0');
+        final year = dateTime.year.toString();
+        final hour = dateTime.hour.toString().padLeft(2, '0');
+        final minute = dateTime.minute.toString().padLeft(2, '0');
+        final formatted = '$day/$month/$year $hour:$minute';
         bytes += generator.text(
           formatted,
+          styles: const PosStyles(align: PosAlign.center),
+        );
+      } catch (e) {
+        // Si falla el parseo, mostrar el string original
+        bytes += generator.text(
+          dateStr,
           styles: const PosStyles(align: PosAlign.center),
         );
       }
@@ -247,112 +255,209 @@ class _HomePageState extends State<HomePage> {
 
     bytes += generator.feed(1);
 
-    // CRITERIA (mesa, etc.)
+    // CRITERIA (mesa, fechas, etc.)
     if (payload['criteria'] != null) {
       bytes += generator.text(separator);
       for (final item in payload['criteria'] as List) {
         final label = item['label'] as String? ?? '';
         final value = item['value'] as String? ?? '';
-        bytes += generator.text('$label: $value');
+        if (label.isNotEmpty || value.isNotEmpty) {
+          bytes += generator.row([
+            PosColumn(
+              text: label,
+              width: label.isNotEmpty ? (value.isNotEmpty ? 6 : 12) : 0,
+              styles: const PosStyles(bold: true),
+            ),
+            PosColumn(
+              text: value,
+              width: value.isNotEmpty ? (label.isNotEmpty ? 6 : 12) : 0,
+              styles: const PosStyles(
+                align: PosAlign.right,
+                bold: true,
+              ),
+            ),
+          ]);
+        }
       }
       bytes += generator.feed(1);
+    }
+
+    // SUMMARY (resumen financiero - para cierre de caja)
+    if (payload['summary'] != null) {
+      final summary = List<Map<String, dynamic>>.from(payload['summary'] as List);
+      bytes += generator.text(separator);
+      for (var i = 0; i < summary.length; i++) {
+        final item = summary[i];
+        final label = item['label'] as String? ?? '';
+        final value = item['value'] as String? ?? '';
+        
+        // Línea divisoria vacía
+        if (label.trim().isEmpty && value.trim().isEmpty) {
+          bytes += generator.feed(1);
+          continue;
+        }
+        
+        bytes += generator.row([
+          PosColumn(
+            text: label,
+            width: 6,
+            styles: const PosStyles(bold: true),
+          ),
+          PosColumn(
+            text: value,
+            width: 6,
+            styles: const PosStyles(
+              align: PosAlign.right,
+              bold: true,
+            ),
+          ),
+        ]);
+      }
     }
 
     // ITEMS
     if (payload['items'] != null) {
       final items = List<Map<String, dynamic>>.from(payload['items'] as List);
+      final itemsStyle = payload['itemsStyle'] as String? ?? 'sale';
+      final isStockTicket = itemsStyle == 'summary';
 
-      // Ordenar: bebidas primero, luego comidas
-      items.sort((a, b) {
-        final aCat = (a['category'] as String?)?.toLowerCase() ?? '';
-        final bCat = (b['category'] as String?)?.toLowerCase() ?? '';
-        final aIsBebida = aCat == 'bebida' || aCat == 'bebidas';
-        final bIsBebida = bCat == 'bebida' || bCat == 'bebidas';
-        final aIsComida = aCat == 'comida';
-        final bIsComida = bCat == 'comida';
-        if (aIsBebida && !bIsBebida) return -1;
-        if (!aIsBebida && bIsBebida) return 1;
-        if (aIsComida && !bIsComida) return 1;
-        if (!aIsComida && bIsComida) return -1;
-        return 0;
-      });
-
-      // TOTAL - Manejar tanto String como num
-      final totalRaw = payload['total'];
-      final total = totalRaw is num
-          ? totalRaw
-          : (totalRaw is String ? num.tryParse(totalRaw) : null);
-      if (total != null) {
+      if (isStockTicket) {
+        // === TICKET DE RESUMEN/STOCK/CIERRE ===
+        bytes += generator.feed(1);
         bytes += generator.text(separator);
-        bytes += generator.row([
-          PosColumn(
-            text: 'TOTAL:',
-            width: 6,
-            styles: const PosStyles(bold: true),
+        
+        // TITULO: Usar el proporcionado o mostrar "VENTAS" para cierre de caja
+        final title = payload['title'] as String? ?? 'VENTAS';
+        bytes += generator.text(
+          title.toUpperCase(),
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
           ),
-          PosColumn(
-            text: '\$${total.toStringAsFixed(2)}',
-            width: 6,
+        );
+        bytes += generator.text(separator);
+
+        // Ordenar items por cantidad descendente (más vendidos primero)
+        items.sort((a, b) {
+          final aQty = a['qty'] is int ? a['qty'] as int : (a['qty'] is num ? (a['qty'] as num).toInt() : 0);
+          final bQty = b['qty'] is int ? b['qty'] as int : (b['qty'] is num ? (b['qty'] as num).toInt() : 0);
+          // Primero por cantidad descendente, luego por nombre
+          if (bQty != aQty) return bQty - aQty;
+          final aName = (a['name'] as String? ?? '').toLowerCase();
+          final bName = (b['name'] as String? ?? '').toLowerCase();
+          return aName.compareTo(bName);
+        });
+
+        // Imprimir items sin agrupar por categoría
+        for (final item in items) {
+          final qtyRaw = item['qty'];
+          final qty = qtyRaw is int
+              ? qtyRaw
+              : (qtyRaw is num
+                  ? qtyRaw.toInt()
+                  : (qtyRaw is String ? int.tryParse(qtyRaw) ?? 1 : 1));
+          final name = item['name'] as String? ?? '';
+
+          // Formato: "cantidad - nombre" (igual que en web)
+          bytes += generator.text(
+            '${qty.toString().padLeft(2, ' ')} - $name',
+            styles: const PosStyles(
+              bold: true,
+            ),
+          );
+        }
+      } else {
+        // === TICKET DE VENTA ===
+        // Ordenar: bebidas primero, luego comidas
+        items.sort((a, b) {
+          final aCat = (a['category'] as String?)?.toLowerCase() ?? '';
+          final bCat = (b['category'] as String?)?.toLowerCase() ?? '';
+          final aIsBebida = aCat == 'bebida' || aCat == 'bebidas';
+          final bIsBebida = bCat == 'bebida' || bCat == 'bebidas';
+          final aIsComida = aCat == 'comida';
+          final bIsComida = bCat == 'comida';
+          if (aIsBebida && !bIsBebida) return -1;
+          if (!aIsBebida && bIsBebida) return 1;
+          if (aIsComida && !bIsComida) return 1;
+          if (!aIsComida && bIsComida) return -1;
+          return 0;
+        });
+
+        // TOTAL
+        final totalRaw = payload['total'];
+        final total = totalRaw is num
+            ? totalRaw
+            : (totalRaw is String ? num.tryParse(totalRaw) : null);
+        if (total != null) {
+          bytes += generator.text(separator);
+          bytes += generator.row([
+            PosColumn(
+              text: 'TOTAL:',
+              width: 6,
+              styles: const PosStyles(bold: true),
+            ),
+            PosColumn(
+              text: '\$${total.toStringAsFixed(2)}',
+              width: 6,
+              styles: const PosStyles(
+                align: PosAlign.right,
+                bold: true,
+              ),
+            ),
+          ]);
+        }
+
+        bytes += generator.feed(1);
+
+        // LISTA DE ITEMS
+        for (var i = 0; i < items.length; i++) {
+          bytes += generator.text(separator);
+
+          final item = items[i];
+          // Manejar qty como String o num
+          final qtyRaw = item['qty'];
+          final qty = qtyRaw is int
+              ? qtyRaw
+              : (qtyRaw is num
+                  ? qtyRaw.toInt()
+                  : (qtyRaw is String ? int.tryParse(qtyRaw) ?? 1 : 1));
+          final name = item['name'] as String? ?? '';
+          final nameUpper = name.toUpperCase();
+          // Manejar orderNumber como String o num
+          final orderNumRaw = item['orderNumber'];
+          final orderNumInt = orderNumRaw is int
+              ? orderNumRaw
+              : (orderNumRaw is num
+                  ? orderNumRaw.toInt()
+                  : (orderNumRaw is String ? int.tryParse(orderNumRaw) ?? 0 : 0));
+          final orderNum = orderNumInt.toString().padLeft(3, '0');
+
+          // Cantidad x Nombre (tamaño normal)
+          bytes += generator.text(
+            '${qty}x $nameUpper',
+            styles: const PosStyles(
+              bold: true,
+            ),
+          );
+
+          // Número de orden alineado a la derecha (ligero destaque)
+          bytes += generator.text(
+            orderNum.padLeft(maxLineWidth),
             styles: const PosStyles(
               align: PosAlign.right,
-              bold: true,
               height: PosTextSize.size2,
+              width: PosTextSize.size2,
             ),
-          ),
-        ]);
-      }
-
-      bytes += generator.feed(1);
-
-      // LISTA DE ITEMS
-      for (var i = 0; i < items.length; i++) {
-        bytes += generator.text(separator);
-
-        final item = items[i];
-        // Manejar qty como String o num
-        final qtyRaw = item['qty'];
-        final qty = qtyRaw is int
-            ? qtyRaw
-            : (qtyRaw is num
-                ? qtyRaw.toInt()
-                : (qtyRaw is String ? int.tryParse(qtyRaw) ?? 1 : 1));
-        final name = item['name'] as String? ?? '';
-        final nameUpper = name.toUpperCase();
-        // Manejar orderNumber como String o num
-        final orderNumRaw = item['orderNumber'];
-        final orderNumInt = orderNumRaw is int
-            ? orderNumRaw
-            : (orderNumRaw is num
-                ? orderNumRaw.toInt()
-                : (orderNumRaw is String ? int.tryParse(orderNumRaw) ?? 0 : 0));
-        final orderNum = orderNumInt.toString().padLeft(3, '0');
-
-        // Cantidad x Nombre (grande)
-        bytes += generator.text(
-          '${qty}x $nameUpper',
-          styles: const PosStyles(
-            bold: true,
-            height: PosTextSize.size2,
-            width: PosTextSize.size2,
-          ),
-        );
-
-        // Número de orden alineado a la derecha
-        bytes += generator.text(
-          orderNum.padLeft(maxLineWidth),
-          styles: const PosStyles(
-            align: PosAlign.right,
-            height: PosTextSize.size3,
-            width: PosTextSize.size3,
-          ),
-        );
+          );
+        }
       }
 
       bytes += generator.text(separator);
     }
 
-    // MENSAJE DE AGRADECIMIENTO
-    if (payload['thanks'] != null) {
+    // MENSAJE DE AGRADECIMIENTO (solo para tickets de venta)
+    final itemsStyle = payload['itemsStyle'] as String? ?? 'sale';
+    if (payload['thanks'] != null && itemsStyle != 'summary') {
       bytes += generator.feed(1);
       bytes += generator.text(
         payload['thanks'] as String,
@@ -360,8 +465,8 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // FOOTER
-    if (payload['footer'] != null) {
+    // FOOTER (solo para tickets de venta)
+    if (payload['footer'] != null && itemsStyle != 'summary') {
       bytes += generator.text(
         payload['footer'] as String,
         styles: const PosStyles(align: PosAlign.center),
