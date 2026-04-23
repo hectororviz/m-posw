@@ -277,8 +277,11 @@ class _HomePageState extends State<HomePage> {
         return 0;
       });
 
-      // TOTAL
-      final total = payload['total'] as num?;
+      // TOTAL - Manejar tanto String como num
+      final totalRaw = payload['total'];
+      final total = totalRaw is num
+          ? totalRaw
+          : (totalRaw is String ? num.tryParse(totalRaw) : null);
       if (total != null) {
         bytes += generator.text(separator);
         bytes += generator.row([
@@ -306,12 +309,22 @@ class _HomePageState extends State<HomePage> {
         bytes += generator.text(separator);
 
         final item = items[i];
-        final qtyVal = item['qty'];
-        final qty = qtyVal is int ? qtyVal : (qtyVal is num ? qtyVal.toInt() : 1);
+        // Manejar qty como String o num
+        final qtyRaw = item['qty'];
+        final qty = qtyRaw is int
+            ? qtyRaw
+            : (qtyRaw is num
+                ? qtyRaw.toInt()
+                : (qtyRaw is String ? int.tryParse(qtyRaw) ?? 1 : 1));
         final name = item['name'] as String? ?? '';
         final nameUpper = name.toUpperCase();
-        final orderNumVal = item['orderNumber'];
-        final orderNumInt = orderNumVal is int ? orderNumVal : (orderNumVal is num ? orderNumVal.toInt() : 0);
+        // Manejar orderNumber como String o num
+        final orderNumRaw = item['orderNumber'];
+        final orderNumInt = orderNumRaw is int
+            ? orderNumRaw
+            : (orderNumRaw is num
+                ? orderNumRaw.toInt()
+                : (orderNumRaw is String ? int.tryParse(orderNumRaw) ?? 0 : 0));
         final orderNum = orderNumInt.toString().padLeft(3, '0');
 
         // Cantidad x Nombre (grande)
