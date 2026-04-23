@@ -434,23 +434,23 @@ class _HomePageState extends State<HomePage> {
                   : (orderNumRaw is String ? int.tryParse(orderNumRaw) ?? 0 : 0));
           final orderNum = orderNumInt.toString().padLeft(3, '0');
 
-          // Cantidad x Nombre y Número de orden en la misma línea
-          bytes += generator.row([
-            PosColumn(
-              text: '${qty}x $nameUpper',
-              width: 9,
-              styles: const PosStyles(bold: true),
+          // Cantidad x Nombre (tamaño normal)
+          bytes += generator.text(
+            '${qty}x $nameUpper',
+            styles: const PosStyles(
+              bold: true,
             ),
-            PosColumn(
-              text: orderNum,
-              width: 3,
-              styles: const PosStyles(
-                align: PosAlign.right,
-                height: PosTextSize.size2,
-                width: PosTextSize.size2,
-              ),
+          );
+
+          // Número de orden alineado a la derecha (ligero destaque)
+          bytes += generator.text(
+            orderNum.padLeft(maxLineWidth),
+            styles: const PosStyles(
+              align: PosAlign.right,
+              height: PosTextSize.size2,
+              width: PosTextSize.size2,
             ),
-          ]);
+          );
         }
       }
 
