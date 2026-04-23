@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.IMAGE_QUALITY = exports.IMAGE_MAX_DIMENSION = exports.SETTINGS_IMAGE_SUBDIR = exports.PRODUCT_IMAGE_SUBDIR = exports.CATEGORY_IMAGE_SUBDIR = exports.ALLOWED_IMAGE_TYPES = exports.MAX_IMAGE_BYTES = exports.UPLOADS_DIR = void 0;
+exports.UPLOADS_DIR = process.env.UPLOADS_DIR ?? '/data/uploads';
+exports.MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+exports.ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+exports.CATEGORY_IMAGE_SUBDIR = 'categories';
+exports.PRODUCT_IMAGE_SUBDIR = 'products';
+exports.SETTINGS_IMAGE_SUBDIR = 'settings';
+exports.IMAGE_MAX_DIMENSION = 768;
+exports.IMAGE_QUALITY = 80;

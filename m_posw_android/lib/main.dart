@@ -232,13 +232,15 @@ class _HomePageState extends State<HomePage> {
     if (payload['dateTimeISO'] != null) {
       final dateStr = payload['dateTimeISO'] as String;
       try {
-        // Parsear ISO 8601 y convertir a hora local
-        final dateTime = DateTime.parse(dateStr).toLocal();
-        final day = dateTime.day.toString().padLeft(2, '0');
-        final month = dateTime.month.toString().padLeft(2, '0');
-        final year = dateTime.year.toString();
-        final hour = dateTime.hour.toString().padLeft(2, '0');
-        final minute = dateTime.minute.toString().padLeft(2, '0');
+        // Parsear ISO 8601 y convertir a GMT-3 (Argentina)
+        final dateTime = DateTime.parse(dateStr).toUtc();
+        // Restar 3 horas para GMT-3 (sin considerar horario de verano)
+        final gmt3DateTime = dateTime.subtract(const Duration(hours: 3));
+        final day = gmt3DateTime.day.toString().padLeft(2, '0');
+        final month = gmt3DateTime.month.toString().padLeft(2, '0');
+        final year = gmt3DateTime.year.toString();
+        final hour = gmt3DateTime.hour.toString().padLeft(2, '0');
+        final minute = gmt3DateTime.minute.toString().padLeft(2, '0');
         final formatted = '$day/$month/$year $hour:$minute';
         bytes += generator.text(
           formatted,
@@ -432,23 +434,23 @@ class _HomePageState extends State<HomePage> {
                   : (orderNumRaw is String ? int.tryParse(orderNumRaw) ?? 0 : 0));
           final orderNum = orderNumInt.toString().padLeft(3, '0');
 
-          // Cantidad x Nombre (tamaño normal)
-          bytes += generator.text(
-            '${qty}x $nameUpper',
-            styles: const PosStyles(
-              bold: true,
+          // Cantidad x Nombre y Número de orden en la misma línea
+          bytes += generator.row([
+            PosColumn(
+              text: '${qty}x $nameUpper',
+              width: 9,
+              styles: const PosStyles(bold: true),
             ),
-          );
-
-          // Número de orden alineado a la derecha (ligero destaque)
-          bytes += generator.text(
-            orderNum.padLeft(maxLineWidth),
-            styles: const PosStyles(
-              align: PosAlign.right,
-              height: PosTextSize.size2,
-              width: PosTextSize.size2,
+            PosColumn(
+              text: orderNum,
+              width: 3,
+              styles: const PosStyles(
+                align: PosAlign.right,
+                height: PosTextSize.size2,
+                width: PosTextSize.size2,
+              ),
             ),
-          );
+          ]);
         }
       }
 
