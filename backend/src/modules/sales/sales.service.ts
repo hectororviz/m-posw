@@ -55,7 +55,7 @@ export class SalesService {
             create: items,
           },
         },
-        include: { items: { include: { product: true } } },
+        include: { items: { include: { product: { include: { category: true } } } } },
       });
 
       // Decrementar stock por cada producto vendido
@@ -87,7 +87,7 @@ export class SalesService {
             create: items,
           },
         },
-        include: { items: { include: { product: true } }, user: true },
+        include: { items: { include: { product: { include: { category: true } } } }, user: true },
       });
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta con QR');
@@ -111,7 +111,7 @@ export class SalesService {
         mpExternalReference: externalReference,
         statusUpdatedAt: new Date(),
       },
-      include: { items: { include: { product: true } }, user: true },
+      include: { items: { include: { product: { include: { category: true } } } }, user: true },
     });
 
     try {
@@ -146,7 +146,7 @@ export class SalesService {
       where: createdAtFilter ? { createdAt: { gte: createdAtFilter } } : undefined,
       include: {
         user: { select: { id: true, name: true, email: true } },
-        items: { include: { product: true } },
+        items: { include: { product: { include: { category: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -200,7 +200,7 @@ export class SalesService {
       where: { id: saleId },
       include: {
         user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
-        items: { include: { product: true } },
+        items: { include: { product: { include: { category: true } } } },
       },
     });
     if (!sale) {
@@ -307,7 +307,7 @@ export class SalesService {
   async completeSale(saleId: string, requester: { id: string; role: string }) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
-      include: { user: true, items: { include: { product: true } } },
+      include: { user: true, items: { include: { product: { include: { category: true } } } } },
     });
     if (!sale) {
       throw new NotFoundException('Venta no encontrada');
@@ -326,7 +326,7 @@ export class SalesService {
         statusUpdatedAt: new Date(),
         paidAt: sale.paidAt ?? new Date(),
       },
-      include: { items: { include: { product: true } } },
+      include: { items: { include: { product: { include: { category: true } } } } },
     });
 
     // Decrementar stock por cada producto vendido
@@ -453,7 +453,7 @@ export class SalesService {
       },
       include: {
         user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
-        items: { include: { product: true } },
+        items: { include: { product: { include: { category: true } } } },
       },
     });
   }
