@@ -39,6 +39,12 @@ enum MovementType {
   SALIDA
 }
 
+enum ProductType {
+  SIMPLE
+  RAW_MATERIAL
+  COMPOSITE
+}
+
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   email     String?  @unique
@@ -95,21 +101,25 @@ model Category {
 }
 
 model Product {
-  id            String                @id @default(uuid()) @db.Uuid
-  name          String
-  price         Decimal               @db.Decimal(10, 2)
-  stock         Int                   @default(0)
-  iconName      String?
-  colorHex      String?
-  imagePath     String?
-  imageUpdatedAt DateTime?
-  active        Boolean               @default(true)
-  categoryId    String                @db.Uuid
-  category      Category              @relation(fields: [categoryId], references: [id])
-  saleItems     SaleItem[]
-  orderCounter  ProductOrderCounter?
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  id               String                @id @default(uuid()) @db.Uuid
+  name             String
+  price            Decimal               @db.Decimal(10, 2)
+  stock            Int                   @default(0)
+  type             ProductType           @default(SIMPLE)
+  iconName         String?
+  colorHex         String?
+  imagePath        String?
+  imageUpdatedAt   DateTime?
+  active           Boolean               @default(true)
+  categoryId       String                @db.Uuid
+  category         Category              @relation(fields: [categoryId], references: [id])
+  saleItems        SaleItem[]
+  orderCounter     ProductOrderCounter?
+  // Relaciones para recetas
+  recipeAsComposite RecipeIngredient[]   @relation("CompositeProduct")
+  recipeAsRawMaterial RecipeIngredient[] @relation("RawMaterialProduct")
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 }
 
 
@@ -262,4 +272,19 @@ model MovimientoMP {
   @@index([paymentId])
   @@index([notificado])
   @@index([createdAt])
+}
+
+model RecipeIngredient {
+  id            String   @id @default(uuid()) @db.Uuid
+  compositeId   String   @db.Uuid
+  composite     Product  @relation("CompositeProduct", fields: [compositeId], references: [id], onDelete: Cascade)
+  rawMaterialId String   @db.Uuid
+  rawMaterial   Product  @relation("RawMaterialProduct", fields: [rawMaterialId], references: [id], onDelete: Cascade)
+  quantity      Decimal  @db.Decimal(10, 4)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([compositeId, rawMaterialId])
+  @@index([compositeId])
+  @@index([rawMaterialId])
 }

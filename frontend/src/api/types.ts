@@ -1,5 +1,12 @@
 export type Role = 'ADMIN' | 'USER';
 
+export type ProductType = 'SIMPLE' | 'RAW_MATERIAL' | 'COMPOSITE';
+
+export interface AuthResponse {
+  accessToken: string;
+  user: User;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -8,11 +15,6 @@ export interface User {
   active?: boolean;
   externalPosId?: string | null;
   externalStoreId?: string | null;
-}
-
-export interface AuthResponse {
-  accessToken: string;
-  user: User;
 }
 
 export interface Category {
@@ -25,11 +27,24 @@ export interface Category {
   active: boolean;
 }
 
+export interface RecipeIngredient {
+  id: string;
+  compositeId: string;
+  rawMaterialId: string;
+  quantity: number;
+  rawMaterial: {
+    id: string;
+    name: string;
+    stock: number;
+  };
+}
+
 export interface Product {
   id: string;
   name: string;
   price: number;
   stock: number;
+  type: ProductType;
   iconName?: string | null;
   colorHex?: string | null;
   imagePath?: string | null;
@@ -37,6 +52,7 @@ export interface Product {
   active: boolean;
   categoryId: string;
   category?: Category;
+  recipeIngredients?: RecipeIngredient[];
 }
 
 export interface StockProduct {
@@ -45,6 +61,7 @@ export interface StockProduct {
   price: number;
   stock: number;
   categoryId: string;
+  type: ProductType;
 }
 
 export interface StockCategory {

@@ -22,7 +22,7 @@ import { RolesGuard } from '../common/roles.guard';
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../common/upload.constants';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { mapProduct, mapProducts } from './product.mapper';
+import { mapIngredients, mapProduct, mapProducts } from './product.mapper';
 import { ProductsService } from './products.service';
 
 @Controller('products')
@@ -35,12 +35,28 @@ export class ProductsController {
     return mapProducts(products);
   }
 
+  @Get('raw-materials')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  async listRawMaterials() {
+    const products = await this.productsService.listRawMaterials();
+    return mapProducts(products);
+  }
+
   @Get('all')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async listAll() {
     const products = await this.productsService.listAll();
-    return mapProducts(products);
+    return products.map(product => ({
+      ...mapProduct(product),
+      recipeIngredients: product.recipeAsComposite?.length > 0
+        ? mapIngredients(product.recipeAsComposite.map(ri => ({
+            ...ri,
+            rawMaterial: mapProduct(ri.rawMaterial),
+          })))
+        : undefined,
+    }));
   }
 
   @Post()
@@ -48,7 +64,15 @@ export class ProductsController {
   @Roles(Role.ADMIN)
   async create(@Body() dto: CreateProductDto) {
     const product = await this.productsService.create(dto);
-    return mapProduct(product);
+    return {
+      ...mapProduct(product),
+      recipeIngredients: product.recipeAsComposite?.length > 0
+        ? mapIngredients(product.recipeAsComposite.map(ri => ({
+            ...ri,
+            rawMaterial: mapProduct(ri.rawMaterial),
+          })))
+        : undefined,
+    };
   }
 
   @Patch(':id')
@@ -56,7 +80,15 @@ export class ProductsController {
   @Roles(Role.ADMIN)
   async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     const product = await this.productsService.update(id, dto);
-    return mapProduct(product);
+    return {
+      ...mapProduct(product),
+      recipeIngredients: product.recipeAsComposite?.length > 0
+        ? mapIngredients(product.recipeAsComposite.map(ri => ({
+            ...ri,
+            rawMaterial: mapProduct(ri.rawMaterial),
+          })))
+        : undefined,
+    };
   }
 
   @Delete(':id')

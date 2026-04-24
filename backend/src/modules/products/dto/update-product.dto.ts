@@ -1,5 +1,21 @@
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsNumber, IsOptional, IsString, Matches, Min, ValidateIf } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Matches, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ProductType } from '@prisma/client';
+
+class IngredientInputDto {
+  @IsUUID()
+  rawMaterialId: string;
+
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) {
+      return value;
+    }
+    return typeof value === 'string' || typeof value === 'number' ? Number(value) : value;
+  })
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  quantity: number;
+}
 
 export class UpdateProductDto {
   @IsOptional()
@@ -22,6 +38,10 @@ export class UpdateProductDto {
   categoryId?: string;
 
   @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
+
+  @IsOptional()
   @IsString()
   iconName?: string;
 
@@ -32,4 +52,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => IngredientInputDto)
+  ingredients?: IngredientInputDto[];
 }

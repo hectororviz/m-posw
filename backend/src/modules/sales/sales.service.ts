@@ -1,11 +1,5 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { MovementType, PaymentMethod, PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { MovementType, PaymentMethod, PaymentStatus, Prisma, ProductType, SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
@@ -59,7 +53,9 @@ export class SalesService {
       });
 
       // Decrementar stock por cada producto vendido
+      this.logger.log(`Venta en efectivo creada saleId=${sale.id}, decrementando stock...`);
       await this.decrementStockForSale(sale.id);
+      this.logger.log(`Stock decrementado para saleId=${sale.id}`);
 
       return sale;
     } catch (error) {
@@ -317,8 +313,12 @@ export class SalesService {
       throw new BadRequestException('La venta todavía no tiene pago aprobado');
     }
     if (sale.status === SaleStatus.APPROVED) {
+      this.logger.warn(`Venta ${saleId} ya está aprobada, no se decrementa stock`);
       return sale;
     }
+    
+    this.logger.log(`Completando venta ${saleId}, estado actual: ${sale.status}`);
+    
     const updatedSale = await this.prisma.sale.update({
       where: { id: saleId },
       data: {
@@ -330,7 +330,9 @@ export class SalesService {
     });
 
     // Decrementar stock por cada producto vendido
+    this.logger.log(`Venta ${saleId} completada, decrementando stock...`);
     await this.decrementStockForSale(saleId);
+    this.logger.log(`Stock decrementado para venta ${saleId}`);
 
     return updatedSale;
   }
@@ -468,6 +470,13 @@ export class SalesService {
       throw new BadRequestException('Producto inválido o inactivo');
     }
 
+    // Validar que no se vendan RAW_MATERIAL
+    for (const product of products) {
+      if (product.type === ProductType.RAW_MATERIAL) {
+        throw new BadRequestException(`No se puede vender ${product.name}: es una materia prima`);
+      }
+    }
+
     // Get or create counters for each product and assign order numbers
     const saleItems = [];
     for (const item of items) {
@@ -496,17 +505,71 @@ export class SalesService {
   }
 
   async decrementStockForSale(saleId: string) {
+    this.logger.log(`Decrementando stock para venta ${saleId}`);
+    
     const saleItems = await this.prisma.saleItem.findMany({
       where: { saleId },
-      select: { productId: true, quantity: true },
+      include: {
+        product: {
+          include: {
+            recipeAsComposite: {
+              include: {
+                rawMaterial: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    for (const item of saleItems) {
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      });
+    this.logger.log(`Venta ${saleId} tiene ${saleItems.length} items`);
+    this.logger.log(`SaleItems: ${JSON.stringify(saleItems.map(i => ({ productId: i.productId, quantity: i.quantity, hasProduct: !!i.product })))}`);
+
+    if (saleItems.length === 0) {
+      this.logger.warn(`No hay items para procesar en venta ${saleId}`);
+      return;
     }
+
+    for (const item of saleItems) {
+      this.logger.log(`Dentro del for - item.productId: ${item.productId}`);
+      const product = item.product;
+      
+      if (!product) {
+        this.logger.error(`Item sin producto: item.productId=${item.productId}`);
+        continue;
+      }
+      
+      this.logger.log(`Procesando item: ${product.name} (tipo: ${product.type}, ID: ${product.id}), cantidad: ${item.quantity}`);
+      this.logger.log(`Producto tiene ${product.recipeAsComposite?.length || 0} ingredientes en recipeAsComposite`);
+
+      if (product.type === ProductType.COMPOSITE) {
+        this.logger.log(`Producto es COMPOSITE. Ingredientes: ${JSON.stringify(product.recipeAsComposite?.map(i => ({ id: i.id, rawMaterialId: i.rawMaterialId, quantity: i.quantity })) || [])}`);
+        // Para productos COMPOSITE, descontar el stock de cada ingrediente
+        for (const ingredient of product.recipeAsComposite) {
+          const quantityToDecrement = Number(ingredient.quantity) * item.quantity;
+          this.logger.log(`Descontando ${quantityToDecrement} de ${ingredient.rawMaterial.name} (ID: ${ingredient.rawMaterialId})`);
+          
+          const updated = await this.prisma.product.update({
+            where: { id: ingredient.rawMaterialId },
+            data: { stock: { decrement: quantityToDecrement } },
+          });
+          
+          this.logger.log(`Stock actualizado: ${ingredient.rawMaterial.name} era ${ingredient.rawMaterial.stock}, ahora es ${updated.stock}`);
+        }
+      } else {
+        // Para productos SIMPLE, descontar el stock del producto directamente
+        this.logger.log(`Descontando ${item.quantity} de ${product.name} (SIMPLE)`);
+        
+        const updated = await this.prisma.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+        
+        this.logger.log(`Stock actualizado: ${product.name} era ${product.stock}, ahora es ${updated.stock}`);
+      }
+    }
+    
+    this.logger.log(`Stock decrementado completado para venta ${saleId}`);
   }
 
   private roundToCurrency(value: number) {

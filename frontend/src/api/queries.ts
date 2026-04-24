@@ -43,6 +43,15 @@ export const useAdminProducts = () =>
     },
   });
 
+export const useRawMaterials = () =>
+  useQuery({
+    queryKey: ['raw-materials'],
+    queryFn: async () => {
+      const response = await apiClient.get<Product[]>('/products/raw-materials');
+      return response.data;
+    },
+  });
+
 export const useSettings = () => {
   const queryClient = useQueryClient();
   return useQuery({
