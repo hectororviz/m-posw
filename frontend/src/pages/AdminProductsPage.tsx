@@ -32,6 +32,7 @@ export const AdminProductsPage: React.FC = () => {
   const [newIngredients, setNewIngredients] = useState<IngredientInput[]>([]);
   const [edits, setEdits] = useState<Record<string, Partial<Product>>>({});
   const [editIngredients, setEditIngredients] = useState<Record<string, IngredientInput[]>>({});
+  const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
 
   const formatCurrencyInput = (value: number) => {
     return value.toLocaleString('es-AR', {
@@ -158,6 +159,13 @@ export const AdminProductsPage: React.FC = () => {
     }
   };
 
+  const toggleProductExpand = (productId: string) => {
+    setExpandedProducts((prev) => ({
+      ...prev,
+      [productId]: !prev[productId],
+    }));
+  };
+
   const updateIngredient = (index: number, field: keyof IngredientInput, value: string, productId?: string) => {
     if (productId) {
       setEditIngredients((prev) => ({
@@ -202,40 +210,47 @@ export const AdminProductsPage: React.FC = () => {
             onChange={(event) => setNewProduct({ ...newProduct, name: event.target.value })}
           />
           
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <select
+              value={newProduct.type}
+              onChange={(event) => setNewProduct({ ...newProduct, type: event.target.value as ProductType })}
+            >
+              {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            {newProduct.type === 'COMPOSITE' && (
+              <span title="Producto compuesto - tiene receta" style={{ fontSize: '14px' }}>
+                📋
+              </span>
+            )}
+          </div>
+
+          {/* Categoría: visible para todos excepto si es RAW_MATERIAL y no hay categorías (el backend asigna una por defecto) */}
           <select
-            value={newProduct.type}
-            onChange={(event) => setNewProduct({ ...newProduct, type: event.target.value as ProductType })}
+            value={newProduct.categoryId}
+            onChange={(event) => setNewProduct({ ...newProduct, categoryId: event.target.value })}
           >
-            {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
+            <option value="">Categoría</option>
+            {categories?.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
               </option>
             ))}
           </select>
 
           {showPriceAndCategory(newProduct.type) && (
-            <>
-              <div className="price-input-wrapper">
-                <span className="price-input-symbol">$</span>
-                <input
-                  type="text"
-                  placeholder="Precio"
-                  value={newProduct.price}
-                  onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
-                />
-              </div>
-              <select
-                value={newProduct.categoryId}
-                onChange={(event) => setNewProduct({ ...newProduct, categoryId: event.target.value })}
-              >
-                <option value="">Categoría</option>
-                {categories?.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </>
+            <div className="price-input-wrapper">
+              <span className="price-input-symbol">$</span>
+              <input
+                type="text"
+                placeholder="Precio"
+                value={newProduct.price}
+                onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
+              />
+            </div>
           )}
 
           <input
@@ -335,60 +350,61 @@ export const AdminProductsPage: React.FC = () => {
                   }
                 />
                 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <select
+                    value={currentType}
+                    onChange={(event) =>
+                      setEdits((prev) => ({
+                        ...prev,
+                        [product.id]: { ...draft, type: event.target.value as ProductType },
+                      }))
+                    }
+                  >
+                    {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  {currentType === 'COMPOSITE' && (
+                    <span title="Producto compuesto - tiene receta" style={{ fontSize: '14px' }}>
+                      📋
+                    </span>
+                  )}
+                </div>
+
                 <select
-                  value={currentType}
+                  value={draft.categoryId ?? product.categoryId}
                   onChange={(event) =>
                     setEdits((prev) => ({
                       ...prev,
-                      [product.id]: { ...draft, type: event.target.value as ProductType },
+                      [product.id]: { ...draft, categoryId: event.target.value },
                     }))
                   }
                 >
-                  {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
+                  {categories?.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
                     </option>
                   ))}
                 </select>
 
-                {showPriceAndCategory(currentType) && (
-                  <>
-                    <div className="price-input-wrapper">
-                      <span className="price-input-symbol">$</span>
-                      <input
-                        type="text"
-                        value={formatCurrencyInput(draft.price ?? product.price)}
-                        onChange={(event) =>
-                          setEdits((prev) => ({
-                            ...prev,
-                            [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
-                          }))
-                        }
-                      />
-                    </div>
-                    <select
-                      value={draft.categoryId ?? product.categoryId}
+                {showPriceAndCategory(currentType) ? (
+                  <div className="price-input-wrapper">
+                    <span className="price-input-symbol">$</span>
+                    <input
+                      type="text"
+                      value={formatCurrencyInput(draft.price ?? product.price)}
                       onChange={(event) =>
                         setEdits((prev) => ({
                           ...prev,
-                          [product.id]: { ...draft, categoryId: event.target.value },
+                          [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
                         }))
                       }
-                    >
-                      {categories?.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
-                
-                {!showPriceAndCategory(currentType) && (
-                  <>
-                    <span>-</span>
-                    <span>-</span>
-                  </>
+                    />
+                  </div>
+                ) : (
+                  <span>-</span>
                 )}
 
                 <input
@@ -430,47 +446,69 @@ export const AdminProductsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sección de ingredientes editable para COMPOSITE */}
+              {/* Sección de ingredientes editable para COMPOSITE - Acordeón */}
               {currentType === 'COMPOSITE' && (
                 <div className="ingredients-edit-section">
-                  <h5>Ingredientes</h5>
-                  {ingredients?.map((ing, index) => (
-                      <div key={index} className="ingredient-row">
-                        <select
-                          value={ing.rawMaterialId}
-                          onChange={(event) => updateIngredient(index, 'rawMaterialId', event.target.value, product.id)}
-                        >
-                          <option value="">Seleccionar materia prima</option>
-                          {rawMaterials?.map((rm) => (
-                            <option key={rm.id} value={rm.id}>
-                              {rm.name} (stock: {rm.stock})
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="number"
-                          step="0.0001"
-                          placeholder="Cantidad"
-                          value={ing.quantity}
-                          onChange={(event) => updateIngredient(index, 'quantity', event.target.value, product.id)}
-                        />
-                        <button
-                          type="button"
-                          className="icon-button danger"
-                          onClick={() => removeIngredient(index, product.id)}
-                          aria-label="Eliminar ingrediente"
-                        >
-                          <span aria-hidden="true">🗑️</span>
-                        </button>
-                      </div>
-                  ))}
                   <button
                     type="button"
-                    className="button secondary small"
-                    onClick={() => addIngredient(product.id)}
+                    className="ingredients-toggle"
+                    onClick={() => toggleProductExpand(product.id)}
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      padding: '8px 0'
+                    }}
                   >
-                    + Agregar ingrediente
+                    <span>{expandedProducts[product.id] ? '▼' : '▶'}</span>
+                    <span>Ingredientes ({ingredients?.length || 0})</span>
                   </button>
+                  
+                  {expandedProducts[product.id] && (
+                    <div className="ingredients-content" style={{ marginTop: '8px' }}>
+                      {ingredients?.map((ing, index) => (
+                        <div key={index} className="ingredient-row">
+                          <select
+                            value={ing.rawMaterialId}
+                            onChange={(event) => updateIngredient(index, 'rawMaterialId', event.target.value, product.id)}
+                          >
+                            <option value="">Seleccionar materia prima</option>
+                            {rawMaterials?.map((rm) => (
+                              <option key={rm.id} value={rm.id}>
+                                {rm.name} (stock: {rm.stock})
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            placeholder="Cantidad"
+                            value={ing.quantity}
+                            onChange={(event) => updateIngredient(index, 'quantity', event.target.value, product.id)}
+                          />
+                          <button
+                            type="button"
+                            className="icon-button danger"
+                            onClick={() => removeIngredient(index, product.id)}
+                            aria-label="Eliminar ingrediente"
+                          >
+                            <span aria-hidden="true">🗑️</span>
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="button secondary small"
+                        onClick={() => addIngredient(product.id)}
+                      >
+                        + Agregar ingrediente
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

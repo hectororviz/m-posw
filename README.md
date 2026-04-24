@@ -157,6 +157,8 @@ El sistema soporta **tres métodos de pago**:
 - **Múltiples métodos de pago**: Efectivo, QR MP, Transferencia.
 - **Roles ADMIN/USER** con permisos diferenciados.
 - **CRUD** de usuarios, categorías, productos.
+- **Productos Compuestos (Recetas)**: productos que descuentan stock de materias primas.
+- **Materias Primas**: insumos con stock decimal para composición de productos.
 - **Personalización** (nombre, logo, favicon, color de la UI).
 - **Impresión de ticket térmico 80mm** configurable desde Settings.
 - **Impresión Bluetooth nativa** desde la APK Android.

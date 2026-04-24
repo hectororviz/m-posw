@@ -505,7 +505,7 @@ export class SalesService {
   }
 
   async decrementStockForSale(saleId: string) {
-    this.logger.log(`Decrementando stock para venta ${saleId}`);
+    this.logger.log(`[STOCK] Procesando venta ${saleId}`);
     
     const saleItems = await this.prisma.saleItem.findMany({
       where: { saleId },
@@ -522,54 +522,54 @@ export class SalesService {
       },
     });
 
-    this.logger.log(`Venta ${saleId} tiene ${saleItems.length} items`);
-    this.logger.log(`SaleItems: ${JSON.stringify(saleItems.map(i => ({ productId: i.productId, quantity: i.quantity, hasProduct: !!i.product })))}`);
-
     if (saleItems.length === 0) {
-      this.logger.warn(`No hay items para procesar en venta ${saleId}`);
+      this.logger.warn(`[STOCK] Venta ${saleId} sin items`);
       return;
     }
 
     for (const item of saleItems) {
-      this.logger.log(`Dentro del for - item.productId: ${item.productId}`);
       const product = item.product;
       
       if (!product) {
-        this.logger.error(`Item sin producto: item.productId=${item.productId}`);
+        this.logger.error(`[STOCK] Item sin producto`);
         continue;
       }
-      
-      this.logger.log(`Procesando item: ${product.name} (tipo: ${product.type}, ID: ${product.id}), cantidad: ${item.quantity}`);
-      this.logger.log(`Producto tiene ${product.recipeAsComposite?.length || 0} ingredientes en recipeAsComposite`);
 
       if (product.type === ProductType.COMPOSITE) {
-        this.logger.log(`Producto es COMPOSITE. Ingredientes: ${JSON.stringify(product.recipeAsComposite?.map(i => ({ id: i.id, rawMaterialId: i.rawMaterialId, quantity: i.quantity })) || [])}`);
-        // Para productos COMPOSITE, descontar el stock de cada ingrediente
         for (const ingredient of product.recipeAsComposite) {
-          const quantityToDecrement = Number(ingredient.quantity) * item.quantity;
-          this.logger.log(`Descontando ${quantityToDecrement} de ${ingredient.rawMaterial.name} (ID: ${ingredient.rawMaterialId})`);
+          const qty = Number(ingredient.quantity);
+          const totalQty = qty * item.quantity;
           
-          const updated = await this.prisma.product.update({
+          const current = await this.prisma.product.findUnique({
             where: { id: ingredient.rawMaterialId },
-            data: { stock: { decrement: quantityToDecrement } },
+            select: { stock: true },
           });
           
-          this.logger.log(`Stock actualizado: ${ingredient.rawMaterial.name} era ${ingredient.rawMaterial.stock}, ahora es ${updated.stock}`);
+          const currentStock = Number(current?.stock || 0);
+          const newStock = currentStock - totalQty;
+          
+          await this.prisma.$executeRaw`
+            UPDATE "Product" SET stock = ${newStock} WHERE id = ${ingredient.rawMaterialId}::uuid
+          `;
+          
+          this.logger.log(`[STOCK] ${ingredient.rawMaterial.name}: ${currentStock} -> ${newStock}`);
         }
       } else {
-        // Para productos SIMPLE, descontar el stock del producto directamente
-        this.logger.log(`Descontando ${item.quantity} de ${product.name} (SIMPLE)`);
-        
-        const updated = await this.prisma.product.update({
+        const current = await this.prisma.product.findUnique({
           where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } },
+          select: { stock: true },
         });
         
-        this.logger.log(`Stock actualizado: ${product.name} era ${product.stock}, ahora es ${updated.stock}`);
+        const currentStock = Number(current?.stock || 0);
+        const newStock = currentStock - item.quantity;
+        
+        await this.prisma.$executeRaw`
+          UPDATE "Product" SET stock = ${newStock} WHERE id = ${item.productId}::uuid
+        `;
+        
+        this.logger.log(`[STOCK] ${product.name}: ${currentStock} -> ${newStock}`);
       }
     }
-    
-    this.logger.log(`Stock decrementado completado para venta ${saleId}`);
   }
 
   private roundToCurrency(value: number) {

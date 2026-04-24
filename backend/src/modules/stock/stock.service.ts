@@ -38,16 +38,19 @@ export class StockService {
         });
       }
       
+      // Convertir stock Decimal a number
+      const stockNumber = Number(product.stock);
+      
       // Para materias primas, mostrar stock con decimales (hasta 4 decimales)
       // Para productos simples, mostrar enteros
       const displayStock = product.type === ProductType.RAW_MATERIAL 
-        ? Math.round(product.stock * 10000) / 10000 
-        : Math.floor(product.stock);
+        ? Math.round(stockNumber * 10000) / 10000 
+        : Math.floor(stockNumber);
       
       categoriesMap.get(categoryId).products.push({
         id: product.id,
         name: product.name,
-        price: product.price,
+        price: Number(product.price),
         stock: displayStock,
         categoryId: product.categoryId,
         type: product.type,
