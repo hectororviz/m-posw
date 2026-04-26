@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ProductType } from '@prisma/client';
 import type { Express } from 'express';
 import { buildImageRelativePath, deleteImageFolder, saveImageFile } from '../common/image-storage';
 import { PrismaService } from '../common/prisma.service';
@@ -49,13 +50,43 @@ export class CategoriesService {
     return this.prisma.category.update({ where: { id }, data });
   }
 
-  listProducts(categoryId: string, includeInactive = false) {
-    return this.prisma.product.findMany({
+  async listProducts(categoryId: string, includeInactive = false) {
+    const products = await this.prisma.product.findMany({
       where: {
         categoryId,
         ...(includeInactive ? {} : { active: true }),
       },
+      include: {
+        recipeAsComposite: {
+          include: {
+            rawMaterial: true,
+          },
+        },
+      },
       orderBy: { name: 'asc' },
+    });
+
+    // Calcular stock para productos compuestos basado en sus recetas
+    return products.map(product => {
+      if (product.type === ProductType.COMPOSITE && product.recipeAsComposite.length > 0) {
+        // Calcular cuántas unidades se pueden hacer con el stock actual de materias primas
+        const possibleUnits = product.recipeAsComposite.map(ingredient => {
+          const rawMaterialStock = Number(ingredient.rawMaterial.stock);
+          const quantityNeeded = Number(ingredient.quantity);
+          return Math.floor(rawMaterialStock / quantityNeeded);
+        });
+
+        // El stock disponible es el mínimo de unidades posibles
+        const calculatedStock = Math.min(...possibleUnits);
+
+        return {
+          ...product,
+          stock: calculatedStock,
+        };
+      }
+
+      // Para productos simples, devolver el stock tal cual
+      return product;
     });
   }
 
