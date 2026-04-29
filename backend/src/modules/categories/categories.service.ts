@@ -54,6 +54,7 @@ export class CategoriesService {
     const products = await this.prisma.product.findMany({
       where: {
         categoryId,
+        type: { not: ProductType.RAW_MATERIAL },
         ...(includeInactive ? {} : { active: true }),
       },
       include: {

@@ -1927,3 +1927,209 @@ button {
     width: 100%;
   }
 }
+
+/* Admin Products Page - New Design */
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.product-category-group {
+  border: 2px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.product-category-header {
+  background: var(--accent-color);
+  color: #ffffff;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.product-card-item {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1rem;
+  transition: background-color 0.15s ease;
+}
+
+.product-card-item:last-child {
+  border-bottom: none;
+}
+
+.product-card-item:hover {
+  background: #f1f5f9;
+}
+
+.product-inactive {
+  background: #f3f4f6;
+  opacity: 0.85;
+}
+
+.product-inactive:hover {
+  background: #e5e7eb;
+}
+
+/* Line 1: Nombre, Categoría, Tipo */
+.product-line-1 {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed #cbd5e1;
+}
+
+/* Line 2: Precio, Imagen, Activo, Acciones */
+.product-line-2 {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr auto auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.product-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.product-name input {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.product-category select,
+.product-type select {
+  min-width: 120px;
+}
+
+.product-price .no-price {
+  padding: 0.5rem 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.product-image input[type='file'] {
+  padding: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.product-active {
+  align-items: center;
+}
+
+.product-active .field-label {
+  text-align: center;
+}
+
+.product-actions {
+  align-items: center;
+}
+
+.product-actions .field-label {
+  text-align: center;
+}
+
+.product-actions-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Ingredients section */
+.ingredients-edit-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.ingredients-content {
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.ingredient-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+
+.ingredient-row select,
+.ingredient-row input {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+/* Responsive styles for product list */
+@media (max-width: 900px) {
+  .product-line-1 {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .product-line-1 .product-name {
+    grid-column: 1 / -1;
+  }
+
+  .product-line-2 {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .product-line-2 .product-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .product-actions-buttons {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 600px) {
+  .product-line-1 {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .product-line-2 {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .product-field {
+    width: 100%;
+  }
+
+  .product-field input,
+  .product-field select {
+    width: 100%;
+  }
+
+  .ingredient-row {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .ingredient-row button {
+    justify-self: end;
+  }
+}

@@ -182,16 +182,58 @@ export const AdminProductsPage: React.FC = () => {
       return [];
     }
     const categoryLookup = new Map(categories?.map((category) => [category.id, category.name]));
+    
+    // Función para obtener el orden de prioridad: tipo + estado
+    // 1. SIMPLE activo, 2. COMPOSITE activo, 3. RAW_MATERIAL activo
+    // 4. SIMPLE inactivo, 5. COMPOSITE inactivo, 6. RAW_MATERIAL inactivo
+    const getPriority = (product: Product): number => {
+      const typeOrder: Record<ProductType, number> = {
+        SIMPLE: 0,
+        COMPOSITE: 1,
+        RAW_MATERIAL: 2,
+      };
+      // Activos primero (0-2), inactivos después (3-5)
+      return (product.active ? 0 : 3) + typeOrder[product.type];
+    };
+    
     return [...products].sort((a, b) => {
+      // Primero por categoría
       const categoryA = categoryLookup.get(a.categoryId) ?? '';
       const categoryB = categoryLookup.get(b.categoryId) ?? '';
       const categoryCompare = categoryA.localeCompare(categoryB, 'es', { sensitivity: 'base' });
       if (categoryCompare !== 0) {
         return categoryCompare;
       }
+      
+      // Luego por tipo + estado
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // Finalmente por nombre
       return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
     });
   }, [products, categories]);
+  
+  // Agrupar productos por categoría para mostrar separadores
+  const groupedByCategory = useMemo(() => {
+    const groups: { categoryName: string; products: Product[] }[] = [];
+    let currentGroup: { categoryName: string; products: Product[] } | null = null;
+    
+    for (const product of rendered) {
+      const categoryName = categories?.find(c => c.id === product.categoryId)?.name ?? 'Sin categoría';
+      
+      if (!currentGroup || currentGroup.categoryName !== categoryName) {
+        currentGroup = { categoryName, products: [] };
+        groups.push(currentGroup);
+      }
+      currentGroup.products.push(product);
+    }
+    
+    return groups;
+  }, [rendered, categories]);
 
   const showPriceAndCategory = (type: ProductType) => type !== 'RAW_MATERIAL';
 
@@ -316,17 +358,11 @@ export const AdminProductsPage: React.FC = () => {
       {error && <p className="error-text">{error}</p>}
 
       {/* Tabla de productos */}
-      <div className="product-table">
-        <div className="product-table-header">
-          <span>Nombre</span>
-          <span>Tipo</span>
-          <span>Precio</span>
-          <span>Categoría</span>
-          <span>Imagen</span>
-          <span>Activo</span>
-          <span>Acciones</span>
-        </div>
-        {rendered.map((product) => {
+      <div className="product-list">
+        {groupedByCategory.map((group) => (
+          <div key={group.categoryName} className="product-category-group">
+            <div className="product-category-header">{group.categoryName}</div>
+            {group.products.map((product) => {
           const draft = edits[product.id] ?? {};
           const currentType = draft.type ?? product.type;
           const ingredients = editIngredients[product.id] !== undefined
@@ -337,94 +373,120 @@ export const AdminProductsPage: React.FC = () => {
               })) || []);
 
           return (
-            <div key={product.id} className="product-table-row-wrapper">
-              <div className="product-table-row">
-                <input
-                  type="text"
-                  value={draft.name ?? product.name}
-                  onChange={(event) =>
-                    setEdits((prev) => ({
-                      ...prev,
-                      [product.id]: { ...draft, name: event.target.value },
-                    }))
-                  }
-                />
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <select
-                    value={currentType}
-                    onChange={(event) =>
-                      setEdits((prev) => ({
-                        ...prev,
-                        [product.id]: { ...draft, type: event.target.value as ProductType },
-                      }))
-                    }
-                  >
-                    {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  {currentType === 'COMPOSITE' && (
-                    <span title="Producto compuesto - tiene receta" style={{ fontSize: '14px' }}>
-                      📋
-                    </span>
-                  )}
-                </div>
-
-                <select
-                  value={draft.categoryId ?? product.categoryId}
-                  onChange={(event) =>
-                    setEdits((prev) => ({
-                      ...prev,
-                      [product.id]: { ...draft, categoryId: event.target.value },
-                    }))
-                  }
-                >
-                  {categories?.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-
-                {showPriceAndCategory(currentType) ? (
-                  <div className="price-input-wrapper">
-                    <span className="price-input-symbol">$</span>
-                    <input
-                      type="text"
-                      value={formatCurrencyInput(draft.price ?? product.price)}
-                      onChange={(event) =>
-                        setEdits((prev) => ({
-                          ...prev,
-                          [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
-                        }))
-                      }
-                    />
-                  </div>
-                ) : (
-                  <span>-</span>
-                )}
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
-                />
-                <label className="switch switch-sm">
+            <div key={product.id} className={`product-card-item ${!product.active ? 'product-inactive' : ''}`}>
+              {/* Línea 1: Nombre, Categoría, Tipo */}
+              <div className="product-line-1">
+                <div className="product-field product-name">
+                  <span className="field-label">Nombre</span>
                   <input
-                    type="checkbox"
-                    checked={draft.active ?? product.active}
+                    type="text"
+                    value={draft.name ?? product.name}
                     onChange={(event) =>
                       setEdits((prev) => ({
                         ...prev,
-                        [product.id]: { ...draft, active: event.target.checked },
+                        [product.id]: { ...draft, name: event.target.value },
                       }))
                     }
                   />
-                </label>
-                <div className="product-actions">
+                </div>
+                
+                <div className="product-field product-category">
+                  <span className="field-label">Categoría</span>
+                  <select
+                    value={draft.categoryId ?? product.categoryId}
+                    onChange={(event) =>
+                      setEdits((prev) => ({
+                        ...prev,
+                        [product.id]: { ...draft, categoryId: event.target.value },
+                      }))
+                    }
+                  >
+                    {categories?.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="product-field product-type">
+                  <span className="field-label">Tipo</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <select
+                      value={currentType}
+                      onChange={(event) =>
+                        setEdits((prev) => ({
+                          ...prev,
+                          [product.id]: { ...draft, type: event.target.value as ProductType },
+                        }))
+                      }
+                    >
+                      {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    {currentType === 'COMPOSITE' && (
+                      <span title="Producto compuesto - tiene receta" style={{ fontSize: '14px' }}>
+                        📋
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Línea 2: Precio, Imagen, Activo, Acciones */}
+              <div className="product-line-2">
+                <div className="product-field product-price">
+                  <span className="field-label">Precio</span>
+                  {showPriceAndCategory(currentType) ? (
+                    <div className="price-input-wrapper">
+                      <span className="price-input-symbol">$</span>
+                      <input
+                        type="text"
+                        value={formatCurrencyInput(draft.price ?? product.price)}
+                        onChange={(event) =>
+                          setEdits((prev) => ({
+                            ...prev,
+                            [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
+                          }))
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <span className="no-price">-</span>
+                  )}
+                </div>
+
+                <div className="product-field product-image">
+                  <span className="field-label">Imagen</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
+                  />
+                </div>
+                
+                <div className="product-field product-active">
+                  <span className="field-label">Activo</span>
+                  <label className="switch switch-sm">
+                    <input
+                      type="checkbox"
+                      checked={draft.active ?? product.active}
+                      onChange={(event) =>
+                        setEdits((prev) => ({
+                          ...prev,
+                          [product.id]: { ...draft, active: event.target.checked },
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+
+                <div className="product-field product-actions">
+                  <span className="field-label">Acciones</span>
+                  <div className="product-actions-buttons">
                   <button
                     type="button"
                     className="icon-button"
@@ -443,6 +505,7 @@ export const AdminProductsPage: React.FC = () => {
                   >
                     <span aria-hidden="true">🗑️</span>
                   </button>
+                  </div>
                 </div>
               </div>
 
@@ -514,6 +577,8 @@ export const AdminProductsPage: React.FC = () => {
             </div>
           );
         })}
+          </div>
+        ))}
       </div>
     </section>
   );
