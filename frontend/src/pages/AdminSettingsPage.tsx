@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { marked } from 'marked';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
@@ -78,6 +79,11 @@ export const AdminSettingsPage: React.FC = () => {
     }
     setShowAboutModal(true);
   };
+
+  // Parsear markdown a HTML
+  const aboutHtml = useMemo(() => {
+    return marked.parse(aboutContent, { async: false }) as string;
+  }, [aboutContent]);
 
   return (
     <section className="card admin-products">
@@ -171,7 +177,7 @@ export const AdminSettingsPage: React.FC = () => {
         <button type="button" className="primary-button" onClick={handleSave}>
           Guardar
         </button>
-        <button type="button" className="secondary-button" onClick={handleOpenAbout}>
+        <button type="button" className="secondary-button about-button" onClick={handleOpenAbout}>
           Acerca de...
         </button>
       </div>
@@ -183,7 +189,7 @@ export const AdminSettingsPage: React.FC = () => {
         <div className="modal-backdrop" onClick={() => setShowAboutModal(false)}>
           <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Acerca de</h3>
+              <h3>Acerca del sistema</h3>
               <button 
                 type="button" 
                 className="icon-button" 
@@ -194,7 +200,10 @@ export const AdminSettingsPage: React.FC = () => {
               </button>
             </div>
             <div className="modal-body about-modal-body">
-              <pre className="about-content">{aboutContent}</pre>
+              <div 
+                className="about-content-markdown" 
+                dangerouslySetInnerHTML={{ __html: aboutHtml }}
+              />
             </div>
           </div>
         </div>
