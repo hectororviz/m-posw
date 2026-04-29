@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
+import * as emoji from 'node-emoji';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
@@ -80,9 +81,10 @@ export const AdminSettingsPage: React.FC = () => {
     setShowAboutModal(true);
   };
 
-  // Parsear markdown a HTML
+  // Parsear markdown a HTML (convirtiendo emojis tipo :soccer: primero)
   const aboutHtml = useMemo(() => {
-    return marked.parse(aboutContent, { async: false }) as string;
+    const contentWithEmojis = emoji.emojify(aboutContent);
+    return marked.parse(contentWithEmojis, { async: false }) as string;
   }, [aboutContent]);
 
   return (
