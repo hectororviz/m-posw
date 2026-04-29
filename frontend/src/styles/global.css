@@ -2133,3 +2133,156 @@ button {
     justify-self: end;
   }
 }
+
+/* Admin Settings Page - Two Columns Design */
+.settings-form-two-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.settings-row label {
+  font-weight: 600;
+  color: #374151;
+  text-align: right;
+  padding-right: 0.5rem;
+}
+
+.settings-row input[type='text'],
+.settings-row input[type='file'] {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+}
+
+.settings-row input[type='file'] {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.settings-checkboxes-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.settings-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.settings-switch input[type='checkbox'] {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+
+.settings-actions-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.settings-actions-row .primary-button,
+.settings-actions-row .secondary-button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.settings-actions-row .primary-button {
+  background: var(--accent-color);
+  color: #ffffff;
+  border: none;
+}
+
+.settings-actions-row .secondary-button {
+  background: #e5e7eb;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.settings-actions-row .secondary-button:hover {
+  background: #d1d5db;
+}
+
+/* About Modal */
+.about-modal {
+  max-width: 600px;
+  width: 90%;
+}
+
+.about-modal-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.about-content {
+  white-space: pre-wrap;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #374151;
+  margin: 0;
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 0.5rem;
+}
+
+/* Responsive Settings */
+@media (max-width: 768px) {
+  .settings-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .settings-row label {
+    text-align: left;
+    padding-right: 0;
+  }
+
+  .settings-row input[type='text'],
+  .settings-row input[type='file'] {
+    max-width: 100%;
+  }
+
+  .settings-checkboxes-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .settings-actions-row {
+    flex-direction: column;
+  }
+
+  .settings-actions-row .primary-button,
+  .settings-actions-row .secondary-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-checkboxes-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}

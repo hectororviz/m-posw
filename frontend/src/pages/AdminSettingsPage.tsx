@@ -18,6 +18,8 @@ export const AdminSettingsPage: React.FC = () => {
     accentColor: '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [aboutContent, setAboutContent] = useState('');
 
   useEffect(() => {
     if (settings) {
@@ -62,11 +64,26 @@ export const AdminSettingsPage: React.FC = () => {
     }
   };
 
+  const handleOpenAbout = async () => {
+    try {
+      const response = await fetch('/about.md');
+      if (response.ok) {
+        const text = await response.text();
+        setAboutContent(text);
+      } else {
+        setAboutContent('No se encontró el archivo de información.');
+      }
+    } catch {
+      setAboutContent('Error al cargar la información.');
+    }
+    setShowAboutModal(true);
+  };
+
   return (
     <section className="card admin-products">
       <h2>Settings</h2>
-      <div className="settings-form-vertical">
-        <div className="settings-field">
+      <div className="settings-form-two-columns">
+        <div className="settings-row">
           <label htmlFor="store-name">Nombre del local</label>
           <input
             id="store-name"
@@ -75,7 +92,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, storeName: event.target.value })}
           />
         </div>
-        <div className="settings-field">
+        <div className="settings-row">
           <label htmlFor="club-name">Nombre del Club/empresa</label>
           <input
             id="club-name"
@@ -84,8 +101,8 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, clubName: event.target.value })}
           />
         </div>
-        <div className="settings-field">
-          <label htmlFor="accent-color">Color de personalizacion</label>
+        <div className="settings-row">
+          <label htmlFor="accent-color">Color de personalización</label>
           <input
             id="accent-color"
             type="text"
@@ -93,7 +110,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => setForm({ ...form, accentColor: event.target.value })}
           />
         </div>
-        <div className="settings-field">
+        <div className="settings-row">
           <label htmlFor="logo-upload">Logo</label>
           <input
             id="logo-upload"
@@ -102,7 +119,7 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('logo', event.target.files?.[0])}
           />
         </div>
-        <div className="settings-field">
+        <div className="settings-row">
           <label htmlFor="favicon-upload">Favicon</label>
           <input
             id="favicon-upload"
@@ -111,8 +128,8 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('favicon', event.target.files?.[0])}
           />
         </div>
-        <div className="settings-field">
-          <label htmlFor="animation-ok-upload">Animacion OK</label>
+        <div className="settings-row">
+          <label htmlFor="animation-ok-upload">Animación OK</label>
           <input
             id="animation-ok-upload"
             type="file"
@@ -120,8 +137,8 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('animation-ok', event.target.files?.[0])}
           />
         </div>
-        <div className="settings-field">
-          <label htmlFor="animation-error-upload">Animacion Error</label>
+        <div className="settings-row">
+          <label htmlFor="animation-error-upload">Animación Error</label>
           <input
             id="animation-error-upload"
             type="file"
@@ -129,27 +146,59 @@ export const AdminSettingsPage: React.FC = () => {
             onChange={(event) => handleUpload('animation-error', event.target.files?.[0])}
           />
         </div>
-        <label className="switch">
-          <input
-            type="checkbox"
-            checked={form.enableTicketPrinting}
-            onChange={(event) => setForm({ ...form, enableTicketPrinting: event.target.checked })}
-          />
-          Imprimir ticket
-        </label>
-        <label className="switch">
-          <input
-            type="checkbox"
-            checked={showEmbeddedKeyboard}
-            onChange={(event) => setShowEmbeddedKeyboard(event.target.checked)}
-          />
-          Teclado embebido
-        </label>
+        
+        <div className="settings-checkboxes-row">
+          <label className="switch settings-switch">
+            <input
+              type="checkbox"
+              checked={form.enableTicketPrinting}
+              onChange={(event) => setForm({ ...form, enableTicketPrinting: event.target.checked })}
+            />
+            Imprimir ticket
+          </label>
+          <label className="switch settings-switch">
+            <input
+              type="checkbox"
+              checked={showEmbeddedKeyboard}
+              onChange={(event) => setShowEmbeddedKeyboard(event.target.checked)}
+            />
+            Teclado embebido
+          </label>
+        </div>
       </div>
-      <button type="button" className="primary-button" onClick={handleSave}>
-        Guardar
-      </button>
+      
+      <div className="settings-actions-row">
+        <button type="button" className="primary-button" onClick={handleSave}>
+          Guardar
+        </button>
+        <button type="button" className="secondary-button" onClick={handleOpenAbout}>
+          Acerca de...
+        </button>
+      </div>
+      
       {error && <p className="error-text">{error}</p>}
+
+      {/* Modal Acerca de */}
+      {showAboutModal && (
+        <div className="modal-backdrop" onClick={() => setShowAboutModal(false)}>
+          <div className="modal about-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Acerca de</h3>
+              <button 
+                type="button" 
+                className="icon-button" 
+                onClick={() => setShowAboutModal(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body about-modal-body">
+              <pre className="about-content">{aboutContent}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
