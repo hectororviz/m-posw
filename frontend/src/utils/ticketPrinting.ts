@@ -1,4 +1,4 @@
-import { apiClient, normalizeApiError } from '../api/client';
+import { apiClient, normalizeApiError, buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
 
 export type TicketItemPayload = {
@@ -16,6 +16,7 @@ export type TicketLinePayload = {
 export type TicketPayload = {
   clubName?: string;
   storeName?: string;
+  logoUrl?: string;
   dateTimeISO?: string;
   criteria?: TicketLinePayload[];
   summary?: TicketLinePayload[];
@@ -87,9 +88,11 @@ export const maybePrintTicket = async ({
   }
 
   // Build payload ensuring all numeric fields are actual numbers
+  const logoUrl = buildImageUrl(settings.logoUrl);
   const payload = cleanPayload({
     clubName: settings.clubName || '',
     storeName: settings.storeName || storeFallback,
+    logoUrl: logoUrl || undefined,
     dateTimeISO: dateTimeISO || undefined,
     items: items.map(item => cleanPayload({
       qty: Number(item.qty),

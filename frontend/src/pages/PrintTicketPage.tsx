@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 
+// Logo configuration for tickets
+const LOGO_CONFIG = {
+  maxWidth: 180, // Maximum width in pixels for thermal printers (58mm ≈ 384px at 203dpi, but we use smaller for padding)
+  maxHeight: 80, // Maximum height to avoid taking too much space
+};
+
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat('es-AR', {
     style: 'currency',
@@ -33,6 +39,7 @@ type TicketLine = {
 type TicketPayload = {
   clubName?: string;
   storeName?: string;
+  logoUrl?: string;
   dateTimeISO?: string;
   criteria?: TicketLine[];
   summary?: TicketLine[];
@@ -151,6 +158,20 @@ export const PrintTicketPage: React.FC = () => {
 
   return (
     <div className="ticket-page">
+      {ticket.logoUrl && (
+        <div className="ticket-logo">
+          <img 
+            src={ticket.logoUrl} 
+            alt="Logo" 
+            style={{
+              maxWidth: `${LOGO_CONFIG.maxWidth}px`,
+              maxHeight: `${LOGO_CONFIG.maxHeight}px`,
+              width: 'auto',
+              height: 'auto',
+            }}
+          />
+        </div>
+      )}
       {ticket.clubName && <p className="ticket-club">{ticket.clubName}</p>}
       <h1 className="ticket-title">{ticket.storeName ?? 'SOLER - Bufet'}</h1>
       <p className="ticket-date">{formatDateTime(ticket.dateTimeISO)}</p>

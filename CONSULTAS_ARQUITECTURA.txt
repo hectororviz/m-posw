@@ -1,0 +1,234 @@
+================================================================================
+CONSULTAS SOBRE ARQUITECTURA DEL SISTEMA M-POSW
+================================================================================
+Fecha: 26/04/2026
+
+================================================================================
+BACKEND
+================================================================================
+
+1. ¿EXISTE ALGÚN ENDPOINT O ESTADO QUE EXPOGA EL TOTAL ACTUAL DEL CARRITO EN 
+   TIEMPO REAL, O EL TOTAL SOLO SE CALCULA EN EL FRONTEND?
+
+   RESPUESTA: ❌ NO existe endpoint de carrito en el backend.
+   
+   - El total del carrito se calcula EXCLUSIVAMENTE en el frontend
+   - No hay estado de carrito mantenido en el backend
+   - El backend solo recibe el total calculado al momento de crear la venta
+   - En los endpoints POST /sales/cash o POST /sales/qr se envía el total
+   - El backend valida ese total contra el cálculo de los ítems recibidos
+   
+   Ubicación de la validación en backend:
+   - Archivo: backend/src/modules/sales/sales.service.ts
+   - Métodos: createCashSale() y createQrSale()
+   - Validación: this.assertTotal(dto.total, roundedTotal)
+
+--------------------------------------------------------------------------------
+
+2. ¿CUÁNDO SE CONFIRMA UN PAGO, HAY ALGÚN EVENTO, WEBHOOK INTERNO O CAMBIO 
+   DE ESTADO EN LA BASE DE DATOS?
+
+   RESPUESTA: ✅ Sí, depende del método de pago.
+
+   A) PAGO EN EFECTIVO:
+      - Se crea la venta directamente con estado APPROVED
+      - No hay webhook externo
+      - El stock se decrementa inmediatamente
+   
+   B) PAGO QR MERCADOPAGO:
+      - MercadoPago envía webhook a: POST /webhooks/mercadopago
+      - Procesador: MercadoPagoWebhookProcessorService
+      - Eventos procesados: payment, merchant_order
+      - Cambios en BD: 
+        * paymentStatus (PENDING → APPROVED/REJECTED/EXPIRED)
+        * status (PENDING → APPROVED/REJECTED/EXPIRED/CANCELLED)
+        * mpPaymentId, mpStatus, mpStatusDetail
+      - Se emite evento WebSocket: 'sale.payment_status_changed'
+   
+   C) PAGO POR TRANSFERENCIA:
+      - Polling desde frontend a: POST /payments/poll-transfer
+      - Confirmación manual: POST /payments/confirm-transfer
+      - Cambios en BD similares a QR
+
+   Ubicación de webhooks:
+   - Controller: backend/src/modules/sales/webhooks/mercadopago-webhook.controller.ts
+   - Procesador: backend/src/modules/sales/services/mercadopago-webhook-processor.service.ts
+
+--------------------------------------------------------------------------------
+
+3. ¿EL BACKEND TIENE SOPORTE PARA WEBSOCKET O SSE ACTUALMENTE?
+
+   RESPUESTA: ✅ Sí, tiene WebSocket implementado con Socket.IO.
+
+   Configuración:
+   - Gateway: backend/src/modules/sales/websockets/sales.gateway.ts
+   - Decorador: @WebSocketGateway({ cors: { origin: '*' } })
+   - Namespace: default
+   
+   Eventos soportados:
+   
+   a) Cliente → Servidor:
+      - Evento: 'sale.join'
+      - Payload: { saleId: string }
+      - Respuesta: { ok: true, room } o { ok: false, error }
+      - Descripción: El cliente se une a una sala específica de venta
+   
+   b) Servidor → Cliente:
+      - Evento: 'sale.payment_status_changed'
+      - Payload: {
+          saleId: string;
+          paymentStatus: string;
+          mpStatus?: string | null;
+          mpStatusDetail?: string | null;
+        }
+      - Descripción: Notifica cambios en el estado de pago de una venta
+   
+   NOTA IMPORTANTE:
+   - Aunque el backend tiene WebSocket implementado
+   - El frontend ACTUAL NO LO USA
+   - El frontend usa polling HTTP tradicional cada 2 segundos
+
+================================================================================
+FRONTEND
+================================================================================
+
+4. ¿DÓNDE SE ACUMULA EL TOTAL DEL CARRITO — EN ESTADO LOCAL DE REACT, 
+   EN UN CONTEXTO GLOBAL, O EN EL BACKEND?
+
+   RESPUESTA: Estado local en React, calculado en múltiples componentes.
+
+   A) Estado del carrito (items):
+      - Ubicación: frontend/src/context/CartContext.tsx
+      - Tipo: React Context (estado global)
+      - Estructura: Array de { product: Product, quantity: number }
+      - Funciones disponibles:
+        * addItem(product)
+        * removeItem(productId)
+        * updateQuantity(productId, quantity)
+        * clear()
+   
+   B) Cálculo del total (se calcula en DOS lugares):
+      
+      1) CartPanel.tsx (línea 20-23):
+         const total = useMemo(
+           () => items.reduce((acc, item) => acc + item.product.price * item.quantity, 0),
+           [items],
+         );
+      
+      2) CheckoutModal.tsx (línea 95-98):
+         const total = useMemo(
+           () => roundToCurrency(items.reduce((acc, item) => acc + item.product.price * item.quantity, 0)),
+           [items],
+         );
+   
+   Características:
+   - El total se recalcula automáticamente cuando cambian los items
+   - useMemo optimiza el rendimiento
+   - No hay persistencia en localStorage (el carrito se pierde al recargar)
+   - El estado vive completamente en el cliente
+
+--------------------------------------------------------------------------------
+
+5. ¿QUÉ SUCEDE EXACTAMENTE CUANDO SE CONFIRMA UN PAGO — QUÉ FUNCIÓN/ENDPOINT 
+   SE LLAMA?
+
+   RESPUESTA: El flujo depende del método de pago.
+
+   A) PAGO EN EFECTIVO:
+      
+      1. Usuario ingresa monto recibido
+      2. Se valida: receivedAmount >= total
+      3. Endpoint: POST /sales/cash
+      4. Payload: {
+           items: [{ productId, quantity }],
+           total: number,
+           cashReceived: number
+         }
+      5. Respuesta: Venta creada con status APPROVED
+      6. Acciones frontend:
+         - Imprime ticket
+         - Limpia carrito (clear())
+         - Muestra animación de éxito
+   
+   B) PAGO QR MERCADOPAGO:
+      
+      1. Inicio:
+         - Endpoint: POST /sales/qr
+         - Payload: { items, total, paymentMethod: 'MP_QR' }
+         - Respuesta: { saleId, status: 'PENDING' }
+      
+      2. Polling de estado (cada 2 segundos):
+         - Endpoint: GET /sales/{saleId}/status
+         - Implementación: setInterval en CheckoutModal.tsx (línea 327)
+      
+      3. Cuando status cambia a APPROVED:
+         - Se obtiene detalle: GET /sales/{saleId}
+         - Se imprime ticket
+         - Se limpia carrito
+         - Se muestra éxito
+      
+      4. Timeouts:
+         - 120 segundos de espera máxima
+         - Si expira: status → EXPIRED
+   
+   C) PAGO POR TRANSFERENCIA:
+      
+      1. Polling de pagos:
+         - Endpoint: POST /payments/poll-transfer
+         - Payload: { monto_esperado: total }
+         - Respuesta: { hay_pago, monto, payment_id }
+      
+      2. Si hay_pago === true:
+         - Compara monto recibido vs esperado
+         - Estados posibles: EXACT, MORE, LESS
+      
+      3. Confirmación:
+         - Endpoint: POST /payments/confirm-transfer
+         - Payload: { payment_id, monto, monto_esperado }
+      
+      4. Acciones posteriores similares a efectivo
+
+   Ubicación del código:
+   - Archivo: frontend/src/components/CheckoutModal.tsx
+   - Métodos relevantes:
+     * handleCashInputChange / appendCashDigit (efectivo)
+     * Efectos useEffect con polling (QR)
+     * Transfer polling effect (línea 458-506)
+
+================================================================================
+RESUMEN DE IMPLEMENTACIÓN ACTUAL
+================================================================================
+
+CARACTERÍSTICA                    │ ESTADO
+──────────────────────────────────┼──────────────────────────────────────────
+Carrito en backend                │ ❌ No existe
+Cálculo de total                  │ ✅ Frontend (React Context)
+Persistencia de carrito           │ ❌ No hay (se pierde al recargar)
+WebSocket backend                 │ ✅ Socket.IO implementado
+WebSocket frontend                │ ❌ No usa (usa polling HTTP)
+Endpoint de venta efectivo        │ ✅ POST /sales/cash
+Endpoint de venta QR              │ ✅ POST /sales/qr
+Endpoint estado de pago           │ ✅ GET /sales/{id}/status
+Webhook MercadoPago               │ ✅ POST /webhooks/mercadopago
+Polling de pagos                  │ ✅ Cada 2 segundos
+
+================================================================================
+ARCHIVOS CLAVE DEL SISTEMA
+================================================================================
+
+BACKEND:
+- backend/src/modules/sales/sales.service.ts          (Lógica de ventas)
+- backend/src/modules/sales/sales.controller.ts       (Endpoints REST)
+- backend/src/modules/sales/websockets/sales.gateway.ts (WebSocket)
+- backend/src/modules/sales/webhooks/mercadopago-webhook.controller.ts
+- backend/src/modules/sales/services/mercadopago-webhook-processor.service.ts
+
+FRONTEND:
+- frontend/src/context/CartContext.tsx                (Estado del carrito)
+- frontend/src/components/CartPanel.tsx               (Panel de carrito)
+- frontend/src/components/CheckoutModal.tsx           (Modal de checkout)
+- frontend/src/pages/CategoryPage.tsx                 (Selección de productos)
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================

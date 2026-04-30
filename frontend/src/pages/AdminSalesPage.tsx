@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { apiClient, normalizeApiError } from '../api/client';
+import { apiClient, normalizeApiError, buildImageUrl } from '../api/client';
 import { useAdminSales, useManualMovements, useSettings } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
@@ -271,9 +271,11 @@ export const AdminSalesPage: React.FC = () => {
         })
         .sort((a, b) => (a.qty !== b.qty ? a.qty - b.qty : a.name.localeCompare(b.name)));
 
+      const logoUrl = buildImageUrl(settings?.logoUrl);
       const payload: TicketPayload = {
         clubName: settings?.clubName ?? '',
         storeName: settings?.storeName ?? 'SOLER - Bufet',
+        logoUrl: logoUrl || undefined,
         dateTimeISO: detailEnd.toISOString(),
         itemsStyle: 'summary',
         title: 'Ventas',
@@ -479,10 +481,12 @@ export const AdminSalesPage: React.FC = () => {
       .filter((movement) => movement.type === 'SALIDA')
       .reduce((acc, movement) => acc + toAmount(movement.amount), 0);
     const totalCashInDrawer = totalCash + totalMovementIn - totalMovementOut;
+    const logoUrlPrint = buildImageUrl(settings?.logoUrl);
 
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
+      logoUrl: logoUrlPrint || undefined,
       dateTimeISO: new Date().toISOString(),
       itemsStyle: 'summary',
       items,
@@ -520,9 +524,11 @@ export const AdminSalesPage: React.FC = () => {
       pushToast(normalizeApiError(error), 'error');
     }
 
+    const logoUrlReprint = buildImageUrl(settings?.logoUrl);
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
+      logoUrl: logoUrlReprint || undefined,
       dateTimeISO: sale.createdAt,
       itemsStyle: 'sale',
       items: sale.items.map((item) => ({

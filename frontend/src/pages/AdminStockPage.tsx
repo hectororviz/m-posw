@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
+import { buildImageUrl } from '../api/client';
 import { useSettings, useStock } from '../api/queries';
 import type { StockCategory, StockProduct } from '../api/types';
 import type { TicketPayload } from '../utils/ticketPrinting';
@@ -55,10 +56,12 @@ export const AdminStockPage: React.FC = () => {
 
     const now = new Date();
     const dateTimeISO = now.toISOString();
+    const logoUrl = buildImageUrl(settings?.logoUrl);
 
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
+      logoUrl: logoUrl || undefined,
       dateTimeISO,
       items: stockCategories.flatMap((category) =>
         category.products.map((product) => ({
