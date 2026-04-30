@@ -1503,28 +1503,6 @@ button {
   overflow-wrap: anywhere;
 }
 
-.ticket-logo {
-  text-align: center;
-  margin: 0 0 8px 0;
-}
-
-.ticket-logo img {
-  display: inline-block;
-  max-width: 100%;
-  height: auto;
-}
-
-@media print {
-  .ticket-logo {
-    margin: 0 0 6px 0;
-  }
-  
-  .ticket-logo img {
-    max-width: 45mm !important;
-    max-height: 20mm !important;
-  }
-}
-
 .ticket-club {
   text-align: center;
   font-size: 14px;
