@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useAdminSales } from '../api/queries';
+import { useAdminSales, useSettings } from '../api/queries';
+import type { TicketPayload } from '../utils/ticketPrinting';
 
 const formatCurrency = (value: number) =>
   value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
@@ -32,8 +33,18 @@ const paymentLabels: Record<string, string> = {
   TRANSFER: 'Transferencia',
 };
 
+const encodeBase64 = (value: string) => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window.btoa(binary);
+};
+
 export const AdminStatsPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
+  const { data: settings } = useSettings();
   const [startDate, setStartDate] = useState('');
   const [startTime, setStartTime] = useState('00:00');
   const [endDate, setEndDate] = useState('');
@@ -121,6 +132,56 @@ export const AdminStatsPage: React.FC = () => {
   const maxProduct = productTotals[0]?.quantity ?? 0;
   const maxDailyTotal = dailyTotals.reduce((acc, item) => Math.max(acc, item.total), 0);
 
+  const handlePrintStats = () => {
+    if (filteredSales.length === 0) {
+      return;
+    }
+
+    const totalProducts = productTotals.reduce((acc, item) => acc + item.quantity, 0);
+    const totalAmount = paymentSummary.totalAmount;
+
+    // Construir items de productos con cantidad y porcentaje
+    const productItems = productTotals.map((product) => ({
+      qty: product.quantity,
+      name: `${product.name} (${((product.quantity / totalProducts) * 100).toFixed(1)}%)`,
+    }));
+
+    // Construir resumen de medios de pago
+    const paymentSummaryItems = paymentSummary.segments.map((segment) => ({
+      label: paymentLabels[segment.method] ?? segment.method,
+      value: `${formatCurrency(segment.total)} (${segment.percent.toFixed(1)}%)`,
+    }));
+
+    const payload: TicketPayload = {
+      clubName: settings?.clubName ?? '',
+      storeName: settings?.storeName ?? 'Estadísticas',
+      dateTimeISO: new Date().toISOString(),
+      itemsStyle: 'summary',
+      items: productItems,
+      criteria: [
+        { label: 'Período:', value: `${startDate || 'Inicio'} ${startTime} - ${endDate || 'Fin'} ${endTime}` },
+        { label: 'Total ventas:', value: formatCurrency(totalAmount) },
+        { label: 'Total productos:', value: totalProducts.toString() },
+      ],
+      summary: [
+        { label: '=== MEDIOS DE PAGO ===', value: '' },
+        ...paymentSummaryItems,
+        { label: '', value: '' },
+        { label: '=== PRODUCTOS ===', value: '' },
+        ...productTotals.slice(0, 10).map((p) => ({
+          label: p.name.substring(0, 20),
+          value: `${p.quantity} (${((p.quantity / totalProducts) * 100).toFixed(1)}%)`,
+        })),
+      ],
+      title: 'ESTADISTICAS',
+      footer: 'Resumen de ventas',
+    };
+
+    const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
+    const url = `/printticket?data=${ticketParam}`;
+    window.location.href = url;
+  };
+
   return (
     <section className="card admin-stats">
       <h2>Estadísticas</h2>
@@ -158,6 +219,15 @@ export const AdminStatsPage: React.FC = () => {
             onChange={(event) => setEndTime(event.target.value)}
           />
         </label>
+        <button
+          type="button"
+          className="primary-button"
+          onClick={handlePrintStats}
+          disabled={filteredSales.length === 0}
+          style={{ alignSelf: 'flex-end' }}
+        >
+          🖨️ Imprimir estadísticas
+        </button>
       </div>
 
       <div className="admin-stats__grid">
