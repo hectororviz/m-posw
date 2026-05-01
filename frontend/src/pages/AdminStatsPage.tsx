@@ -140,6 +140,38 @@ export const AdminStatsPage: React.FC = () => {
     const totalProducts = productTotals.reduce((acc, item) => acc + item.quantity, 0);
     const totalAmount = paymentSummary.totalAmount;
 
+    // Calcular fechas reales del período
+    const sortedSales = [...filteredSales].sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const firstSale = sortedSales[0];
+    const lastSale = sortedSales[sortedSales.length - 1];
+    
+    const formatDateShort = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+      });
+    };
+
+    const formatTimeShort = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toLocaleTimeString('es-AR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    };
+
+    const desdeFecha = startDate 
+      ? `${startDate} ${startTime}` 
+      : `${formatDateShort(firstSale.createdAt)} ${formatTimeShort(firstSale.createdAt)}`;
+    const hastaFecha = endDate 
+      ? `${endDate} ${endTime}` 
+      : `${formatDateShort(lastSale.createdAt)} ${formatTimeShort(lastSale.createdAt)}`;
+
     // Construir resumen de medios de pago en formato de dos líneas
     const paymentSummaryLines: { label: string; value: string }[] = [];
     paymentSummary.segments.forEach((segment) => {
@@ -169,8 +201,8 @@ export const AdminStatsPage: React.FC = () => {
       itemsStyle: 'summary',
       items: [], // No enviar items para evitar duplicación
       criteria: [
-        { label: 'Desde:', value: `${startDate || 'Inicio'} ${startTime}` },
-        { label: 'Hasta:', value: `${endDate || 'Fin'} ${endTime}` },
+        { label: 'Desde:', value: desdeFecha },
+        { label: 'Hasta:', value: hastaFecha },
         { label: 'Total ventas:', value: formatCurrency(totalAmount) },
         { label: 'Total productos:', value: totalProducts.toString() },
       ],
