@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Category, ManualMovement, Product, Sale, Setting, StockCategory, User } from './types';
+import type { CashClose, Category, ManualMovement, Product, Sale, Setting, StockCategory, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -107,6 +107,15 @@ export const useStock = () =>
     queryKey: ['stock'],
     queryFn: async () => {
       const response = await apiClient.get<StockCategory[]>('/stock');
+      return response.data;
+    },
+  });
+
+export const useCashCloses = () =>
+  useQuery({
+    queryKey: ['cash-closes'],
+    queryFn: async () => {
+      const response = await apiClient.get<CashClose[]>('/cash-close/list');
       return response.data;
     },
   });

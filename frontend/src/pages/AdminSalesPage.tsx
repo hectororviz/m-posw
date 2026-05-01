@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAdminSales, useManualMovements, useSettings } from '../api/queries';
+import { useAdminSales, useCashCloses, useManualMovements, useSettings } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
@@ -79,12 +79,23 @@ type SalesTableEntry =
       userName: string;
       paymentLabel: string;
       reason: string;
+    }
+  | {
+      kind: 'CASH_CLOSE';
+      id: string;
+      createdAt: string;
+      total: number;
+      userName: string;
+      paymentLabel: string;
+      cashCloseId: string;
+      note?: string | null;
     };
 
 export const AdminSalesPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
   const { data: settings } = useSettings();
   const { data: movements = [] } = useManualMovements();
+  const { data: cashCloses = [] } = useCashCloses();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [startDate, setStartDate] = useState('');
@@ -95,6 +106,7 @@ export const AdminSalesPage: React.FC = () => {
   const [movementAmount, setMovementAmount] = useState('');
   const [movementReason, setMovementReason] = useState('');
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [selectedCashCloseId, setSelectedCashCloseId] = useState<string | null>(null);
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
   const [isSavingMovement, setIsSavingMovement] = useState(false);
@@ -120,6 +132,11 @@ export const AdminSalesPage: React.FC = () => {
     [sales, selectedSaleId],
   );
 
+  const selectedCashClose = useMemo(
+    () => cashCloses.find((close) => close.id === selectedCashCloseId) ?? null,
+    [cashCloses, selectedCashCloseId],
+  );
+
   const filteredEntries = useMemo(() => {
     if (!startDate && !endDate) {
       return [
@@ -140,6 +157,16 @@ export const AdminSalesPage: React.FC = () => {
           userName: 'Movimiento manual',
           paymentLabel: movement.type,
           reason: movement.reason,
+        })),
+        ...cashCloses.map<SalesTableEntry>((close) => ({
+          kind: 'CASH_CLOSE',
+          id: `close-${close.id}`,
+          createdAt: close.closedAt,
+          total: close.salesTotal,
+          userName: close.closedBy?.name ?? 'Sistema',
+          paymentLabel: 'CIERRE',
+          cashCloseId: close.id,
+          note: close.note,
         })),
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
@@ -164,6 +191,16 @@ export const AdminSalesPage: React.FC = () => {
         paymentLabel: movement.type,
         reason: movement.reason,
       })),
+      ...cashCloses.map((close) => ({
+        kind: 'CASH_CLOSE' as const,
+        id: `close-${close.id}`,
+        createdAt: close.closedAt,
+        total: close.salesTotal,
+        userName: close.closedBy?.name ?? 'Sistema',
+        paymentLabel: 'CIERRE',
+        cashCloseId: close.id,
+        note: close.note,
+      })),
     ];
 
     return entries
@@ -178,7 +215,7 @@ export const AdminSalesPage: React.FC = () => {
         return true;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [sales, movements, startDate, endDate]);
+  }, [sales, movements, cashCloses, startDate, endDate]);
 
   const filteredMovements = useMemo(() => {
     if (!printStart && !printEnd) {
@@ -333,7 +370,19 @@ export const AdminSalesPage: React.FC = () => {
         ];
       }
 
-      const sale = sales.find((item) => item.id === entry.saleId);
+      if (entry.kind === 'CASH_CLOSE') {
+        return [
+          formatDate(entry.createdAt),
+          formatTime(entry.createdAt),
+          entry.userName,
+          formatCurrency(entry.total),
+          entry.paymentLabel,
+          entry.note ?? 'Cierre de caja',
+        ];
+      }
+
+      const saleEntry = entry as Extract<SalesTableEntry, { kind: 'SALE' }>;
+      const sale = sales.find((item) => item.id === saleEntry.saleId);
       return [
         formatDate(entry.createdAt),
         formatTime(entry.createdAt),
@@ -544,6 +593,45 @@ export const AdminSalesPage: React.FC = () => {
     window.location.href = url;
   };
 
+  const handleReprintCashCloseTicket = (cashClose: typeof selectedCashClose) => {
+    if (!cashClose) {
+      return;
+    }
+
+    const payload: TicketPayload = {
+      clubName: settings?.clubName ?? '',
+      storeName: settings?.storeName ?? 'SOLER - Bufet',
+      dateTimeISO: cashClose.closedAt,
+      itemsStyle: 'summary',
+      items: [],
+      criteria: [
+        { label: 'Desde:', value: formatDate(cashClose.from) + ' ' + formatTime(cashClose.from) },
+        { label: 'Hasta:', value: formatDate(cashClose.to) + ' ' + formatTime(cashClose.to) },
+      ],
+      summary: [
+        { label: 'Ventas:', value: formatCurrency(cashClose.salesTotal) },
+        { label: 'Efectivo:', value: formatCurrency(cashClose.salesCashTotal) },
+        { label: 'QR:', value: formatCurrency(cashClose.salesQrTotal) },
+        { label: 'Transferencia:', value: formatCurrency(cashClose.salesTransferTotal ?? 0) },
+        { label: '', value: '' },
+        { label: 'Entradas:', value: formatCurrency(cashClose.movementsInTotal) },
+        { label: 'Salidas:', value: formatCurrency(cashClose.movementsOutTotal) },
+        { label: 'Neto caja:', value: formatCurrency(cashClose.netCashDelta) },
+        { label: 'Movimientos:', value: cashClose.movementsCount.toString() },
+        { label: 'Ventas emitidas:', value: cashClose.salesCount.toString() },
+      ],
+      title: 'CIERRE DE CAJA',
+      footer: cashClose.note || 'Cierre de caja',
+    };
+
+    const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
+    const url = `/printticket?data=${ticketParam}`;
+    
+    pushToast('Enviando ticket de cierre a impresión.', 'success');
+    // Navigate to ticket page (works better in WebView than popup)
+    window.location.href = url;
+  };
+
   return (
     <section className="card admin-products">
       <h2>Ventas</h2>
@@ -595,12 +683,18 @@ export const AdminSalesPage: React.FC = () => {
               <span>{entry.userName}</span>
               <span>{formatCurrency(entry.total)}</span>
               <span>{entry.paymentLabel}</span>
-              {entry.kind === 'SALE' ? (
-                <button type="button" className="secondary-button" onClick={() => setSelectedSaleId(entry.saleId)}>
+              {entry.kind === 'SALE' && (
+                <button type="button" className="secondary-button" onClick={() => setSelectedSaleId((entry as Extract<SalesTableEntry, { kind: 'SALE' }>).saleId)}>
                   Ver detalle
                 </button>
-              ) : (
-                <span>{entry.reason}</span>
+              )}
+              {entry.kind === 'CASH_CLOSE' && (
+                <button type="button" className="secondary-button" onClick={() => setSelectedCashCloseId((entry as Extract<SalesTableEntry, { kind: 'CASH_CLOSE' }>).cashCloseId)}>
+                  Ver detalle
+                </button>
+              )}
+              {entry.kind === 'MOVEMENT' && (
+                <span>{(entry as Extract<SalesTableEntry, { kind: 'MOVEMENT' }>).reason}</span>
               )}
             </div>
           ))
@@ -648,6 +742,78 @@ export const AdminSalesPage: React.FC = () => {
                   onClick={() => handleReprintTicket(selectedSale.id)}
                 >
                   🎟️ Reimprimir ticket
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {selectedCashClose && (
+        <div className="modal-backdrop" onClick={() => setSelectedCashCloseId(null)} role="presentation">
+          <div className="modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Cierre de Caja</h2>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setSelectedCashCloseId(null)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body admin-sales__detail">
+              <p>
+                <strong>Fecha cierre:</strong> {formatDate(selectedCashClose.closedAt)} {formatTime(selectedCashClose.closedAt)}
+              </p>
+              <p>
+                <strong>Período:</strong> {formatDate(selectedCashClose.from)} - {formatDate(selectedCashClose.to)}
+              </p>
+              <p>
+                <strong>Cerrado por:</strong> {selectedCashClose.closedBy?.name ?? 'Sistema'}
+              </p>
+              {selectedCashClose.note && (
+                <p>
+                  <strong>Nota:</strong> {selectedCashClose.note}
+                </p>
+              )}
+              <div className="ticket-divider" />
+              <p>
+                <strong>Total Ventas:</strong> {formatCurrency(selectedCashClose.salesTotal)}
+              </p>
+              <p>
+                <strong>Efectivo:</strong> {formatCurrency(selectedCashClose.salesCashTotal)}
+              </p>
+              <p>
+                <strong>QR:</strong> {formatCurrency(selectedCashClose.salesQrTotal)}
+              </p>
+              <p>
+                <strong>Transferencia:</strong> {formatCurrency(selectedCashClose.salesTransferTotal ?? 0)}
+              </p>
+              <div className="ticket-divider" />
+              <p>
+                <strong>Entradas:</strong> {formatCurrency(selectedCashClose.movementsInTotal)}
+              </p>
+              <p>
+                <strong>Salidas:</strong> {formatCurrency(selectedCashClose.movementsOutTotal)}
+              </p>
+              <p>
+                <strong>Neto en Caja:</strong> {formatCurrency(selectedCashClose.netCashDelta)}
+              </p>
+              <div className="ticket-divider" />
+              <p>
+                <strong>Cantidad de Ventas:</strong> {selectedCashClose.salesCount}
+              </p>
+              <p>
+                <strong>Cantidad de Movimientos:</strong> {selectedCashClose.movementsCount}
+              </p>
+              <div className="checkout-actions">
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => handleReprintCashCloseTicket(selectedCashClose)}
+                >
+                  🖨️ Reimprimir ticket
                 </button>
               </div>
             </div>

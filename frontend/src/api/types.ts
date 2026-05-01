@@ -172,3 +172,27 @@ export interface ConfirmTransferResponse {
 }
 
 export type TransferStatus = 'WAITING' | 'EXACT' | 'MORE' | 'LESS' | 'TIMEOUT' | 'CONFIRMED' | 'ERROR';
+
+export interface CashClose {
+  id: string;
+  from: string;
+  to: string;
+  closedAt: string;
+  note?: string | null;
+  closedByUserId: string;
+  closedBy?: {
+    id: string;
+    name: string;
+    role: string;
+  };
+  salesCashTotal: number;
+  salesQrTotal: number;
+  salesTransferTotal: number;
+  salesTotal: number;
+  salesCount: number;
+  movementsOutTotal: number;
+  movementsInTotal: number;
+  movementsNet: number;
+  netCashDelta: number;
+  movementsCount: number;
+}
