@@ -146,10 +146,26 @@ export const AdminStatsPage: React.FC = () => {
       name: `${product.name} (${((product.quantity / totalProducts) * 100).toFixed(1)}%)`,
     }));
 
-    // Construir resumen de medios de pago
-    const paymentSummaryItems = paymentSummary.segments.map((segment) => ({
-      label: paymentLabels[segment.method] ?? segment.method,
-      value: `${formatCurrency(segment.total)} (${segment.percent.toFixed(1)}%)`,
+    // Construir resumen de medios de pago en formato de dos líneas
+    const paymentSummaryLines: { label: string; value: string }[] = [];
+    paymentSummary.segments.forEach((segment) => {
+      const methodName = paymentLabels[segment.method] ?? segment.method;
+      // Línea 1: Nombre y porcentaje
+      paymentSummaryLines.push({
+        label: `${methodName}`,
+        value: `${segment.percent.toFixed(1)}%`,
+      });
+      // Línea 2: Monto
+      paymentSummaryLines.push({
+        label: '',
+        value: formatCurrency(segment.total),
+      });
+    });
+
+    // Construir resumen de productos top 10
+    const productSummaryLines = productTotals.slice(0, 10).map((p) => ({
+      label: p.name.substring(0, 18),
+      value: `${p.quantity} (${((p.quantity / totalProducts) * 100).toFixed(1)}%)`,
     }));
 
     const payload: TicketPayload = {
@@ -159,19 +175,17 @@ export const AdminStatsPage: React.FC = () => {
       itemsStyle: 'summary',
       items: productItems,
       criteria: [
-        { label: 'Período:', value: `${startDate || 'Inicio'} ${startTime} - ${endDate || 'Fin'} ${endTime}` },
+        { label: 'Desde:', value: `${startDate || 'Inicio'} ${startTime}` },
+        { label: 'Hasta:', value: `${endDate || 'Fin'} ${endTime}` },
         { label: 'Total ventas:', value: formatCurrency(totalAmount) },
         { label: 'Total productos:', value: totalProducts.toString() },
       ],
       summary: [
         { label: '=== MEDIOS DE PAGO ===', value: '' },
-        ...paymentSummaryItems,
+        ...paymentSummaryLines,
         { label: '', value: '' },
         { label: '=== PRODUCTOS ===', value: '' },
-        ...productTotals.slice(0, 10).map((p) => ({
-          label: p.name.substring(0, 20),
-          value: `${p.quantity} (${((p.quantity / totalProducts) * 100).toFixed(1)}%)`,
-        })),
+        ...productSummaryLines,
       ],
       title: 'ESTADISTICAS',
       footer: 'Resumen de ventas',
