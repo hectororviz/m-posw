@@ -140,12 +140,6 @@ export const AdminStatsPage: React.FC = () => {
     const totalProducts = productTotals.reduce((acc, item) => acc + item.quantity, 0);
     const totalAmount = paymentSummary.totalAmount;
 
-    // Construir items de productos con cantidad y porcentaje
-    const productItems = productTotals.map((product) => ({
-      qty: product.quantity,
-      name: `${product.name} (${((product.quantity / totalProducts) * 100).toFixed(1)}%)`,
-    }));
-
     // Construir resumen de medios de pago en formato de dos líneas
     const paymentSummaryLines: { label: string; value: string }[] = [];
     paymentSummary.segments.forEach((segment) => {
@@ -173,7 +167,7 @@ export const AdminStatsPage: React.FC = () => {
       storeName: settings?.storeName ?? 'Estadísticas',
       dateTimeISO: new Date().toISOString(),
       itemsStyle: 'summary',
-      items: productItems,
+      items: [], // No enviar items para evitar duplicación
       criteria: [
         { label: 'Desde:', value: `${startDate || 'Inicio'} ${startTime}` },
         { label: 'Hasta:', value: `${endDate || 'Fin'} ${endTime}` },
@@ -181,10 +175,10 @@ export const AdminStatsPage: React.FC = () => {
         { label: 'Total productos:', value: totalProducts.toString() },
       ],
       summary: [
-        { label: '=== MEDIOS DE PAGO ===', value: '' },
+        { label: 'MEDIOS DE PAGO', value: '' },
         ...paymentSummaryLines,
         { label: '', value: '' },
-        { label: '=== PRODUCTOS ===', value: '' },
+        { label: 'PRODUCTOS', value: '' },
         ...productSummaryLines,
       ],
       title: 'ESTADISTICAS',
