@@ -6,6 +6,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,18 +47,143 @@ class _HomePageState extends State<HomePage> {
   bool _isSidebarOpen = false;
   bool _isConnected = false;
 
-  static const String _url = 'https://pos.csdsoler.com.ar';
+  // URL configurable - por defecto vacía
+  String _appUrl = '';
+  bool _isLoadingUrl = true;
+
+  // Clave para SharedPreferences
+  static const String _urlKey = 'app_url';
+  // URL por defecto (para mostrar en el diálogo como sugerencia)
+  static const String _defaultUrl = 'https://pos.csdsoler.com.ar';
 
   @override
   void initState() {
     super.initState();
     _initBluetooth();
+    _loadSavedUrl();
   }
 
   @override
   void dispose() {
     PrintBluetoothThermal.disconnect;
     super.dispose();
+  }
+
+  /// Carga la URL guardada en SharedPreferences
+  Future<void> _loadSavedUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUrl = prefs.getString(_urlKey);
+
+      if (mounted) {
+        setState(() {
+          _appUrl = savedUrl ?? '';
+          _isLoadingUrl = false;
+        });
+
+        // Si no hay URL configurada, mostrar el diálogo
+        if (savedUrl == null || savedUrl.isEmpty) {
+          // Esperar a que se construya el widget
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showUrlConfigDialog(forceShow: true);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error cargando URL: $e');
+      if (mounted) {
+        setState(() => _isLoadingUrl = false);
+      }
+    }
+  }
+
+  /// Guarda la URL en SharedPreferences
+  Future<void> _saveUrl(String url) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_urlKey, url);
+    } catch (e) {
+      debugPrint('Error guardando URL: $e');
+    }
+  }
+
+  /// Muestra el diálogo para configurar la URL
+  void _showUrlConfigDialog({bool forceShow = false}) {
+    final controller = TextEditingController(text: _appUrl.isNotEmpty ? _appUrl : _defaultUrl);
+
+    showDialog(
+      context: context,
+      barrierDismissible: !forceShow, // No se puede cerrar si es obligatorio
+      builder: (context) => AlertDialog(
+        title: const Text('Configurar URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ingresa la URL de la aplicación:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: 'https://tu-dominio.com',
+                labelText: 'URL',
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.link),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => controller.clear(),
+                ),
+              ),
+              keyboardType: TextInputType.url,
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Ejemplo: https://pos.csdsoler.com.ar',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          if (!forceShow)
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+          FilledButton(
+            onPressed: () {
+              final url = controller.text.trim();
+              if (url.isNotEmpty) {
+                // Validar que tenga protocolo
+                String finalUrl = url;
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                  finalUrl = 'https://$url';
+                }
+
+                setState(() {
+                  _appUrl = finalUrl;
+                });
+                _saveUrl(finalUrl);
+
+                // Recargar el WebView con la nueva URL
+                _webViewController?.loadUrl(
+                  urlRequest: URLRequest(url: WebUri(finalUrl)),
+                );
+
+                Navigator.pop(context);
+                _showMessage('URL guardada correctamente');
+              } else {
+                _showMessage('Por favor ingresa una URL válida');
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _initBluetooth() async {
@@ -292,13 +418,13 @@ class _HomePageState extends State<HomePage> {
         final item = summary[i];
         final label = item['label'] as String? ?? '';
         final value = item['value'] as String? ?? '';
-        
+
         // Línea divisoria vacía
         if (label.trim().isEmpty && value.trim().isEmpty) {
           bytes += generator.feed(1);
           continue;
         }
-        
+
         bytes += generator.row([
           PosColumn(
             text: label,
@@ -327,7 +453,7 @@ class _HomePageState extends State<HomePage> {
         // === TICKET DE RESUMEN/STOCK/CIERRE ===
         bytes += generator.feed(1);
         bytes += generator.text(separator);
-        
+
         // TITULO: Usar el proporcionado o mostrar "VENTAS" para cierre de caja
         final title = payload['title'] as String? ?? 'VENTAS';
         bytes += generator.text(
@@ -562,6 +688,22 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Mostrar pantalla de carga mientras se carga la URL
+    if (_isLoadingUrl) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Cargando configuración...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Stack(
         children: [
@@ -578,6 +720,7 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           children: [
                             const SizedBox(height: 60),
+                            // Sección de Impresora
                             ListTile(
                               leading: Icon(
                                 _isConnected
@@ -591,6 +734,23 @@ class _HomePageState extends State<HomePage> {
                               ),
                               subtitle: Text(_isConnected ? 'Conectado' : 'Desconectado'),
                               onTap: _showPrinterDialog,
+                            ),
+                            const Divider(),
+                            // Sección de URL
+                            ListTile(
+                              leading: const Icon(Icons.link),
+                              title: const Text(
+                                'URL App',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                _appUrl.isNotEmpty ? 'Configurada' : 'No configurada',
+                                style: TextStyle(
+                                  color: _appUrl.isNotEmpty ? Colors.green : Colors.orange,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              onTap: _showUrlConfigDialog,
                             ),
                             const Divider(),
                             ListTile(
@@ -610,30 +770,68 @@ class _HomePageState extends State<HomePage> {
                     : null,
               ),
               Expanded(
-                child: InAppWebView(
-                  initialUrlRequest: URLRequest(url: WebUri(_url)),
-                  onWebViewCreated: (controller) {
-                    _webViewController = controller;
-                  },
-                  onLoadStart: (controller, url) {
-                    debugPrint('Cargando: $url');
-                  },
-                  onReceivedError: (controller, request, error) {
-                    debugPrint('Error: ${error.description}');
-                  },
-                  shouldOverrideUrlLoading:
-                      (controller, navigationAction) async {
-                        final uri = navigationAction.request.url;
-                        if (uri != null && uri.path == '/printticket') {
-                          final ticketData = uri.queryParameters['data'] ?? '';
-                          if (ticketData.isNotEmpty) {
-                            _printTicketFromBase64(ticketData);
-                            return NavigationActionPolicy.CANCEL;
-                          }
-                        }
-                        return NavigationActionPolicy.ALLOW;
-                      },
-                ),
+                child: _appUrl.isNotEmpty
+                    ? InAppWebView(
+                        initialUrlRequest: URLRequest(url: WebUri(_appUrl)),
+                        onWebViewCreated: (controller) {
+                          _webViewController = controller;
+                        },
+                        onLoadStart: (controller, url) {
+                          debugPrint('Cargando: $url');
+                        },
+                        onReceivedError: (controller, request, error) {
+                          debugPrint('Error: ${error.description}');
+                        },
+                        shouldOverrideUrlLoading:
+                            (controller, navigationAction) async {
+                              final uri = navigationAction.request.url;
+                              if (uri != null && uri.path == '/printticket') {
+                                final ticketData = uri.queryParameters['data'] ?? '';
+                                if (ticketData.isNotEmpty) {
+                                  _printTicketFromBase64(ticketData);
+                                  return NavigationActionPolicy.CANCEL;
+                                }
+                              }
+                              return NavigationActionPolicy.ALLOW;
+                            },
+                      )
+                    : Container(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.link_off,
+                                size: 64,
+                                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'URL no configurada',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Toca el menú para configurar la URL',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              FilledButton.icon(
+                                onPressed: () => _showUrlConfigDialog(),
+                                icon: const Icon(Icons.settings),
+                                label: const Text('Configurar URL'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -646,11 +844,11 @@ class _HomePageState extends State<HomePage> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: Colors.black.withOpacity(0.2),
                       blurRadius: 4,
                     ),
                   ],
