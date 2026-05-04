@@ -418,10 +418,18 @@ export const AdminSalesPage: React.FC = () => {
   };
 
   const getAvailableReasons = (type: 'ENTRADA' | 'SALIDA') => {
-    const reasons = type === 'ENTRADA' 
-      ? (settings?.movementInReasons ?? DEFAULT_IN_REASONS)
-      : (settings?.movementOutReasons ?? DEFAULT_OUT_REASONS);
-    return reasons.length > 0 ? reasons : (type === 'ENTRADA' ? DEFAULT_IN_REASONS : DEFAULT_OUT_REASONS);
+    const defaultReasons = type === 'ENTRADA' ? DEFAULT_IN_REASONS : DEFAULT_OUT_REASONS;
+    const customReasons = type === 'ENTRADA'
+      ? (settings?.movementInReasons ?? [])
+      : (settings?.movementOutReasons ?? []);
+    // Combinar motivos del sistema con motivos personalizados (sin duplicados)
+    const allReasons = [...defaultReasons];
+    customReasons.forEach((reason) => {
+      if (!allReasons.includes(reason)) {
+        allReasons.push(reason);
+      }
+    });
+    return allReasons;
   };
 
   const handleOpenMovement = () => {
