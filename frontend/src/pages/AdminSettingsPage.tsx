@@ -65,11 +65,17 @@ export const AdminSettingsPage: React.FC = () => {
 
   const handleAddInReason = () => {
     const trimmed = newInReason.trim();
+    console.log('Agregando motivo de entrada:', trimmed);
+    console.log('Motivos actuales:', form.movementInReasons);
     if (trimmed && !form.movementInReasons.includes(trimmed)) {
-      setForm((prev) => ({
-        ...prev,
-        movementInReasons: [...prev.movementInReasons, trimmed],
-      }));
+      setForm((prev) => {
+        const newForm = {
+          ...prev,
+          movementInReasons: [...prev.movementInReasons, trimmed],
+        };
+        console.log('Nuevo estado de form:', newForm);
+        return newForm;
+      });
       setNewInReason('');
     }
   };
@@ -105,8 +111,13 @@ export const AdminSettingsPage: React.FC = () => {
     const validatedForm = validatePaymentMethods(form);
     setForm(validatedForm);
     
+    console.log('Guardando configuración:', validatedForm);
+    console.log('Motivos de entrada:', validatedForm.movementInReasons);
+    console.log('Motivos de salida:', validatedForm.movementOutReasons);
+    
     try {
       const response = await apiClient.patch<Setting>('/settings', validatedForm);
+      console.log('Respuesta del servidor:', response.data);
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       pushToast('Configuración actualizada', 'success');
