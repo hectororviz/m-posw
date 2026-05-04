@@ -8,9 +8,6 @@ import type { Setting } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
-const DEFAULT_IN_REASONS = ['Apertura de Caja', 'Otro'];
-const DEFAULT_OUT_REASONS = ['Retiro de caja', 'Otro'];
-
 export const AdminSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
