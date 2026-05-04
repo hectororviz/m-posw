@@ -5,6 +5,7 @@ import { apiClient, buildImageUrl } from '../api/client';
 import { useCategories } from '../api/queries';
 import type { Category } from '../api/types';
 import { AppLayout } from '../components/AppLayout';
+import { CartPanel } from '../components/CartPanel';
 
 const prefetchCategories = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await queryClient.prefetchQuery({
@@ -26,18 +27,23 @@ export const HomePage: React.FC = () => {
 
   return (
     <AppLayout title="Categorías">
-      {isLoading && <p>Cargando categorías...</p>}
-      <div className="grid">
-        {categories?.map((category) => {
-          const imageUrl = buildImageUrl(category.imagePath, category.imageUpdatedAt);
-          return (
-            <Link key={category.id} to={`/category/${category.id}`} className="card category-card">
-              <div className="card-header" style={{ background: category.colorHex || '#111827' }}>
-                {imageUrl ? <img src={imageUrl} alt={category.name} /> : null}
-              </div>
-            </Link>
-          );
-        })}
+      <div className="two-column category-layout">
+        <section>
+          {isLoading && <p>Cargando categorías...</p>}
+          <div className="grid">
+            {categories?.map((category) => {
+              const imageUrl = buildImageUrl(category.imagePath, category.imageUpdatedAt);
+              return (
+                <Link key={category.id} to={`/category/${category.id}`} className="card category-card">
+                  <div className="card-header" style={{ background: category.colorHex || '#111827' }}>
+                    {imageUrl ? <img src={imageUrl} alt={category.name} /> : null}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+        <CartPanel showMovementButton />
       </div>
     </AppLayout>
   );
