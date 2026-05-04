@@ -65,17 +65,11 @@ export const AdminSettingsPage: React.FC = () => {
 
   const handleAddInReason = () => {
     const trimmed = newInReason.trim();
-    console.log('Agregando motivo de entrada:', trimmed);
-    console.log('Motivos actuales:', form.movementInReasons);
     if (trimmed && !form.movementInReasons.includes(trimmed)) {
-      setForm((prev) => {
-        const newForm = {
-          ...prev,
-          movementInReasons: [...prev.movementInReasons, trimmed],
-        };
-        console.log('Nuevo estado de form:', newForm);
-        return newForm;
-      });
+      setForm((prev) => ({
+        ...prev,
+        movementInReasons: [...prev.movementInReasons, trimmed],
+      }));
       setNewInReason('');
     }
   };
@@ -111,18 +105,27 @@ export const AdminSettingsPage: React.FC = () => {
     const validatedForm = validatePaymentMethods(form);
     setForm(validatedForm);
     
-    console.log('Guardando configuración:', validatedForm);
-    console.log('Motivos de entrada:', validatedForm.movementInReasons);
-    console.log('Motivos de salida:', validatedForm.movementOutReasons);
-    
     try {
       const response = await apiClient.patch<Setting>('/settings', validatedForm);
-      console.log('Respuesta del servidor:', response.data);
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       pushToast('Configuración actualizada', 'success');
     } catch (err) {
       setError(normalizeApiError(err));
+    }
+  };
+
+  const handleSaveMovementReasons = async () => {
+    try {
+      const response = await apiClient.patch<Setting>('/settings', {
+        movementInReasons: form.movementInReasons,
+        movementOutReasons: form.movementOutReasons,
+      });
+      queryClient.setQueryData(['settings'], response.data);
+      await queryClient.invalidateQueries({ queryKey: ['settings'] });
+      pushToast('Motivos guardados correctamente', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
     }
   };
 
@@ -451,6 +454,11 @@ export const AdminSettingsPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="primary-button" onClick={handleSaveMovementReasons}>
+                  Guardar motivos
+                </button>
               </div>
             </div>
           </div>
