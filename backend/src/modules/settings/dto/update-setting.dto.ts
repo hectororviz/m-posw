@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateSettingDto {
   @IsOptional()
@@ -45,4 +45,14 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsBoolean()
   enableTransferPayment?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  movementInReasons?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  movementOutReasons?: string[];
 }

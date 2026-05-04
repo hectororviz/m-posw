@@ -227,6 +227,8 @@ model Setting {
   enableCashPayment Boolean @default(true)
   enableQrPayment Boolean @default(true)
   enableTransferPayment Boolean @default(true)
+  movementInReasons String[] @default([])
+  movementOutReasons String[] @default([])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

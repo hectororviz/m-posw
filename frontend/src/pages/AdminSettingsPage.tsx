@@ -21,10 +21,14 @@ export const AdminSettingsPage: React.FC = () => {
     enableCashPayment: true,
     enableQrPayment: true,
     enableTransferPayment: true,
+    movementInReasons: [] as string[],
+    movementOutReasons: [] as string[],
   });
   const [error, setError] = useState<string | null>(null);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [aboutContent, setAboutContent] = useState('');
+  const [newInReason, setNewInReason] = useState('');
+  const [newOutReason, setNewOutReason] = useState('');
 
   useEffect(() => {
     if (settings) {
@@ -36,6 +40,8 @@ export const AdminSettingsPage: React.FC = () => {
         enableCashPayment: settings.enableCashPayment ?? true,
         enableQrPayment: settings.enableQrPayment ?? true,
         enableTransferPayment: settings.enableTransferPayment ?? true,
+        movementInReasons: settings.movementInReasons ?? [],
+        movementOutReasons: settings.movementOutReasons ?? [],
       });
     }
   }, [settings]);
@@ -54,6 +60,42 @@ export const AdminSettingsPage: React.FC = () => {
 
   const handlePaymentMethodChange = (field: keyof typeof form, value: boolean) => {
     setForm((prev) => validatePaymentMethods({ ...prev, [field]: value }));
+  };
+
+  const handleAddInReason = () => {
+    const trimmed = newInReason.trim();
+    if (trimmed && !form.movementInReasons.includes(trimmed)) {
+      setForm((prev) => ({
+        ...prev,
+        movementInReasons: [...prev.movementInReasons, trimmed],
+      }));
+      setNewInReason('');
+    }
+  };
+
+  const handleRemoveInReason = (reason: string) => {
+    setForm((prev) => ({
+      ...prev,
+      movementInReasons: prev.movementInReasons.filter((r) => r !== reason),
+    }));
+  };
+
+  const handleAddOutReason = () => {
+    const trimmed = newOutReason.trim();
+    if (trimmed && !form.movementOutReasons.includes(trimmed)) {
+      setForm((prev) => ({
+        ...prev,
+        movementOutReasons: [...prev.movementOutReasons, trimmed],
+      }));
+      setNewOutReason('');
+    }
+  };
+
+  const handleRemoveOutReason = (reason: string) => {
+    setForm((prev) => ({
+      ...prev,
+      movementOutReasons: prev.movementOutReasons.filter((r) => r !== reason),
+    }));
   };
 
   const handleSave = async () => {
@@ -236,6 +278,91 @@ export const AdminSettingsPage: React.FC = () => {
               />
               Transferencia
             </label>
+          </div>
+        </div>
+
+        {/* Motivos de Movimientos */}
+        <div className="settings-movement-reasons">
+          <h3>Motivos de movimientos</h3>
+          
+          {/* Motivos de Entrada */}
+          <div className="movement-reasons-section">
+            <h4>Motivos de Entrada</h4>
+            <div className="reasons-list">
+              {form.movementInReasons.map((reason) => (
+                <span key={reason} className="reason-tag">
+                  {reason}
+                  <button
+                    type="button"
+                    className="reason-remove-btn"
+                    onClick={() => handleRemoveInReason(reason)}
+                    aria-label={`Eliminar ${reason}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {form.movementInReasons.length === 0 && (
+                <span className="no-reasons-text">No hay motivos configurados</span>
+              )}
+            </div>
+            <div className="add-reason-row">
+              <input
+                type="text"
+                placeholder="Nuevo motivo de entrada"
+                value={newInReason}
+                onChange={(e) => setNewInReason(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddInReason();
+                  }
+                }}
+              />
+              <button type="button" className="secondary-button" onClick={handleAddInReason}>
+                Agregar
+              </button>
+            </div>
+          </div>
+
+          {/* Motivos de Salida */}
+          <div className="movement-reasons-section">
+            <h4>Motivos de Salida</h4>
+            <div className="reasons-list">
+              {form.movementOutReasons.map((reason) => (
+                <span key={reason} className="reason-tag">
+                  {reason}
+                  <button
+                    type="button"
+                    className="reason-remove-btn"
+                    onClick={() => handleRemoveOutReason(reason)}
+                    aria-label={`Eliminar ${reason}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {form.movementOutReasons.length === 0 && (
+                <span className="no-reasons-text">No hay motivos configurados</span>
+              )}
+            </div>
+            <div className="add-reason-row">
+              <input
+                type="text"
+                placeholder="Nuevo motivo de salida"
+                value={newOutReason}
+                onChange={(e) => setNewOutReason(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddOutReason();
+                  }
+                }}
+              />
+              <button type="button" className="secondary-button" onClick={handleAddOutReason}>
+                Agregar
+              </button>
+            </div>
           </div>
         </div>
       </div>

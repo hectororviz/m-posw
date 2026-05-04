@@ -6,6 +6,9 @@ import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
+const DEFAULT_IN_REASONS = ['Apertura de caja', 'Venta', 'Otro'];
+const DEFAULT_OUT_REASONS = ['Cierre de caja', 'Pago a proveedor', 'Gastos operativos', 'Retiro de efectivo', 'Otro'];
+
 const formatCurrency = (value: number | string) => {
   const normalizedValue = Number(value);
   const amount = Number.isFinite(normalizedValue) ? normalizedValue : 0;
@@ -105,6 +108,8 @@ export const AdminSalesPage: React.FC = () => {
   const [movementType, setMovementType] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
   const [movementAmount, setMovementAmount] = useState('');
   const [movementReason, setMovementReason] = useState('');
+  const [movementDescription, setMovementDescription] = useState('');
+  const [, setActiveMovementField] = useState<'amount' | 'reason' | 'description'>('amount');
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const [selectedCashCloseId, setSelectedCashCloseId] = useState<string | null>(null);
   const [printStart, setPrintStart] = useState('');
@@ -124,7 +129,6 @@ export const AdminSalesPage: React.FC = () => {
       netCashDelta: number | string;
     };
   } | null>(null);
-  const [, setActiveMovementField] = useState<'amount' | 'reason'>('amount');
   const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
 
   const selectedSale = useMemo(
@@ -413,10 +417,19 @@ export const AdminSalesPage: React.FC = () => {
     setIsPrintOpen(true);
   };
 
+  const getAvailableReasons = (type: 'ENTRADA' | 'SALIDA') => {
+    const reasons = type === 'ENTRADA' 
+      ? (settings?.movementInReasons ?? DEFAULT_IN_REASONS)
+      : (settings?.movementOutReasons ?? DEFAULT_OUT_REASONS);
+    return reasons.length > 0 ? reasons : (type === 'ENTRADA' ? DEFAULT_IN_REASONS : DEFAULT_OUT_REASONS);
+  };
+
   const handleOpenMovement = () => {
     setMovementType('ENTRADA');
     setMovementAmount('');
-    setMovementReason('');
+    const reasons = getAvailableReasons('ENTRADA');
+    setMovementReason(reasons[0] || '');
+    setMovementDescription('');
     setActiveMovementField('amount');
     setIsMovementOpen(true);
   };
@@ -428,7 +441,15 @@ export const AdminSalesPage: React.FC = () => {
   const handleSaveMovement = async () => {
     const amount = Number(movementAmount);
     const reason = movementReason.trim();
+    const description = movementDescription.trim();
+    
     if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) {
+      return;
+    }
+    
+    // Si el motivo es "Otro", la descripción es obligatoria
+    if (reason === 'Otro' && description.length === 0) {
+      pushToast('La descripción es obligatoria cuando el motivo es "Otro"', 'error');
       return;
     }
 
@@ -438,6 +459,7 @@ export const AdminSalesPage: React.FC = () => {
         type: movementType,
         amount,
         reason,
+        description: description || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ['manual-movements'] });
       pushToast('Movimiento agregado correctamente.', 'success');
@@ -449,7 +471,22 @@ export const AdminSalesPage: React.FC = () => {
     }
   };
 
-  const isMovementValid = Number(movementAmount) > 0 && movementReason.trim().length > 0;
+  const isMovementValid = () => {
+    const amount = Number(movementAmount);
+    const reason = movementReason.trim();
+    const description = movementDescription.trim();
+    
+    if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) {
+      return false;
+    }
+    
+    // Si el motivo es "Otro", la descripción es obligatoria
+    if (reason === 'Otro' && description.length === 0) {
+      return false;
+    }
+    
+    return true;
+  };
 
   const handleAmountKeyPress = (key: string) => {
     setActiveMovementField('amount');
@@ -466,18 +503,18 @@ export const AdminSalesPage: React.FC = () => {
   };
 
   const handleReasonKeyPress = (key: string) => {
-    setActiveMovementField('reason');
+    setActiveMovementField('description');
     if (key === '⌫') {
-      setMovementReason((current) => current.slice(0, -1));
+      setMovementDescription((current) => current.slice(0, -1));
       return;
     }
 
     if (key === 'ESPACIO') {
-      setMovementReason((current) => `${current} `);
+      setMovementDescription((current) => `${current} `);
       return;
     }
 
-    setMovementReason((current) => `${current}${key.toLowerCase()}`);
+    setMovementDescription((current) => `${current}${key.toLowerCase()}`);
   };
 
   const handlePrint = () => {
@@ -880,7 +917,12 @@ export const AdminSalesPage: React.FC = () => {
                     name="movement-type"
                     value="ENTRADA"
                     checked={movementType === 'ENTRADA'}
-                    onChange={() => setMovementType('ENTRADA')}
+                    onChange={() => {
+                      setMovementType('ENTRADA');
+                      const reasons = getAvailableReasons('ENTRADA');
+                      setMovementReason(reasons[0] || '');
+                      setMovementDescription('');
+                    }}
                   />
                   Entrada
                 </label>
@@ -890,7 +932,12 @@ export const AdminSalesPage: React.FC = () => {
                     name="movement-type"
                     value="SALIDA"
                     checked={movementType === 'SALIDA'}
-                    onChange={() => setMovementType('SALIDA')}
+                    onChange={() => {
+                      setMovementType('SALIDA');
+                      const reasons = getAvailableReasons('SALIDA');
+                      setMovementReason(reasons[0] || '');
+                      setMovementDescription('');
+                    }}
                   />
                   Salida
                 </label>
@@ -933,16 +980,48 @@ export const AdminSalesPage: React.FC = () => {
               </div>
               <label className="input-field">
                 Motivo
-                <textarea
-                  rows={3}
-                  placeholder="Describí el motivo"
+                <select
                   value={movementReason}
-                  onFocus={() => setActiveMovementField('reason')}
-                  onChange={(event) => setMovementReason(event.target.value)}
-                />
+                  onChange={(e) => {
+                    setMovementReason(e.target.value);
+                    setMovementDescription('');
+                  }}
+                  className="movement-reason-select"
+                >
+                  {getAvailableReasons(movementType).map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                </select>
               </label>
+              {movementReason === 'Otro' && (
+                <label className="input-field">
+                  Descripción (obligatoria)
+                  <textarea
+                    rows={3}
+                    placeholder="Describí el motivo"
+                    value={movementDescription}
+                    onFocus={() => setActiveMovementField('description')}
+                    onChange={(event) => setMovementDescription(event.target.value)}
+                    required
+                  />
+                </label>
+              )}
+              {movementReason !== 'Otro' && (
+                <label className="input-field">
+                  Descripción (opcional)
+                  <textarea
+                    rows={2}
+                    placeholder="Descripción adicional (opcional)"
+                    value={movementDescription}
+                    onFocus={() => setActiveMovementField('description')}
+                    onChange={(event) => setMovementDescription(event.target.value)}
+                  />
+                </label>
+              )}
               {showEmbeddedKeyboard && (
-                <div className="admin-sales__mini-keyboard" aria-label="Teclado para motivo">
+                <div className="admin-sales__mini-keyboard" aria-label="Teclado para descripción">
                   {['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'].map((row) => (
                     <div key={row} className="admin-sales__keyboard-row">
                       {row.split('').map((letter) => (
@@ -983,7 +1062,7 @@ export const AdminSalesPage: React.FC = () => {
                   type="button"
                   className="primary-button"
                   onClick={handleSaveMovement}
-                  disabled={!isMovementValid || isSavingMovement}
+                  disabled={!isMovementValid() || isSavingMovement}
                 >
                   {isSavingMovement ? 'Guardando...' : 'Guardar movimiento'}
                 </button>

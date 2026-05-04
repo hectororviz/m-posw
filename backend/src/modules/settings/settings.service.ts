@@ -27,6 +27,8 @@ export class SettingsService {
         enableCashPayment: true,
         enableQrPayment: true,
         enableTransferPayment: true,
+        movementInReasons: [],
+        movementOutReasons: [],
       },
       update: {},
     });
@@ -48,6 +50,8 @@ export class SettingsService {
         enableCashPayment: dto.enableCashPayment ?? true,
         enableQrPayment: dto.enableQrPayment ?? true,
         enableTransferPayment: dto.enableTransferPayment ?? true,
+        movementInReasons: dto.movementInReasons ?? [],
+        movementOutReasons: dto.movementOutReasons ?? [],
       },
       update: {
         ...(dto.storeName !== undefined ? { storeName: dto.storeName } : {}),
@@ -63,6 +67,8 @@ export class SettingsService {
         ...(dto.enableCashPayment !== undefined ? { enableCashPayment: dto.enableCashPayment } : {}),
         ...(dto.enableQrPayment !== undefined ? { enableQrPayment: dto.enableQrPayment } : {}),
         ...(dto.enableTransferPayment !== undefined ? { enableTransferPayment: dto.enableTransferPayment } : {}),
+        ...(dto.movementInReasons !== undefined ? { movementInReasons: dto.movementInReasons } : {}),
+        ...(dto.movementOutReasons !== undefined ? { movementOutReasons: dto.movementOutReasons } : {}),
       },
     });
   }

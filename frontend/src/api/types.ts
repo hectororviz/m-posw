@@ -141,6 +141,8 @@ export interface Setting {
   enableCashPayment?: boolean | null;
   enableQrPayment?: boolean | null;
   enableTransferPayment?: boolean | null;
+  movementInReasons?: string[];
+  movementOutReasons?: string[];
 }
 
 export interface ApiErrorResponse {

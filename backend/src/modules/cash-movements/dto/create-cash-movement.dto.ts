@@ -9,8 +9,12 @@ export class CreateCashMovementDto {
   @Min(0.01)
   amount!: number;
 
+  @IsString()
+  @MaxLength(300)
+  reason!: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(300)
-  reason?: string;
+  description?: string;
 }
