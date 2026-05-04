@@ -8,6 +8,9 @@ import type { Setting } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
+const DEFAULT_IN_REASONS = ['Apertura de Caja', 'Otro'];
+const DEFAULT_OUT_REASONS = ['Retiro de caja', 'Otro'];
+
 export const AdminSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
@@ -27,6 +30,7 @@ export const AdminSettingsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [aboutContent, setAboutContent] = useState('');
+  const [showMovementReasonsModal, setShowMovementReasonsModal] = useState(false);
   const [newInReason, setNewInReason] = useState('');
   const [newOutReason, setNewOutReason] = useState('');
 
@@ -284,86 +288,16 @@ export const AdminSettingsPage: React.FC = () => {
         {/* Motivos de Movimientos */}
         <div className="settings-movement-reasons">
           <h3>Motivos de movimientos</h3>
-          
-          {/* Motivos de Entrada */}
-          <div className="movement-reasons-section">
-            <h4>Motivos de Entrada</h4>
-            <div className="reasons-list">
-              {form.movementInReasons.map((reason) => (
-                <span key={reason} className="reason-tag">
-                  {reason}
-                  <button
-                    type="button"
-                    className="reason-remove-btn"
-                    onClick={() => handleRemoveInReason(reason)}
-                    aria-label={`Eliminar ${reason}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {form.movementInReasons.length === 0 && (
-                <span className="no-reasons-text">No hay motivos configurados</span>
-              )}
-            </div>
-            <div className="add-reason-row">
-              <input
-                type="text"
-                placeholder="Nuevo motivo de entrada"
-                value={newInReason}
-                onChange={(e) => setNewInReason(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddInReason();
-                  }
-                }}
-              />
-              <button type="button" className="secondary-button" onClick={handleAddInReason}>
-                Agregar
-              </button>
-            </div>
-          </div>
-
-          {/* Motivos de Salida */}
-          <div className="movement-reasons-section">
-            <h4>Motivos de Salida</h4>
-            <div className="reasons-list">
-              {form.movementOutReasons.map((reason) => (
-                <span key={reason} className="reason-tag">
-                  {reason}
-                  <button
-                    type="button"
-                    className="reason-remove-btn"
-                    onClick={() => handleRemoveOutReason(reason)}
-                    aria-label={`Eliminar ${reason}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              {form.movementOutReasons.length === 0 && (
-                <span className="no-reasons-text">No hay motivos configurados</span>
-              )}
-            </div>
-            <div className="add-reason-row">
-              <input
-                type="text"
-                placeholder="Nuevo motivo de salida"
-                value={newOutReason}
-                onChange={(e) => setNewOutReason(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddOutReason();
-                  }
-                }}
-              />
-              <button type="button" className="secondary-button" onClick={handleAddOutReason}>
-                Agregar
-              </button>
-            </div>
-          </div>
+          <p className="settings-description">
+            Configura los motivos disponibles para los movimientos de caja.
+          </p>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setShowMovementReasonsModal(true)}
+          >
+            Configurar motivos
+          </button>
         </div>
       </div>
       
@@ -398,6 +332,118 @@ export const AdminSettingsPage: React.FC = () => {
                 className="about-content-markdown" 
                 dangerouslySetInnerHTML={{ __html: aboutHtml }}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Motivos de Movimientos */}
+      {showMovementReasonsModal && (
+        <div className="modal-backdrop" onClick={() => setShowMovementReasonsModal(false)}>
+          <div className="modal movement-reasons-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Configurar motivos de movimientos</h3>
+              <button 
+                type="button" 
+                className="icon-button" 
+                onClick={() => setShowMovementReasonsModal(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="movement-reasons-columns">
+                {/* Columna Entradas */}
+                <div className="movement-reasons-column">
+                  <h4>Motivos de Entrada</h4>
+                  <div className="reasons-list">
+                    <div className="reason-tag reason-tag--default">
+                      <span>Apertura de Caja</span>
+                      <small>(Sistema)</small>
+                    </div>
+                    <div className="reason-tag reason-tag--default">
+                      <span>Otro</span>
+                      <small>(Sistema)</small>
+                    </div>
+                    {form.movementInReasons.map((reason) => (
+                      <span key={reason} className="reason-tag">
+                        {reason}
+                        <button
+                          type="button"
+                          className="reason-remove-btn"
+                          onClick={() => handleRemoveInReason(reason)}
+                          aria-label={`Eliminar ${reason}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="add-reason-row">
+                    <input
+                      type="text"
+                      placeholder="Nuevo motivo"
+                      value={newInReason}
+                      onChange={(e) => setNewInReason(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddInReason();
+                        }
+                      }}
+                    />
+                    <button type="button" className="secondary-button" onClick={handleAddInReason}>
+                      Agregar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Columna Salidas */}
+                <div className="movement-reasons-column">
+                  <h4>Motivos de Salida</h4>
+                  <div className="reasons-list">
+                    <div className="reason-tag reason-tag--default">
+                      <span>Retiro de caja</span>
+                      <small>(Sistema)</small>
+                    </div>
+                    <div className="reason-tag reason-tag--default">
+                      <span>Otro</span>
+                      <small>(Sistema)</small>
+                    </div>
+                    {form.movementOutReasons.map((reason) => (
+                      <span key={reason} className="reason-tag">
+                        {reason}
+                        <button
+                          type="button"
+                          className="reason-remove-btn"
+                          onClick={() => handleRemoveOutReason(reason)}
+                          aria-label={`Eliminar ${reason}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="add-reason-row">
+                    <input
+                      type="text"
+                      placeholder="Nuevo motivo"
+                      value={newOutReason}
+                      onChange={(e) => setNewOutReason(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddOutReason();
+                        }
+                      }}
+                    />
+                    <button type="button" className="secondary-button" onClick={handleAddOutReason}>
+                      Agregar
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

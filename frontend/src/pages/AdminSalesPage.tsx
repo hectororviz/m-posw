@@ -6,8 +6,8 @@ import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
-const DEFAULT_IN_REASONS = ['Apertura de caja', 'Venta', 'Otro'];
-const DEFAULT_OUT_REASONS = ['Cierre de caja', 'Pago a proveedor', 'Gastos operativos', 'Retiro de efectivo', 'Otro'];
+const DEFAULT_IN_REASONS = ['Apertura de Caja', 'Otro'];
+const DEFAULT_OUT_REASONS = ['Retiro de caja', 'Otro'];
 
 const formatCurrency = (value: number | string) => {
   const normalizedValue = Number(value);
@@ -910,38 +910,57 @@ export const AdminSalesPage: React.FC = () => {
               </button>
             </div>
             <div className="modal-body admin-sales__movement-form">
-              <fieldset className="admin-sales__movement-type" aria-label="Tipo de movimiento">
-                <label>
-                  <input
-                    type="radio"
-                    name="movement-type"
-                    value="ENTRADA"
-                    checked={movementType === 'ENTRADA'}
-                    onChange={() => {
-                      setMovementType('ENTRADA');
-                      const reasons = getAvailableReasons('ENTRADA');
-                      setMovementReason(reasons[0] || '');
+              <div className="admin-sales__movement-type-row">
+                <fieldset className="admin-sales__movement-type" aria-label="Tipo de movimiento">
+                  <label>
+                    <input
+                      type="radio"
+                      name="movement-type"
+                      value="ENTRADA"
+                      checked={movementType === 'ENTRADA'}
+                      onChange={() => {
+                        setMovementType('ENTRADA');
+                        const reasons = getAvailableReasons('ENTRADA');
+                        setMovementReason(reasons[0] || '');
+                        setMovementDescription('');
+                      }}
+                    />
+                    Entrada
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="movement-type"
+                      value="SALIDA"
+                      checked={movementType === 'SALIDA'}
+                      onChange={() => {
+                        setMovementType('SALIDA');
+                        const reasons = getAvailableReasons('SALIDA');
+                        setMovementReason(reasons[0] || '');
+                        setMovementDescription('');
+                      }}
+                    />
+                    Salida
+                  </label>
+                </fieldset>
+                <label className="input-field movement-reason-field">
+                  Motivo
+                  <select
+                    value={movementReason}
+                    onChange={(e) => {
+                      setMovementReason(e.target.value);
                       setMovementDescription('');
                     }}
-                  />
-                  Entrada
+                    className="movement-reason-select"
+                  >
+                    {getAvailableReasons(movementType).map((reason) => (
+                      <option key={reason} value={reason}>
+                        {reason}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="movement-type"
-                    value="SALIDA"
-                    checked={movementType === 'SALIDA'}
-                    onChange={() => {
-                      setMovementType('SALIDA');
-                      const reasons = getAvailableReasons('SALIDA');
-                      setMovementReason(reasons[0] || '');
-                      setMovementDescription('');
-                    }}
-                  />
-                  Salida
-                </label>
-              </fieldset>
+              </div>
               <div className="admin-sales__movement-main">
                 <label className="input-field">
                   Monto
@@ -978,23 +997,6 @@ export const AdminSalesPage: React.FC = () => {
                   </div>
                 )}
               </div>
-              <label className="input-field">
-                Motivo
-                <select
-                  value={movementReason}
-                  onChange={(e) => {
-                    setMovementReason(e.target.value);
-                    setMovementDescription('');
-                  }}
-                  className="movement-reason-select"
-                >
-                  {getAvailableReasons(movementType).map((reason) => (
-                    <option key={reason} value={reason}>
-                      {reason}
-                    </option>
-                  ))}
-                </select>
-              </label>
               {movementReason === 'Otro' && (
                 <label className="input-field">
                   Descripción (obligatoria)
