@@ -33,4 +33,16 @@ export class UpdateSettingDto {
   @IsString()
   @Matches(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/)
   accentColor?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  enableCashPayment?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enableQrPayment?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enableTransferPayment?: boolean;
 }

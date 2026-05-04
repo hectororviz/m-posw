@@ -97,6 +97,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     [items],
   );
 
+  // Calcular qué métodos de pago están habilitados
+  const paymentMethods = useMemo(() => {
+    const enableCash = settings?.enableCashPayment ?? true;
+    const enableQr = settings?.enableQrPayment ?? true;
+    const enableTransfer = settings?.enableTransferPayment ?? true;
+
+    // Si todos están desactivados, activar Efectivo por defecto
+    if (!enableCash && !enableQr && !enableTransfer) {
+      return { enableCashPayment: true, enableQrPayment: false, enableTransferPayment: false };
+    }
+
+    return {
+      enableCashPayment: enableCash,
+      enableQrPayment: enableQr,
+      enableTransferPayment: enableTransfer,
+    };
+  }, [settings]);
+
   useEffect(() => {
     itemsSnapshotRef.current = items;
   }, [items]);
@@ -758,31 +776,42 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
           {step === 'SELECT_METHOD' && (
             <div className="checkout-step">
               <p className="checkout-total">Total: <strong>{formatCurrency(total)}</strong></p>
-              <div className="checkout-actions checkout-actions--three">
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => setStep('CASH')}
-                  disabled={items.length === 0}
-                >
-                  Efectivo
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handleStartQr}
-                  disabled={items.length === 0}
-                >
-                  QR
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handleStartTransfer}
-                  disabled={items.length === 0}
-                >
-                  Transferencia
-                </button>
+              <div className={`checkout-actions ${
+                [paymentMethods.enableCashPayment, paymentMethods.enableQrPayment, paymentMethods.enableTransferPayment]
+                  .filter(Boolean).length === 1 ? 'checkout-actions--single' :
+                  [paymentMethods.enableCashPayment, paymentMethods.enableQrPayment, paymentMethods.enableTransferPayment]
+                    .filter(Boolean).length === 2 ? 'checkout-actions--two' : 'checkout-actions--three'
+              }`}>
+                {paymentMethods.enableCashPayment && (
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => setStep('CASH')}
+                    disabled={items.length === 0}
+                  >
+                    Efectivo
+                  </button>
+                )}
+                {paymentMethods.enableQrPayment && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleStartQr}
+                    disabled={items.length === 0}
+                  >
+                    QR
+                  </button>
+                )}
+                {paymentMethods.enableTransferPayment && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleStartTransfer}
+                    disabled={items.length === 0}
+                  >
+                    Transferencia
+                  </button>
+                )}
               </div>
             </div>
           )}

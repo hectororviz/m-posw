@@ -24,6 +24,9 @@ export class SettingsService {
         okAnimationUrl: null,
         errorAnimationUrl: null,
         accentColor: DEFAULT_ACCENT_COLOR,
+        enableCashPayment: true,
+        enableQrPayment: true,
+        enableTransferPayment: true,
       },
       update: {},
     });
@@ -42,6 +45,9 @@ export class SettingsService {
         okAnimationUrl: dto.okAnimationUrl ?? null,
         errorAnimationUrl: dto.errorAnimationUrl ?? null,
         accentColor: dto.accentColor ?? DEFAULT_ACCENT_COLOR,
+        enableCashPayment: dto.enableCashPayment ?? true,
+        enableQrPayment: dto.enableQrPayment ?? true,
+        enableTransferPayment: dto.enableTransferPayment ?? true,
       },
       update: {
         ...(dto.storeName !== undefined ? { storeName: dto.storeName } : {}),
@@ -54,6 +60,9 @@ export class SettingsService {
         ...(dto.okAnimationUrl !== undefined ? { okAnimationUrl: dto.okAnimationUrl } : {}),
         ...(dto.errorAnimationUrl !== undefined ? { errorAnimationUrl: dto.errorAnimationUrl } : {}),
         ...(dto.accentColor !== undefined ? { accentColor: dto.accentColor } : {}),
+        ...(dto.enableCashPayment !== undefined ? { enableCashPayment: dto.enableCashPayment } : {}),
+        ...(dto.enableQrPayment !== undefined ? { enableQrPayment: dto.enableQrPayment } : {}),
+        ...(dto.enableTransferPayment !== undefined ? { enableTransferPayment: dto.enableTransferPayment } : {}),
       },
     });
   }

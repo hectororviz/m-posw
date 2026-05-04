@@ -138,6 +138,9 @@ export interface Setting {
   okAnimationUrl?: string | null;
   errorAnimationUrl?: string | null;
   accentColor?: string | null;
+  enableCashPayment?: boolean | null;
+  enableQrPayment?: boolean | null;
+  enableTransferPayment?: boolean | null;
 }
 
 export interface ApiErrorResponse {

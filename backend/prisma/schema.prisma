@@ -223,7 +223,10 @@ model Setting {
   faviconUrl  String?
   okAnimationUrl String?
   errorAnimationUrl String?
-  accentColor String?  
+  accentColor String?
+  enableCashPayment Boolean @default(true)
+  enableQrPayment Boolean @default(true)
+  enableTransferPayment Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

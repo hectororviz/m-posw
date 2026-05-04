@@ -18,6 +18,9 @@ export const AdminSettingsPage: React.FC = () => {
     clubName: '',
     enableTicketPrinting: false,
     accentColor: '',
+    enableCashPayment: true,
+    enableQrPayment: true,
+    enableTransferPayment: true,
   });
   const [error, setError] = useState<string | null>(null);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -30,14 +33,37 @@ export const AdminSettingsPage: React.FC = () => {
         clubName: settings.clubName ?? '',
         enableTicketPrinting: settings.enableTicketPrinting ?? false,
         accentColor: settings.accentColor ?? '',
+        enableCashPayment: settings.enableCashPayment ?? true,
+        enableQrPayment: settings.enableQrPayment ?? true,
+        enableTransferPayment: settings.enableTransferPayment ?? true,
       });
     }
   }, [settings]);
 
+  // Validar que al menos un medio de pago esté activo
+  const validatePaymentMethods = (newForm: typeof form): typeof form => {
+    const { enableCashPayment, enableQrPayment, enableTransferPayment } = newForm;
+    
+    // Si todos están desactivados, activar Efectivo por defecto
+    if (!enableCashPayment && !enableQrPayment && !enableTransferPayment) {
+      return { ...newForm, enableCashPayment: true };
+    }
+    
+    return newForm;
+  };
+
+  const handlePaymentMethodChange = (field: keyof typeof form, value: boolean) => {
+    setForm((prev) => validatePaymentMethods({ ...prev, [field]: value }));
+  };
+
   const handleSave = async () => {
     setError(null);
+    // Asegurar que al menos un medio de pago esté activo antes de guardar
+    const validatedForm = validatePaymentMethods(form);
+    setForm(validatedForm);
+    
     try {
-      const response = await apiClient.patch<Setting>('/settings', form);
+      const response = await apiClient.patch<Setting>('/settings', validatedForm);
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       pushToast('Configuración actualizada', 'success');
@@ -86,6 +112,9 @@ export const AdminSettingsPage: React.FC = () => {
     const contentWithEmojis = emoji.emojify(aboutContent);
     return marked.parse(contentWithEmojis, { async: false }) as string;
   }, [aboutContent]);
+
+  // Verificar si todos los medios de pago están desactivados
+  const allPaymentMethodsDisabled = !form.enableCashPayment && !form.enableQrPayment && !form.enableTransferPayment;
 
   return (
     <section className="card admin-products">
@@ -172,6 +201,42 @@ export const AdminSettingsPage: React.FC = () => {
             />
             Teclado embebido
           </label>
+        </div>
+
+        {/* Medios de Pago */}
+        <div className="settings-payment-methods">
+          <h3>Medios de pago</h3>
+          {allPaymentMethodsDisabled && (
+            <p className="warning-text">
+              ⚠️ Debe habilitar al menos un medio de pago. Efectivo se activará por defecto.
+            </p>
+          )}
+          <div className="settings-checkboxes-row">
+            <label className="switch settings-switch">
+              <input
+                type="checkbox"
+                checked={form.enableCashPayment}
+                onChange={(event) => handlePaymentMethodChange('enableCashPayment', event.target.checked)}
+              />
+              Efectivo
+            </label>
+            <label className="switch settings-switch">
+              <input
+                type="checkbox"
+                checked={form.enableQrPayment}
+                onChange={(event) => handlePaymentMethodChange('enableQrPayment', event.target.checked)}
+              />
+              QR MercadoPago
+            </label>
+            <label className="switch settings-switch">
+              <input
+                type="checkbox"
+                checked={form.enableTransferPayment}
+                onChange={(event) => handlePaymentMethodChange('enableTransferPayment', event.target.checked)}
+              />
+              Transferencia
+            </label>
+          </div>
         </div>
       </div>
       

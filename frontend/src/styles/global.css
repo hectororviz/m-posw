@@ -1674,6 +1674,28 @@ button {
   width: 100%;
 }
 
+.checkout-actions--two {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.checkout-actions--two .primary-button,
+.checkout-actions--two .secondary-button {
+  width: 100%;
+}
+
+.checkout-actions--single {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.checkout-actions--single .primary-button,
+.checkout-actions--single .secondary-button {
+  width: 100%;
+}
+
 .transfer-instructions {
   text-align: center;
   color: #64748b;
@@ -1726,6 +1748,10 @@ button {
 
 @media (max-width: 480px) {
   .checkout-actions--three {
+    grid-template-columns: 1fr;
+  }
+
+  .checkout-actions--two {
     grid-template-columns: 1fr;
   }
 }
@@ -2224,6 +2250,31 @@ button {
 
 .settings-actions-row .secondary-button:hover {
   background: #d1d5db;
+}
+
+/* Payment Methods Section */
+.settings-payment-methods {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.settings-payment-methods h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.warning-text {
+  color: #d97706;
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 0.375rem;
 }
 
 /* About Modal */
