@@ -125,6 +125,7 @@ export const CheckoutQrPage: React.FC = () => {
               name: item.product.name,
               category: item.product.category?.name,
               orderNumber: item.orderNumber,
+              categoryTicket: item.product.category?.ticket,
             })),
             onPopupBlocked: () =>
               pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),

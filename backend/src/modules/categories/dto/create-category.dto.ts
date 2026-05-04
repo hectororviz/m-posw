@@ -14,4 +14,8 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  ticket?: boolean;
 }

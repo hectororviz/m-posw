@@ -32,6 +32,7 @@ export class CategoriesService {
         ...dto,
         colorHex: dto.colorHex ?? this.defaultColor,
         active: dto.active ?? true,
+        ticket: dto.ticket ?? true,
       },
     });
   }
@@ -43,6 +44,7 @@ export class CategoriesService {
     if (dto.iconName !== undefined) data.iconName = dto.iconName;
     if (dto.colorHex !== undefined) data.colorHex = dto.colorHex;
     if (dto.active !== undefined) data.active = dto.active;
+    if (dto.ticket !== undefined) data.ticket = dto.ticket;
 
     if (process.env.NODE_ENV !== 'production') {
       this.logger.debug(`Updating category ${id} with data: ${JSON.stringify(data)}`);

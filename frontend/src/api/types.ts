@@ -25,6 +25,7 @@ export interface Category {
   imagePath?: string | null;
   imageUpdatedAt?: string | null;
   active: boolean;
+  ticket: boolean;
 }
 
 export interface RecipeIngredient {

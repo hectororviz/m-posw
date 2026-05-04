@@ -13,6 +13,7 @@ export const AdminCategoriesPage: React.FC = () => {
     iconName: '🧾',
     colorHex: '#111827',
     active: true,
+    ticket: true,
   });
   const [edits, setEdits] = useState<Record<string, Partial<Category>>>({});
 
@@ -20,7 +21,7 @@ export const AdminCategoriesPage: React.FC = () => {
     setError(null);
     try {
       await apiClient.post('/categories', newCategory);
-      setNewCategory({ name: '', iconName: '🧾', colorHex: '#111827', active: true });
+      setNewCategory({ name: '', iconName: '🧾', colorHex: '#111827', active: true, ticket: true });
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -85,22 +86,31 @@ export const AdminCategoriesPage: React.FC = () => {
           />
           Activa
         </label>
+        <label className="switch">
+          <input
+            type="checkbox"
+            checked={newCategory.ticket}
+            onChange={(event) => setNewCategory({ ...newCategory, ticket: event.target.checked })}
+          />
+          Ticket
+        </label>
         <button type="button" className="icon-button primary-button" onClick={handleCreate} aria-label="Crear" title="Crear">
           <span aria-hidden="true">+</span>
         </button>
       </div>
       {error && <p className="error-text">{error}</p>}
       <div className="product-table">
-        <div className="product-table-header product-table-header--3">
+        <div className="product-table-header product-table-header--4">
           <span>Nombre</span>
           <span>Activa</span>
+          <span>Ticket</span>
           <span>Imagen</span>
           <span>Acciones</span>
         </div>
         {rendered.map((category) => {
           const draft = edits[category.id] ?? {};
           return (
-            <div key={category.id} className="product-table-row product-table-row--3">
+            <div key={category.id} className="product-table-row product-table-row--4">
               <input
                 type="text"
                 value={draft.name ?? category.name}
@@ -119,6 +129,18 @@ export const AdminCategoriesPage: React.FC = () => {
                     setEdits((prev) => ({
                       ...prev,
                       [category.id]: { ...draft, active: event.target.checked },
+                    }))
+                  }
+                />
+              </label>
+              <label className="switch switch-sm">
+                <input
+                  type="checkbox"
+                  checked={draft.ticket ?? category.ticket}
+                  onChange={(event) =>
+                    setEdits((prev) => ({
+                      ...prev,
+                      [category.id]: { ...draft, ticket: event.target.checked },
                     }))
                   }
                 />

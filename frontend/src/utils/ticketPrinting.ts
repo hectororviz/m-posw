@@ -6,6 +6,7 @@ export type TicketItemPayload = {
   name: string;
   category?: string;
   orderNumber?: number;
+  categoryTicket?: boolean;
 };
 
 export type TicketLinePayload = {
@@ -73,6 +74,17 @@ export const maybePrintTicket = async ({
     return { skipped: true, opened: false } as const;
   }
 
+  // Filtrar items que tienen categoría con ticket habilitado
+  // Si categoryTicket es undefined (para compatibilidad hacia atrás), asumimos true
+  const ticketItems = items.filter(item => 
+    item.categoryTicket === undefined || item.categoryTicket === true
+  );
+
+  // Si no hay items para imprimir, no imprimir ticket
+  if (ticketItems.length === 0) {
+    return { skipped: true, opened: false, noTicketItems: true } as const;
+  }
+
   if (saleId) {
     try {
       const response = await apiClient.post<{ alreadyPrinted: boolean }>(`/sales/${saleId}/ticket-printed`);
@@ -91,7 +103,7 @@ export const maybePrintTicket = async ({
     clubName: settings.clubName || '',
     storeName: settings.storeName || storeFallback,
     dateTimeISO: dateTimeISO || undefined,
-    items: items.map(item => cleanPayload({
+    items: ticketItems.map(item => cleanPayload({
       qty: Number(item.qty),
       name: String(item.name),
       category: item.category,

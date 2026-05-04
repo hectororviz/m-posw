@@ -16,4 +16,8 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  ticket?: boolean;
 }

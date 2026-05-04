@@ -347,6 +347,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
               name: item.product.name,
               category: item.product.category?.name,
               orderNumber: item.orderNumber,
+              categoryTicket: item.product.category?.ticket,
             })),
             onPopupBlocked: () =>
               pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
@@ -543,13 +544,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             name: item.product.name,
             category: item.product.category?.name,
             orderNumber: item.orderNumber,
+            categoryTicket: item.product.category?.ticket,
           })),
           onPopupBlocked: () =>
             pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
           onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
           onError: (message) => pushToast(message, 'error'),
         });
-        
+
         clear();
         setTransferResult('SUCCESS');
         setTransferResultMessage(`Pago confirmado. Venta #${data.orderNumber}`);
@@ -588,7 +590,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         saleId: sale.id,
         dateTimeISO: sale.paidAt ?? sale.createdAt,
         total: sale.total,
-        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber })),
+        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber, categoryTicket: item.product.category?.ticket })),
         onPopupBlocked: () =>
           pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
         onError: (message) => pushToast(message, 'error'),

@@ -95,6 +95,7 @@ model Category {
   imagePath String?
   imageUpdatedAt DateTime?
   active    Boolean  @default(true)
+  ticket    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   products  Product[]
