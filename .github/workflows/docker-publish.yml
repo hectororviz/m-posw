@@ -54,7 +54,7 @@ jobs:
           push: true
           build-args: |
             VITE_API_BASE_URL=/api
-            VITE_UPLOADS_BASE_URL=/uploads
+            VITE_UPLOADS_BASE_URL=
           tags: |
             ghcr.io/${{ env.IMAGE_NAME }}-frontend:latest
             ghcr.io/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}

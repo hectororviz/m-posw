@@ -76,7 +76,11 @@ export const buildImageUrl = (imagePath?: string | null, imageUpdatedAt?: string
     return imagePath;
   }
   const base = getUploadsBaseUrl();
-  const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  let normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  const uploadsPrefix = '/uploads';
+  if (normalizedPath.startsWith(`${uploadsPrefix}/`) && base.endsWith(uploadsPrefix)) {
+    normalizedPath = normalizedPath.slice(uploadsPrefix.length);
+  }
   const url = `${base}${normalizedPath}`;
   if (imageUpdatedAt) {
     const separator = url.includes('?') ? '&' : '?';
