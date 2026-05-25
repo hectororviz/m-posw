@@ -93,7 +93,7 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/admin/categories" replace />} />
+        <Route index element={<Navigate to="/admin/sales" replace />} />
         <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="products" element={<AdminProductsPage />} />
         <Route path="sales" element={<AdminSalesPage />} />

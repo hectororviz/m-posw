@@ -12,23 +12,23 @@ export const AdminLayout: React.FC = () => {
           <NavLink to="/admin/stats" className={({ isActive }) => (isActive ? 'active' : '')}>
             Estadísticas
           </NavLink>
+          <NavLink to="/admin/contabilidad" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Contabilidad
+          </NavLink>
           <NavLink to="/admin/categories" className={({ isActive }) => (isActive ? 'active' : '')}>
             Categorías
           </NavLink>
           <NavLink to="/admin/products" className={({ isActive }) => (isActive ? 'active' : '')}>
             Productos
           </NavLink>
-          <NavLink to="/admin/users" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Usuarios
-          </NavLink>
           <NavLink to="/admin/stock" className={({ isActive }) => (isActive ? 'active' : '')}>
             Stock
           </NavLink>
+          <NavLink to="/admin/users" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Usuarios
+          </NavLink>
           <NavLink to="/admin/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             Settings
-          </NavLink>
-          <NavLink to="/admin/contabilidad" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Contabilidad
           </NavLink>
         </nav>
         <div className="admin-content">
