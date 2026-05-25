@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiClient, normalizeApiError } from '../api/client';
+import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
 import { useAdminCategories, useAdminProducts, useRawMaterials } from '../api/queries';
 import type { Product, ProductType } from '../api/types';
 
@@ -15,25 +15,34 @@ interface IngredientInput {
   quantity: string;
 }
 
+interface ProductForm {
+  name: string;
+  price: string;
+  categoryId: string;
+  iconName: string;
+  active: boolean;
+  type: ProductType;
+}
+
+const EMPTY_FORM: ProductForm = {
+  name: '',
+  price: '',
+  categoryId: '',
+  iconName: '🍽️',
+  active: true,
+  type: 'SIMPLE',
+};
+
 export const AdminProductsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: categories } = useAdminCategories();
   const { data: products } = useAdminProducts();
   const { data: rawMaterials } = useRawMaterials();
   const [error, setError] = useState<string | null>(null);
-  const [newProduct, setNewProduct] = useState({
-    name: '',
-    price: '',
-    categoryId: '',
-    iconName: '🍽️',
-    active: true,
-    type: 'SIMPLE' as ProductType,
-  });
-  const [newIngredients, setNewIngredients] = useState<IngredientInput[]>([]);
-  const [edits, setEdits] = useState<Record<string, Partial<Product>>>({});
-  const [editIngredients, setEditIngredients] = useState<Record<string, IngredientInput[]>>({});
-  const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
+  const [formIngredients, setFormIngredients] = useState<IngredientInput[]>([]);
+  const [showModal, setShowModal] = useState(false);
 
   const formatCurrencyInput = (value: number) => {
     return value.toLocaleString('es-AR', {
@@ -50,21 +59,51 @@ export const AdminProductsPage: React.FC = () => {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  const handleCreate = async () => {
+  const openCreate = () => {
+    setEditingProduct(null);
+    setForm(EMPTY_FORM);
+    setFormIngredients([]);
+    setShowModal(true);
+  };
+
+  const openEdit = (product: Product) => {
+    setEditingProduct(product);
+    setForm({
+      name: product.name,
+      price: String(product.price),
+      categoryId: product.categoryId,
+      iconName: product.iconName ?? '🍽️',
+      active: product.active,
+      type: product.type,
+    });
+    setFormIngredients(
+      product.recipeIngredients?.map(ri => ({
+        rawMaterialId: ri.rawMaterialId,
+        quantity: String(ri.quantity),
+      })) || [],
+    );
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingProduct(null);
+  };
+
+  const handleSave = async () => {
     setError(null);
     try {
       const payload: Record<string, unknown> = {
-        name: newProduct.name,
-        price: parseCurrencyInput(newProduct.price),
-        categoryId: newProduct.type === 'RAW_MATERIAL' ? categories?.[0]?.id : newProduct.categoryId,
-        iconName: newProduct.iconName,
-        active: newProduct.active,
-        type: newProduct.type,
+        name: form.name,
+        price: parseCurrencyInput(form.price),
+        categoryId: form.type === 'RAW_MATERIAL' ? categories?.[0]?.id : form.categoryId,
+        iconName: form.iconName,
+        active: form.active,
+        type: form.type,
       };
 
-      // Agregar ingredientes si es COMPOSITE
-      if (newProduct.type === 'COMPOSITE' && newIngredients.length > 0) {
-        payload.ingredients = newIngredients
+      if (form.type === 'COMPOSITE' && formIngredients.length > 0) {
+        payload.ingredients = formIngredients
           .filter(ing => ing.rawMaterialId && ing.quantity)
           .map(ing => ({
             rawMaterialId: ing.rawMaterialId,
@@ -72,39 +111,13 @@ export const AdminProductsPage: React.FC = () => {
           }));
       }
 
-      await apiClient.post('/products', payload);
-      setNewProduct({ name: '', price: '', categoryId: '', iconName: '🍽️', active: true, type: 'SIMPLE' });
-      setNewIngredients([]);
-      await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
-    } catch (err) {
-      setError(normalizeApiError(err));
-    }
-  };
-
-  const handleUpdate = async (productId: string) => {
-    setError(null);
-    try {
-      const product = products?.find(p => p.id === productId);
-      const draft = edits[productId] ?? {};
-      const ingredients = editIngredients[productId];
-      const payload: Record<string, unknown> = { ...draft };
-
-      // Determinar el tipo actual (considerando el draft y el producto original)
-      const currentType = draft.type ?? product?.type;
-
-      // Agregar ingredientes si es COMPOSITE y se editaron
-      if (ingredients !== undefined && currentType === 'COMPOSITE') {
-        payload.ingredients = ingredients
-          .filter(ing => ing.rawMaterialId && ing.quantity)
-          .map(ing => ({
-            rawMaterialId: ing.rawMaterialId,
-            quantity: Number(ing.quantity),
-          }));
+      if (editingProduct) {
+        await apiClient.patch(`/products/${editingProduct.id}`, payload);
+      } else {
+        await apiClient.post('/products', payload);
       }
 
-      await apiClient.patch(`/products/${productId}`, payload);
-      setEdits((prev) => ({ ...prev, [productId]: {} }));
-      setEditIngredients((prev) => ({ ...prev, [productId]: undefined as unknown as IngredientInput[] }));
+      closeModal();
       await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -122,9 +135,7 @@ export const AdminProductsPage: React.FC = () => {
   };
 
   const handleUpload = async (productId: string, file?: File | null) => {
-    if (!file) {
-      return;
-    }
+    if (!file) return;
     setError(null);
     try {
       const formData = new FormData();
@@ -138,101 +149,58 @@ export const AdminProductsPage: React.FC = () => {
     }
   };
 
-  const addIngredient = (productId?: string) => {
-    if (productId) {
-      setEditIngredients((prev) => ({
-        ...prev,
-        [productId]: [...(prev[productId] || []), { rawMaterialId: '', quantity: '' }],
-      }));
-    } else {
-      setNewIngredients((prev) => [...prev, { rawMaterialId: '', quantity: '' }]);
-    }
+  const addIngredient = () => {
+    setFormIngredients((prev) => [...prev, { rawMaterialId: '', quantity: '' }]);
   };
 
-  const removeIngredient = (index: number, productId?: string) => {
-    if (productId) {
-      setEditIngredients((prev) => ({
-        ...prev,
-        [productId]: prev[productId]?.filter((_, i) => i !== index) || [],
-      }));
-    } else {
-      setNewIngredients((prev) => prev.filter((_, i) => i !== index));
-    }
+  const removeIngredient = (index: number) => {
+    setFormIngredients((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const toggleProductExpand = (productId: string) => {
-    setExpandedProducts((prev) => ({
-      ...prev,
-      [productId]: !prev[productId],
-    }));
-  };
-
-  const updateIngredient = (index: number, field: keyof IngredientInput, value: string, productId?: string) => {
-    if (productId) {
-      setEditIngredients((prev) => ({
-        ...prev,
-        [productId]: prev[productId]?.map((ing, i) => (i === index ? { ...ing, [field]: value } : ing)) || [],
-      }));
-    } else {
-      setNewIngredients((prev) => prev.map((ing, i) => (i === index ? { ...ing, [field]: value } : ing)));
-    }
+  const updateIngredient = (index: number, field: keyof IngredientInput, value: string) => {
+    setFormIngredients((prev) =>
+      prev.map((ing, i) => (i === index ? { ...ing, [field]: value } : ing)),
+    );
   };
 
   const rendered = useMemo(() => {
-    if (!products) {
-      return [];
-    }
+    if (!products) return [];
     const categoryLookup = new Map(categories?.map((category) => [category.id, category.name]));
-    
-    // Función para obtener el orden de prioridad: tipo + estado
-    // 1. SIMPLE activo, 2. COMPOSITE activo, 3. RAW_MATERIAL activo
-    // 4. SIMPLE inactivo, 5. COMPOSITE inactivo, 6. RAW_MATERIAL inactivo
+
     const getPriority = (product: Product): number => {
       const typeOrder: Record<ProductType, number> = {
         SIMPLE: 0,
         COMPOSITE: 1,
         RAW_MATERIAL: 2,
       };
-      // Activos primero (0-2), inactivos después (3-5)
       return (product.active ? 0 : 3) + typeOrder[product.type];
     };
-    
+
     return [...products].sort((a, b) => {
-      // Primero por categoría
       const categoryA = categoryLookup.get(a.categoryId) ?? '';
       const categoryB = categoryLookup.get(b.categoryId) ?? '';
       const categoryCompare = categoryA.localeCompare(categoryB, 'es', { sensitivity: 'base' });
-      if (categoryCompare !== 0) {
-        return categoryCompare;
-      }
-      
-      // Luego por tipo + estado
+      if (categoryCompare !== 0) return categoryCompare;
       const priorityA = getPriority(a);
       const priorityB = getPriority(b);
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-      
-      // Finalmente por nombre
+      if (priorityA !== priorityB) return priorityA - priorityB;
       return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
     });
   }, [products, categories]);
-  
-  // Agrupar productos por categoría para mostrar separadores
+
   const groupedByCategory = useMemo(() => {
     const groups: { categoryName: string; products: Product[] }[] = [];
     let currentGroup: { categoryName: string; products: Product[] } | null = null;
-    
+
     for (const product of rendered) {
       const categoryName = categories?.find(c => c.id === product.categoryId)?.name ?? 'Sin categoría';
-      
       if (!currentGroup || currentGroup.categoryName !== categoryName) {
         currentGroup = { categoryName, products: [] };
         groups.push(currentGroup);
       }
       currentGroup.products.push(product);
     }
-    
+
     return groups;
   }, [rendered, categories]);
 
@@ -244,41 +212,34 @@ export const AdminProductsPage: React.FC = () => {
 
       {error && <p className="error-text">{error}</p>}
 
-      {/* FAB - Botón flotante para nuevo producto */}
       <button
         type="button"
         className="fab-button"
-        onClick={() => setShowCreateModal(true)}
+        onClick={openCreate}
         aria-label="Nuevo producto"
         title="Nuevo producto"
       >
         <span aria-hidden="true">+</span>
       </button>
 
-      {/* Modal de creación de producto */}
-      {showCreateModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)} role="presentation">
-          <div className="modal product-create-modal" onClick={(e) => e.stopPropagation()}>
+      {showModal && (
+        <div className="modal-backdrop" onClick={closeModal} role="presentation">
+          <div className="modal product-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Nuevo Producto</h3>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => setShowCreateModal(false)}
-                aria-label="Cerrar"
-              >
+              <h3>{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h3>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">
                 ✕
               </button>
             </div>
             <div className="modal-body">
-              <div className="product-create-fields">
+              <div className="product-form-fields">
                 <div className="field">
                   <label>Nombre</label>
                   <input
                     type="text"
                     placeholder="Nombre del producto"
-                    value={newProduct.name}
-                    onChange={(event) => setNewProduct({ ...newProduct, name: event.target.value })}
+                    value={form.name}
+                    onChange={(event) => setForm({ ...form, name: event.target.value })}
                   />
                 </div>
 
@@ -286,37 +247,31 @@ export const AdminProductsPage: React.FC = () => {
                   <label>Tipo</label>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <select
-                      value={newProduct.type}
-                      onChange={(event) => setNewProduct({ ...newProduct, type: event.target.value as ProductType })}
+                      value={form.type}
+                      onChange={(event) => setForm({ ...form, type: event.target.value as ProductType })}
                     >
                       {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
+                        <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
-                    {newProduct.type === 'COMPOSITE' && (
-                      <span title="Producto compuesto - tiene receta">📋</span>
-                    )}
+                    {form.type === 'COMPOSITE' && <span title="Producto compuesto - tiene receta">📋</span>}
                   </div>
                 </div>
 
                 <div className="field">
                   <label>Categoría</label>
                   <select
-                    value={newProduct.categoryId}
-                    onChange={(event) => setNewProduct({ ...newProduct, categoryId: event.target.value })}
+                    value={form.categoryId}
+                    onChange={(event) => setForm({ ...form, categoryId: event.target.value })}
                   >
                     <option value="">Seleccionar categoría</option>
                     {categories?.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
+                      <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
                   </select>
                 </div>
 
-                {showPriceAndCategory(newProduct.type) && (
+                {showPriceAndCategory(form.type) && (
                   <div className="field">
                     <label>Precio</label>
                     <div className="price-input-wrapper">
@@ -324,8 +279,8 @@ export const AdminProductsPage: React.FC = () => {
                       <input
                         type="text"
                         placeholder="Precio"
-                        value={newProduct.price}
-                        onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
+                        value={form.price}
+                        onChange={(event) => setForm({ ...form, price: event.target.value })}
                       />
                     </div>
                   </div>
@@ -336,26 +291,25 @@ export const AdminProductsPage: React.FC = () => {
                   <input
                     type="text"
                     placeholder="Emoji del producto"
-                    value={newProduct.iconName}
-                    onChange={(event) => setNewProduct({ ...newProduct, iconName: event.target.value })}
+                    value={form.iconName}
+                    onChange={(event) => setForm({ ...form, iconName: event.target.value })}
                   />
                 </div>
 
                 <label className="switch">
                   <input
                     type="checkbox"
-                    checked={newProduct.active}
-                    onChange={(event) => setNewProduct({ ...newProduct, active: event.target.checked })}
+                    checked={form.active}
+                    onChange={(event) => setForm({ ...form, active: event.target.checked })}
                   />
                   Activo
                 </label>
               </div>
 
-              {/* Sección de ingredientes para COMPOSITE */}
-              {newProduct.type === 'COMPOSITE' && (
+              {form.type === 'COMPOSITE' && (
                 <div className="ingredients-section">
                   <h4>Ingredientes</h4>
-                  {newIngredients.map((ing, index) => (
+                  {formIngredients.map((ing, index) => (
                     <div key={index} className="ingredient-row">
                       <select
                         value={ing.rawMaterialId}
@@ -385,248 +339,99 @@ export const AdminProductsPage: React.FC = () => {
                       </button>
                     </div>
                   ))}
-                  <button type="button" className="button secondary" onClick={() => addIngredient()}>
+                  <button type="button" className="button secondary" onClick={addIngredient}>
                     + Agregar ingrediente
                   </button>
                 </div>
               )}
             </div>
             <div className="checkout-actions">
-              <button type="button" className="secondary-button" onClick={() => setShowCreateModal(false)}>
+              <button type="button" className="secondary-button" onClick={closeModal}>
                 Cancelar
               </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => { handleCreate(); setShowCreateModal(false); }}
-              >
-                Crear producto
+              <button type="button" className="primary-button" onClick={handleSave}>
+                {editingProduct ? 'Guardar cambios' : 'Crear producto'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tabla de productos */}
       <div className="product-list">
         {groupedByCategory.map((group) => (
           <div key={group.categoryName} className="product-category-group">
             <div className="product-category-header">{group.categoryName}</div>
             {group.products.map((product) => {
-          const draft = edits[product.id] ?? {};
-          const currentType = draft.type ?? product.type;
-          const ingredients = editIngredients[product.id] !== undefined
-            ? editIngredients[product.id]
-            : (product.recipeIngredients?.map(ri => ({
-                rawMaterialId: ri.rawMaterialId,
-                quantity: String(ri.quantity),
-              })) || []);
+              const imageUrl = buildImageUrl(product.imagePath, product.imageUpdatedAt);
 
-          return (
-            <div key={product.id} className={`product-card-item ${!product.active ? 'product-inactive' : ''}`}>
-              {/* Línea 1: Nombre, Categoría, Tipo */}
-              <div className="product-line-1">
-                <div className="product-field product-name">
-                  <span className="field-label">Nombre</span>
-                  <input
-                    type="text"
-                    value={draft.name ?? product.name}
-                    onChange={(event) =>
-                      setEdits((prev) => ({
-                        ...prev,
-                        [product.id]: { ...draft, name: event.target.value },
-                      }))
-                    }
-                  />
-                </div>
-                
-                <div className="product-field product-category">
-                  <span className="field-label">Categoría</span>
-                  <select
-                    value={draft.categoryId ?? product.categoryId}
-                    onChange={(event) =>
-                      setEdits((prev) => ({
-                        ...prev,
-                        [product.id]: { ...draft, categoryId: event.target.value },
-                      }))
-                    }
-                  >
-                    {categories?.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="product-field product-type">
-                  <span className="field-label">Tipo</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <select
-                      value={currentType}
-                      onChange={(event) =>
-                        setEdits((prev) => ({
-                          ...prev,
-                          [product.id]: { ...draft, type: event.target.value as ProductType },
-                        }))
-                      }
-                    >
-                      {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    {currentType === 'COMPOSITE' && (
-                      <span title="Producto compuesto - tiene receta" style={{ fontSize: '14px' }}>
-                        📋
-                      </span>
+              return (
+                <div key={product.id} className={`product-row ${!product.active ? 'product-row--inactive' : ''}`}>
+                  <div className="product-row__image">
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={product.name} />
+                    ) : (
+                      <span className="product-row__icon">{product.iconName || '🍽️'}</span>
                     )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Línea 2: Precio, Imagen, Activo, Acciones */}
-              <div className="product-line-2">
-                <div className="product-field product-price">
-                  <span className="field-label">Precio</span>
-                  {showPriceAndCategory(currentType) ? (
-                    <div className="price-input-wrapper">
-                      <span className="price-input-symbol">$</span>
+                    <label className="product-row__image-upload">
                       <input
-                        type="text"
-                        value={formatCurrencyInput(draft.price ?? product.price)}
-                        onChange={(event) =>
-                          setEdits((prev) => ({
-                            ...prev,
-                            [product.id]: { ...draft, price: parseCurrencyInput(event.target.value) },
-                          }))
-                        }
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
+                        className="product-row__file-input"
                       />
-                    </div>
-                  ) : (
-                    <span className="no-price">-</span>
-                  )}
-                </div>
+                    </label>
+                  </div>
 
-                <div className="product-field product-image">
-                  <span className="field-label">Imagen</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
-                  />
-                </div>
-                
-                <div className="product-field product-active">
-                  <span className="field-label">Activo</span>
-                  <label className="switch switch-sm">
-                    <input
-                      type="checkbox"
-                      checked={draft.active ?? product.active}
-                      onChange={(event) =>
-                        setEdits((prev) => ({
-                          ...prev,
-                          [product.id]: { ...draft, active: event.target.checked },
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
+                  <div className="product-row__info">
+                    <span className="product-row__name">{product.name}</span>
+                    <span className="product-row__meta">
+                      {showPriceAndCategory(product.type) && (
+                        <span className="product-row__price">$ {formatCurrencyInput(product.price)}</span>
+                      )}
+                      <span className="product-row__type">{PRODUCT_TYPE_LABELS[product.type]}</span>
+                      {product.type === 'COMPOSITE' && (
+                        <span className="product-row__recipe-badge">📋 {(product.recipeIngredients?.length || 0)} ing.</span>
+                      )}
+                    </span>
+                  </div>
 
-                <div className="product-field product-actions">
-                  <span className="field-label">Acciones</span>
-                  <div className="product-actions-buttons">
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => handleUpdate(product.id)}
-                    aria-label="Guardar"
-                    title="Guardar"
-                  >
-                    <span aria-hidden="true">💾</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button danger"
-                    onClick={() => handleDelete(product.id)}
-                    aria-label="Eliminar"
-                    title="Eliminar"
-                  >
-                    <span aria-hidden="true">🗑️</span>
-                  </button>
+                  <div className="product-row__actions">
+                    <label className="switch switch-sm">
+                      <input
+                        type="checkbox"
+                        checked={product.active}
+                        onChange={async () => {
+                          try {
+                            await apiClient.patch(`/products/${product.id}`, { active: !product.active });
+                            await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+                          } catch (err) {
+                            setError(normalizeApiError(err));
+                          }
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => openEdit(product)}
+                      aria-label="Editar"
+                      title="Editar"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button danger"
+                      onClick={() => handleDelete(product.id)}
+                      aria-label="Eliminar"
+                      title="Eliminar"
+                    >
+                      <span aria-hidden="true">🗑️</span>
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              {/* Sección de ingredientes editable para COMPOSITE - Acordeón */}
-              {currentType === 'COMPOSITE' && (
-                <div className="ingredients-edit-section">
-                  <button
-                    type="button"
-                    className="ingredients-toggle"
-                    onClick={() => toggleProductExpand(product.id)}
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: 'bold',
-                      padding: '8px 0'
-                    }}
-                  >
-                    <span>{expandedProducts[product.id] ? '▼' : '▶'}</span>
-                    <span>Ingredientes ({ingredients?.length || 0})</span>
-                  </button>
-                  
-                  {expandedProducts[product.id] && (
-                    <div className="ingredients-content" style={{ marginTop: '8px' }}>
-                      {ingredients?.map((ing, index) => (
-                        <div key={index} className="ingredient-row">
-                          <select
-                            value={ing.rawMaterialId}
-                            onChange={(event) => updateIngredient(index, 'rawMaterialId', event.target.value, product.id)}
-                          >
-                            <option value="">Seleccionar materia prima</option>
-                            {rawMaterials?.map((rm) => (
-                              <option key={rm.id} value={rm.id}>
-                                {rm.name} (stock: {rm.stock})
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="number"
-                            step="0.0001"
-                            placeholder="Cantidad"
-                            value={ing.quantity}
-                            onChange={(event) => updateIngredient(index, 'quantity', event.target.value, product.id)}
-                          />
-                          <button
-                            type="button"
-                            className="icon-button danger"
-                            onClick={() => removeIngredient(index, product.id)}
-                            aria-label="Eliminar ingrediente"
-                          >
-                            <span aria-hidden="true">🗑️</span>
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        className="button secondary small"
-                        onClick={() => addIngredient(product.id)}
-                      >
-                        + Agregar ingrediente
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
           </div>
         ))}
       </div>
