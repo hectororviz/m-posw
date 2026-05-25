@@ -384,16 +384,18 @@ export const AdminProductsPage: React.FC = () => {
                     </div>
 
                     <div className="product-card__info">
-                      <span className="product-card__name">{product.name}</span>
+                      <span className="product-card__name">
+                        {product.name}
+                        {showPriceAndCategory(product.type) && (
+                          <span className="product-card__price"> - $ {formatCurrencyInput(product.price)}</span>
+                        )}
+                      </span>
                       <span className="product-card__type">
                         {PRODUCT_TYPE_LABELS[product.type]}
                         {product.type === 'COMPOSITE' && (
                           <span className="product-card__recipe"> ({product.recipeIngredients?.length || 0} ing.)</span>
                         )}
                       </span>
-                      {showPriceAndCategory(product.type) && (
-                        <span className="product-card__price">$ {formatCurrencyInput(product.price)}</span>
-                      )}
                     </div>
 
                     <div className="product-card__actions">
