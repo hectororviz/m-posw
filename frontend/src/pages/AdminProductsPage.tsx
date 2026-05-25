@@ -33,6 +33,7 @@ export const AdminProductsPage: React.FC = () => {
   const [edits, setEdits] = useState<Record<string, Partial<Product>>>({});
   const [editIngredients, setEditIngredients] = useState<Record<string, IngredientInput[]>>({});
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const formatCurrencyInput = (value: number) => {
     return value.toLocaleString('es-AR', {
@@ -240,122 +241,171 @@ export const AdminProductsPage: React.FC = () => {
   return (
     <section className="card admin-products">
       <h2>Productos</h2>
-      
-      {/* Formulario de creación */}
-      <div className="product-form-section">
-        <h3>Nuevo Producto</h3>
-        <div className="product-form-row">
-          <input
-            type="text"
-            placeholder="Nombre"
-            value={newProduct.name}
-            onChange={(event) => setNewProduct({ ...newProduct, name: event.target.value })}
-          />
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <select
-              value={newProduct.type}
-              onChange={(event) => setNewProduct({ ...newProduct, type: event.target.value as ProductType })}
-            >
-              {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            {newProduct.type === 'COMPOSITE' && (
-              <span title="Producto compuesto - tiene receta" style={{ fontSize: '14px' }}>
-                📋
-              </span>
-            )}
-          </div>
-
-          {/* Categoría: visible para todos excepto si es RAW_MATERIAL y no hay categorías (el backend asigna una por defecto) */}
-          <select
-            value={newProduct.categoryId}
-            onChange={(event) => setNewProduct({ ...newProduct, categoryId: event.target.value })}
-          >
-            <option value="">Categoría</option>
-            {categories?.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-
-          {showPriceAndCategory(newProduct.type) && (
-            <div className="price-input-wrapper">
-              <span className="price-input-symbol">$</span>
-              <input
-                type="text"
-                placeholder="Precio"
-                value={newProduct.price}
-                onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
-              />
-            </div>
-          )}
-
-          <input
-            type="text"
-            placeholder="Icono"
-            value={newProduct.iconName}
-            onChange={(event) => setNewProduct({ ...newProduct, iconName: event.target.value })}
-          />
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={newProduct.active}
-              onChange={(event) => setNewProduct({ ...newProduct, active: event.target.checked })}
-            />
-            Activo
-          </label>
-          <button type="button" className="icon-button primary-button" onClick={handleCreate} aria-label="Crear" title="Crear">
-            <span aria-hidden="true">+</span>
-          </button>
-        </div>
-
-        {/* Sección de ingredientes para COMPOSITE */}
-        {newProduct.type === 'COMPOSITE' && (
-          <div className="ingredients-section">
-            <h4>Ingredientes</h4>
-            {newIngredients.map((ing, index) => (
-              <div key={index} className="ingredient-row">
-                <select
-                  value={ing.rawMaterialId}
-                  onChange={(event) => updateIngredient(index, 'rawMaterialId', event.target.value)}
-                >
-                  <option value="">Seleccionar materia prima</option>
-                  {rawMaterials?.map((rm) => (
-                    <option key={rm.id} value={rm.id}>
-                      {rm.name} (stock: {rm.stock})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  step="0.0001"
-                  placeholder="Cantidad"
-                  value={ing.quantity}
-                  onChange={(event) => updateIngredient(index, 'quantity', event.target.value)}
-                />
-                <button
-                  type="button"
-                  className="icon-button danger"
-                  onClick={() => removeIngredient(index)}
-                  aria-label="Eliminar ingrediente"
-                >
-                  <span aria-hidden="true">🗑️</span>
-                </button>
-              </div>
-            ))}
-            <button type="button" className="button secondary" onClick={() => addIngredient()}>
-              + Agregar ingrediente
-            </button>
-          </div>
-        )}
-      </div>
 
       {error && <p className="error-text">{error}</p>}
+
+      {/* FAB - Botón flotante para nuevo producto */}
+      <button
+        type="button"
+        className="fab-button"
+        onClick={() => setShowCreateModal(true)}
+        aria-label="Nuevo producto"
+        title="Nuevo producto"
+      >
+        <span aria-hidden="true">+</span>
+      </button>
+
+      {/* Modal de creación de producto */}
+      {showCreateModal && (
+        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)} role="presentation">
+          <div className="modal product-create-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Nuevo Producto</h3>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setShowCreateModal(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="product-create-fields">
+                <div className="field">
+                  <label>Nombre</label>
+                  <input
+                    type="text"
+                    placeholder="Nombre del producto"
+                    value={newProduct.name}
+                    onChange={(event) => setNewProduct({ ...newProduct, name: event.target.value })}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>Tipo</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <select
+                      value={newProduct.type}
+                      onChange={(event) => setNewProduct({ ...newProduct, type: event.target.value as ProductType })}
+                    >
+                      {Object.entries(PRODUCT_TYPE_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    {newProduct.type === 'COMPOSITE' && (
+                      <span title="Producto compuesto - tiene receta">📋</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>Categoría</label>
+                  <select
+                    value={newProduct.categoryId}
+                    onChange={(event) => setNewProduct({ ...newProduct, categoryId: event.target.value })}
+                  >
+                    <option value="">Seleccionar categoría</option>
+                    {categories?.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {showPriceAndCategory(newProduct.type) && (
+                  <div className="field">
+                    <label>Precio</label>
+                    <div className="price-input-wrapper">
+                      <span className="price-input-symbol">$</span>
+                      <input
+                        type="text"
+                        placeholder="Precio"
+                        value={newProduct.price}
+                        onChange={(event) => setNewProduct({ ...newProduct, price: event.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="field">
+                  <label>Icono</label>
+                  <input
+                    type="text"
+                    placeholder="Emoji del producto"
+                    value={newProduct.iconName}
+                    onChange={(event) => setNewProduct({ ...newProduct, iconName: event.target.value })}
+                  />
+                </div>
+
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={newProduct.active}
+                    onChange={(event) => setNewProduct({ ...newProduct, active: event.target.checked })}
+                  />
+                  Activo
+                </label>
+              </div>
+
+              {/* Sección de ingredientes para COMPOSITE */}
+              {newProduct.type === 'COMPOSITE' && (
+                <div className="ingredients-section">
+                  <h4>Ingredientes</h4>
+                  {newIngredients.map((ing, index) => (
+                    <div key={index} className="ingredient-row">
+                      <select
+                        value={ing.rawMaterialId}
+                        onChange={(event) => updateIngredient(index, 'rawMaterialId', event.target.value)}
+                      >
+                        <option value="">Seleccionar materia prima</option>
+                        {rawMaterials?.map((rm) => (
+                          <option key={rm.id} value={rm.id}>
+                            {rm.name} (stock: {rm.stock})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        placeholder="Cantidad"
+                        value={ing.quantity}
+                        onChange={(event) => updateIngredient(index, 'quantity', event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="icon-button danger"
+                        onClick={() => removeIngredient(index)}
+                        aria-label="Eliminar ingrediente"
+                      >
+                        <span aria-hidden="true">🗑️</span>
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className="button secondary" onClick={() => addIngredient()}>
+                    + Agregar ingrediente
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="checkout-actions">
+              <button type="button" className="secondary-button" onClick={() => setShowCreateModal(false)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => { handleCreate(); setShowCreateModal(false); }}
+              >
+                Crear producto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabla de productos */}
       <div className="product-list">
