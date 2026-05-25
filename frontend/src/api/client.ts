@@ -16,6 +16,18 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  },
+);
+
 export const normalizeApiError = (error: unknown): string => {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     const data = error.response?.data;
