@@ -361,77 +361,76 @@ export const AdminProductsPage: React.FC = () => {
         {groupedByCategory.map((group) => (
           <div key={group.categoryName} className="product-category-group">
             <div className="product-category-header">{group.categoryName}</div>
-            {group.products.map((product) => {
-              const imageUrl = buildImageUrl(product.imagePath, product.imageUpdatedAt);
+            <div className="product-grid">
+              {group.products.map((product) => {
+                const imageUrl = buildImageUrl(product.imagePath, product.imageUpdatedAt);
 
-              return (
-                <div key={product.id} className={`product-row ${!product.active ? 'product-row--inactive' : ''}`}>
-                  <div className="product-row__image">
-                    {imageUrl ? (
-                      <img src={imageUrl} alt={product.name} />
-                    ) : (
-                      <span className="product-row__icon">{product.iconName || '🍽️'}</span>
-                    )}
-                    <label className="product-row__image-upload">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
-                        className="product-row__file-input"
-                      />
-                    </label>
-                  </div>
+                return (
+                  <div key={product.id} className={`product-card ${!product.active ? 'product-card--inactive' : ''}`}>
+                    <div className="product-card__image">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={product.name} />
+                      ) : (
+                        <span className="product-card__icon">{product.iconName || '🍽️'}</span>
+                      )}
+                      <label className="product-card__image-upload">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => handleUpload(product.id, event.target.files?.[0])}
+                          className="product-card__file-input"
+                        />
+                      </label>
+                    </div>
 
-                  <div className="product-row__info">
-                    <span className="product-row__name">{product.name}</span>
-                    <span className="product-row__meta">
+                    <div className="product-card__info">
+                      <span className="product-card__name">{product.name}</span>
+                      <span className="product-card__type">
+                        {PRODUCT_TYPE_LABELS[product.type]}
+                        {product.type === 'COMPOSITE' && (
+                          <span className="product-card__recipe"> ({product.recipeIngredients?.length || 0} ing.)</span>
+                        )}
+                      </span>
                       {showPriceAndCategory(product.type) && (
-                        <span className="product-row__price">$ {formatCurrencyInput(product.price)}</span>
+                        <span className="product-card__price">$ {formatCurrencyInput(product.price)}</span>
                       )}
-                      <span className="product-row__type">{PRODUCT_TYPE_LABELS[product.type]}</span>
-                      {product.type === 'COMPOSITE' && (
-                        <span className="product-row__recipe-badge">📋 {(product.recipeIngredients?.length || 0)} ing.</span>
-                      )}
-                    </span>
-                  </div>
+                    </div>
 
-                  <div className="product-row__actions">
-                    <label className="switch switch-sm">
-                      <input
-                        type="checkbox"
-                        checked={product.active}
-                        onChange={async () => {
-                          try {
-                            await apiClient.patch(`/products/${product.id}`, { active: !product.active });
-                            await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
-                          } catch (err) {
-                            setError(normalizeApiError(err));
-                          }
-                        }}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      className="icon-button"
-                      onClick={() => openEdit(product)}
-                      aria-label="Editar"
-                      title="Editar"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button danger"
-                      onClick={() => handleDelete(product.id)}
-                      aria-label="Eliminar"
-                      title="Eliminar"
-                    >
-                      <span aria-hidden="true">🗑️</span>
-                    </button>
+                    <div className="product-card__actions">
+                      <label className="product-card__active-toggle">
+                        <input
+                          type="checkbox"
+                          checked={product.active}
+                          onChange={async () => {
+                            try {
+                              await apiClient.patch(`/products/${product.id}`, { active: !product.active });
+                              await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
+                            } catch (err) {
+                              setError(normalizeApiError(err));
+                            }
+                          }}
+                        />
+                        <span>Activo</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="product-card__edit-btn"
+                        onClick={() => openEdit(product)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="product-card__delete-btn"
+                        onClick={() => handleDelete(product.id)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>
