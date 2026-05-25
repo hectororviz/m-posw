@@ -20,7 +20,7 @@ services:
       retries: 10
 
   backend:
-    image: ghcr.io/hectororviz/m-posw-backend:latest
+    image: ghcr.io/hectororviz/m-posw-backend:${DOCKER_TAG:-latest}
 
     restart: unless-stopped
 
@@ -51,7 +51,7 @@ services:
       default: {}
 
   frontend:
-    image: ghcr.io/hectororviz/m-posw-frontend:latest
+    image: ghcr.io/hectororviz/m-posw-frontend:${DOCKER_TAG:-latest}
 
     restart: unless-stopped
 

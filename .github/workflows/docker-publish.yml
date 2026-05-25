@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -34,15 +36,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract Docker tags
+        id: meta
+        run: |
+          IMAGE_BACKEND="ghcr.io/${{ env.IMAGE_NAME }}-backend"
+          IMAGE_FRONTEND="ghcr.io/${{ env.IMAGE_NAME }}-frontend"
+          TAGS_BACKEND="${IMAGE_BACKEND}:latest"
+          TAGS_FRONTEND="${IMAGE_FRONTEND}:latest"
+
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${{ github.ref_name }}"
+            TAGS_BACKEND="${TAGS_BACKEND},${IMAGE_BACKEND}:${VERSION}"
+            TAGS_FRONTEND="${TAGS_FRONTEND},${IMAGE_FRONTEND}:${VERSION}"
+          fi
+
+          echo "tags_backend=${TAGS_BACKEND}" >> $GITHUB_OUTPUT
+          echo "tags_frontend=${TAGS_FRONTEND}" >> $GITHUB_OUTPUT
+
       - name: Build and push Backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ env.IMAGE_NAME }}-backend:latest
-            ghcr.io/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags_backend }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -55,8 +72,6 @@ jobs:
           build-args: |
             VITE_API_BASE_URL=/api
             VITE_UPLOADS_BASE_URL=
-          tags: |
-            ghcr.io/${{ env.IMAGE_NAME }}-frontend:latest
-            ghcr.io/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags_frontend }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
