@@ -209,36 +209,6 @@ export const AdminCategoriesPage: React.FC = () => {
               </div>
 
               <div className="product-card__actions">
-                <label className="product-card__active-toggle">
-                  <input
-                    type="checkbox"
-                    checked={category.active}
-                    onChange={async () => {
-                      try {
-                        await apiClient.patch(`/categories/${category.id}`, { active: !category.active });
-                        await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
-                      } catch (err) {
-                        setError(normalizeApiError(err));
-                      }
-                    }}
-                  />
-                  <span>Activa</span>
-                </label>
-                <label className="product-card__active-toggle">
-                  <input
-                    type="checkbox"
-                    checked={category.ticket}
-                    onChange={async () => {
-                      try {
-                        await apiClient.patch(`/categories/${category.id}`, { ticket: !category.ticket });
-                        await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
-                      } catch (err) {
-                        setError(normalizeApiError(err));
-                      }
-                    }}
-                  />
-                  <span>Ticket</span>
-                </label>
                 <button
                   type="button"
                   className="product-card__edit-btn"

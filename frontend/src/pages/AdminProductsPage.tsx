@@ -399,21 +399,6 @@ export const AdminProductsPage: React.FC = () => {
                     </div>
 
                     <div className="product-card__actions">
-                      <label className="product-card__active-toggle">
-                        <input
-                          type="checkbox"
-                          checked={product.active}
-                          onChange={async () => {
-                            try {
-                              await apiClient.patch(`/products/${product.id}`, { active: !product.active });
-                              await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
-                            } catch (err) {
-                              setError(normalizeApiError(err));
-                            }
-                          }}
-                        />
-                        <span>Activo</span>
-                      </label>
                       <button
                         type="button"
                         className="product-card__edit-btn"
