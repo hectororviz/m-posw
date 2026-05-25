@@ -20,7 +20,7 @@ services:
       retries: 10
 
   backend:
-    image: ghcr.io/hectororviz/m-posw-backend:${DOCKER_TAG:-v1.2.0-test}
+    image: ghcr.io/hectororviz/m-posw-backend:${DOCKER_TAG:-latest}
     # Rollback a versión estable: image: ghcr.io/hectororviz/m-posw-backend:v1.1.0
 
     restart: unless-stopped
@@ -52,7 +52,7 @@ services:
       default: {}
 
   frontend:
-    image: ghcr.io/hectororviz/m-posw-frontend:${DOCKER_TAG:-v1.2.0-test}
+    image: ghcr.io/hectororviz/m-posw-frontend:${DOCKER_TAG:-latest}
     # Rollback a versión estable: image: ghcr.io/hectororviz/m-posw-frontend:v1.1.0
 
     restart: unless-stopped
