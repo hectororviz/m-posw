@@ -3,12 +3,16 @@ version: '3.9'
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+
     volumes:
       - db_data:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
@@ -16,9 +20,13 @@ services:
       retries: 10
 
   backend:
-    build:
-      context: ./backend
-    env_file: .env
+    image: ghcr.io/hectororviz/m-posw-backend:latest
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
@@ -28,13 +36,14 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_NAME: ${ADMIN_NAME}
       MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET}
+
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "3000:3000"
+
     volumes:
       - uploads_data:/data/uploads
+
     networks:
       shared_proxy:
         aliases:
@@ -42,20 +51,20 @@ services:
       default: {}
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-        VITE_UPLOADS_BASE_URL: ${VITE_UPLOADS_BASE_URL}
+    image: ghcr.io/hectororviz/m-posw-frontend:latest
+
+    restart: unless-stopped
+
     env_file:
       - .env
+
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL}
       VITE_UPLOADS_BASE_URL: ${VITE_UPLOADS_BASE_URL}
-    ports:
-      - "8080:80"
+
     depends_on:
       - backend
+
     networks:
       shared_proxy:
         aliases:
