@@ -1,38 +1,66 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiClient, normalizeApiError } from '../api/client';
+import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
 import { useAdminCategories } from '../api/queries';
 import type { Category } from '../api/types';
+
+interface CategoryForm {
+  name: string;
+  iconName: string;
+  colorHex: string;
+  active: boolean;
+  ticket: boolean;
+}
+
+const EMPTY_FORM: CategoryForm = {
+  name: '',
+  iconName: '🧾',
+  colorHex: '#111827',
+  active: true,
+  ticket: true,
+};
 
 export const AdminCategoriesPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: categories } = useAdminCategories();
   const [error, setError] = useState<string | null>(null);
-  const [newCategory, setNewCategory] = useState({
-    name: '',
-    iconName: '🧾',
-    colorHex: '#111827',
-    active: true,
-    ticket: true,
-  });
-  const [edits, setEdits] = useState<Record<string, Partial<Category>>>({});
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [form, setForm] = useState<CategoryForm>(EMPTY_FORM);
+  const [showModal, setShowModal] = useState(false);
 
-  const handleCreate = async () => {
-    setError(null);
-    try {
-      await apiClient.post('/categories', newCategory);
-      setNewCategory({ name: '', iconName: '🧾', colorHex: '#111827', active: true, ticket: true });
-      await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
-    } catch (err) {
-      setError(normalizeApiError(err));
-    }
+  const openCreate = () => {
+    setEditingCategory(null);
+    setForm(EMPTY_FORM);
+    setShowModal(true);
   };
 
-  const handleUpdate = async (categoryId: string) => {
+  const openEdit = (category: Category) => {
+    setEditingCategory(category);
+    setForm({
+      name: category.name,
+      iconName: category.iconName,
+      colorHex: category.colorHex,
+      active: category.active,
+      ticket: category.ticket,
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingCategory(null);
+  };
+
+  const handleSave = async () => {
     setError(null);
     try {
-      await apiClient.patch(`/categories/${categoryId}`, edits[categoryId]);
-      setEdits((prev) => ({ ...prev, [categoryId]: {} }));
+      const payload: Record<string, unknown> = { ...form };
+      if (editingCategory) {
+        await apiClient.patch(`/categories/${editingCategory.id}`, payload);
+      } else {
+        await apiClient.post('/categories', payload);
+      }
+      closeModal();
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -50,9 +78,7 @@ export const AdminCategoriesPage: React.FC = () => {
   };
 
   const handleUpload = async (categoryId: string, file?: File | null) => {
-    if (!file) {
-      return;
-    }
+    if (!file) return;
     setError(null);
     try {
       const formData = new FormData();
@@ -71,103 +97,161 @@ export const AdminCategoriesPage: React.FC = () => {
   return (
     <section className="card admin-products">
       <h2>Categorías</h2>
-      <div className="product-form-row product-form-row--inline">
-        <input
-          type="text"
-          placeholder="Nombre"
-          value={newCategory.name}
-          onChange={(event) => setNewCategory({ ...newCategory, name: event.target.value })}
-        />
-        <label className="switch">
-          <input
-            type="checkbox"
-            checked={newCategory.active}
-            onChange={(event) => setNewCategory({ ...newCategory, active: event.target.checked })}
-          />
-          Activa
-        </label>
-        <label className="switch">
-          <input
-            type="checkbox"
-            checked={newCategory.ticket}
-            onChange={(event) => setNewCategory({ ...newCategory, ticket: event.target.checked })}
-          />
-          Ticket
-        </label>
-        <button type="button" className="icon-button primary-button" onClick={handleCreate} aria-label="Crear" title="Crear">
-          <span aria-hidden="true">+</span>
-        </button>
-      </div>
+
       {error && <p className="error-text">{error}</p>}
-      <div className="product-table">
-        <div className="product-table-header product-table-header--4">
-          <span>Nombre</span>
-          <span>Activa</span>
-          <span>Ticket</span>
-          <span>Imagen</span>
-          <span>Acciones</span>
+
+      <button
+        type="button"
+        className="fab-button"
+        onClick={openCreate}
+        aria-label="Nueva categoría"
+        title="Nueva categoría"
+      >
+        <span aria-hidden="true">+</span>
+      </button>
+
+      {showModal && (
+        <div className="modal-backdrop" onClick={closeModal} role="presentation">
+          <div className="modal product-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="product-form-fields">
+                <div className="field">
+                  <label>Nombre</label>
+                  <input
+                    type="text"
+                    placeholder="Nombre de la categoría"
+                    value={form.name}
+                    onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>Icono</label>
+                  <input
+                    type="text"
+                    placeholder="Emoji de la categoría"
+                    value={form.iconName}
+                    onChange={(event) => setForm({ ...form, iconName: event.target.value })}
+                  />
+                </div>
+
+                <div className="field">
+                  <label>Color</label>
+                  <input
+                    type="color"
+                    value={form.colorHex}
+                    onChange={(event) => setForm({ ...form, colorHex: event.target.value })}
+                    style={{ height: '42px', padding: '4px' }}
+                  />
+                </div>
+
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(event) => setForm({ ...form, active: event.target.checked })}
+                  />
+                  Activa
+                </label>
+
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={form.ticket}
+                    onChange={(event) => setForm({ ...form, ticket: event.target.checked })}
+                  />
+                  Ticket
+                </label>
+              </div>
+            </div>
+            <div className="checkout-actions">
+              <button type="button" className="secondary-button" onClick={closeModal}>
+                Cancelar
+              </button>
+              <button type="button" className="primary-button" onClick={handleSave}>
+                {editingCategory ? 'Guardar cambios' : 'Crear categoría'}
+              </button>
+            </div>
+          </div>
         </div>
+      )}
+
+      <div className="product-grid">
         {rendered.map((category) => {
-          const draft = edits[category.id] ?? {};
+          const imageUrl = buildImageUrl(category.imagePath, category.imageUpdatedAt);
+
           return (
-            <div key={category.id} className="product-table-row product-table-row--4">
-              <input
-                type="text"
-                value={draft.name ?? category.name}
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [category.id]: { ...draft, name: event.target.value },
-                  }))
-                }
-              />
-              <label className="switch switch-sm">
-                <input
-                  type="checkbox"
-                  checked={draft.active ?? category.active}
-                  onChange={(event) =>
-                    setEdits((prev) => ({
-                      ...prev,
-                      [category.id]: { ...draft, active: event.target.checked },
-                    }))
-                  }
-                />
-              </label>
-              <label className="switch switch-sm">
-                <input
-                  type="checkbox"
-                  checked={draft.ticket ?? category.ticket}
-                  onChange={(event) =>
-                    setEdits((prev) => ({
-                      ...prev,
-                      [category.id]: { ...draft, ticket: event.target.checked },
-                    }))
-                  }
-                />
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => handleUpload(category.id, event.target.files?.[0])}
-              />
-              <div className="product-actions">
+            <div key={category.id} className={`product-card ${!category.active ? 'product-card--inactive' : ''}`}>
+              <div className="product-card__image">
+                {imageUrl ? (
+                  <img src={imageUrl} alt={category.name} />
+                ) : (
+                  <span className="product-card__icon">{category.iconName || '🧾'}</span>
+                )}
+                <label className="product-card__image-upload">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => handleUpload(category.id, event.target.files?.[0])}
+                    className="product-card__file-input"
+                  />
+                </label>
+              </div>
+
+              <div className="product-card__info">
+                <span className="product-card__name">{category.name}</span>
+              </div>
+
+              <div className="product-card__actions">
+                <label className="product-card__active-toggle">
+                  <input
+                    type="checkbox"
+                    checked={category.active}
+                    onChange={async () => {
+                      try {
+                        await apiClient.patch(`/categories/${category.id}`, { active: !category.active });
+                        await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+                      } catch (err) {
+                        setError(normalizeApiError(err));
+                      }
+                    }}
+                  />
+                  <span>Activa</span>
+                </label>
+                <label className="product-card__active-toggle">
+                  <input
+                    type="checkbox"
+                    checked={category.ticket}
+                    onChange={async () => {
+                      try {
+                        await apiClient.patch(`/categories/${category.id}`, { ticket: !category.ticket });
+                        await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+                      } catch (err) {
+                        setError(normalizeApiError(err));
+                      }
+                    }}
+                  />
+                  <span>Ticket</span>
+                </label>
                 <button
                   type="button"
-                  className="icon-button"
-                  onClick={() => handleUpdate(category.id)}
-                  aria-label="Guardar"
-                  title="Guardar"
+                  className="product-card__edit-btn"
+                  onClick={() => openEdit(category)}
                 >
-                  <span aria-hidden="true">💾</span>
+                  Editar
                 </button>
                 <button
                   type="button"
-                  className="icon-button danger"
+                  className="product-card__delete-btn"
                   onClick={() => handleDelete(category.id)}
-                  aria-label="Eliminar"
-                  title="Eliminar"
                 >
-                  <span aria-hidden="true">🗑️</span>
+                  Eliminar
                 </button>
               </div>
             </div>
