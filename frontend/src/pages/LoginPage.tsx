@@ -1,14 +1,25 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient, normalizeApiError } from '../api/client';
-import { useLoginUsers } from '../api/queries';
+import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
+import { useLoginUsers, useSettings } from '../api/queries';
 import type { AuthResponse } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
+const DEFAULT_ACCENT_COLOR = '#f59e0b';
+
+const getInitials = (name?: string | null) => {
+  if (!name) return 'MP';
+  const words = name.trim().split(' ').filter(Boolean);
+  if (words.length === 0) return 'MP';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+};
+
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { data: settings } = useSettings();
   const {
     data: users,
     isLoading: usersLoading,
@@ -20,10 +31,30 @@ export const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTempKeyboard, setShowTempKeyboard] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
   const pinLength = 6;
 
   const shouldShowKeyboard = showEmbeddedKeyboard || showTempKeyboard;
+
+  useEffect(() => {
+    const accentColor = settings?.accentColor?.trim();
+    if (accentColor) {
+      document.documentElement.style.setProperty('--accent-color', accentColor);
+      return;
+    }
+    document.documentElement.style.setProperty('--accent-color', DEFAULT_ACCENT_COLOR);
+  }, [settings?.accentColor]);
+
+  const storeName = settings?.storeName ?? 'm-POSw';
+  const clubName = settings?.clubName ?? '';
+  const logoUrl = buildImageUrl(settings?.logoUrl);
+  const showLogo = Boolean(logoUrl) && !logoError;
+  const initials = getInitials(storeName);
+
+  useEffect(() => {
+    setLogoError(false);
+  }, [logoUrl]);
 
   const availableUsers = useMemo(
     () => (users ?? []).filter((user) => user.active !== false),
@@ -83,6 +114,20 @@ export const LoginPage: React.FC = () => {
   return (
     <div className="login-page">
       <form className="card login-card" onSubmit={handleSubmit}>
+        <div className="login-brand">
+          {showLogo ? (
+            <img
+              src={logoUrl}
+              alt={storeName}
+              className="login-logo"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <div className="login-logo-placeholder">{initials}</div>
+          )}
+          <h1 className="login-store-name">{storeName}</h1>
+          {clubName && <p className="login-club-name">{clubName}</p>}
+        </div>
         <h2>Iniciar sesión</h2>
         <label className="field">
           Email o usuario
