@@ -202,3 +202,63 @@ export interface CashClose {
   netCashDelta: number;
   movementsCount: number;
 }
+
+export type AccountingMovementType = 'INCOME' | 'EXPENSE';
+
+export interface AccountingCategory {
+  id: string;
+  name: string;
+  type: AccountingMovementType;
+  active: boolean;
+  _count?: { movements: number };
+}
+
+export interface AccountingMovement {
+  id: string;
+  type: AccountingMovementType;
+  amount: number;
+  description: string;
+  date: string;
+  categoryId: string;
+  refMovementId?: string | null;
+  category?: AccountingCategory;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ManualMovementWithCategory {
+  id: string;
+  createdAt: string;
+  type: 'ENTRADA' | 'SALIDA';
+  amount: number;
+  reason: string;
+  userId: string;
+  user?: { id: string; name: string };
+  manualMovementCategory?: {
+    id: string;
+    categoryId: string;
+    category: AccountingCategory;
+  } | null;
+}
+
+export interface AccountingSummary {
+  totalIncome: number;
+  totalExpense: number;
+  netBalance: number;
+  jornadaSalesTotal: number;
+  jornadaMovementsInTotal: number;
+  jornadaMovementsOutTotal: number;
+  accountingMovementsInTotal: number;
+  accountingMovementsOutTotal: number;
+  byCategory: Array<{
+    categoryId: string;
+    categoryName: string;
+    type: AccountingMovementType;
+    total: number;
+  }>;
+  monthlySeries: Array<{
+    month: string;
+    income: number;
+    expense: number;
+  }>;
+}

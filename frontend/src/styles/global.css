@@ -699,6 +699,10 @@ button {
   grid-template-columns: 1.5fr 0.5fr 1fr 0.7fr;
 }
 
+.product-table-header--4 {
+  grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr;
+}
+
 .product-table-header--5 {
   grid-template-columns: 1.2fr 0.8fr 1fr 0.8fr 1fr;
 }
@@ -709,6 +713,10 @@ button {
 
 .product-table-header--7 {
   grid-template-columns: 1.2fr 0.6fr 0.5fr 0.8fr 0.8fr 0.8fr 0.7fr;
+}
+
+.product-table-header--8 {
+  grid-template-columns: 0.5fr 0.7fr 0.5fr 0.8fr 1.2fr 0.3fr 0.7fr 0.7fr;
 }
 
 .product-table-row {
@@ -724,6 +732,10 @@ button {
   grid-template-columns: 1.5fr 0.5fr 1fr 0.7fr;
 }
 
+.product-table-row--4 {
+  grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr;
+}
+
 .product-table-row--5 {
   grid-template-columns: 1.2fr 0.8fr 1fr 0.8fr 1fr;
 }
@@ -734,6 +746,10 @@ button {
 
 .product-table-row--7 {
   grid-template-columns: 1.2fr 0.6fr 0.5fr 0.8fr 0.8fr 0.8fr 0.7fr;
+}
+
+.product-table-row--8 {
+  grid-template-columns: 0.5fr 0.7fr 0.5fr 0.8fr 1.2fr 0.3fr 0.7fr 0.7fr;
 }
 
 .product-table-row:last-child {
@@ -2632,4 +2648,243 @@ button {
 .product-form-fields .field input,
 .product-form-fields .field select {
   width: 100%;
+}
+
+/* ─── Accounting Module ───────────────────────────────────────── */
+
+.accounting-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.accounting-summary-card {
+  padding: 1.25rem;
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.accounting-summary-card.income {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #a7f3d0;
+}
+
+.accounting-summary-card.expense {
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1px solid #fecaca;
+}
+
+.accounting-summary-card.net {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #bfdbfe;
+}
+
+.accounting-summary-card.sales {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  border: 1px solid #c4b5fd;
+}
+
+.accounting-summary-card__label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.accounting-summary-card__value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.accounting-dashboard h2 {
+  margin-bottom: 1rem;
+}
+
+.accounting-filters {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  align-items: end;
+}
+
+.accounting-export-filters {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: end;
+}
+
+.accounting-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.accounting-actions .ghost-button {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background: transparent;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.15s;
+}
+
+.accounting-actions .ghost-button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.accounting-category-section {
+  margin-bottom: 2rem;
+}
+
+.accounting-category-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.accounting-category-section-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.accounting-monthly-chart {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  min-height: 180px;
+  padding: 1rem 0;
+}
+
+.accounting-monthly-bar-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.accounting-monthly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  width: 100%;
+  height: 120px;
+  justify-content: center;
+}
+
+.accounting-monthly-bar-fill {
+  width: 18px;
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height 0.3s ease;
+}
+
+.accounting-monthly-bar-fill.income-bar {
+  background: linear-gradient(180deg, #34d399, #059669);
+}
+
+.accounting-monthly-bar-fill.expense-bar {
+  background: linear-gradient(180deg, #fb923c, #dc2626);
+}
+
+.accounting-monthly-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+.accounting-monthly-meta small {
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.income-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #059669;
+}
+
+.expense-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dc2626;
+}
+
+.text-green {
+  color: #059669;
+  font-weight: 500;
+}
+
+.text-red {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.text-muted {
+  color: #9ca3af;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-inactive {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.accounting-nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.accounting-nav a {
+  text-decoration: none;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6b7280;
+  border-radius: 0.375rem 0.375rem 0 0;
+  transition: all 0.15s;
+}
+
+.accounting-nav a:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
+.accounting-nav a.active {
+  color: var(--accent-color);
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom: 2px solid var(--accent-color);
+  margin-bottom: -0.5rem;
 }

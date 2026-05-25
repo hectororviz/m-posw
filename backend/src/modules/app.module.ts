@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AccountingModule } from './accounting/accounting.module';
 import { AuthModule } from './auth/auth.module';
 import { CashCloseModule } from './cash-close/cash-close.module';
 import { CategoriesModule } from './categories/categories.module';
@@ -17,6 +18,7 @@ import { UsersModule } from './users/users.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    AccountingModule,
     AuthModule,
     CashCloseModule,
     UsersModule,

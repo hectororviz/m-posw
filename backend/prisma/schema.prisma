@@ -39,6 +39,11 @@ enum MovementType {
   SALIDA
 }
 
+enum AccountingMovementType {
+  INCOME
+  EXPENSE
+}
+
 enum ProductType {
   SIMPLE
   RAW_MATERIAL
@@ -133,6 +138,7 @@ model ManualMovement {
   reason    String
   userId    String       @db.Uuid
   user      User         @relation(fields: [userId], references: [id])
+  manualMovementCategory ManualMovementCategory?
 
   @@index([createdAt])
 }
@@ -293,4 +299,42 @@ model RecipeIngredient {
   @@unique([compositeId, rawMaterialId])
   @@index([compositeId])
   @@index([rawMaterialId])
+}
+
+model AccountingCategory {
+  id        String                   @id @default(uuid()) @db.Uuid
+  name      String
+  type      AccountingMovementType
+  active    Boolean                  @default(true)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  movements AccountingMovement[]
+  manualMovementCategories ManualMovementCategory[]
+}
+
+model AccountingMovement {
+  id               String                   @id @default(uuid()) @db.Uuid
+  type             AccountingMovementType
+  amount           Decimal                  @db.Decimal(10, 2)
+  description      String
+  date             DateTime
+  categoryId       String                   @db.Uuid
+  category         AccountingCategory       @relation(fields: [categoryId], references: [id])
+  refMovementId    String?                  @db.Uuid
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([date])
+  @@index([categoryId])
+  @@index([type])
+}
+
+model ManualMovementCategory {
+  id                String             @id @default(uuid()) @db.Uuid
+  manualMovementId  String             @unique @db.Uuid
+  manualMovement    ManualMovement     @relation(fields: [manualMovementId], references: [id])
+  categoryId        String             @db.Uuid
+  category          AccountingCategory @relation(fields: [categoryId], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }

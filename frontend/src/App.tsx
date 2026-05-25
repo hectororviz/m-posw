@@ -10,6 +10,11 @@ import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminStockPage } from './pages/AdminStockPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AccountingDashboard } from './pages/AccountingDashboard';
+import { AccountingMovementsPage } from './pages/AccountingMovementsPage';
+import { AccountingJornadasPage } from './pages/AccountingJornadasPage';
+import { AccountingCategoriesPage } from './pages/AccountingCategoriesPage';
+import { AccountingExportPage } from './pages/AccountingExportPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { PrintTicketPage } from './pages/PrintTicketPage';
@@ -96,6 +101,11 @@ export const App: React.FC = () => {
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="stock" element={<AdminStockPage />} />
         <Route path="users" element={<AdminUsersPage />} />
+        <Route path="contabilidad" element={<AccountingDashboard />} />
+        <Route path="contabilidad/movimientos" element={<AccountingMovementsPage />} />
+        <Route path="contabilidad/jornadas" element={<AccountingJornadasPage />} />
+        <Route path="contabilidad/categorias" element={<AccountingCategoriesPage />} />
+        <Route path="contabilidad/exportar" element={<AccountingExportPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

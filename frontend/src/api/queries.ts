@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { CashClose, Category, ManualMovement, Product, Sale, Setting, StockCategory, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, CashClose, Category, ManualMovement, ManualMovementWithCategory, Product, Sale, Setting, StockCategory, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -116,6 +116,60 @@ export const useCashCloses = () =>
     queryKey: ['cash-closes'],
     queryFn: async () => {
       const response = await apiClient.get<CashClose[]>('/cash-close/list');
+      return response.data;
+    },
+  });
+
+export const useAccountingCategories = (type?: string) =>
+  useQuery({
+    queryKey: ['accounting-categories', type],
+    queryFn: async () => {
+      const response = await apiClient.get<AccountingCategory[]>('/accounting/categories', {
+        params: type ? { type } : undefined,
+      });
+      return response.data;
+    },
+  });
+
+export const useAccountingMovements = (params?: {
+  from?: string;
+  to?: string;
+  type?: string;
+  categoryId?: string;
+}) =>
+  useQuery({
+    queryKey: ['accounting-movements', params],
+    queryFn: async () => {
+      const response = await apiClient.get<AccountingMovement[]>('/accounting/movements', {
+        params,
+      });
+      return response.data;
+    },
+  });
+
+export const useAccountingManualMovements = (params?: {
+  from?: string;
+  to?: string;
+  type?: string;
+}) =>
+  useQuery({
+    queryKey: ['accounting-manual-movements', params],
+    queryFn: async () => {
+      const response = await apiClient.get<ManualMovementWithCategory[]>(
+        '/accounting/manual-movements',
+        { params },
+      );
+      return response.data;
+    },
+  });
+
+export const useAccountingSummary = (params?: { from?: string; to?: string }) =>
+  useQuery({
+    queryKey: ['accounting-summary', params],
+    queryFn: async () => {
+      const response = await apiClient.get<AccountingSummary>('/accounting/summary', {
+        params,
+      });
       return response.data;
     },
   });

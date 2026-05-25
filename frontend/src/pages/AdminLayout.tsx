@@ -27,6 +27,9 @@ export const AdminLayout: React.FC = () => {
           <NavLink to="/admin/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
             Settings
           </NavLink>
+          <NavLink to="/admin/contabilidad" className={({ isActive }) => (isActive ? 'active' : '')}>
+            Contabilidad
+          </NavLink>
         </nav>
         <div className="admin-content">
           <Outlet />
