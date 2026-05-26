@@ -2312,6 +2312,21 @@ button {
   background: #d1d5db;
 }
 
+.settings-actions-row .download-apk-button {
+  background: #1f2937;
+  color: #ffffff;
+  border: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.settings-actions-row .download-apk-button:hover {
+  background: #374151;
+  color: #ffffff;
+}
+
 /* Payment Methods Section */
 .settings-payment-methods {
   grid-column: 1 / -1;

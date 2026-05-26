@@ -319,6 +319,14 @@ export const AdminSettingsPage: React.FC = () => {
         <button type="button" className="secondary-button about-button" onClick={handleOpenAbout}>
           Acerca de...
         </button>
+        <a
+          href="https://github.com/hectororviz/m-posw/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="secondary-button download-apk-button"
+        >
+          Descargar APK
+        </a>
       </div>
       
       {error && <p className="error-text">{error}</p>}
