@@ -24,6 +24,7 @@ CREATE TABLE "CashClose" (
     "note" TEXT,
     "salesCashTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "salesQrTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "salesTransferTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "salesTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "salesCount" INTEGER NOT NULL DEFAULT 0,
     "movementsOutTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,

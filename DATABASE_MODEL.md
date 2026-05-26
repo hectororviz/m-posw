@@ -359,8 +359,7 @@ Archivo schema: `backend/prisma/schema.prisma`
 - `20261007000000_add_ticket_settings` - Configuraciones de ticket
 - `20261007001000_add_ticket_printed_at` - Fecha de impresión de ticket
 - `20261008000000_add_manual_movements` - Movimientos manuales
-- `20261009000000_add_cash_closes` - Cierres de caja
-- `20261101000000_add_cash_close_and_movements` - Cierre y movimientos
+- `20261101000000_add_cash_close_and_movements` - Cierre de caja y movimientos de caja (incluye salesTransferTotal)
 - `20261115000000_add_order_number` - Número de orden
 - `20261116000000_add_order_number_to_sale_item` - Número de orden en ítems
 - `20261117000000_add_product_order_counter` - Contador de órdenes por producto
