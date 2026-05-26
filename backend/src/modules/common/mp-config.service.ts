@@ -3,6 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from './prisma.service';
 
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
+const RENEW_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutos
+
+interface MpTokenResponse {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+}
 
 @Injectable()
 export class MercadoPagoConfigService {
@@ -17,10 +24,29 @@ export class MercadoPagoConfigService {
     try {
       const setting = await this.prisma.setting.findUnique({
         where: { id: DEFAULT_SETTING_ID },
-        select: { mpLinked: true, mpAccessToken: true },
+        select: {
+          mpLinked: true,
+          mpAccessToken: true,
+          mpRefreshToken: true,
+          mpTokenExpiresAt: true,
+        },
       });
 
       if (setting?.mpLinked && setting.mpAccessToken) {
+        const needsRenewal =
+          !setting.mpTokenExpiresAt ||
+          setting.mpTokenExpiresAt.getTime() < Date.now() + RENEW_THRESHOLD_MS;
+
+        if (needsRenewal && setting.mpRefreshToken) {
+          this.logger.log('MP OAuth token proximo a expirar, renovando...');
+          const newTokens = await this.callRefreshApi(setting.mpRefreshToken);
+          if (newTokens) {
+            return newTokens;
+          }
+          this.logger.warn('Renovacion de token MP fallida, usando token actual');
+          return setting.mpAccessToken;
+        }
+
         return setting.mpAccessToken;
       }
     } catch (error) {
@@ -32,5 +58,96 @@ export class MercadoPagoConfigService {
       this.logger.error('MP_ACCESS_TOKEN no configurado (ni en DB ni en .env)');
     }
     return envToken ?? '';
+  }
+
+  async tryRefreshToken(): Promise<void> {
+    try {
+      const setting = await this.prisma.setting.findUnique({
+        where: { id: DEFAULT_SETTING_ID },
+        select: {
+          mpLinked: true,
+          mpRefreshToken: true,
+          mpTokenExpiresAt: true,
+        },
+      });
+
+      if (!setting?.mpLinked || !setting.mpRefreshToken) {
+        return;
+      }
+
+      const expiresIn = setting.mpTokenExpiresAt
+        ? setting.mpTokenExpiresAt.getTime() - Date.now()
+        : 0;
+
+      if (expiresIn > 24 * 60 * 60 * 1000) {
+        return;
+      }
+
+      this.logger.log('Cron: renovando token MP proactivamente...');
+      await this.callRefreshApi(setting.mpRefreshToken);
+    } catch (error) {
+      this.logger.warn(`Cron: renovacion de token MP fallida: ${error}`);
+    }
+  }
+
+  private async callRefreshApi(refreshToken: string): Promise<string | null> {
+    const clientId = this.config.get<string>('MP_CLIENT_ID');
+    const clientSecret = this.config.get<string>('MP_CLIENT_SECRET');
+
+    if (!clientId || !clientSecret) {
+      this.logger.error('Faltan MP_CLIENT_ID o MP_CLIENT_SECRET para renovar token');
+      return null;
+    }
+
+    const body = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    });
+
+    try {
+      const response = await fetch('https://api.mercadopago.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+
+      const data = (await response.json()) as MpTokenResponse;
+
+      if (!response.ok || !data.access_token) {
+        this.logger.error(`MP OAuth refresh failed: ${JSON.stringify(data)}`);
+        return null;
+      }
+
+      const expiresAt = data.expires_in
+        ? new Date(Date.now() + data.expires_in * 1000)
+        : undefined;
+
+      await this.prisma.setting.upsert({
+        where: { id: DEFAULT_SETTING_ID },
+        create: {
+          id: DEFAULT_SETTING_ID,
+          storeName: 'MiBPS Demo',
+          mpAccessToken: data.access_token,
+          mpRefreshToken: data.refresh_token ?? refreshToken,
+          mpTokenExpiresAt: expiresAt ?? null,
+          mpLinked: true,
+        },
+        update: {
+          mpAccessToken: data.access_token,
+          mpRefreshToken: data.refresh_token ?? refreshToken,
+          mpTokenExpiresAt: expiresAt ?? null,
+          mpLinked: true,
+        },
+      });
+
+      this.logger.log('MP OAuth token renovado exitosamente');
+
+      return data.access_token;
+    } catch (error) {
+      this.logger.error(`MP OAuth refresh network error: ${error}`);
+      return null;
+    }
   }
 }

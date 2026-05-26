@@ -1,5 +1,7 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Cron } from '@nestjs/schedule';
+import { MercadoPagoConfigService } from '../common/mp-config.service';
 import { PrismaService } from '../common/prisma.service';
 
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
@@ -11,6 +13,7 @@ export class MercadoPagoOauthService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private mpConfig: MercadoPagoConfigService,
   ) {}
 
   generateConnectUrl(): { url: string } {
@@ -32,6 +35,7 @@ export class MercadoPagoOauthService {
       platform_id: 'mp',
       state: subdomain,
       redirect_uri: redirectUri,
+      scope: 'read write offline_access',
     });
 
     const url = `https://auth.mercadopago.com/authorization?${params.toString()}`;
@@ -150,5 +154,11 @@ export class MercadoPagoOauthService {
     this.logger.log('MP OAuth desconectado, credenciales limpiadas de la BD');
 
     return { ok: true };
+  }
+
+  @Cron('0 0 */6 * * *')
+  async handleTokenRefresh() {
+    this.logger.debug('Cron: verificando renovacion proactiva de token MP...');
+    await this.mpConfig.tryRefreshToken();
   }
 }
