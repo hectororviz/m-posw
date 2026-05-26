@@ -235,6 +235,10 @@ model Setting {
   enableTransferPayment Boolean @default(true)
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
+  mpAccessToken   String?
+  mpRefreshToken  String?
+  mpTokenExpiresAt DateTime?
+  mpLinked        Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

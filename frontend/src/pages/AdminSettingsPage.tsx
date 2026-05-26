@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import * as emoji from 'node-emoji';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useSettings } from '../api/queries';
+import { useMpOauthStatus, useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
@@ -11,6 +11,7 @@ import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 export const AdminSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
+  const { data: mpStatus, refetch: refetchMpStatus } = useMpOauthStatus();
   const { pushToast } = useToast();
   const { showEmbeddedKeyboard, setShowEmbeddedKeyboard } = useEmbeddedKeyboard();
   const [form, setForm] = useState({
@@ -30,6 +31,8 @@ export const AdminSettingsPage: React.FC = () => {
   const [showMovementReasonsModal, setShowMovementReasonsModal] = useState(false);
   const [newInReason, setNewInReason] = useState('');
   const [newOutReason, setNewOutReason] = useState('');
+  const [mpConnecting, setMpConnecting] = useState(false);
+  const [mpDisconnecting, setMpDisconnecting] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -146,6 +149,30 @@ export const AdminSettingsPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
     } catch (err) {
       setError(normalizeApiError(err));
+    }
+  };
+
+  const handleConnectMp = async () => {
+    setMpConnecting(true);
+    try {
+      const response = await apiClient.get<{ url: string }>('/mp-oauth/connect');
+      window.location.href = response.data.url;
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+      setMpConnecting(false);
+    }
+  };
+
+  const handleDisconnectMp = async () => {
+    setMpDisconnecting(true);
+    try {
+      await apiClient.delete('/mp-oauth/disconnect');
+      await refetchMpStatus();
+      pushToast('Cuenta de MercadoPago desconectada', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setMpDisconnecting(false);
     }
   };
 
@@ -294,6 +321,43 @@ export const AdminSettingsPage: React.FC = () => {
               Transferencia
             </label>
           </div>
+        </div>
+
+        {/* Mercado Pago */}
+        <div className="settings-mp-oauth">
+          <h3>Mercado Pago</h3>
+          {mpStatus?.linked ? (
+            <div className="mp-linked-info">
+              <p>
+                <span className="mp-linked-badge">Conectado</span>
+              </p>
+              {mpStatus.expiresAt && (
+                <p className="mp-expires">
+                  Expira: {new Date(mpStatus.expiresAt).toLocaleString()}
+                </p>
+              )}
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleDisconnectMp}
+                disabled={mpDisconnecting}
+              >
+                {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
+              </button>
+            </div>
+          ) : (
+            <div className="mp-unlinked-info">
+              <p>Vincula tu cuenta de MercadoPago via OAuth para gestionar los pagos.</p>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handleConnectMp}
+                disabled={mpConnecting}
+              >
+                {mpConnecting ? 'Redirigiendo...' : 'Conectar Mercado Pago'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Motivos de Movimientos */}

@@ -2352,6 +2352,54 @@ button {
   border-radius: 0.375rem;
 }
 
+/* Mercado Pago OAuth */
+.settings-mp-oauth {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.settings-mp-oauth h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.settings-mp-oauth .mp-linked-badge {
+  display: inline-block;
+  background: #dcfce7;
+  color: #166534;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.settings-mp-oauth .mp-expires {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0.5rem 0;
+}
+
+.settings-mp-oauth .mp-linked-info p,
+.settings-mp-oauth .mp-unlinked-info p {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+/* OAuth return page */
+.oauth-return-page h2 {
+  margin-bottom: 0.5rem;
+}
+
+.oauth-return-page p {
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
 /* About Modal */
 .about-modal {
   max-width: 600px;

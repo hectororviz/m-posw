@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
+import { MercadoPagoConfigService } from '../common/mp-config.service';
 import type { PollTransferResponse } from './dto/transfer.dto';
 
 interface MPPayment {
@@ -31,11 +31,11 @@ export class PaymentsService {
 
   constructor(
     private prisma: PrismaService,
-    private config: ConfigService,
+    private mpConfig: MercadoPagoConfigService,
   ) {}
 
   async pollTransfer(montoEsperado: number, userId: string): Promise<PollTransferResponse> {
-    const token = this.config.get<string>('MP_ACCESS_TOKEN');
+    const token = await this.mpConfig.getAccessToken();
     if (!token) {
       throw new Error('MP_ACCESS_TOKEN no configurado');
     }

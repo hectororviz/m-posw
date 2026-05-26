@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, CashClose, Category, ManualMovement, ManualMovementWithCategory, Product, Sale, Setting, StockCategory, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, CashClose, Category, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -64,6 +64,15 @@ export const useSettings = () => {
     placeholderData: () => queryClient.getQueryData<Setting>(['settings']),
   });
 };
+
+export const useMpOauthStatus = () =>
+  useQuery({
+    queryKey: ['mp-oauth-status'],
+    queryFn: async () => {
+      const response = await apiClient.get<MpOauthStatus>('/mp-oauth/status');
+      return response.data;
+    },
+  });
 
 export const useUsers = () =>
   useQuery({

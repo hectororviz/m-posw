@@ -143,6 +143,13 @@ export interface Setting {
   enableTransferPayment?: boolean | null;
   movementInReasons?: string[];
   movementOutReasons?: string[];
+  mpLinked?: boolean | null;
+  mpTokenExpiresAt?: string | null;
+}
+
+export interface MpOauthStatus {
+  linked: boolean;
+  expiresAt: string | null;
 }
 
 export interface ApiErrorResponse {

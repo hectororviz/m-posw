@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Sale, SaleItem } from '@prisma/client';
+import { MercadoPagoConfigService } from '../../common/mp-config.service';
 
 interface CreateOrderInput {
   externalStoreId: string;
@@ -41,7 +42,10 @@ export class MercadoPagoInstoreService {
   private readonly logger = new Logger(MercadoPagoInstoreService.name);
   private readonly notificationUrl = 'https://pos.csdsoler.com.ar/api/webhooks/mercadopago';
 
-  constructor(private config: ConfigService) {}
+  constructor(
+    private config: ConfigService,
+    private mpConfig: MercadoPagoConfigService,
+  ) {}
 
   async createOrUpdateOrder(input: CreateOrderInput) {
     const url = this.buildOrdersUrl(input.externalStoreId, input.externalPosId);
@@ -171,7 +175,7 @@ export class MercadoPagoInstoreService {
   }
 
   private async request<T = unknown>(method: string, url: string, payload?: unknown): Promise<T> {
-    const token = this.config.get<string>('MP_ACCESS_TOKEN');
+    const token = await this.mpConfig.getAccessToken();
     if (!token) {
       throw new HttpException('MP_ACCESS_TOKEN no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
     }

@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { MercadoPagoConfigService } from '../../common/mp-config.service';
 
 @Injectable()
 export class MercadoPagoQueryService {
@@ -7,7 +7,7 @@ export class MercadoPagoQueryService {
   private readonly timeoutMs = 8000;
   private readonly logger = new Logger(MercadoPagoQueryService.name);
 
-  constructor(private config: ConfigService) {}
+  constructor(private mpConfig: MercadoPagoConfigService) {}
 
   getPayment(paymentId: string) {
     return this.request('GET', `${this.baseUrl}/v1/payments/${paymentId}`);
@@ -37,7 +37,7 @@ export class MercadoPagoQueryService {
   }
 
   private async request<T = unknown>(method: string, url: string): Promise<T> {
-    const token = this.config.get<string>('MP_ACCESS_TOKEN');
+    const token = await this.mpConfig.getAccessToken();
     if (!token) {
       throw new HttpException('MP_ACCESS_TOKEN no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
     }

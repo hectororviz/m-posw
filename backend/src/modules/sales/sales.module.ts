@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { MercadoPagoConfigService } from '../common/mp-config.service';
 import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
 import { MercadoPagoWebhookController } from './webhooks/mercadopago-webhook.controller';
@@ -13,6 +14,7 @@ import { SalesGateway } from './websockets/sales.gateway';
   providers: [
     SalesService,
     PrismaService,
+    MercadoPagoConfigService,
     MercadoPagoInstoreService,
     MercadoPagoQueryService,
     MercadoPagoWebhookProcessorService,

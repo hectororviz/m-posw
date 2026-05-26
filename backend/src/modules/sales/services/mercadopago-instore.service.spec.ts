@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { MercadoPagoConfigService } from '../../common/mp-config.service';
 import { MercadoPagoInstoreService } from './mercadopago-instore.service';
 
 describe('MercadoPagoInstoreService', () => {
@@ -12,12 +13,16 @@ describe('MercadoPagoInstoreService', () => {
     }),
   } as unknown as ConfigService;
 
+  const mpConfig = {
+    getAccessToken: jest.fn().mockResolvedValue('token'),
+  } as unknown as MercadoPagoConfigService;
+
   afterEach(() => {
     global.fetch = originalFetch;
   });
 
   it('arma la URL de orders con store y pos', () => {
-    const service = new MercadoPagoInstoreService(config);
+    const service = new MercadoPagoInstoreService(config, mpConfig);
 
     expect(service.buildOrdersUrl('STORE_1', 'POS_1')).toBe(
       'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/stores/STORE_1/pos/POS_1/orders',
@@ -25,7 +30,7 @@ describe('MercadoPagoInstoreService', () => {
   });
 
   it('arma la URL de orders solo con pos', () => {
-    const service = new MercadoPagoInstoreService(config);
+    const service = new MercadoPagoInstoreService(config, mpConfig);
 
     expect(service.buildPosOrdersUrl('POS_1')).toBe(
       'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/pos/POS_1/orders',
@@ -39,7 +44,7 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config);
+    const service = new MercadoPagoInstoreService(config, mpConfig);
 
     await service.createOrUpdateOrder({
       externalStoreId: 'STORE_1',
@@ -95,7 +100,7 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config);
+    const service = new MercadoPagoInstoreService(config, mpConfig);
 
     await service.createOrUpdateOrder({
       externalStoreId: 'STORE_1',
@@ -120,7 +125,7 @@ describe('MercadoPagoInstoreService', () => {
   });
 
   it('buildPayload calcula total con decimales y currency_id', () => {
-    const service = new MercadoPagoInstoreService(config);
+    const service = new MercadoPagoInstoreService(config, mpConfig);
 
     const payload = service.buildPayload({
       id: 'sale-3',
@@ -149,7 +154,7 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config);
+    const service = new MercadoPagoInstoreService(config, mpConfig);
 
     await service.deleteOrder({
       externalStoreId: 'STORE_1',
@@ -172,7 +177,7 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config);
+    const service = new MercadoPagoInstoreService(config, mpConfig);
 
     await (service as any).request('PUT', 'https://api.mercadopago.com/test', {
       total_amount: 10,

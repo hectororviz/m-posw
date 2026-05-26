@@ -17,6 +17,7 @@ import { AccountingCategoriesPage } from './pages/AccountingCategoriesPage';
 import { AccountingExportPage } from './pages/AccountingExportPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
+import { OAuthReturnPage } from './pages/OAuthReturnPage';
 import { PrintTicketPage } from './pages/PrintTicketPage';
 import { SalesPage } from './pages/SalesPage';
 import { useAuth } from './context/AuthContext';
@@ -41,6 +42,7 @@ export const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/oauth-return" element={<OAuthReturnPage />} />
       <Route path="/print/ticket" element={<PrintTicketPage />} />
       <Route path="/printticket" element={<PrintTicketPage />} />
       <Route

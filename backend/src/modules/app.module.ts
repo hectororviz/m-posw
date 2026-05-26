@@ -6,6 +6,7 @@ import { CashCloseModule } from './cash-close/cash-close.module';
 import { CategoriesModule } from './categories/categories.module';
 import { CashMovementsModule } from './cash-movements/cash-movements.module';
 import { IconsModule } from './icons/icons.module';
+import { MercadoPagoOauthModule } from './mercadopago-oauth/mercadopago-oauth.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ProductsModule } from './products/products.module';
 import { ReportsModule } from './reports/reports.module';
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module';
     CategoriesModule,
     CashMovementsModule,
     IconsModule,
+    MercadoPagoOauthModule,
     PaymentsModule,
     ProductsModule,
     SalesModule,
