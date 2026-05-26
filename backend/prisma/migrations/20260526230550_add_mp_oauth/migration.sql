@@ -1,6 +1,5 @@
 -- AlterTable
-ALTER TABLE "Setting"
-  ADD COLUMN IF NOT EXISTS "mpAccessToken" TEXT,
-  ADD COLUMN IF NOT EXISTS "mpRefreshToken" TEXT,
-  ADD COLUMN IF NOT EXISTS "mpTokenExpiresAt" TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS "mpLinked" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Setting" ADD COLUMN     "mpAccessToken" TEXT,
+ADD COLUMN     "mpLinked" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "mpRefreshToken" TEXT,
+ADD COLUMN     "mpTokenExpiresAt" TIMESTAMP(3);
