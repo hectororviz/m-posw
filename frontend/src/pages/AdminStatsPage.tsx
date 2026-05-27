@@ -6,41 +6,22 @@ const formatCurrency = (value: number) =>
   value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
 
 const formatDateLabel = (value: string) =>
-  new Date(value).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-  });
+  new Date(value).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
 
 const normalizeAmount = (value?: number | string | null) => {
-  if (typeof value === 'number') {
-    return value;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const buildDateTime = (date?: string, time?: string, fallbackTime?: string) => {
-  if (!date) {
-    return null;
-  }
-  const safeTime = time || fallbackTime || '00:00';
-  return new Date(`${date}T${safeTime}`);
-};
-
-const paymentLabels: Record<string, string> = {
-  CASH: 'Efectivo',
-  MP_QR: 'QR MercadoPago',
-  TRANSFER: 'Transferencia',
+  if (typeof value === 'number') return value;
+  const p = Number(value);
+  return Number.isFinite(p) ? p : 0;
 };
 
 const encodeBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return window.btoa(binary);
 };
+
+const paymentLabels: Record<string, string> = { CASH: 'Efectivo', MP_QR: 'QR', TRANSFER: 'Transf.' };
 
 export const AdminStatsPage: React.FC = () => {
   const { data: sales = [] } = useAdminSales();
@@ -51,310 +32,181 @@ export const AdminStatsPage: React.FC = () => {
   const [endTime, setEndTime] = useState('23:59');
 
   const filteredSales = useMemo(() => {
-    if (!startDate && !endDate) {
-      return sales;
-    }
-    const start = buildDateTime(startDate, startTime, '00:00');
-    const end = buildDateTime(endDate, endTime, '23:59');
-
-    return sales.filter((sale) => {
-      const createdAt = new Date(sale.createdAt);
-      if (start && createdAt < start) {
-        return false;
-      }
-      if (end && createdAt > end) {
-        return false;
-      }
+    if (!startDate && !endDate) return sales;
+    const start = startDate ? new Date(`${startDate}T${startTime || '00:00'}`) : null;
+    const end = endDate ? new Date(`${endDate}T${endTime || '23:59'}`) : null;
+    return sales.filter((s) => {
+      const d = new Date(s.createdAt);
+      if (start && d < start) return false;
+      if (end && d > end) return false;
       return true;
     });
   }, [sales, startDate, startTime, endDate, endTime]);
 
   const productTotals = useMemo(() => {
     const totals = new Map<string, number>();
-    filteredSales.forEach((sale) => {
-      sale.items.forEach((item) => {
-        totals.set(item.product.name, (totals.get(item.product.name) || 0) + item.quantity);
-      });
-    });
-    return Array.from(totals.entries())
-      .map(([name, quantity]) => ({ name, quantity }))
-      .sort((a, b) => b.quantity - a.quantity);
+    filteredSales.forEach((s) => { s.items.forEach((i) => { totals.set(i.product.name, (totals.get(i.product.name) || 0) + i.quantity); }); });
+    return Array.from(totals.entries()).map(([name, quantity]) => ({ name, quantity })).sort((a, b) => b.quantity - a.quantity);
   }, [filteredSales]);
 
   const paymentTotals = useMemo(() => {
     const totals = new Map<string, number>();
-    filteredSales.forEach((sale) => {
-      const method = sale.paymentMethod ?? 'CASH';
-      const amount = normalizeAmount(sale.total);
-      totals.set(method, (totals.get(method) || 0) + amount);
-    });
-    return Array.from(totals.entries()).map(([method, total]) => ({
-      method,
-      total,
-    }));
+    filteredSales.forEach((s) => { const m = s.paymentMethod ?? 'CASH'; totals.set(m, (totals.get(m) || 0) + normalizeAmount(s.total)); });
+    return Array.from(totals.entries()).map(([method, total]) => ({ method, total }));
   }, [filteredSales]);
 
   const paymentSummary = useMemo(() => {
-    const totalAmount = paymentTotals.reduce((acc, item) => acc + item.total, 0);
+    const totalAmount = paymentTotals.reduce((acc, i) => acc + i.total, 0);
     const palette = ['#38bdf8', '#f97316', '#a78bfa', '#4ade80'];
     let current = 0;
-    const segments = paymentTotals.map((item, index) => {
+    const segments = paymentTotals.map((item, idx) => {
       const percent = totalAmount ? (item.total / totalAmount) * 100 : 0;
       const start = current;
-      const end = current + percent;
-      current = end;
-      return {
-        ...item,
-        percent,
-        color: palette[index % palette.length],
-        gradient: `${palette[index % palette.length]} ${start}% ${end}%`,
-      };
+      current += percent;
+      return { ...item, percent, color: palette[idx % palette.length], gradient: `${palette[idx % palette.length]} ${start}% ${current}%` };
     });
-    const gradient = segments.length
-      ? `conic-gradient(${segments.map((segment) => segment.gradient).join(', ')})`
-      : 'conic-gradient(#e2e8f0 0% 100%)';
-    return { totalAmount, segments, gradient };
+    return { totalAmount, segments, gradient: segments.length ? `conic-gradient(${segments.map((s) => s.gradient).join(', ')})` : 'conic-gradient(#e2e8f0 0% 100%)' };
   }, [paymentTotals]);
 
   const dailyTotals = useMemo(() => {
     const totals = new Map<string, number>();
-    sales.forEach((sale) => {
-      const dateKey = sale.createdAt.slice(0, 10);
-      const amount = normalizeAmount(sale.total);
-      totals.set(dateKey, (totals.get(dateKey) || 0) + amount);
-    });
-    const entries = Array.from(totals.entries())
-      .map(([date, total]) => ({ date, total }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-    return entries.slice(-7);
+    sales.forEach((s) => { const dk = s.createdAt.slice(0, 10); totals.set(dk, (totals.get(dk) || 0) + normalizeAmount(s.total)); });
+    return Array.from(totals.entries()).map(([date, total]) => ({ date, total })).sort((a, b) => a.date.localeCompare(b.date)).slice(-7);
   }, [sales]);
 
   const maxProduct = productTotals[0]?.quantity ?? 0;
-  const maxDailyTotal = dailyTotals.reduce((acc, item) => Math.max(acc, item.total), 0);
+  const maxDailyTotal = dailyTotals.reduce((acc, i) => Math.max(acc, i.total), 0);
+  const totalSales = paymentSummary.totalAmount;
+  const totalProducts = productTotals.reduce((acc, i) => acc + i.quantity, 0);
+  const avgTicket = filteredSales.length ? totalSales / filteredSales.length : 0;
+  const topProduct = productTotals[0]?.name ?? '—';
 
   const handlePrintStats = () => {
-    if (filteredSales.length === 0) {
-      return;
-    }
-
-    const totalProducts = productTotals.reduce((acc, item) => acc + item.quantity, 0);
-    const totalAmount = paymentSummary.totalAmount;
-
-    // Calcular fechas reales del período
-    const sortedSales = [...filteredSales].sort((a, b) => 
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-    const firstSale = sortedSales[0];
-    const lastSale = sortedSales[sortedSales.length - 1];
-    
-    const formatDateShort = (dateStr: string) => {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-      });
-    };
-
-    const formatTimeShort = (dateStr: string) => {
-      const date = new Date(dateStr);
-      return date.toLocaleTimeString('es-AR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
-    };
-
-    const desdeFecha = startDate 
-      ? `${startDate} ${startTime}` 
-      : `${formatDateShort(firstSale.createdAt)} ${formatTimeShort(firstSale.createdAt)}`;
-    const hastaFecha = endDate 
-      ? `${endDate} ${endTime}` 
-      : `${formatDateShort(lastSale.createdAt)} ${formatTimeShort(lastSale.createdAt)}`;
-
-    // Construir resumen de medios de pago en formato de dos líneas
-    const paymentSummaryLines: { label: string; value: string }[] = [];
-    paymentSummary.segments.forEach((segment) => {
-      const methodName = paymentLabels[segment.method] ?? segment.method;
-      // Línea 1: Nombre y porcentaje
-      paymentSummaryLines.push({
-        label: `${methodName}`,
-        value: `${segment.percent.toFixed(1)}%`,
-      });
-      // Línea 2: Monto
-      paymentSummaryLines.push({
-        label: '',
-        value: formatCurrency(segment.total),
-      });
-    });
-
-    // Construir resumen de productos top 10
-    const productSummaryLines = productTotals.slice(0, 10).map((p) => ({
-      label: p.name.substring(0, 18),
-      value: `${p.quantity} (${((p.quantity / totalProducts) * 100).toFixed(1)}%)`,
-    }));
-
-    const payload: TicketPayload = {
-      clubName: settings?.clubName ?? '',
-      storeName: settings?.storeName ?? 'Estadísticas',
-      dateTimeISO: new Date().toISOString(),
-      itemsStyle: 'summary',
-      items: [], // No enviar items para evitar duplicación
-      criteria: [
-        { label: 'Desde:', value: desdeFecha },
-        { label: 'Hasta:', value: hastaFecha },
-        { label: 'Total ventas:', value: formatCurrency(totalAmount) },
-        { label: 'Total productos:', value: totalProducts.toString() },
-      ],
-      summary: [
-        { label: 'MEDIOS DE PAGO', value: '' },
-        ...paymentSummaryLines,
-        { label: '', value: '' },
-        { label: 'PRODUCTOS', value: '' },
-        ...productSummaryLines,
-      ],
-      title: 'ESTADISTICAS',
-      footer: 'Resumen de ventas',
-    };
-
-    const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
-    const url = `/printticket?data=${ticketParam}`;
-    window.location.href = url;
+    if (filteredSales.length === 0) return;
+    const sorted = [...filteredSales].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    const fmt = (d: string) => { const dt = new Date(d); return dt.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+    const paymentLines: { label: string; value: string }[] = [];
+    paymentSummary.segments.forEach((s) => { paymentLines.push({ label: paymentLabels[s.method] ?? s.method, value: `${s.percent.toFixed(1)}%` }); paymentLines.push({ label: '', value: formatCurrency(s.total) }); });
+    const productLines = productTotals.slice(0, 10).map((p) => ({ label: p.name.substring(0, 18), value: `${p.quantity} (${((p.quantity / totalProducts) * 100).toFixed(1)}%)` }));
+    const payload: TicketPayload = { clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: new Date().toISOString(), itemsStyle: 'summary', items: [], criteria: [{ label: 'Desde:', value: fmt(first.createdAt) }, { label: 'Hasta:', value: fmt(last.createdAt) }, { label: 'Total ventas:', value: formatCurrency(totalSales) }, { label: 'Total productos:', value: totalProducts.toString() }], summary: [{ label: 'MEDIOS DE PAGO', value: '' }, ...paymentLines, { label: '', value: '' }, { label: 'PRODUCTOS', value: '' }, ...productLines], title: 'ESTADISTICAS', footer: 'Resumen de ventas' };
+    window.location.href = `/printticket?data=${encodeURIComponent(encodeBase64(JSON.stringify(payload)))}`;
   };
 
   return (
-    <section className="card admin-stats">
-      <h2>Estadísticas</h2>
-      <p>Selecciona un rango para analizar productos vendidos y medios de pago.</p>
-      <div className="form-grid admin-stats__filters">
-        <label className="input-field">
-          Fecha desde
-          <input
-            type="date"
-            value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
-          />
+    <div>
+      <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Estadisticas</h2>
+            <p className="page-header-subtitle">Analiza ventas, productos y medios de pago por periodo.</p>
+          </div>
+          <button type="button" className="btn-ghost" onClick={handlePrintStats} disabled={filteredSales.length === 0}>Imprimir reporte</button>
+        </div>
+      </div>
+
+      <div className="stats-kpi-main">
+        <span className="stats-kpi-main-label">Ventas totales</span>
+        <span className="stats-kpi-main-value">{formatCurrency(totalSales)}</span>
+      </div>
+
+      <div className="stats-kpis">
+        <div className="stats-kpi-card">
+          <span className="stats-kpi-label">Operaciones</span>
+          <span className="stats-kpi-value">{filteredSales.length}</span>
+        </div>
+        <div className="stats-kpi-card">
+          <span className="stats-kpi-label">Ticket promedio</span>
+          <span className="stats-kpi-value">{formatCurrency(avgTicket)}</span>
+        </div>
+        <div className="stats-kpi-card">
+          <span className="stats-kpi-label">Productos vendidos</span>
+          <span className="stats-kpi-value">{totalProducts}</span>
+        </div>
+        <div className="stats-kpi-card">
+          <span className="stats-kpi-label">Mas vendido</span>
+          <span className="stats-kpi-value">{topProduct}</span>
+        </div>
+      </div>
+
+      <div className="stock-toolbar">
+        <label className="input-field input-field--compact" style={{ margin: 0 }}>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '0.5rem 0.65rem', fontSize: '0.85rem' }} />
         </label>
-        <label className="input-field">
-          Hora desde
-          <input
-            type="time"
-            value={startTime}
-            onChange={(event) => setStartTime(event.target.value)}
-          />
+        <label className="input-field input-field--compact" style={{ margin: 0 }}>
+          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ padding: '0.5rem 0.65rem', fontSize: '0.85rem' }} />
         </label>
-        <label className="input-field">
-          Fecha hasta
-          <input
-            type="date"
-            value={endDate}
-            onChange={(event) => setEndDate(event.target.value)}
-          />
+        <label className="input-field input-field--compact" style={{ margin: 0 }}>
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '0.5rem 0.65rem', fontSize: '0.85rem' }} />
         </label>
-        <label className="input-field">
-          Hora hasta
-          <input
-            type="time"
-            value={endTime}
-            onChange={(event) => setEndTime(event.target.value)}
-          />
+        <label className="input-field input-field--compact" style={{ margin: 0 }}>
+          <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ padding: '0.5rem 0.65rem', fontSize: '0.85rem' }} />
         </label>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handlePrintStats}
-          disabled={filteredSales.length === 0}
-          style={{ alignSelf: 'flex-end' }}
-        >
-          🖨️ Imprimir estadísticas
-        </button>
       </div>
 
       <div className="admin-stats__grid">
-        <article className="admin-stats__panel">
-          <header>
-            <h3>Productos vendidos</h3>
-            <p>Totales por producto en el rango seleccionado.</p>
-          </header>
+        <div className="settings-section">
+          <h3 className="settings-section-header">Productos vendidos</h3>
           {productTotals.length === 0 ? (
-            <div className="admin-stats__empty">No hay ventas en el rango elegido.</div>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>Sin ventas en el rango.</p>
           ) : (
-            <div className="admin-stats__bar-chart">
+            <div className="stats-bar-chart">
               {productTotals.map((product) => (
-                <div className="admin-stats__bar" key={product.name}>
-                  <div className="admin-stats__bar-track">
-                    <div
-                      className="admin-stats__bar-fill"
-                      style={{ width: `${(product.quantity / maxProduct) * 100}%` }}
-                    />
+                <div className="stats-bar" key={product.name}>
+                  <div className="stats-bar-track">
+                    <div className="stats-bar-fill" style={{ width: `${(product.quantity / maxProduct) * 100}%` }} />
                   </div>
-                  <div className="admin-stats__bar-meta">
-                    <span>{product.name}</span>
-                    <strong>{product.quantity}</strong>
+                  <div className="stats-bar-meta">
+                    <span className="stats-bar-name">{product.name}</span>
+                    <span className="stats-bar-qty">{product.quantity}</span>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </article>
+        </div>
 
-        <article className="admin-stats__panel">
-          <header>
-            <h3>Medio de pago</h3>
-            <p>Distribución del total vendido por método.</p>
-          </header>
+        <div className="settings-section">
+          <h3 className="settings-section-header">Medios de pago</h3>
           {paymentSummary.totalAmount === 0 ? (
-            <div className="admin-stats__empty">No hay ventas en el rango elegido.</div>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>Sin ventas en el rango.</p>
           ) : (
-            <div className="admin-stats__pie">
-              <div className="admin-stats__pie-chart" style={{ background: paymentSummary.gradient }} />
-              <div className="admin-stats__legend">
-                {paymentSummary.segments.map((segment) => (
-                  <div className="admin-stats__legend-item" key={segment.method}>
-                    <span
-                      className="admin-stats__legend-color"
-                      style={{ background: segment.color }}
-                    />
-                    <div>
-                      <strong>{paymentLabels[segment.method] ?? segment.method}</strong>
-                      <span>{formatCurrency(segment.total)}</span>
-                    </div>
-                    <span className="admin-stats__legend-percent">
-                      {segment.percent.toFixed(1)}%
-                    </span>
+            <div className="stats-donut">
+              <div className="stats-donut-chart" style={{ background: paymentSummary.gradient }} />
+              <div className="stats-donut-legend">
+                {paymentSummary.segments.map((s) => (
+                  <div key={s.method} className="stats-donut-legend-item">
+                    <span className="stats-donut-dot" style={{ background: s.color }} />
+                    <span className="stats-donut-label">{paymentLabels[s.method] ?? s.method}</span>
+                    <span className="stats-donut-value">{formatCurrency(s.total)}</span>
+                    <span className="stats-donut-pct">{s.percent.toFixed(1)}%</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </article>
+        </div>
       </div>
 
-      <article className="admin-stats__panel admin-stats__panel--wide">
-        <header>
-          <h3>Totales de ventas recientes</h3>
-          <p>Comparativa de los últimos días con venta registrada.</p>
-        </header>
-        {dailyTotals.length === 0 ? (
-          <div className="admin-stats__empty">Todavía no hay ventas registradas.</div>
-        ) : (
-          <div className="admin-stats__daily-chart">
+      {dailyTotals.length > 0 && (
+        <div className="settings-section" style={{ marginTop: '1rem' }}>
+          <h3 className="settings-section-header">Ventas recientes</h3>
+          <p className="settings-section-desc">Comparativa de los ultimos dias con venta registrada.</p>
+          <div className="stats-daily">
             {dailyTotals.map((day) => (
-              <div className="admin-stats__daily-bar" key={day.date}>
-                <div className="admin-stats__daily-bar-fill">
-                  <span
-                    style={{ height: `${maxDailyTotal ? (day.total / maxDailyTotal) * 100 : 0}%` }}
-                  />
+              <div className="stats-daily-bar" key={day.date}>
+                <div className="stats-daily-fill">
+                  <span style={{ height: `${maxDailyTotal ? (day.total / maxDailyTotal) * 100 : 0}%` }} />
                 </div>
-                <div className="admin-stats__daily-meta">
-                  <strong>{formatDateLabel(day.date)}</strong>
-                  <span>{formatCurrency(day.total)}</span>
+                <div className="stats-daily-meta">
+                  <span className="stats-daily-date">{formatDateLabel(day.date)}</span>
+                  <span className="stats-daily-amount">{formatCurrency(day.total)}</span>
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </article>
-    </section>
+        </div>
+      )}
+    </div>
   );
 };
