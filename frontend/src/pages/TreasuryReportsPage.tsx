@@ -100,12 +100,14 @@ export const TreasuryReportsPage: React.FC = () => {
               </select>
             </div>
           )}
-          {activeTab === 'availabilities' && (
-            <div className="filter-field">
-              <label>Fecha de corte</label>
-              <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
-            </div>
-          )}
+        </div>
+      )}
+      {activeTab === 'availabilities' && (
+        <div className="filter-bar">
+          <div className="filter-field">
+            <label>Fecha de corte</label>
+            <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+          </div>
         </div>
       )}
 

@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { normalizeApiError } from '../api/client';
 import { useLedgerAccounts } from '../api/queries';
-import type { LedgerAccount, LedgerAccountType } from '../api/types';
+import type { LedgerAccountType } from '../api/types';
 
 const typeLabel: Record<LedgerAccountType, string> = {
   ASSET: 'Activo',

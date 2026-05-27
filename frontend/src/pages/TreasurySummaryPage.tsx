@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTreasurySummary } from '../api/queries';
-import { Link } from 'react-router-dom';
+
 
 const formatCurrency = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });

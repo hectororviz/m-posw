@@ -36,7 +36,6 @@ async function main() {
       },
     });
   }
-}
 
   await seedLedgerAccounts();
 }

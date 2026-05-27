@@ -10,7 +10,7 @@ import {
   useJournalEntry,
   useLedgerAccounts,
 } from '../api/queries';
-import type { EntryLineInput, JournalEntry, LedgerAccount } from '../api/types';
+import type { JournalEntry } from '../api/types';
 
 const formatCurrency = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
@@ -256,7 +256,7 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
 const SimpleEntryModal: React.FC<{
   type: 'income' | 'expense';
   onClose: () => void;
-  onSave: (mode: string, data: any) => void;
+  onSave: (mode: 'income' | 'expense', data: any) => Promise<void>;
   error: string | null;
 }> = ({ type, onClose, onSave, error }) => {
   const { data: assetAccounts } = useImputableAssetAccounts();
