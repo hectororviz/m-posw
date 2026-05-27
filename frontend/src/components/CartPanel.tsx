@@ -24,14 +24,11 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
   const { data: settings } = useSettings();
   const { pushToast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
+    if (typeof window === 'undefined') return false;
     return localStorage.getItem(STORAGE_KEY) === 'true';
   });
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  
-  // Estados para el modal de movimientos
+
   const [isMovementOpen, setIsMovementOpen] = useState(false);
   const [movementType, setMovementType] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
   const [movementAmount, setMovementAmount] = useState('');
@@ -47,50 +44,30 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
       const next = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, String(next));
-      }
+      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, String(next));
       return next;
     });
   };
 
   const getAvailableReasons = (type: 'ENTRADA' | 'SALIDA') => {
-    const defaultReasons = type === 'ENTRADA' ? DEFAULT_IN_REASONS : DEFAULT_OUT_REASONS;
-    const customReasons = type === 'ENTRADA'
-      ? (settings?.movementInReasons ?? [])
-      : (settings?.movementOutReasons ?? []);
-    const allReasons = [...defaultReasons];
-    customReasons.forEach((reason) => {
-      if (!allReasons.includes(reason)) {
-        allReasons.push(reason);
-      }
-    });
-    return allReasons;
+    const defaults = type === 'ENTRADA' ? DEFAULT_IN_REASONS : DEFAULT_OUT_REASONS;
+    const custom = type === 'ENTRADA' ? (settings?.movementInReasons ?? []) : (settings?.movementOutReasons ?? []);
+    return [...new Set([...defaults, ...custom])];
   };
 
   const handleOpenMovement = () => {
     setMovementType('ENTRADA');
     setMovementAmount('');
-    const reasons = getAvailableReasons('ENTRADA');
-    setMovementReason(reasons[0] || '');
+    setMovementReason(getAvailableReasons('ENTRADA')[0] || '');
     setMovementDescription('');
     setIsMovementOpen(true);
   };
 
-  const handleCloseMovement = () => {
-    setIsMovementOpen(false);
-  };
-
   const isMovementValid = () => {
-    const amount = Number(movementAmount);
-    const reason = movementReason.trim();
-    const description = movementDescription.trim();
-    if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) {
-      return false;
-    }
-    if (reason === 'Otro' && description.length === 0) {
-      return false;
-    }
+    const a = Number(movementAmount);
+    const r = movementReason.trim();
+    if (!Number.isFinite(a) || a <= 0 || r.length === 0) return false;
+    if (r === 'Otro' && movementDescription.trim().length === 0) return false;
     return true;
   };
 
@@ -98,28 +75,16 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
     const amount = Number(movementAmount);
     const reason = movementReason.trim();
     const description = movementDescription.trim();
-    
-    if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) {
-      return;
-    }
-    if (reason === 'Otro' && description.length === 0) {
-      pushToast('La descripción es obligatoria cuando el motivo es "Otro"', 'error');
-      return;
-    }
-
+    if (!Number.isFinite(amount) || amount <= 0 || reason.length === 0) return;
+    if (reason === 'Otro' && description.length === 0) { pushToast('La descripcion es obligatoria', 'error'); return; }
     setIsSavingMovement(true);
     try {
-      await apiClient.post('/sales/manual-movements', {
-        type: movementType,
-        amount,
-        reason,
-        description: description || undefined,
-      });
+      await apiClient.post('/sales/manual-movements', { type: movementType, amount, reason, description: description || undefined });
       await queryClient.invalidateQueries({ queryKey: ['manual-movements'] });
-      pushToast('Movimiento agregado correctamente.', 'success');
+      pushToast('Movimiento agregado.', 'success');
       setIsMovementOpen(false);
-    } catch (error) {
-      pushToast(normalizeApiError(error), 'error');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
     } finally {
       setIsSavingMovement(false);
     }
@@ -130,57 +95,27 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
       <aside className={`cart-panel ${isCollapsed ? 'is-collapsed' : ''}`}>
         <div className="cart-panel__header">
           {!isCollapsed && <h2>Carrito</h2>}
-          <button
-            type="button"
-            className="icon-button cart-collapse-button"
-            onClick={toggleCollapsed}
-            aria-label={isCollapsed ? 'Expandir carrito' : 'Colapsar carrito'}
-          >
+          <button type="button" className="icon-button cart-collapse-button" onClick={toggleCollapsed} aria-label={isCollapsed ? 'Expandir' : 'Colapsar'}>
             <span aria-hidden="true">{isCollapsed ? '←' : '→'}</span>
           </button>
         </div>
         {!isCollapsed && (
           <>
             <div className="cart-panel__content">
-              {items.length === 0 && <p className="empty-cart">Seleccioná productos para empezar.</p>}
+              {items.length === 0 && <p className="empty-cart">Selecciona productos para empezar.</p>}
               {items.length > 0 && (
                 <ul className="cart-items">
                   {items.map((item) => (
                     <li key={item.product.id} className="cart-item">
                       <div className="cart-item__info">
-                        <strong>{item.product.name}</strong>
-                        <span>{formatAmount(item.product.price)}</span>
+                        <span className="cart-item__name">{item.product.name}</span>
+                        <span className="cart-item__unit">{formatAmount(item.product.price)}</span>
                       </div>
-                      <div className="cart-controls">
-                        <button
-                          type="button"
-                          className="quantity-button"
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                        >
-                          -
-                        </button>
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.quantity}
-                          onChange={(event) =>
-                            updateQuantity(item.product.id, Number(event.target.value) || 1)
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="quantity-button"
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-button remove-button"
-                          onClick={() => removeItem(item.product.id)}
-                        >
-                          Quitar
-                        </button>
+                      <div className="cart-item__stepper">
+                        <button type="button" className="cart-stepper-btn" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>−</button>
+                        <span className="cart-stepper-value">{item.quantity}</span>
+                        <button type="button" className="cart-stepper-btn" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>+</button>
+                        <button type="button" className="cart-item-remove" onClick={() => removeItem(item.product.id)} aria-label={`Quitar ${item.product.name}`}>×</button>
                       </div>
                     </li>
                   ))}
@@ -192,20 +127,11 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
                 <span>TOTAL</span>
                 <strong>{formatAmount(total)}</strong>
               </div>
-              <button
-                type="button"
-                className="primary-button cart-checkout-button"
-                onClick={() => setIsCheckoutOpen(true)}
-                disabled={items.length === 0}
-              >
+              <button type="button" className="cart-checkout-btn" onClick={() => setIsCheckoutOpen(true)} disabled={items.length === 0}>
                 Cobrar
               </button>
               {showMovementButton && (
-                <button
-                  type="button"
-                  className="movement-button"
-                  onClick={handleOpenMovement}
-                >
+                <button type="button" className="cart-movement-btn" onClick={handleOpenMovement}>
                   Movimientos
                 </button>
               )}
@@ -214,121 +140,36 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
         )}
       </aside>
       <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} />
-      
-      {/* Modal de Movimientos */}
+
       {isMovementOpen && (
-        <div className="modal-backdrop" onClick={handleCloseMovement} role="presentation">
-          <div
-            className="modal admin-sales__movement-modal"
-            role="dialog"
-            aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h2>Agregar movimiento</h2>
-              <button type="button" className="icon-button" onClick={handleCloseMovement} aria-label="Cerrar">
-                ✕
-              </button>
-            </div>
-            <div className="modal-body admin-sales__movement-form">
-              <div className="admin-sales__movement-type-row">
-                <fieldset className="admin-sales__movement-type" aria-label="Tipo de movimiento">
-                  <label>
-                    <input
-                      type="radio"
-                      name="movement-type"
-                      value="ENTRADA"
-                      checked={movementType === 'ENTRADA'}
-                      onChange={() => {
-                        setMovementType('ENTRADA');
-                        const reasons = getAvailableReasons('ENTRADA');
-                        setMovementReason(reasons[0] || '');
-                        setMovementDescription('');
-                      }}
-                    />
-                    Entrada
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="movement-type"
-                      value="SALIDA"
-                      checked={movementType === 'SALIDA'}
-                      onChange={() => {
-                        setMovementType('SALIDA');
-                        const reasons = getAvailableReasons('SALIDA');
-                        setMovementReason(reasons[0] || '');
-                        setMovementDescription('');
-                      }}
-                    />
-                    Salida
-                  </label>
+        <div className="modal-backdrop" onClick={() => setIsMovementOpen(false)}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header"><h3>Nuevo movimiento</h3><button className="icon-button" onClick={() => setIsMovementOpen(false)}>✕</button></div>
+            <div className="modal-body">
+              <div className="settings-field">
+                <label>Tipo</label>
+                <fieldset className="admin-sales__movement-type" style={{ border: 'none', padding: 0, margin: 0, display: 'flex', gap: '1rem' }}>
+                  <label className="toggle-switch"><input type="radio" name="cmov-type" value="ENTRADA" checked={movementType === 'ENTRADA'} onChange={() => { setMovementType('ENTRADA'); setMovementReason(getAvailableReasons('ENTRADA')[0] || ''); }} /><span className="toggle-switch-track" />Entrada</label>
+                  <label className="toggle-switch"><input type="radio" name="cmov-type" value="SALIDA" checked={movementType === 'SALIDA'} onChange={() => { setMovementType('SALIDA'); setMovementReason(getAvailableReasons('SALIDA')[0] || ''); }} /><span className="toggle-switch-track" />Salida</label>
                 </fieldset>
-                <label className="input-field movement-reason-field">
-                  Motivo
-                  <select
-                    value={movementReason}
-                    onChange={(e) => {
-                      setMovementReason(e.target.value);
-                      setMovementDescription('');
-                    }}
-                    className="movement-reason-select"
-                  >
-                    {getAvailableReasons(movementType).map((reason) => (
-                      <option key={reason} value={reason}>
-                        {reason}
-                      </option>
-                    ))}
-                  </select>
-                </label>
               </div>
-              <div className="admin-sales__movement-main">
-                <label className="input-field">
-                  Monto
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0"
-                    value={movementAmount}
-                    onChange={(event) => setMovementAmount(event.target.value)}
-                  />
-                </label>
+              <div className="settings-field">
+                <label>Motivo</label>
+                <select value={movementReason} onChange={(e) => { setMovementReason(e.target.value); setMovementDescription(''); }}>
+                  {getAvailableReasons(movementType).map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
-              {movementReason === 'Otro' && (
-                <label className="input-field">
-                  Descripción (obligatoria)
-                  <textarea
-                    rows={3}
-                    placeholder="Describí el motivo"
-                    value={movementDescription}
-                    onChange={(event) => setMovementDescription(event.target.value)}
-                    required
-                  />
-                </label>
-              )}
-              {movementReason !== 'Otro' && (
-                <label className="input-field">
-                  Descripción (opcional)
-                  <textarea
-                    rows={2}
-                    placeholder="Descripción adicional (opcional)"
-                    value={movementDescription}
-                    onChange={(event) => setMovementDescription(event.target.value)}
-                  />
-                </label>
-              )}
-              <div className="checkout-actions">
-                <button type="button" className="secondary-button" onClick={handleCloseMovement}>
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={handleSaveMovement}
-                  disabled={!isMovementValid() || isSavingMovement}
-                >
-                  {isSavingMovement ? 'Guardando...' : 'Guardar movimiento'}
-                </button>
+              <div className="settings-field">
+                <label>Monto</label>
+                <input type="text" inputMode="decimal" placeholder="0" value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
+              </div>
+              <div className="settings-field">
+                <label>{movementReason === 'Otro' ? 'Descripcion (obligatoria)' : 'Descripcion (opcional)'}</label>
+                <textarea rows={movementReason === 'Otro' ? 3 : 2} placeholder="Descripcion" value={movementDescription} onChange={(e) => setMovementDescription(e.target.value)} />
+              </div>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={() => setIsMovementOpen(false)}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={handleSaveMovement} disabled={!isMovementValid() || isSavingMovement}>{isSavingMovement ? 'Guardando...' : 'Guardar'}</button>
               </div>
             </div>
           </div>
