@@ -1,34 +1,36 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 
+const navIcon = (emoji: string) => <span className="nav-icon" aria-hidden="true">{emoji}</span>;
+
 export const AdminLayout: React.FC = () => {
   return (
-    <AppLayout title="Administración">
+    <AppLayout title="">
       <div className="admin-layout">
         <nav className="admin-sidebar">
-          <NavLink to="/admin/sales" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Ventas
+          <NavLink to="/admin/sales" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('📋')} Ventas
           </NavLink>
-          <NavLink to="/admin/stats" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Estadísticas
+          <NavLink to="/admin/stats" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('📊')} Estadisticas
           </NavLink>
-          <NavLink to="/admin/contabilidad" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Contabilidad
+          <NavLink to="/admin/contabilidad" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('💰')} Contabilidad
           </NavLink>
-          <NavLink to="/admin/categories" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Categorías
+          <NavLink to="/admin/categories" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('🗂️')} Categorias
           </NavLink>
-          <NavLink to="/admin/products" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Productos
+          <NavLink to="/admin/products" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('📦')} Productos
           </NavLink>
-          <NavLink to="/admin/stock" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Stock
+          <NavLink to="/admin/stock" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('📐')} Stock
           </NavLink>
-          <NavLink to="/admin/users" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Usuarios
+          <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('👥')} Usuarios
           </NavLink>
-          <NavLink to="/admin/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
-            Settings
+          <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'active' : ''}>
+            {navIcon('⚙️')} Configuracion
           </NavLink>
         </nav>
         <div className="admin-content">
@@ -38,3 +40,4 @@ export const AdminLayout: React.FC = () => {
     </AppLayout>
   );
 };
+

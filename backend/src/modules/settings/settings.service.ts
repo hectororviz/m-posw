@@ -6,13 +6,15 @@ const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
 const DEFAULT_STORE_NAME = 'MiBPS Demo';
 const DEFAULT_ACCENT_COLOR = '#0ea5e9';
 const DEFAULT_CLUB_NAME = '';
+const DEFAULT_OK_ANIMATION_URL = '/animations/ok.json';
+const DEFAULT_ERROR_ANIMATION_URL = '/animations/error.json';
 
 @Injectable()
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
   async get() {
-    return this.prisma.setting.upsert({
+    const settings = await this.prisma.setting.upsert({
       where: { id: DEFAULT_SETTING_ID },
       create: {
         id: DEFAULT_SETTING_ID,
@@ -32,6 +34,11 @@ export class SettingsService {
       },
       update: {},
     });
+    return {
+      ...settings,
+      okAnimationUrl: settings.okAnimationUrl ?? DEFAULT_OK_ANIMATION_URL,
+      errorAnimationUrl: settings.errorAnimationUrl ?? DEFAULT_ERROR_ANIMATION_URL,
+    };
   }
 
   async update(dto: UpdateSettingDto) {
