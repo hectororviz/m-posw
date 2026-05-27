@@ -330,20 +330,31 @@ export const AdminProductsPage: React.FC = () => {
         <div className="product-list-v2">
           {groupedByCategory.map((group) => (
             <div key={group.name} className="product-list-group">
-              <div className="product-list-group-head">{group.name}</div>
+              <div className="product-list-group-head">
+                <span>{group.name}</span>
+                <span className="product-list-group-count">{group.products.length}</span>
+              </div>
               {group.products.map((product) => {
                 const imageUrl = buildImageUrl(product.imagePath, product.imageUpdatedAt);
                 return (
                   <div key={product.id} className={`product-list-row ${!product.active ? 'is-inactive' : ''}`}>
-                    <div className="product-list-row-main">
-                      <span className="product-list-row-icon">{product.iconName || imageUrl ? (imageUrl ? <img src={imageUrl} alt="" /> : null) : null}</span>
-                      <span className="product-list-row-name">{product.name}</span>
-                      <span className={typeBadgeClass(product.type)}>{PRODUCT_TYPE_LABELS[product.type]}</span>
-                      {showPriceAndCategory(product.type) && (
-                        <span className="product-list-row-price">${formatCurrencyInput(product.price)}</span>
+                    <div className="product-list-thumb">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={product.name} loading="lazy" />
+                      ) : (
+                        <span className="product-list-thumb-icon">{product.iconName || '📦'}</span>
                       )}
                     </div>
-                    <div className="user-list-actions">
+                    <div className="product-list-details">
+                      <span className="product-list-row-name">{product.name}</span>
+                      <span className="product-list-row-cat">{group.name}</span>
+                    </div>
+                    <span className={typeBadgeClass(product.type)}>{PRODUCT_TYPE_LABELS[product.type]}</span>
+                    {showPriceAndCategory(product.type) && (
+                      <span className="product-list-row-price">${formatCurrencyInput(product.price)}</span>
+                    )}
+                    <span className="product-list-row-stock">{product.stock}</span>
+                    <div className="product-list-actions">
                       <button type="button" className="btn-ghost" onClick={() => openEdit(product)} aria-label={`Editar ${product.name}`}>✎</button>
                       <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} aria-label={`Eliminar ${product.name}`}>✕</button>
                     </div>
