@@ -1,0 +1,5 @@
+ALTER TABLE "Setting" ADD COLUMN "mpStoreId" TEXT,
+ADD COLUMN "mpPosId" TEXT,
+ADD COLUMN "mpPosName" TEXT,
+ADD COLUMN "mpStoreName" TEXT,
+ADD COLUMN "mpQrData" TEXT;

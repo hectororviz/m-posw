@@ -2390,6 +2390,49 @@ button {
   color: #4b5563;
 }
 
+.settings-mp-oauth .mp-pos-badge {
+  display: inline-block;
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.mp-pos-setup-form {
+  margin-top: 0.75rem;
+}
+
+.mp-pos-setup-form .settings-row {
+  margin-bottom: 0.75rem;
+}
+
+.mp-pos-setup-form .settings-row label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.mp-pos-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.mp-qr-preview {
+  margin: 0.75rem 0;
+}
+
+.mp-qr-image {
+  max-width: 200px;
+  height: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+}
+
 /* OAuth return page */
 .oauth-return-page h2 {
   margin-bottom: 0.5rem;

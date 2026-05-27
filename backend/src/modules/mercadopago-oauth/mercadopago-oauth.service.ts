@@ -123,15 +123,17 @@ export class MercadoPagoOauthService {
     return { ok: true };
   }
 
-  async getStatus(): Promise<{ linked: boolean; expiresAt: Date | null }> {
+  async getStatus(): Promise<{ linked: boolean; expiresAt: Date | null; mpPosId: string | null; mpQrData: string | null }> {
     const setting = await this.prisma.setting.findUnique({
       where: { id: DEFAULT_SETTING_ID },
-      select: { mpLinked: true, mpTokenExpiresAt: true },
+      select: { mpLinked: true, mpTokenExpiresAt: true, mpPosId: true, mpQrData: true },
     });
 
     return {
       linked: setting?.mpLinked ?? false,
       expiresAt: setting?.mpTokenExpiresAt ?? null,
+      mpPosId: setting?.mpPosId ?? null,
+      mpQrData: setting?.mpQrData ?? null,
     };
   }
 
@@ -155,6 +157,160 @@ export class MercadoPagoOauthService {
     });
 
     this.logger.log('MP OAuth desconectado, credenciales limpiadas de la BD');
+
+    return { ok: true };
+  }
+
+  async setupPos(storeName: string, posName: string): Promise<{ ok: boolean; qrUrl: string }> {
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) {
+      throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    const collectorId = await this.mpConfig.getCollectorId();
+    if (!collectorId) {
+      throw new HttpException('Sin collectorId de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
+
+    const mpHeaders = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+
+    let storeId: string;
+
+    try {
+      const storeRes = await fetch(`https://api.mercadopago.com/users/${collectorId}/stores`, {
+        method: 'POST',
+        headers: mpHeaders,
+        body: JSON.stringify({
+          name: storeName,
+          location: {
+            street_name: '',
+            street_number: '',
+            city_name: '',
+            state_name: '',
+            country: 'AR',
+          },
+        }),
+      });
+
+      const storeData = (await storeRes.json()) as { id?: string; status?: number; message?: string };
+
+      if (!storeRes.ok || !storeData.id) {
+        this.logger.error(`MP POS setup - store creation failed: ${JSON.stringify(storeData)}`);
+        throw new HttpException(
+          storeData.message || 'Error al crear la tienda en MercadoPago',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      storeId = storeData.id;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`MP POS setup - store network error: ${error}`);
+      throw new HttpException('Error de red al crear la tienda en MP', HttpStatus.BAD_GATEWAY);
+    }
+
+    let posId: string;
+    let qrData: string;
+
+    try {
+      const posRes = await fetch('https://api.mercadopago.com/pos', {
+        method: 'POST',
+        headers: mpHeaders,
+        body: JSON.stringify({
+          name: posName,
+          store_id: storeId,
+          category: 621102,
+          external_id: `${subdomain}_pos`,
+        }),
+      });
+
+      const posData = (await posRes.json()) as {
+        id?: string;
+        qr?: { image?: string };
+        message?: string;
+      };
+
+      if (!posRes.ok || !posData.id) {
+        this.logger.error(`MP POS setup - pos creation failed: ${JSON.stringify(posData)}`);
+        throw new HttpException(
+          posData.message || 'Error al crear el POS en MercadoPago',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      posId = posData.id;
+      qrData = posData.qr?.image ?? '';
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`MP POS setup - pos network error: ${error}`);
+      throw new HttpException('Error de red al crear el POS en MP', HttpStatus.BAD_GATEWAY);
+    }
+
+    await this.prisma.setting.upsert({
+      where: { id: DEFAULT_SETTING_ID },
+      create: {
+        id: DEFAULT_SETTING_ID,
+        storeName: 'MiBPS Demo',
+        mpStoreId: storeId,
+        mpPosId: posId,
+        mpStoreName: storeName,
+        mpPosName: posName,
+        mpQrData: qrData,
+      },
+      update: {
+        mpStoreId: storeId,
+        mpPosId: posId,
+        mpStoreName: storeName,
+        mpPosName: posName,
+        mpQrData: qrData,
+      },
+    });
+
+    this.logger.log(`MP POS configurado: storeId=${storeId}, posId=${posId}`);
+
+    return { ok: true, qrUrl: qrData };
+  }
+
+  async getQr(): Promise<{ qrUrl: string }> {
+    const setting = await this.prisma.setting.findUnique({
+      where: { id: DEFAULT_SETTING_ID },
+      select: { mpQrData: true },
+    });
+
+    if (!setting?.mpQrData) {
+      throw new HttpException('QR no configurado', HttpStatus.NOT_FOUND);
+    }
+
+    return { qrUrl: setting.mpQrData };
+  }
+
+  async deletePosSetup(): Promise<{ ok: boolean }> {
+    await this.prisma.setting.upsert({
+      where: { id: DEFAULT_SETTING_ID },
+      create: {
+        id: DEFAULT_SETTING_ID,
+        storeName: 'MiBPS Demo',
+        mpStoreId: null,
+        mpPosId: null,
+        mpStoreName: null,
+        mpPosName: null,
+        mpQrData: null,
+      },
+      update: {
+        mpStoreId: null,
+        mpPosId: null,
+        mpStoreName: null,
+        mpPosName: null,
+        mpQrData: null,
+      },
+    });
+
+    this.logger.log('MP POS setup limpiado de la BD');
 
     return { ok: true };
   }

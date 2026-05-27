@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import * as emoji from 'node-emoji';
@@ -10,6 +11,7 @@ import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
 export const AdminSettingsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: settings } = useSettings();
   const { data: mpStatus, refetch: refetchMpStatus } = useMpOauthStatus();
   const { pushToast } = useToast();
@@ -33,6 +35,21 @@ export const AdminSettingsPage: React.FC = () => {
   const [newOutReason, setNewOutReason] = useState('');
   const [mpConnecting, setMpConnecting] = useState(false);
   const [mpDisconnecting, setMpDisconnecting] = useState(false);
+  const [mpSetupLoading, setMpSetupLoading] = useState(false);
+  const [mpStoreNameInput, setMpStoreNameInput] = useState('');
+  const [mpPosNameInput, setMpPosNameInput] = useState('');
+
+  useEffect(() => {
+    const mpParam = searchParams.get('mp');
+    if (mpParam === 'connected') {
+      pushToast('Mercado Pago conectado correctamente', 'success');
+      refetchMpStatus();
+      setSearchParams({}, { replace: true });
+    } else if (mpParam === 'error') {
+      pushToast('Error al conectar Mercado Pago, intenta de nuevo', 'error');
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, pushToast, refetchMpStatus, setSearchParams]);
 
   useEffect(() => {
     if (settings) {
@@ -173,6 +190,36 @@ export const AdminSettingsPage: React.FC = () => {
       pushToast(normalizeApiError(err), 'error');
     } finally {
       setMpDisconnecting(false);
+    }
+  };
+
+  const handleSetupPos = async () => {
+    if (!mpStoreNameInput.trim() || !mpPosNameInput.trim()) {
+      pushToast('Completa ambos campos para configurar el QR', 'error');
+      return;
+    }
+    setMpSetupLoading(true);
+    try {
+      await apiClient.post('/mp-oauth/setup-pos', {
+        storeName: mpStoreNameInput.trim(),
+        posName: mpPosNameInput.trim(),
+      });
+      await refetchMpStatus();
+      pushToast('Punto de venta configurado correctamente', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setMpSetupLoading(false);
+    }
+  };
+
+  const handleReconfigurePos = async () => {
+    try {
+      await apiClient.delete('/mp-oauth/setup-pos');
+      await refetchMpStatus();
+      pushToast('Configuracion de POS eliminada. Podes volver a configurarlo.', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
     }
   };
 
@@ -326,26 +373,7 @@ export const AdminSettingsPage: React.FC = () => {
         {/* Mercado Pago */}
         <div className="settings-mp-oauth">
           <h3>Mercado Pago</h3>
-          {mpStatus?.linked ? (
-            <div className="mp-linked-info">
-              <p>
-                <span className="mp-linked-badge">Conectado</span>
-              </p>
-              {mpStatus.expiresAt && (
-                <p className="mp-expires">
-                  Expira: {new Date(mpStatus.expiresAt).toLocaleString()}
-                </p>
-              )}
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={handleDisconnectMp}
-                disabled={mpDisconnecting}
-              >
-                {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
-              </button>
-            </div>
-          ) : (
+          {!mpStatus?.linked ? (
             <div className="mp-unlinked-info">
               <p>Vincula tu cuenta de MercadoPago via OAuth para gestionar los pagos.</p>
               <button
@@ -356,6 +384,91 @@ export const AdminSettingsPage: React.FC = () => {
               >
                 {mpConnecting ? 'Redirigiendo...' : 'Conectar Mercado Pago'}
               </button>
+            </div>
+          ) : !mpStatus?.mpPosId ? (
+            <div className="mp-linked-info">
+              <p>
+                <span className="mp-linked-badge">Conectada</span>
+              </p>
+              <div className="mp-pos-setup-form">
+                <div className="settings-row">
+                  <label htmlFor="mp-store-name-input">Nombre de la tienda</label>
+                  <input
+                    id="mp-store-name-input"
+                    type="text"
+                    value={mpStoreNameInput}
+                    onChange={(e) => setMpStoreNameInput(e.target.value)}
+                    placeholder="Ej: Tienda Principal"
+                  />
+                </div>
+                <div className="settings-row">
+                  <label htmlFor="mp-pos-name-input">Nombre del punto de venta</label>
+                  <input
+                    id="mp-pos-name-input"
+                    type="text"
+                    value={mpPosNameInput}
+                    onChange={(e) => setMpPosNameInput(e.target.value)}
+                    placeholder="Ej: Caja 1"
+                  />
+                </div>
+                <div className="mp-pos-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={handleSetupPos}
+                    disabled={mpSetupLoading}
+                  >
+                    {mpSetupLoading ? 'Configurando...' : 'Configurar QR'}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleDisconnectMp}
+                    disabled={mpDisconnecting}
+                  >
+                    {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mp-linked-info">
+              <p>
+                <span className="mp-linked-badge">Conectada</span>{' '}
+                <span className="mp-pos-badge">POS configurado</span>
+              </p>
+              {mpStatus.mpQrData && (
+                <div className="mp-qr-preview">
+                  <img src={mpStatus.mpQrData} alt="QR MercadoPago" className="mp-qr-image" />
+                </div>
+              )}
+              <div className="mp-pos-actions">
+                {mpStatus.mpQrData && (
+                  <a
+                    href={mpStatus.mpQrData}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="secondary-button"
+                  >
+                    Descargar QR
+                  </a>
+                )}
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handleReconfigurePos}
+                >
+                  Reconfigurar POS
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handleDisconnectMp}
+                  disabled={mpDisconnecting}
+                >
+                  {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
+                </button>
+              </div>
             </div>
           )}
         </div>

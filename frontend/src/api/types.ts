@@ -145,11 +145,15 @@ export interface Setting {
   movementOutReasons?: string[];
   mpLinked?: boolean | null;
   mpTokenExpiresAt?: string | null;
+  mpPosId?: string | null;
+  mpQrData?: string | null;
 }
 
 export interface MpOauthStatus {
   linked: boolean;
   expiresAt: string | null;
+  mpPosId: string | null;
+  mpQrData: string | null;
 }
 
 export interface ApiErrorResponse {

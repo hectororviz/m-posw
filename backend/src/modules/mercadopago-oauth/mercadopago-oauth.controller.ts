@@ -30,4 +30,19 @@ export class MercadoPagoOauthController {
   disconnect() {
     return this.mpOauthService.disconnect();
   }
+
+  @Post('setup-pos')
+  setupPos(@Body() body: { storeName: string; posName: string }) {
+    return this.mpOauthService.setupPos(body.storeName, body.posName);
+  }
+
+  @Get('qr')
+  getQr() {
+    return this.mpOauthService.getQr();
+  }
+
+  @Delete('setup-pos')
+  deletePosSetup() {
+    return this.mpOauthService.deletePosSetup();
+  }
 }

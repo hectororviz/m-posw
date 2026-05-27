@@ -239,6 +239,11 @@ model Setting {
   mpRefreshToken  String?
   mpTokenExpiresAt DateTime?
   mpCollectorId   String?
+  mpStoreId       String?
+  mpPosId         String?
+  mpPosName       String?
+  mpStoreName     String?
+  mpQrData        String?
   mpLinked        Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
