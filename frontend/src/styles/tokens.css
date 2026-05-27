@@ -35,6 +35,11 @@
   /* ── Accent ───────────────────────────────────────────────────── */
   --color-accent:              #f59e0b;
   --color-accent-ring:         rgba(245, 158, 11, 0.12);
+  --color-accent-glow:         rgba(245, 158, 11, 0.06);
+
+  /* ── Button-specific ──────────────────────────────────────────── */
+  --color-btn-secondary-raw:   rgba(15, 23, 42, 0.08);
+  --color-btn-icon-bg:         rgba(15, 23, 42, 0.12);
 
   /* ── Danger ───────────────────────────────────────────────────── */
   --color-danger:              #dc2626;
@@ -69,6 +74,14 @@
   --shadow-xl:    0 6px 16px  rgba(15, 23, 42, 0.2);
   --shadow-fab:   0 4px 14px  rgba(15, 23, 42, 0.2);
   --shadow-card:  0 4px 20px  rgba(15, 23, 42, 0.06);
+  --shadow-toast: 0 12px 30px rgba(15, 23, 42, 0.35);
+  --shadow-float: 0 2px 8px   rgba(15, 23, 42, 0.1);
+  --shadow-popup: 0 6px 12px  rgba(15, 23, 42, 0.12);
+  --shadow-modal: 0 20px 60px rgba(15, 23, 42, 0.4);
+
+  /* ── Misc ─────────────────────────────────────────────────────── */
+  --color-upload-overlay:      rgba(15, 23, 42, 0.5);
+  --color-upload-overlay-light: rgba(15, 23, 42, 0.45);
 
   /* ── Misc ─────────────────────────────────────────────────────── */
   --color-code-bg:             #0f172a;
@@ -132,8 +145,11 @@
   --color-info-bg:           #172554;
   --color-info-text:         #93c5fd;
 
-  --color-code-bg:           #0f172a;
+  --color-code-bg:           #1e293b;
   --color-code-text:         #cbd5e1;
+
+  --color-accent-ring:       rgba(245, 158, 11, 0.2);
+  --color-accent-glow:       rgba(245, 158, 11, 0.08);
 
   --shadow-xs:   0 2px 8px   rgba(0, 0, 0, 0.3);
   --shadow-sm:   0 4px 12px  rgba(0, 0, 0, 0.35);
@@ -142,6 +158,15 @@
   --shadow-xl:   0 6px 16px  rgba(0, 0, 0, 0.5);
   --shadow-fab:  0 4px 14px  rgba(0, 0, 0, 0.5);
   --shadow-card: 0 4px 20px  rgba(0, 0, 0, 0.3);
+  --shadow-toast: 0 12px 30px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 2px 8px   rgba(0, 0, 0, 0.3);
+  --shadow-popup: 0 6px 12px  rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.6);
+
+  --color-btn-secondary-raw:   rgba(255, 255, 255, 0.06);
+  --color-btn-icon-bg:         rgba(255, 255, 255, 0.1);
+  --color-upload-overlay:      rgba(0, 0, 0, 0.7);
+  --color-upload-overlay-light: rgba(0, 0, 0, 0.65);
 
   --chart-1:  #7dd3fc;  --chart-2:  #fb923c;
   --chart-3:  #c4b5fd;  --chart-4:  #86efac;
