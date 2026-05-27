@@ -139,9 +139,12 @@
   --color-danger-hover:      #7f1d1d;
 
   --color-success-bg:        #14331e;
+  --color-success-text:      #4ade80;
+  --color-success-dark:      #16a34a;
   --color-warning-bg:        #3b2e0a;
   --color-warning-bg-light:  #3b2e0a;
   --color-warning-border:    #7c5e10;
+  --color-warning-text:      #fbbf24;
   --color-info-bg:           #172554;
   --color-info-text:         #93c5fd;
 
