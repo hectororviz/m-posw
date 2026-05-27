@@ -15,6 +15,7 @@ describe('MercadoPagoInstoreService', () => {
 
   const mpConfig = {
     getAccessToken: jest.fn().mockResolvedValue('token'),
+    getCollectorId: jest.fn().mockResolvedValue('collector-1'),
   } as unknown as MercadoPagoConfigService;
 
   afterEach(() => {
@@ -24,7 +25,7 @@ describe('MercadoPagoInstoreService', () => {
   it('arma la URL de orders con store y pos', () => {
     const service = new MercadoPagoInstoreService(config, mpConfig);
 
-    expect(service.buildOrdersUrl('STORE_1', 'POS_1')).toBe(
+    expect(service.buildOrdersUrl('collector-1', 'STORE_1', 'POS_1')).toBe(
       'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/stores/STORE_1/pos/POS_1/orders',
     );
   });
@@ -32,7 +33,7 @@ describe('MercadoPagoInstoreService', () => {
   it('arma la URL de orders solo con pos', () => {
     const service = new MercadoPagoInstoreService(config, mpConfig);
 
-    expect(service.buildPosOrdersUrl('POS_1')).toBe(
+    expect(service.buildPosOrdersUrl('collector-1', 'POS_1')).toBe(
       'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/pos/POS_1/orders',
     );
   });

@@ -9,6 +9,7 @@ interface MpTokenResponse {
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
+  user_id?: number;
 }
 
 @Injectable()
@@ -58,6 +59,27 @@ export class MercadoPagoConfigService {
       this.logger.error('MP_ACCESS_TOKEN no configurado (ni en DB ni en .env)');
     }
     return envToken ?? '';
+  }
+
+  async getCollectorId(): Promise<string> {
+    try {
+      const setting = await this.prisma.setting.findUnique({
+        where: { id: DEFAULT_SETTING_ID },
+        select: { mpLinked: true, mpCollectorId: true },
+      });
+
+      if (setting?.mpLinked && setting.mpCollectorId) {
+        return setting.mpCollectorId;
+      }
+    } catch (error) {
+      this.logger.warn('No se pudo leer mpCollectorId de la DB, usando fallback de .env');
+    }
+
+    const envCollectorId = this.config.get<string>('MP_COLLECTOR_ID');
+    if (!envCollectorId) {
+      this.logger.error('MP_COLLECTOR_ID no configurado (ni en DB ni en .env)');
+    }
+    return envCollectorId ?? '';
   }
 
   async tryRefreshToken(): Promise<void> {
@@ -124,22 +146,25 @@ export class MercadoPagoConfigService {
         ? new Date(Date.now() + data.expires_in * 1000)
         : undefined;
 
+      const updateData: Record<string, unknown> = {
+        mpAccessToken: data.access_token,
+        mpRefreshToken: data.refresh_token ?? refreshToken,
+        mpTokenExpiresAt: expiresAt ?? null,
+        mpLinked: true,
+      };
+
+      if (data.user_id !== undefined) {
+        updateData.mpCollectorId = String(data.user_id);
+      }
+
       await this.prisma.setting.upsert({
         where: { id: DEFAULT_SETTING_ID },
         create: {
           id: DEFAULT_SETTING_ID,
           storeName: 'MiBPS Demo',
-          mpAccessToken: data.access_token,
-          mpRefreshToken: data.refresh_token ?? refreshToken,
-          mpTokenExpiresAt: expiresAt ?? null,
-          mpLinked: true,
-        },
-        update: {
-          mpAccessToken: data.access_token,
-          mpRefreshToken: data.refresh_token ?? refreshToken,
-          mpTokenExpiresAt: expiresAt ?? null,
-          mpLinked: true,
-        },
+          ...updateData,
+        } as any,
+        update: updateData as any,
       });
 
       this.logger.log('MP OAuth token renovado exitosamente');

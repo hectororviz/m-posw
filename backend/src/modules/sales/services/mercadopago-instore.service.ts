@@ -48,9 +48,10 @@ export class MercadoPagoInstoreService {
   ) {}
 
   async createOrUpdateOrder(input: CreateOrderInput) {
-    const url = this.buildOrdersUrl(input.externalStoreId, input.externalPosId);
     this.assertExternalId('externalStoreId', input.externalStoreId);
     this.assertExternalId('externalPosId', input.externalPosId);
+    const collectorId = await this.getCollectorId();
+    const url = this.buildOrdersUrl(collectorId, input.externalStoreId, input.externalPosId);
     const payload = this.buildPayload(input.sale);
     const itemsTotal = payload.items.reduce((sum, item) => sum + item.total_amount, 0);
     this.logger.debug(
@@ -62,17 +63,18 @@ export class MercadoPagoInstoreService {
       `Mercado Pago payload titles: title=${payload.title} first_item_title=${payload.items[0]?.title ?? 'n/a'}`,
     );
     this.logger.debug(
-      `Mercado Pago request: PUT ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
+      `Mercado Pago request: PUT ${url} (collectorId=${collectorId}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
     );
     await this.request('PUT', url, payload);
   }
 
   async deleteOrder(input: OrderIdentity) {
-    const url = this.buildPosOrdersUrl(input.externalPosId);
     this.assertExternalId('externalStoreId', input.externalStoreId);
     this.assertExternalId('externalPosId', input.externalPosId);
+    const collectorId = await this.getCollectorId();
+    const url = this.buildPosOrdersUrl(collectorId, input.externalPosId);
     this.logger.debug(
-      `Mercado Pago request: DELETE ${url} (collectorId=${this.getCollectorId()}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
+      `Mercado Pago request: DELETE ${url} (collectorId=${collectorId}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
     );
     await this.request('DELETE', url);
   }
@@ -154,16 +156,16 @@ export class MercadoPagoInstoreService {
    * - PUT /instore/qr/seller/collectors/{user_id}/stores/{external_store_id}/pos/{external_pos_id}/orders
    * - DELETE /instore/qr/seller/collectors/{user_id}/pos/{external_pos_id}/orders
    */
-  buildOrdersUrl(externalStoreId: string, externalPosId: string) {
-    return `${this.baseUrl}/instore/qr/seller/collectors/${this.getCollectorId()}/stores/${externalStoreId}/pos/${externalPosId}/orders`;
+  buildOrdersUrl(collectorId: string, externalStoreId: string, externalPosId: string) {
+    return `${this.baseUrl}/instore/qr/seller/collectors/${collectorId}/stores/${externalStoreId}/pos/${externalPosId}/orders`;
   }
 
-  buildPosOrdersUrl(externalPosId: string) {
-    return `${this.baseUrl}/instore/qr/seller/collectors/${this.getCollectorId()}/pos/${externalPosId}/orders`;
+  buildPosOrdersUrl(collectorId: string, externalPosId: string) {
+    return `${this.baseUrl}/instore/qr/seller/collectors/${collectorId}/pos/${externalPosId}/orders`;
   }
 
-  private getCollectorId() {
-    const collectorId = this.config.get<string>('MP_COLLECTOR_ID');
+  private async getCollectorId() {
+    const collectorId = await this.mpConfig.getCollectorId();
     if (!collectorId) {
       throw new HttpException('MP_COLLECTOR_ID no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
     }

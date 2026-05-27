@@ -66,6 +66,7 @@ export class MercadoPagoOauthService {
       access_token?: string;
       refresh_token?: string;
       expires_in?: number;
+      user_id?: number;
     };
 
     try {
@@ -105,12 +106,14 @@ export class MercadoPagoOauthService {
         mpAccessToken: tokenData.access_token,
         mpRefreshToken: tokenData.refresh_token ?? null,
         mpTokenExpiresAt: expiresAt ?? null,
+        mpCollectorId: tokenData.user_id !== undefined ? String(tokenData.user_id) : null,
         mpLinked: true,
       },
       update: {
         mpAccessToken: tokenData.access_token,
         mpRefreshToken: tokenData.refresh_token ?? null,
         mpTokenExpiresAt: expiresAt ?? null,
+        mpCollectorId: tokenData.user_id !== undefined ? String(tokenData.user_id) : null,
         mpLinked: true,
       },
     });
