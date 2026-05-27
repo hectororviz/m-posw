@@ -252,6 +252,126 @@ export interface ManualMovementWithCategory {
   } | null;
 }
 
+export type LedgerAccountType = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+export type JournalEntryStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
+
+export interface LedgerAccount {
+  id: string;
+  code: string;
+  name: string;
+  type: LedgerAccountType;
+  active: boolean;
+  acceptsEntries: boolean;
+  parentId?: string | null;
+  children?: LedgerAccount[];
+  _count?: { lines: number };
+}
+
+export interface JournalEntryLine {
+  id: string;
+  entryId: string;
+  accountId: string;
+  account: LedgerAccount;
+  debit: number;
+  credit: number;
+  description?: string | null;
+}
+
+export interface JournalEntry {
+  id: string;
+  entryNumber: string;
+  sequenceNumber: number;
+  fiscalYear: number;
+  month: number;
+  date: string;
+  description: string;
+  notes?: string | null;
+  status: JournalEntryStatus;
+  createdById: string;
+  createdBy?: { id: string; name: string };
+  postedAt?: string | null;
+  voidedAt?: string | null;
+  voidReason?: string | null;
+  reversalOfId?: string | null;
+  reversalOf?: { id: string; entryNumber: string; description: string } | null;
+  reversalEntry?: { id: string; entryNumber: string; description: string } | null;
+  lines: JournalEntryLine[];
+  createdAt: string;
+}
+
+export interface EntryLineInput {
+  accountId: string;
+  debit: number;
+  credit: number;
+  description?: string;
+}
+
+export interface TreasurySummary {
+  availabilities: {
+    accounts: { code: string; name: string; balance: number }[];
+    total: number;
+  };
+  incomeStatement: {
+    totalRevenue: number;
+    totalExpense: number;
+    netResult: number;
+  };
+  lastEntries: JournalEntry[];
+}
+
+export interface LedgerBookRow {
+  entryNumber: string;
+  date: string;
+  description: string;
+  accountCode: string;
+  accountName: string;
+  debit: number;
+  credit: number;
+  status: string;
+}
+
+export interface LedgerAccountDetail {
+  account: { id: string; code: string; name: string; type: string };
+  isDebitNature: boolean;
+  rows: {
+    date: string;
+    entryNumber: string;
+    description: string;
+    debit: number;
+    credit: number;
+    balance: number;
+  }[];
+  finalBalance: number;
+}
+
+export interface TrialBalanceRow {
+  code: string;
+  name: string;
+  type: string;
+  totalDebit: number;
+  totalCredit: number;
+  debitBalance: number;
+  creditBalance: number;
+}
+
+export interface TrialBalanceData {
+  rows: TrialBalanceRow[];
+  totals: { totalDebit: number; totalCredit: number; debitBalance: number; creditBalance: number };
+}
+
+export interface IncomeStatementData {
+  revenueRows: { code: string; name: string; amount: number }[];
+  expenseRows: { code: string; name: string; amount: number }[];
+  totalRevenue: number;
+  totalExpense: number;
+  netResult: number;
+}
+
+export interface AvailabilityData {
+  accounts: { code: string; name: string; balance: number }[];
+  total: number;
+}
+
 export interface AccountingSummary {
   totalIncome: number;
   totalExpense: number;

@@ -14,6 +14,10 @@ import { AccountingMovementsPage } from './pages/AccountingMovementsPage';
 import { AccountingJornadasPage } from './pages/AccountingJornadasPage';
 import { AccountingCategoriesPage } from './pages/AccountingCategoriesPage';
 import { AccountingExportPage } from './pages/AccountingExportPage';
+import { TreasurySummaryPage } from './pages/TreasurySummaryPage';
+import { TreasuryJournalEntriesPage } from './pages/TreasuryJournalEntriesPage';
+import { TreasuryLedgerAccountsPage } from './pages/TreasuryLedgerAccountsPage';
+import { TreasuryReportsPage } from './pages/TreasuryReportsPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { OAuthReturnPage } from './pages/OAuthReturnPage';
@@ -107,6 +111,10 @@ export const App: React.FC = () => {
         <Route path="contabilidad/jornadas" element={<AccountingJornadasPage />} />
         <Route path="contabilidad/categorias" element={<AccountingCategoriesPage />} />
         <Route path="contabilidad/exportar" element={<AccountingExportPage />} />
+        <Route path="tesoreria" element={<TreasurySummaryPage />} />
+        <Route path="tesoreria/movimientos" element={<TreasuryJournalEntriesPage />} />
+        <Route path="tesoreria/cuentas" element={<TreasuryLedgerAccountsPage />} />
+        <Route path="tesoreria/reportes" element={<TreasuryReportsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

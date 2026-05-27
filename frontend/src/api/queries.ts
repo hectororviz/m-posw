@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, CashClose, Category, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -179,6 +179,150 @@ export const useAccountingSummary = (params?: { from?: string; to?: string }) =>
       const response = await apiClient.get<AccountingSummary>('/accounting/summary', {
         params,
       });
+      return response.data;
+    },
+  });
+
+// Treasury queries
+
+export const useLedgerAccounts = () =>
+  useQuery({
+    queryKey: ['treasury-ledger-accounts'],
+    queryFn: async () => {
+      const response = await apiClient.get<LedgerAccount[]>('/treasury/accounts/flat');
+      return response.data;
+    },
+  });
+
+export const useLedgerAccountsTree = () =>
+  useQuery({
+    queryKey: ['treasury-ledger-accounts-tree'],
+    queryFn: async () => {
+      const response = await apiClient.get<LedgerAccount[]>('/treasury/accounts');
+      return response.data;
+    },
+  });
+
+export const useImputableAssetAccounts = () =>
+  useQuery({
+    queryKey: ['treasury-asset-imputable'],
+    queryFn: async () => {
+      const response = await apiClient.get<LedgerAccount[]>('/treasury/accounts/asset-imputable');
+      return response.data;
+    },
+  });
+
+export const useImputableRevenueAccounts = () =>
+  useQuery({
+    queryKey: ['treasury-revenue-imputable'],
+    queryFn: async () => {
+      const response = await apiClient.get<LedgerAccount[]>('/treasury/accounts/revenue-imputable');
+      return response.data;
+    },
+  });
+
+export const useImputableExpenseAccounts = () =>
+  useQuery({
+    queryKey: ['treasury-expense-imputable'],
+    queryFn: async () => {
+      const response = await apiClient.get<LedgerAccount[]>('/treasury/accounts/expense-imputable');
+      return response.data;
+    },
+  });
+
+export const useJournalEntries = (params?: {
+  from?: string;
+  to?: string;
+  status?: string;
+  search?: string;
+  accountId?: string;
+}) =>
+  useQuery({
+    queryKey: ['treasury-journal-entries', params],
+    queryFn: async () => {
+      const response = await apiClient.get<JournalEntry[]>('/treasury/entries', { params });
+      return response.data;
+    },
+  });
+
+export const useJournalEntry = (id?: string) =>
+  useQuery({
+    queryKey: ['treasury-journal-entry', id],
+    queryFn: async () => {
+      const response = await apiClient.get<JournalEntry>(`/treasury/entries/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useTreasurySummary = (params?: { from?: string; to?: string }, enabled = true) =>
+  useQuery({
+    queryKey: ['treasury-summary', params],
+    queryFn: async () => {
+      const response = await apiClient.get<TreasurySummary>('/treasury/reports/summary', {
+        params,
+      });
+      return response.data;
+    },
+    enabled,
+  });
+
+export const useLedgerBook = (params?: { from?: string; to?: string }) =>
+  useQuery({
+    queryKey: ['treasury-ledger-book', params],
+    queryFn: async () => {
+      const response = await apiClient.get<LedgerBookRow[]>('/treasury/reports/ledger-book', {
+        params,
+      });
+      return response.data;
+    },
+  });
+
+export const useLedgerAccountDetail = (accountId?: string, params?: { from?: string; to?: string }) =>
+  useQuery({
+    queryKey: ['treasury-ledger-account', accountId, params],
+    queryFn: async () => {
+      const response = await apiClient.get<LedgerAccountDetail>(
+        '/treasury/reports/ledger-account',
+        { params: { accountId, ...params } },
+      );
+      return response.data;
+    },
+    enabled: Boolean(accountId),
+  });
+
+export const useTrialBalance = (params?: { from?: string; to?: string }) =>
+  useQuery({
+    queryKey: ['treasury-trial-balance', params],
+    queryFn: async () => {
+      const response = await apiClient.get<TrialBalanceData>(
+        '/treasury/reports/trial-balance',
+        { params },
+      );
+      return response.data;
+    },
+  });
+
+export const useIncomeStatement = (params?: { from?: string; to?: string }) =>
+  useQuery({
+    queryKey: ['treasury-income-statement', params],
+    queryFn: async () => {
+      const response = await apiClient.get<IncomeStatementData>(
+        '/treasury/reports/income-statement',
+        { params },
+      );
+      return response.data;
+    },
+  });
+
+export const useAvailabilities = (asOf?: string) =>
+  useQuery({
+    queryKey: ['treasury-availabilities', asOf],
+    queryFn: async () => {
+      const response = await apiClient.get<AvailabilityData>(
+        '/treasury/reports/availabilities',
+        { params: { asOf } },
+      );
       return response.data;
     },
   });

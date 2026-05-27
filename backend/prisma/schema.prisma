@@ -66,6 +66,7 @@ model User {
   cashMovements CashMovement[]
   sessions  Session[]
   manualMovements ManualMovement[]
+  journalEntries JournalEntry[]
 }
 
 model CashClose {
@@ -275,6 +276,20 @@ enum CashMovementType {
   EXPENSE
 }
 
+enum LedgerAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  VOIDED
+}
+
 model MovimientoMP {
   id            String   @id @default(uuid()) @db.Uuid
   saleId        String?  @db.Uuid
@@ -347,4 +362,76 @@ model ManualMovementCategory {
   category          AccountingCategory @relation(fields: [categoryId], references: [id])
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+}
+
+model LedgerAccount {
+  id             String            @id @default(uuid()) @db.Uuid
+  code           String            @unique
+  name           String
+  type           LedgerAccountType
+  active         Boolean           @default(true)
+  acceptsEntries Boolean           @default(true)
+
+  parentId       String?           @db.Uuid
+  parent         LedgerAccount?    @relation("LedgerAccountHierarchy", fields: [parentId], references: [id])
+  children       LedgerAccount[]   @relation("LedgerAccountHierarchy")
+
+  lines          JournalEntryLine[]
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([type])
+  @@index([parentId])
+}
+
+model JournalEntry {
+  id              String             @id @default(uuid()) @db.Uuid
+  entryNumber     String             @unique
+  sequenceNumber  Int
+  fiscalYear      Int
+  month           Int
+  date            DateTime
+  description     String
+  notes           String?
+  status          JournalEntryStatus @default(DRAFT)
+
+  createdById     String             @db.Uuid
+  createdBy       User               @relation(fields: [createdById], references: [id])
+
+  postedAt        DateTime?
+  voidedAt        DateTime?
+  voidReason      String?
+
+  reversalOfId    String?            @unique @db.Uuid
+  reversalOf      JournalEntry?      @relation("JournalEntryReversal", fields: [reversalOfId], references: [id])
+  reversalEntry   JournalEntry?      @relation("JournalEntryReversal")
+
+  lines           JournalEntryLine[]
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([fiscalYear, sequenceNumber])
+  @@index([date])
+  @@index([status])
+  @@index([fiscalYear, sequenceNumber])
+}
+
+model JournalEntryLine {
+  id          String        @id @default(uuid()) @db.Uuid
+  entryId     String        @db.Uuid
+  entry       JournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  accountId   String        @db.Uuid
+  account     LedgerAccount @relation(fields: [accountId], references: [id])
+
+  debit       Decimal       @default(0) @db.Decimal(12, 2)
+  credit      Decimal       @default(0) @db.Decimal(12, 2)
+  description String?
+
+  createdAt   DateTime      @default(now())
+
+  @@index([entryId])
+  @@index([accountId])
 }

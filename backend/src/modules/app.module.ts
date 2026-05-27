@@ -14,12 +14,14 @@ import { SalesModule } from './sales/sales.module';
 import { SettingsModule } from './settings/settings.module';
 import { StatsModule } from './stats/stats.module';
 import { StockModule } from './stock/stock.module';
+import { TreasuryModule } from './treasury/treasury.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     AccountingModule,
+    TreasuryModule,
     AuthModule,
     CashCloseModule,
     UsersModule,
