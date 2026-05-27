@@ -29,6 +29,7 @@ export const AdminStockPage: React.FC = () => {
   const [filter, setFilter] = useState<StockFilter>('todos');
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [stockEdits, setStockEdits] = useState<Record<string, string>>({});
   const timersRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -66,17 +67,47 @@ export const AdminStockPage: React.FC = () => {
     }
   }, [queryClient]);
 
-  const handleAdjust = useCallback((product: StockProduct, delta: number) => {
-    const newStock = Math.max(0, product.stock + delta);
+  const debouncedSave = useCallback((productId: string, stock: number) => {
     setError(null);
-    if (timersRef.current[product.id]) {
-      clearTimeout(timersRef.current[product.id]);
+    if (timersRef.current[productId]) {
+      clearTimeout(timersRef.current[productId]);
     }
-    timersRef.current[product.id] = window.setTimeout(() => {
-      delete timersRef.current[product.id];
-      updateStockApi(product.id, newStock);
+    timersRef.current[productId] = window.setTimeout(() => {
+      delete timersRef.current[productId];
+      updateStockApi(productId, stock);
     }, 400);
   }, [updateStockApi]);
+
+  const handleAdjust = useCallback((product: StockProduct, delta: number) => {
+    debouncedSave(product.id, Math.max(0, product.stock + delta));
+  }, [debouncedSave]);
+
+  const handleStockInputChange = useCallback((productId: string, value: string) => {
+    if (value === '') {
+      setStockEdits((prev) => ({ ...prev, [productId]: '' }));
+      return;
+    }
+    const num = parseInt(value.replace(/\D/g, ''), 10);
+    if (!Number.isNaN(num)) {
+      setStockEdits((prev) => ({ ...prev, [productId]: String(num) }));
+    }
+  }, []);
+
+  const handleStockInputBlur = useCallback((productId: string, currentStock: number) => {
+    const editValue = stockEdits[productId];
+    if (editValue === undefined) return;
+    setStockEdits((prev) => { const next = { ...prev }; delete next[productId]; return next; });
+    const num = parseInt(editValue, 10);
+    if (!Number.isNaN(num) && num !== currentStock) {
+      debouncedSave(productId, num);
+    }
+  }, [stockEdits, debouncedSave]);
+
+  const handleStockInputKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    }
+  }, []);
 
   const filteredCategories = useMemo(() => {
     if (!stockCategories) return [];
@@ -213,15 +244,20 @@ export const AdminStockPage: React.FC = () => {
                         >
                           −
                         </button>
-                        <span className="stock-qty-value">
-                          {isSaving ? (
-                            <span className="stock-qty-spinner" />
-                          ) : isSaved ? (
-                            <span className="stock-qty-check">✓</span>
-                          ) : (
-                            product.stock
-                          )}
-                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          className="stock-qty-input"
+                          value={stockEdits[product.id] ?? String(product.stock)}
+                          onChange={(e) => handleStockInputChange(product.id, e.target.value)}
+                          onBlur={() => handleStockInputBlur(product.id, product.stock)}
+                          onKeyDown={handleStockInputKeyDown}
+                          disabled={isSaving}
+                          aria-label={`Stock de ${product.name}`}
+                        />
+                        {isSaving && <span className="stock-qty-spinner-overlay" />}
+                        {isSaved && product.id === product.id && !stockEdits[product.id] && <span className="stock-qty-check-overlay">✓</span>}
                         <button
                           type="button"
                           className="stock-qty-btn"

@@ -95,139 +95,89 @@ export const AdminCategoriesPage: React.FC = () => {
   const rendered = useMemo(() => categories ?? [], [categories]);
 
   return (
-    <section className="card admin-products">
-      <h2>Categorías</h2>
+    <div>
+      <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Categorias</h2>
+            <p className="page-header-subtitle">Organiza los productos en categorias para el punto de venta.</p>
+          </div>
+        </div>
+      </div>
 
       {error && <p className="error-text">{error}</p>}
 
-      <button
-        type="button"
-        className="fab-button"
-        onClick={openCreate}
-        aria-label="Nueva categoría"
-        title="Nueva categoría"
-      >
-        <span aria-hidden="true">+</span>
-      </button>
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nueva categoria" title="Nueva categoria">+</button>
 
       {showModal && (
         <div className="modal-backdrop" onClick={closeModal} role="presentation">
-          <div className="modal product-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
-              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">
-                ✕
-              </button>
+              <h3>{editingCategory ? 'Editar categoria' : 'Nueva categoria'}</h3>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
             </div>
             <div className="modal-body">
-              <div className="product-form-fields">
-                <div className="field">
-                  <label>Nombre</label>
-                  <input
-                    type="text"
-                    placeholder="Nombre de la categoría"
-                    value={form.name}
-                    onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  />
-                </div>
-
-                <div className="field">
-                  <label>Icono</label>
-                  <input
-                    type="text"
-                    placeholder="Emoji de la categoría"
-                    value={form.iconName}
-                    onChange={(event) => setForm({ ...form, iconName: event.target.value })}
-                  />
-                </div>
-
-                <div className="field">
-                  <label>Color</label>
-                  <input
-                    type="color"
-                    value={form.colorHex}
-                    onChange={(event) => setForm({ ...form, colorHex: event.target.value })}
-                    style={{ height: '42px', padding: '4px' }}
-                  />
-                </div>
-
-                <label className="switch">
-                  <input
-                    type="checkbox"
-                    checked={form.active}
-                    onChange={(event) => setForm({ ...form, active: event.target.checked })}
-                  />
+              <div className="settings-field">
+                <label htmlFor="cat-name">Nombre</label>
+                <input id="cat-name" type="text" placeholder="Nombre de la categoria" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              </div>
+              <div className="settings-field">
+                <label htmlFor="cat-icon">Icono</label>
+                <input id="cat-icon" type="text" placeholder="Emoji de la categoria" value={form.iconName} onChange={(e) => setForm({ ...form, iconName: e.target.value })} />
+              </div>
+              <div className="settings-field">
+                <label htmlFor="cat-color">Color</label>
+                <input id="cat-color" type="color" value={form.colorHex} onChange={(e) => setForm({ ...form, colorHex: e.target.value })} style={{ height: '42px', padding: '4px', maxWidth: '100px' }} />
+              </div>
+              <div className="settings-field" style={{ marginBottom: 0 }}>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
+                  <span className="toggle-switch-track" />
                   Activa
                 </label>
-
-                <label className="switch">
-                  <input
-                    type="checkbox"
-                    checked={form.ticket}
-                    onChange={(event) => setForm({ ...form, ticket: event.target.checked })}
-                  />
-                  Ticket
+              </div>
+              <div className="settings-field" style={{ marginBottom: 0, marginTop: '0.75rem' }}>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={form.ticket} onChange={(e) => setForm({ ...form, ticket: e.target.checked })} />
+                  <span className="toggle-switch-track" />
+                  Mostrar en ticket
                 </label>
               </div>
             </div>
-            <div className="checkout-actions">
-              <button type="button" className="secondary-button" onClick={closeModal}>
-                Cancelar
-              </button>
-              <button type="button" className="primary-button" onClick={handleSave}>
-                {editingCategory ? 'Guardar cambios' : 'Crear categoría'}
-              </button>
+            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
+              <button type="button" className="btn-primary" onClick={handleSave}>{editingCategory ? 'Guardar cambios' : 'Crear categoria'}</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="product-grid">
+      <div className="product-grid-v2">
         {rendered.map((category) => {
           const imageUrl = buildImageUrl(category.imagePath, category.imageUpdatedAt);
-
           return (
-            <div key={category.id} className={`product-card ${!category.active ? 'product-card--inactive' : ''}`}>
-              <div className="product-card__image">
+            <div key={category.id} className={`product-card-v2 ${!category.active ? 'is-inactive' : ''}`}>
+              <div className="product-card-v2-media product-card-v2-media--category">
                 {imageUrl ? (
                   <img src={imageUrl} alt={category.name} />
                 ) : (
-                  <span className="product-card__icon">{category.iconName || '🧾'}</span>
+                  <span className="product-card-v2-icon">{category.iconName || '🧾'}</span>
                 )}
-                <label className="product-card__image-upload">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => handleUpload(category.id, event.target.files?.[0])}
-                    className="product-card__file-input"
-                  />
+                <label className="product-card-v2-upload">
+                  <input type="file" accept="image/*" onChange={(e) => handleUpload(category.id, e.target.files?.[0])} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
                 </label>
               </div>
-
-              <div className="product-card__info">
-                <span className="product-card__name">{category.name}</span>
+              <div className="product-card-v2-info">
+                <span className="product-card-v2-name">{category.name}</span>
               </div>
-
-              <div className="product-card__actions">
-                <button
-                  type="button"
-                  className="product-card__edit-btn"
-                  onClick={() => openEdit(category)}
-                >
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  className="product-card__delete-btn"
-                  onClick={() => handleDelete(category.id)}
-                >
-                  Eliminar
-                </button>
+              <div className="product-card-v2-actions">
+                <button type="button" className="btn-ghost" onClick={() => openEdit(category)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${category.name}`}>✎</button>
+                <button type="button" className="btn-ghost" onClick={() => handleDelete(category.id)} style={{ padding: '0.3rem 0.5rem', color: '#b91c1c' }} aria-label={`Eliminar ${category.name}`}>✕</button>
               </div>
             </div>
           );
         })}
       </div>
-    </section>
+    </div>
   );
 };
