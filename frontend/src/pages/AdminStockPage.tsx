@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings, useStock } from '../api/queries';
 import type { StockCategory, StockProduct } from '../api/types';
 import type { TicketPayload } from '../utils/ticketPrinting';
 
+type StockFilter = 'todos' | 'bajo' | 'sin-stock';
+
 const encodeBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   let binary = '';
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return window.btoa(binary);
+};
+
+const getStockBadge = (stock: number): { label: string; className: string } | null => {
+  if (stock === 0) return { label: 'Sin stock', className: 'badge badge-warning' };
+  if (stock <= 10) return { label: 'Bajo', className: 'badge badge-warning' };
+  return null;
 };
 
 export const AdminStockPage: React.FC = () => {
@@ -19,47 +25,85 @@ export const AdminStockPage: React.FC = () => {
   const { data: stockCategories, isLoading } = useStock();
   const { data: settings } = useSettings();
   const [error, setError] = useState<string | null>(null);
-  const [editingStock, setEditingStock] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<StockFilter>('todos');
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const timersRef = useRef<Record<string, number>>({});
 
-  const handleStockChange = (productId: string, value: string) => {
-    setEditingStock((prev) => ({ ...prev, [productId]: value }));
-  };
+  useEffect(() => {
+    return () => {
+      Object.values(timersRef.current).forEach(clearTimeout);
+    };
+  }, []);
 
-  const handleUpdateStock = async (productId: string) => {
-    const value = editingStock[productId];
-    if (value === undefined) return;
-
-    const stock = parseInt(value, 10);
-    if (Number.isNaN(stock)) {
-      setError('El stock debe ser un número válido');
-      return;
-    }
-
-    setError(null);
+  const updateStockApi = useCallback(async (productId: string, stock: number) => {
+    setSavingIds((prev) => new Set(prev).add(productId));
     try {
       await apiClient.patch(`/stock/${productId}`, { stock });
-      setEditingStock((prev) => {
-        const updated = { ...prev };
-        delete updated[productId];
-        return updated;
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
       });
+      setSavedIds((prev) => new Set(prev).add(productId));
+      setTimeout(() => {
+        setSavedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      }, 1800);
       await queryClient.invalidateQueries({ queryKey: ['stock'] });
       await queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err) {
+      setSavingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
       setError(normalizeApiError(err));
     }
-  };
+  }, [queryClient]);
+
+  const handleAdjust = useCallback((product: StockProduct, delta: number) => {
+    const newStock = Math.max(0, product.stock + delta);
+    setError(null);
+    if (timersRef.current[product.id]) {
+      clearTimeout(timersRef.current[product.id]);
+    }
+    timersRef.current[product.id] = window.setTimeout(() => {
+      delete timersRef.current[product.id];
+      updateStockApi(product.id, newStock);
+    }, 400);
+  }, [updateStockApi]);
+
+  const filteredCategories = useMemo(() => {
+    if (!stockCategories) return [];
+    return stockCategories
+      .map((cat) => {
+        let products = cat.products;
+        if (search) {
+          const q = search.toLowerCase();
+          products = products.filter((p) => p.name.toLowerCase().includes(q));
+        }
+        if (filter === 'bajo') {
+          products = products.filter((p) => p.stock > 0 && p.stock <= 10);
+        } else if (filter === 'sin-stock') {
+          products = products.filter((p) => p.stock === 0);
+        }
+        return { ...cat, products };
+      })
+      .filter((cat) => cat.products.length > 0);
+  }, [stockCategories, search, filter]);
 
   const handlePrintStockTicket = () => {
     if (!stockCategories || stockCategories.length === 0) return;
-
     const now = new Date();
-    const dateTimeISO = now.toISOString();
-
     const payload: TicketPayload = {
       clubName: settings?.clubName ?? '',
       storeName: settings?.storeName ?? 'SOLER - Bufet',
-      dateTimeISO,
+      dateTimeISO: now.toISOString(),
       items: stockCategories.flatMap((category) =>
         category.products.map((product) => ({
           qty: product.stock,
@@ -72,160 +116,130 @@ export const AdminStockPage: React.FC = () => {
       thanks: '',
       footer: 'Ticket de Stock',
     };
-
     const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));
-    const url = `/printticket?data=${ticketParam}`;
-    // Navigate to ticket page (works better in WebView than popup)
-    window.location.href = url;
+    window.location.href = `/printticket?data=${ticketParam}`;
   };
 
-  const getStockAlertClass = (stock: number): string => {
-    if (stock === 0) return 'stock-zero';
-    if (stock <= 10) return 'stock-low';
-    return 'stock-ok';
-  };
+  const totalProducts = stockCategories?.reduce((acc, c) => acc + c.products.length, 0) ?? 0;
 
   if (isLoading) {
     return (
-      <section className="card admin-stock">
-        <h2>Control de Stock</h2>
-        <p>Cargando...</p>
-      </section>
+      <div>
+        <div className="page-header">
+          <h2 className="page-header-title">Control de stock</h2>
+          <p className="page-header-subtitle">Cargando productos...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <section className="card admin-stock">
-      <div className="stock-header">
-        <h2>Control de Stock</h2>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={handlePrintStockTicket}
-          disabled={!stockCategories || stockCategories.length === 0}
-        >
-          🖨️ Imprimir ticket de stock
-        </button>
+    <div>
+      <div className="page-header">
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Control de stock</h2>
+            <p className="page-header-subtitle">Monitorea productos con bajo stock y actualiza cantidades rapidamente.</p>
+          </div>
+          <button type="button" className="btn-ghost" onClick={handlePrintStockTicket} disabled={totalProducts === 0}>
+            Imprimir reporte
+          </button>
+        </div>
       </div>
 
       {error && <p className="error-text">{error}</p>}
 
-      <div className="stock-legend">
-        <span className="legend-item stock-low">🔴 Stock bajo (1-10)</span>
-        <span className="legend-item stock-zero">⚫ Sin stock</span>
-      </div>
-
-      <div className="stock-categories">
-        {stockCategories?.map((category) => (
-          <StockCategorySection
-            key={category.id}
-            category={category}
-            editingStock={editingStock}
-            onStockChange={handleStockChange}
-            onUpdateStock={handleUpdateStock}
-            getStockAlertClass={getStockAlertClass}
-          />
-        ))}
-      </div>
-    </section>
-  );
-};
-
-interface StockCategorySectionProps {
-  category: StockCategory;
-  editingStock: Record<string, string>;
-  onStockChange: (productId: string, value: string) => void;
-  onUpdateStock: (productId: string) => void;
-  getStockAlertClass: (stock: number) => string;
-}
-
-const StockCategorySection: React.FC<StockCategorySectionProps> = ({
-  category,
-  editingStock,
-  onStockChange,
-  onUpdateStock,
-  getStockAlertClass,
-}) => {
-  return (
-    <div
-      className="stock-category-section"
-      style={{ borderLeftColor: category.colorHex }}
-    >
-      <h3
-        className="stock-category-title"
-        style={{ backgroundColor: `${category.colorHex}20`, color: category.colorHex }}
-      >
-        {category.name}
-      </h3>
-
-      <div className="stock-products">
-        {category.products.map((product) => (
-          <StockProductRow
-            key={product.id}
-            product={product}
-            editingValue={editingStock[product.id]}
-            onStockChange={onStockChange}
-            onUpdateStock={onUpdateStock}
-            getStockAlertClass={getStockAlertClass}
-          />
-        ))}
-      </div>
-    </div>
-  );
-};
-
-interface StockProductRowProps {
-  product: StockProduct;
-  editingValue: string | undefined;
-  onStockChange: (productId: string, value: string) => void;
-  onUpdateStock: (productId: string) => void;
-  getStockAlertClass: (stock: number) => string;
-}
-
-const StockProductRow: React.FC<StockProductRowProps> = ({
-  product,
-  editingValue,
-  onStockChange,
-  onUpdateStock,
-  getStockAlertClass,
-}) => {
-  const isEditing = editingValue !== undefined;
-  const displayStock = isEditing ? editingValue : product.stock.toString();
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      onUpdateStock(product.id);
-    }
-  };
-
-  return (
-    <div className={`stock-product-row ${getStockAlertClass(product.stock)}`}>
-      <span className="stock-product-name">{product.name}</span>
-      <span className="stock-product-price">
-        ${product.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-      </span>
-      <div className="stock-input-group">
+      <div className="stock-toolbar">
         <input
-          type="number"
-          min="0"
-          className="stock-input"
-          value={displayStock}
-          onChange={(e) => onStockChange(product.id, e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => isEditing && onUpdateStock(product.id)}
+          type="text"
+          className="stock-search-input"
+          placeholder="Buscar producto..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
-        {isEditing && (
-          <button
-            type="button"
-            className="icon-button primary-button"
-            onClick={() => onUpdateStock(product.id)}
-            aria-label="Guardar stock"
-            title="Guardar"
-          >
-            💾
-          </button>
-        )}
+        <div className="stock-filter-group">
+          {([
+            ['todos', 'Todos'],
+            ['bajo', 'Bajo stock'],
+            ['sin-stock', 'Sin stock'],
+          ] as [StockFilter, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={`stock-filter-chip ${filter === key ? 'active' : ''}`}
+              onClick={() => setFilter(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {filteredCategories.length === 0 ? (
+        <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+          <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.95rem' }}>
+            {search ? 'No se encontraron productos.' : 'No hay productos que mostrar.'}
+          </p>
+        </div>
+      ) : (
+        <div className="stock-list">
+          {filteredCategories.map((category) => (
+            <div key={category.id} className="stock-category-group">
+              <div className="stock-category-head">
+                <h3 className="stock-category-name">{category.name}</h3>
+                <span className="stock-category-count">{category.products.length} productos</span>
+              </div>
+              <div className="stock-product-rows">
+                {category.products.map((product) => {
+                  const badge = getStockBadge(product.stock);
+                  const isSaving = savingIds.has(product.id);
+                  const isSaved = savedIds.has(product.id);
+                  return (
+                    <div key={product.id} className={`stock-product-item ${product.stock === 0 ? 'is-zero' : ''} ${product.stock <= 10 && product.stock > 0 ? 'is-low' : ''}`}>
+                      <div className="stock-product-main">
+                        <span className="stock-product-name">{product.name}</span>
+                        {badge && <span className={badge.className}>{badge.label}</span>}
+                        <span className="stock-product-price">
+                          ${product.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="stock-qty-group">
+                        <button
+                          type="button"
+                          className="stock-qty-btn"
+                          onClick={() => handleAdjust(product, -1)}
+                          disabled={product.stock === 0 || isSaving}
+                          aria-label={`Reducir stock de ${product.name}`}
+                        >
+                          −
+                        </button>
+                        <span className="stock-qty-value">
+                          {isSaving ? (
+                            <span className="stock-qty-spinner" />
+                          ) : isSaved ? (
+                            <span className="stock-qty-check">✓</span>
+                          ) : (
+                            product.stock
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="stock-qty-btn"
+                          onClick={() => handleAdjust(product, 1)}
+                          disabled={isSaving}
+                          aria-label={`Aumentar stock de ${product.name}`}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
