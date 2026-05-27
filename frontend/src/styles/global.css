@@ -348,8 +348,8 @@ a {
   position: absolute;
   top: 0.6rem;
   right: 0.6rem;
-  background: rgba(0, 0, 0, 0.85);
-  color: var(--color-surface);
+  background: var(--color-price-badge-bg);
+  color: var(--color-price-badge-text);
   font-weight: 700;
   font-size: 1rem;
   padding: 0.3rem 0.55rem;
@@ -381,7 +381,7 @@ a {
 
 .product-icon {
   font-size: 3rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--color-product-icon);
 }
 
 .price {
@@ -425,7 +425,7 @@ button {
 
 .primary-button {
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
   border: none;
   width: 100%;
 }
@@ -771,7 +771,7 @@ button {
 }
 
 .pos-category-chip.active {
-  color: #ffffff;
+  color: var(--color-primary-contrast);
   border-color: transparent;
   font-weight: 600;
 }
@@ -845,8 +845,8 @@ button {
   position: absolute;
   top: 0.35rem;
   right: 0.35rem;
-  background: rgba(0, 0, 0, 0.78);
-  color: var(--color-surface);
+  background: var(--color-price-badge-bg);
+  color: var(--color-price-badge-text);
   font-weight: 700;
   font-size: 0.75rem;
   padding: 0.2rem 0.45rem;
@@ -858,8 +858,8 @@ button {
   position: absolute;
   bottom: 0.35rem;
   right: 0.35rem;
-  background: rgba(220, 38, 38, 0.88);
-  color: var(--color-surface);
+  background: var(--color-stock-badge-bg);
+  color: var(--color-stock-badge-text);
   font-weight: 700;
   font-size: 0.7rem;
   padding: 0.15rem 0.4rem;
@@ -1049,7 +1049,7 @@ button {
 
 .cart-checkout-btn {
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
   border: none;
   border-radius: 0.6rem;
   padding: 0.8rem;
@@ -1915,12 +1915,12 @@ button {
 
 .toast.success {
   background: var(--color-success-dark);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
 }
 
 .toast.error {
   background: var(--color-danger-text);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
 }
 
 @media (max-width: 900px) {
@@ -2975,7 +2975,7 @@ button {
   left: 2px;
   width: 18px;
   height: 18px;
-  background: #ffffff;
+  background: var(--color-toggle-thumb);
   border-radius: 50%;
   transition: transform 0.2s ease;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
@@ -3472,7 +3472,7 @@ button {
   height: 56px;
   border-radius: 50%;
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
   border: none;
   font-size: 1.75rem;
   font-weight: 400;
@@ -3505,7 +3505,7 @@ button {
   height: 48px;
   border-radius: 50%;
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
   border: none;
   font-size: 1.5rem;
   font-weight: 400;
@@ -4292,7 +4292,7 @@ button {
 
 .product-view-btn.active {
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
 }
 
 /* ─── Price Input (modal) ────────────────────────────────────── */
@@ -4770,7 +4770,7 @@ button {
 
 .pos-zoom-btn.active {
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
 }
 
 .pos-product-grid.pos-product-grid--sm {
@@ -5013,7 +5013,7 @@ button {
   width: 100%;
   padding: 0.8rem;
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--color-primary-contrast);
   border: none;
   border-radius: 0.65rem;
   font-size: 1rem;
@@ -5090,7 +5090,7 @@ button {
 
 /* ─── Dark mode: login PIN display glow ───────────────────────── */
 [data-theme="dark"] .login-pin-dot.filled {
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 6px var(--color-login-pin-glow);
 }
 
 /* ─── Dark mode: date/time input fix ───────────────────────────── */
