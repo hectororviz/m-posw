@@ -1915,10 +1915,12 @@ button {
 
 .toast.success {
   background: var(--color-success-dark);
+  color: #ffffff;
 }
 
 .toast.error {
   background: var(--color-danger-text);
+  color: #ffffff;
 }
 
 @media (max-width: 900px) {
@@ -2407,7 +2409,7 @@ button {
 }
 
 .stock-product-item:hover {
-  background: var(--acct-sales-text);
+  background: var(--color-hover);
 }
 
 .stock-product-item.is-zero .stock-product-name {
