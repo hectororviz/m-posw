@@ -266,24 +266,123 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
   );
 };
 
-// ─── Currency input (no spinners, $ prefix) □━━━━━━━━━━━━━━━━━━
+// ─── Parseo de moneda argentina  □━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function parseArsToNumber(input: string): number | null {
+  if (!input) return null;
+  let s = input.replace(/[$\s]/g, '').trim();
+  if (!s) return null;
+
+  // Si tiene coma, coma = decimal, puntos = miles
+  if (s.includes(',')) {
+    const [intRaw, decRaw] = s.split(',');
+    const intPart = intRaw.replace(/\./g, '');
+    const decPart = (decRaw || '0').replace(/\D/g, '').slice(0, 2).padEnd(2, '0');
+    const val = parseFloat(intPart + '.' + decPart);
+    return isNaN(val) ? null : val;
+  }
+
+  // Sin coma: contar puntos
+  const dots = (s.match(/\./g) || []).length;
+  if (dots === 0) {
+    const val = parseInt(s.replace(/\D/g, ''));
+    return isNaN(val) ? null : val;
+  }
+
+  if (dots === 1) {
+    const idx = s.lastIndexOf('.');
+    const after = s.slice(idx + 1);
+    // 1 o 2 dígitos después del punto → decimal
+    if (after.length <= 2 && /^\d+$/.test(after)) {
+      const intPart = s.slice(0, idx).replace(/\D/g, '') || '0';
+      const decPart = after.padEnd(2, '0');
+      const val = parseFloat(intPart + '.' + decPart);
+      return isNaN(val) ? null : val;
+    }
+    // Más dígitos → punto de miles
+    const val = parseInt(s.replace(/\./g, ''));
+    return isNaN(val) ? null : val;
+  }
+
+  // Múltiples puntos → todos son separadores de miles
+  const val = parseInt(s.replace(/\./g, ''));
+  return isNaN(val) ? null : val;
+}
+
+// ─── Formateo a display argentino  □━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function formatArsDisplay(normalized: string): string {
+  const num = parseFloat(normalized);
+  if (isNaN(num) || num === 0) return '';
+  const parts = num.toFixed(2).split('.');
+  const intFormatted = parseInt(parts[0], 10).toLocaleString('de-DE');
+  return `${intFormatted},${parts[1]}`;
+}
+
+// ─── CurrencyInput  □━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const CurrencyInput: React.FC<{
   value: string;
-  onChange: (raw: string) => void;
+  onChange: (normalized: string) => void;
   placeholder?: string;
-  min?: number;
-}> = ({ value, onChange, placeholder, min = 0 }) => {
+}> = ({ value, onChange, placeholder }) => {
+  const [focused, setFocused] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const num = parseFloat(value);
+  const hasValue = value !== '' && !isNaN(num) && num > 0;
+
+  // Qué mostrar en el input
+  let displayValue: string;
+  if (focused) {
+    displayValue = editValue;
+  } else if (hasValue) {
+    displayValue = formatArsDisplay(value);
+  } else {
+    displayValue = '';
+  }
+
+  const handleFocus = () => {
+    setFocused(true);
+    // Al enfocar, mostrar versión editable: sin formato de miles
+    if (hasValue) {
+      const parts = value.split('.');
+      const intPart = parts[0];
+      const decPart = parts[1] || '00';
+      if (decPart === '00') {
+        setEditValue(intPart);
+      } else {
+        setEditValue(`${intPart},${decPart}`);
+      }
+    } else {
+      setEditValue('');
+    }
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    // Al perder foco, normalizar a 2 decimales
+    if (value !== '') {
+      const n = parseFloat(value);
+      if (!isNaN(n) && n > 0) {
+        onChange(n.toFixed(2));
+      }
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    // allow digits, comma, dot
-    const cleaned = raw.replace(/[^0-9.,]/g, '');
-    if (cleaned === '') { onChange(''); return; }
-    const normalized = cleaned.replace(',', '.');
-    if (!/^\d*\.?\d{0,2}$/.test(normalized)) return;
-    const num = parseFloat(normalized);
-    if (isNaN(num)) return;
-    if (num < min) return;
-    onChange(cleaned);
+    // Quitar todo excepto dígitos, coma, punto
+    const cleaned = raw.replace(/[^0-9,.]/g, '');
+    setEditValue(cleaned);
+
+    if (cleaned === '') {
+      onChange('');
+      return;
+    }
+
+    const parsed = parseArsToNumber(cleaned);
+    if (parsed !== null && parsed >= 0) {
+      onChange(parsed.toString());
+    }
+    // Si parsed es null, no actualizamos (el usuario está en medio de escribir algo inválido)
   };
 
   return (
@@ -293,8 +392,10 @@ const CurrencyInput: React.FC<{
         className="currency-input-field"
         type="text"
         inputMode="decimal"
-        value={value}
+        value={displayValue}
         onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         placeholder={placeholder || '0,00'}
         autoComplete="off"
       />
@@ -361,7 +462,7 @@ const NewEntryModal: React.FC<{
   const advAllAccountsSelected = lines.every((l) => l.accountId !== '');
   const isBalanced = advDiff < 0.005 && advTotalDebit > 0 && advTotalCredit > 0;
 
-  const parseAmount = (raw: string) => parseFloat(raw.replace(',', '.')) || 0;
+  const parseAmount = (raw: string) => parseFloat(raw) || 0;
 
   const hasSimpleData = date !== todayStr() || assetId || ieAccountId || amount || description || notes;
   const hasAdvancedData = advancedDate !== todayStr() || advancedDesc || advancedNotes ||
