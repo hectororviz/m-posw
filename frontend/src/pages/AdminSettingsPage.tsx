@@ -466,20 +466,24 @@ export const AdminSettingsPage: React.FC = () => {
               ) : (
                 <>
                   <div className="mp-status-row">
-                    <span className="mp-status-label">Cuenta</span>
-                    <span className="mp-status-value">{mpStatus?.email ?? '—'}</span>
+                    <span className="mp-status-label">Vencimiento del token</span>
+                    <span className="mp-status-value">
+                      {mpStatus?.expiresAt
+                        ? new Date(mpStatus.expiresAt).toLocaleDateString('es-AR')
+                        : '—'}
+                    </span>
                   </div>
                   <div className="mp-status-row">
                     <span className="mp-status-label">POS</span>
                     <span className="badge badge-info">Configurado</span>
                   </div>
-                  {mpStatus.mpQrData && (
+                  {mpStatus?.mpQrData && (
                     <div className="mp-qr-preview">
                       <img src={mpStatus.mpQrData} alt="QR MercadoPago" className="mp-qr-image" />
                     </div>
                   )}
                   <div className="mp-actions">
-                    {mpStatus.mpQrData && (
+                    {mpStatus?.mpQrData && (
                       <a
                         href={mpStatus.mpQrData}
                         target="_blank"
