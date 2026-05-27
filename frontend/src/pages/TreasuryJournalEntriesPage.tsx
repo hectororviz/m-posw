@@ -52,6 +52,7 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [showNewEntryModal, setShowNewEntryModal] = useState(false);
+  const [newEntryInitialTab, setNewEntryInitialTab] = useState<'ingreso' | 'avanzado'>('ingreso');
   const [modalMode, setModalMode] = useState<'income' | 'expense' | 'advanced' | 'detail' | 'void'>('income');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const { data: detailEntry } = useJournalEntry(
@@ -163,10 +164,10 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
           <p className="page-subtitle">Registro de asientos contables</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn-primary" onClick={() => { setError(null); setShowNewEntryModal(true); }}>
+          <button className="btn-primary" onClick={() => { setError(null); setNewEntryInitialTab('ingreso'); setShowNewEntryModal(true); }}>
             ＋ Nuevo movimiento
           </button>
-          <button className="btn-ghost" onClick={() => { setError(null); setShowNewEntryModal(true); }}>
+          <button className="btn-ghost" onClick={() => { setError(null); setNewEntryInitialTab('avanzado'); setShowNewEntryModal(true); }}>
             Asiento avanzado
           </button>
           <button className="btn-ghost" onClick={() => exportLedgerBook()}>
@@ -247,7 +248,9 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
 
       {showNewEntryModal && (
         <NewEntryModal
-          onClose={() => setShowNewEntryModal(false)}
+          key={newEntryInitialTab + String(Date.now())}
+          initialMode={newEntryInitialTab === 'avanzado' ? 'avanzado' : 'ingreso'}
+          onClose={() => { setShowNewEntryModal(false); setError(null); }}
           onSaveSimple={handleQuickSave}
           onSaveAdvanced={handleAdvancedSave}
           error={error}
@@ -263,13 +266,50 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
   );
 };
 
+// ─── Currency input (no spinners, $ prefix) □━━━━━━━━━━━━━━━━━━
+const CurrencyInput: React.FC<{
+  value: string;
+  onChange: (raw: string) => void;
+  placeholder?: string;
+  min?: number;
+}> = ({ value, onChange, placeholder, min = 0 }) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // allow digits, comma, dot
+    const cleaned = raw.replace(/[^0-9.,]/g, '');
+    if (cleaned === '') { onChange(''); return; }
+    const normalized = cleaned.replace(',', '.');
+    if (!/^\d*\.?\d{0,2}$/.test(normalized)) return;
+    const num = parseFloat(normalized);
+    if (isNaN(num)) return;
+    if (num < min) return;
+    onChange(cleaned);
+  };
+
+  return (
+    <div className="currency-input">
+      <span className="currency-input-prefix">$</span>
+      <input
+        className="currency-input-field"
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={handleChange}
+        placeholder={placeholder || '0,00'}
+        autoComplete="off"
+      />
+    </div>
+  );
+};
+
 // ─── Unified Nuevo movimiento modal □━━━━━━━━━━━━━━━━━━━━━━━━━
 const NewEntryModal: React.FC<{
+  initialMode: 'ingreso' | 'avanzado';
   onClose: () => void;
   onSaveSimple: (mode: 'income' | 'expense', data: any) => Promise<void>;
   onSaveAdvanced: (data: any) => void;
   error: string | null;
-}> = ({ onClose, onSaveSimple, onSaveAdvanced, error }) => {
+}> = ({ initialMode, onClose, onSaveSimple, onSaveAdvanced, error }) => {
   const { data: assetAccounts } = useImputableAssetAccounts();
   const { data: revenueAccounts } = useImputableRevenueAccounts();
   const { data: expenseAccounts } = useImputableExpenseAccounts();
@@ -279,7 +319,8 @@ const NewEntryModal: React.FC<{
     [allAccounts],
   );
 
-  const [tab, setTab] = useState<'ingreso' | 'gasto' | 'avanzado'>('ingreso');
+  const [tab, setTab] = useState<'ingreso' | 'gasto' | 'avanzado'>(initialMode);
+  const [tabConfirm, setTabConfirm] = useState<'ingreso' | 'gasto' | 'avanzado' | null>(null);
 
   // Simple fields
   const [date, setDate] = useState(todayStr());
@@ -288,13 +329,12 @@ const NewEntryModal: React.FC<{
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
-  const [saveAs, setSaveAs] = useState<'DRAFT' | 'POSTED'>('POSTED');
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Advanced fields
   const [advancedDate, setAdvancedDate] = useState(todayStr());
   const [advancedDesc, setAdvancedDesc] = useState('');
   const [advancedNotes, setAdvancedNotes] = useState('');
-  const [advancedSaveAs, setAdvancedSaveAs] = useState<'DRAFT' | 'POSTED'>('POSTED');
   const [lines, setLines] = useState<{ accountId: string; debit: string; credit: string; desc: string }[]>([
     { accountId: '', debit: '', credit: '', desc: '' },
     { accountId: '', debit: '', credit: '', desc: '' },
@@ -316,35 +356,33 @@ const NewEntryModal: React.FC<{
   const advTotalDebit = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
   const advTotalCredit = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
   const advDiff = Math.abs(advTotalDebit - advTotalCredit);
+  const advHasDebit = lines.some((l) => parseFloat(l.debit) > 0);
+  const advHasCredit = lines.some((l) => parseFloat(l.credit) > 0);
+  const advAllAccountsSelected = lines.every((l) => l.accountId !== '');
   const isBalanced = advDiff < 0.005 && advTotalDebit > 0 && advTotalCredit > 0;
 
-  const handleSimpleSubmit = (mode: 'income' | 'expense') => (e: React.FormEvent) => {
-    e.preventDefault();
-    onSaveSimple(mode, {
-      date,
-      assetAccountId: assetId,
-      incomeExpenseAccountId: ieAccountId,
-      amount: Number(amount),
-      description,
-      notes: notes || undefined,
-      status: saveAs,
-    });
+  const parseAmount = (raw: string) => parseFloat(raw.replace(',', '.')) || 0;
+
+  const hasSimpleData = date !== todayStr() || assetId || ieAccountId || amount || description || notes;
+  const hasAdvancedData = advancedDate !== todayStr() || advancedDesc || advancedNotes ||
+    lines.some((l) => l.accountId || l.debit || l.credit || l.desc);
+
+  const confirmTabChange = (newTab: 'ingreso' | 'gasto' | 'avanzado') => {
+    const currentHasData = tab === 'avanzado' ? hasAdvancedData : hasSimpleData;
+    if (currentHasData && newTab !== tab) {
+      setTabConfirm(newTab);
+    } else {
+      setTab(newTab);
+      resetSimple();
+    }
   };
 
-  const handleAdvancedSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSaveAdvanced({
-      date: advancedDate,
-      description: advancedDesc,
-      notes: advancedNotes || undefined,
-      status: advancedSaveAs,
-      lines: lines.map((l) => ({
-        accountId: l.accountId,
-        debit: parseFloat(l.debit) || 0,
-        credit: parseFloat(l.credit) || 0,
-        description: l.desc || undefined,
-      })),
-    });
+  const doTabChange = () => {
+    if (tabConfirm) {
+      setTab(tabConfirm);
+      resetSimple();
+      setTabConfirm(null);
+    }
   };
 
   const resetSimple = () => {
@@ -354,164 +392,197 @@ const NewEntryModal: React.FC<{
     setAmount('');
     setDescription('');
     setNotes('');
-    setSaveAs('POSTED');
+    setTouched({});
   };
 
-  const handleTabChange = (newTab: 'ingreso' | 'gasto' | 'avanzado') => {
-    setTab(newTab);
-    resetSimple();
+  const simpleValid = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    if (!date) errs.date = 'Requerido';
+    if (!assetId) errs.assetId = 'Requerido';
+    if (!ieAccountId) errs.ieAccountId = 'Requerido';
+    if (!amount || parseAmount(amount) <= 0) errs.amount = 'Ingrese un importe mayor a cero';
+    if (!description.trim()) errs.description = 'Requerido';
+    return errs;
   };
+
+  const handleSimpleSubmit = (mode: 'income' | 'expense', isDraft: boolean) => (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setTouched({ date: true, assetId: true, ieAccountId: true, amount: true, description: true });
+    const errs = simpleValid();
+    if (Object.keys(errs).length > 0 && !isDraft) return;
+    if (!amount || parseAmount(amount) <= 0) return;
+    onSaveSimple(mode, {
+      date,
+      assetAccountId: assetId,
+      incomeExpenseAccountId: ieAccountId,
+      amount: parseAmount(amount),
+      description,
+      notes: notes || undefined,
+      status: isDraft ? 'DRAFT' : 'POSTED',
+    });
+  };
+
+  const handleAdvancedSubmit = (isDraft: boolean) => (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    onSaveAdvanced({
+      date: advancedDate,
+      description: advancedDesc,
+      notes: advancedNotes || undefined,
+      status: isDraft ? 'DRAFT' : 'POSTED',
+      lines: lines.map((l) => ({
+        accountId: l.accountId,
+        debit: parseFloat(l.debit) || 0,
+        credit: parseFloat(l.credit) || 0,
+        description: l.desc || undefined,
+      })),
+    });
+  };
+
+  const simpleErrs = simpleValid();
+
+  let advBlockMsg = '';
+  if (!advAllAccountsSelected) advBlockMsg = 'Seleccione una cuenta para cada línea';
+  else if (!advHasDebit) advBlockMsg = 'Debe existir al menos una línea en el Debe';
+  else if (!advHasCredit) advBlockMsg = 'Debe existir al menos una línea en el Haber';
+  else if (!isBalanced) advBlockMsg = 'El asiento debe estar balanceado';
+  else if (!advancedDesc.trim()) advBlockMsg = 'La descripción es requerida';
+
+  const canConfirmAdv = isBalanced && advAllAccountsSelected && advHasDebit && advHasCredit && advancedDesc.trim();
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <div
-        className="modal user-modal"
-        style={{ maxWidth: tab === 'avanzado' ? '750px' : '520px' }}
+        className="modal user-modal new-entry-modal"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
           <h3>Nuevo movimiento</h3>
-          <button type="button" className="icon-button" onClick={onClose}>✕</button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Cerrar">✕</button>
         </div>
-        <div className="modal-body">
+        <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {error && <div className="error-banner">{error}</div>}
 
           <div className="entry-type-tabs">
             <button
               className={`entry-type-tab ${tab === 'ingreso' ? 'active' : ''}`}
-              onClick={() => handleTabChange('ingreso')}
+              onClick={() => tab === 'ingreso' ? null : confirmTabChange('ingreso')}
+              type="button"
             >
               Ingreso
             </button>
             <button
               className={`entry-type-tab ${tab === 'gasto' ? 'active' : ''}`}
-              onClick={() => handleTabChange('gasto')}
+              onClick={() => tab === 'gasto' ? null : confirmTabChange('gasto')}
+              type="button"
             >
               Gasto
             </button>
             <button
               className={`entry-type-tab ${tab === 'avanzado' ? 'active' : ''}`}
-              onClick={() => handleTabChange('avanzado')}
+              onClick={() => tab === 'avanzado' ? null : confirmTabChange('avanzado')}
+              type="button"
             >
               Avanzado
             </button>
           </div>
 
           {tab === 'ingreso' && (
-            <form onSubmit={handleSimpleSubmit('income')}>
+            <>
               <div className="settings-field">
                 <label>Fecha</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                {touched.date && simpleErrs.date && <span className="field-error">{simpleErrs.date}</span>}
               </div>
               <div className="settings-field">
                 <label>Cuenta donde ingresa el dinero</label>
-                <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
+                <select value={assetId} onChange={(e) => setAssetId(e.target.value)}>
                   <option value="">Seleccionar cuenta</option>
                   {(assetAccounts || []).map((a) => (
                     <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                   ))}
                 </select>
+                {touched.assetId && simpleErrs.assetId && <span className="field-error">{simpleErrs.assetId}</span>}
               </div>
               <div className="settings-field">
                 <label>Concepto del ingreso</label>
-                <select value={ieAccountId} onChange={(e) => setIeAccountId(e.target.value)} required>
+                <select value={ieAccountId} onChange={(e) => setIeAccountId(e.target.value)}>
                   <option value="">Seleccionar cuenta de ingreso</option>
                   {(revenueAccounts || []).map((a) => (
                     <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                   ))}
                 </select>
+                {touched.ieAccountId && simpleErrs.ieAccountId && <span className="field-error">{simpleErrs.ieAccountId}</span>}
               </div>
               <div className="settings-field">
                 <label>Importe</label>
-                <div className="price-input-wrapper">
-                  <span className="price-input-symbol">$</span>
-                  <input type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-                </div>
+                <CurrencyInput value={amount} onChange={setAmount} />
+                {touched.amount && simpleErrs.amount && <span className="field-error">{simpleErrs.amount}</span>}
               </div>
               <div className="settings-field">
                 <label>Descripción</label>
-                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} required />
+                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} />
+                {touched.description && simpleErrs.description && <span className="field-error">{simpleErrs.description}</span>}
               </div>
               <div className="settings-field">
                 <label>Observaciones (opcional)</label>
                 <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
-              <div className="modal-footer" style={{ padding: '16px 0 0 0' }}>
-                <label className="toggle-switch" style={{ marginRight: 'auto' }}>
-                  <input type="checkbox" checked={saveAs === 'DRAFT'} onChange={(e) => setSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
-                  <span className="toggle-switch-track" />
-                  Guardar como borrador
-                </label>
-                <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
-                <button type="submit" className="btn-primary">
-                  {saveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar movimiento'}
-                </button>
-              </div>
-            </form>
+            </>
           )}
 
           {tab === 'gasto' && (
-            <form onSubmit={handleSimpleSubmit('expense')}>
+            <>
               <div className="settings-field">
                 <label>Fecha</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                {touched.date && simpleErrs.date && <span className="field-error">{simpleErrs.date}</span>}
               </div>
               <div className="settings-field">
                 <label>Concepto del gasto</label>
-                <select value={ieAccountId} onChange={(e) => setIeAccountId(e.target.value)} required>
+                <select value={ieAccountId} onChange={(e) => setIeAccountId(e.target.value)}>
                   <option value="">Seleccionar cuenta de gasto</option>
                   {(expenseAccounts || []).map((a) => (
                     <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                   ))}
                 </select>
+                {touched.ieAccountId && simpleErrs.ieAccountId && <span className="field-error">{simpleErrs.ieAccountId}</span>}
               </div>
               <div className="settings-field">
                 <label>Cuenta desde donde sale el dinero</label>
-                <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
+                <select value={assetId} onChange={(e) => setAssetId(e.target.value)}>
                   <option value="">Seleccionar cuenta de activo</option>
                   {(assetAccounts || []).map((a) => (
                     <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                   ))}
                 </select>
+                {touched.assetId && simpleErrs.assetId && <span className="field-error">{simpleErrs.assetId}</span>}
               </div>
               <div className="settings-field">
                 <label>Importe</label>
-                <div className="price-input-wrapper">
-                  <span className="price-input-symbol">$</span>
-                  <input type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-                </div>
+                <CurrencyInput value={amount} onChange={setAmount} />
+                {touched.amount && simpleErrs.amount && <span className="field-error">{simpleErrs.amount}</span>}
               </div>
               <div className="settings-field">
                 <label>Descripción</label>
-                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} required />
+                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} />
+                {touched.description && simpleErrs.description && <span className="field-error">{simpleErrs.description}</span>}
               </div>
               <div className="settings-field">
                 <label>Observaciones (opcional)</label>
                 <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
-              <div className="modal-footer" style={{ padding: '16px 0 0 0' }}>
-                <label className="toggle-switch" style={{ marginRight: 'auto' }}>
-                  <input type="checkbox" checked={saveAs === 'DRAFT'} onChange={(e) => setSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
-                  <span className="toggle-switch-track" />
-                  Guardar como borrador
-                </label>
-                <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
-                <button type="submit" className="btn-primary">
-                  {saveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar movimiento'}
-                </button>
-              </div>
-            </form>
+            </>
           )}
 
           {tab === 'avanzado' && (
-            <form onSubmit={handleAdvancedSubmit}>
+            <>
               <div className="settings-field">
                 <label>Fecha</label>
-                <input type="date" value={advancedDate} onChange={(e) => setAdvancedDate(e.target.value)} required />
+                <input type="date" value={advancedDate} onChange={(e) => setAdvancedDate(e.target.value)} />
               </div>
               <div className="settings-field">
                 <label>Descripción</label>
-                <input type="text" value={advancedDesc} onChange={(e) => setAdvancedDesc(e.target.value)} required />
+                <input type="text" value={advancedDesc} onChange={(e) => setAdvancedDesc(e.target.value)} />
               </div>
               <div className="settings-field">
                 <label>Observaciones (opcional)</label>
@@ -521,35 +592,48 @@ const NewEntryModal: React.FC<{
               <div className="entry-lines-section">
                 <div className="entry-lines-header">
                   <h4>Líneas del asiento</h4>
-                  <button type="button" className="btn-ghost btn-sm" onClick={addLine}>+ Agregar línea</button>
                 </div>
                 {lines.map((line, i) => (
-                  <div key={i} className="entry-line-row">
-                    <div className="entry-line-account">
-                      <select value={line.accountId} onChange={(e) => updateLine(i, 'accountId', e.target.value)} required>
-                        <option value="">Cuenta</option>
+                  <div key={i} className="entry-line-card">
+                    <div className="entry-line-card__head">
+                      <span className="entry-line-card__num">Línea {i + 1}</span>
+                      {lines.length > 2 && (
+                        <button type="button" className="btn-ghost btn-sm" onClick={() => removeLine(i)}>
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
+                    <div className="entry-line-card__account">
+                      <select value={line.accountId} onChange={(e) => updateLine(i, 'accountId', e.target.value)}>
+                        <option value="">Seleccionar cuenta contable</option>
                         {imputableAccounts.map((a) => (
                           <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                         ))}
                       </select>
                     </div>
-                    <div className="entry-line-amount">
-                      <div className="price-input-wrapper">
-                        <span className="price-input-symbol">D$</span>
-                        <input type="number" inputMode="decimal" min="0" step="0.01" value={line.debit} onChange={(e) => updateLine(i, 'debit', e.target.value)} placeholder="Debe" />
+                    <div className="entry-line-card__amounts">
+                      <div className="entry-line-card__amount">
+                        <label>Debe</label>
+                        <CurrencyInput
+                          value={line.debit}
+                          onChange={(v) => updateLine(i, 'debit', v)}
+                          placeholder="0,00"
+                        />
+                      </div>
+                      <div className="entry-line-card__amount">
+                        <label>Haber</label>
+                        <CurrencyInput
+                          value={line.credit}
+                          onChange={(v) => updateLine(i, 'credit', v)}
+                          placeholder="0,00"
+                        />
                       </div>
                     </div>
-                    <div className="entry-line-amount">
-                      <div className="price-input-wrapper">
-                        <span className="price-input-symbol">H$</span>
-                        <input type="number" inputMode="decimal" min="0" step="0.01" value={line.credit} onChange={(e) => updateLine(i, 'credit', e.target.value)} placeholder="Haber" />
-                      </div>
-                    </div>
-                    {lines.length > 2 && (
-                      <button type="button" className="btn-ghost btn-sm" onClick={() => removeLine(i)}>✕</button>
-                    )}
                   </div>
                 ))}
+                <button type="button" className="btn-ghost btn-sm" onClick={addLine} style={{ marginTop: 8 }}>
+                  ＋ Agregar línea
+                </button>
               </div>
 
               <div className="entry-balance-summary">
@@ -559,25 +643,79 @@ const NewEntryModal: React.FC<{
                   <span>Diferencia</span><strong>{formatCurrency(advDiff)}</strong>
                 </div>
               </div>
+              {advBlockMsg && <p className="hint-text">{advBlockMsg}</p>}
+            </>
+          )}
 
-              <div className="modal-footer" style={{ padding: '16px 0 0 0' }}>
-                <label className="toggle-switch" style={{ marginRight: 'auto' }}>
-                  <input type="checkbox" checked={advancedSaveAs === 'DRAFT'} onChange={(e) => setAdvancedSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
-                  <span className="toggle-switch-track" />
-                  Guardar como borrador
-                </label>
-                <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={!isBalanced && advancedSaveAs === 'POSTED'}>
-                  {advancedSaveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar asiento'}
-                </button>
-              </div>
-              {!isBalanced && advancedSaveAs === 'POSTED' && (
-                <p className="hint-text">El asiento debe estar balanceado para confirmar</p>
-              )}
-            </form>
+        </div>
+
+        {/* Footer */}
+        <div className="modal-footer new-entry-footer">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          {tab !== 'avanzado' ? (
+            <>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleSimpleSubmit(tab === 'ingreso' ? 'income' : 'expense', true)()}
+              >
+                Guardar borrador
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleSimpleSubmit(tab === 'ingreso' ? 'income' : 'expense', false)()}
+              >
+                Confirmar movimiento
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => handleAdvancedSubmit(true)()}
+              >
+                Guardar borrador
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!canConfirmAdv}
+                onClick={() => handleAdvancedSubmit(false)()}
+              >
+                Confirmar asiento
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Tab change confirmation mini-modal */}
+      {tabConfirm && (
+        <div className="modal-backdrop" style={{ zIndex: 1001 }} role="presentation">
+          <div className="modal user-modal" style={{ maxWidth: 380 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Cambiar tipo</h3>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, color: 'var(--color-text-body)', fontSize: '0.9rem' }}>
+                Al cambiar de tipo de movimiento se perderán los datos ingresados. ¿Continuar?
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn-ghost" onClick={() => setTabConfirm(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn-primary" onClick={doTabChange}>
+                Cambiar y descartar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

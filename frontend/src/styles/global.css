@@ -5789,3 +5789,181 @@ button {
 [data-theme="dark"] .entry-type-tab.active {
   color: var(--color-primary-contrast);
 }
+
+/* ═══ Currency Input (no spinners) ───────────────────────────── */
+.currency-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.currency-input-prefix {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.currency-input-field {
+  width: 100%;
+  padding: 8px 10px 8px 28px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.currency-input-field::-webkit-inner-spin-button,
+.currency-input-field::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.currency-input-field:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-ring);
+}
+
+/* ═══ Field error ────────────────────────────────────────────── */
+.field-error {
+  display: block;
+  color: var(--color-danger);
+  font-size: 0.75rem;
+  margin-top: 3px;
+}
+
+/* ═══ Secondary button ───────────────────────────────────────── */
+.btn-secondary {
+  padding: 8px 18px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-secondary:hover {
+  background: var(--color-hover);
+  border-color: var(--color-accent);
+}
+
+/* ═══ New entry modal ────────────────────────────────────────── */
+.new-entry-modal {
+  max-width: 520px;
+  width: 100%;
+}
+
+.new-entry-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  border-radius: 0 0 12px 12px;
+}
+
+.new-entry-footer .btn-ghost {
+  margin-right: auto;
+}
+
+@media (max-width: 480px) {
+  .new-entry-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .new-entry-footer .btn-ghost {
+    order: 3;
+    margin-right: 0;
+  }
+
+  .new-entry-footer .btn-secondary {
+    order: 2;
+  }
+
+  .new-entry-footer .btn-primary {
+    order: 1;
+    width: 100%;
+    padding: 12px;
+  }
+}
+
+/* ═══ Entry line card (responsive) ──────────────────────────── */
+.entry-line-card {
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.entry-line-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.entry-line-card__num {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.entry-line-card__account {
+  margin-bottom: 8px;
+}
+
+.entry-line-card__account select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
+}
+
+.entry-line-card__amounts {
+  display: flex;
+  gap: 8px;
+}
+
+.entry-line-card__amount {
+  flex: 1;
+}
+
+.entry-line-card__amount label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+@media (min-width: 640px) {
+  .new-entry-modal {
+    max-width: 520px;
+  }
+
+  .new-entry-modal:has(.entry-line-card) {
+    max-width: 750px;
+  }
+}
