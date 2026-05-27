@@ -20,30 +20,20 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { data: settings } = useSettings();
-  const {
-    data: users,
-    isLoading: usersLoading,
-    error: usersError,
-  } = useLoginUsers();
+  const { data: users, isLoading: usersLoading, error: usersError } = useLoginUsers();
   const [identifier, setIdentifier] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showTempKeyboard, setShowTempKeyboard] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
+  const [pinFocused, setPinFocused] = useState(false);
   const pinLength = 6;
-
-  const shouldShowKeyboard = showEmbeddedKeyboard || showTempKeyboard;
 
   useEffect(() => {
     const accentColor = settings?.accentColor?.trim();
-    if (accentColor) {
-      document.documentElement.style.setProperty('--accent-color', accentColor);
-      return;
-    }
-    document.documentElement.style.setProperty('--accent-color', DEFAULT_ACCENT_COLOR);
+    document.documentElement.style.setProperty('--accent-color', accentColor || DEFAULT_ACCENT_COLOR);
   }, [settings?.accentColor]);
 
   const storeName = settings?.storeName ?? 'm-POSw';
@@ -52,14 +42,9 @@ export const LoginPage: React.FC = () => {
   const showLogo = Boolean(logoUrl) && !logoError;
   const initials = getInitials(storeName);
 
-  useEffect(() => {
-    setLogoError(false);
-  }, [logoUrl]);
+  useEffect(() => { setLogoError(false); }, [logoUrl]);
 
-  const availableUsers = useMemo(
-    () => (users ?? []).filter((user) => user.active !== false),
-    [users],
-  );
+  const availableUsers = useMemo(() => (users ?? []).filter((u) => u.active !== false), [users]);
 
   const handleUserChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedUserId(event.target.value);
@@ -67,38 +52,26 @@ export const LoginPage: React.FC = () => {
     setPin('');
   };
 
-  const handlePinChange = (value: string) => {
-    const sanitized = value.replace(/\D/g, '').slice(0, pinLength);
-    setPin(sanitized);
-  };
-
   const appendDigit = (digit: string) => {
-    setPin((current) => (current + digit).slice(0, pinLength));
+    setPin((c) => (c + digit).slice(0, pinLength));
   };
 
-  const handleBackspace = () => {
-    setPin((current) => current.slice(0, -1));
-  };
-
-  const handleClear = () => {
-    setPin('');
-  };
+  const handleBackspace = () => setPin((c) => c.slice(0, -1));
+  const handleClear = () => setPin('');
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      const selectedUser = availableUsers.find((user) => user.id === selectedUserId);
-      const payload =
-        selectedUser?.email
-          ? { email: selectedUser.email, pin }
-          : selectedUser
-            ? { name: selectedUser.name, pin }
-            : identifier.includes('@')
-              ? { email: identifier, pin }
-              : { name: identifier, pin };
-
+      const selectedUser = availableUsers.find((u) => u.id === selectedUserId);
+      const payload = selectedUser?.email
+        ? { email: selectedUser.email, pin }
+        : selectedUser
+          ? { name: selectedUser.name, pin }
+          : identifier.includes('@')
+            ? { email: identifier, pin }
+            : { name: identifier, pin };
       const response = await apiClient.post<AuthResponse>('/auth/login', payload);
       login(response.data);
       navigate('/', { replace: true });
@@ -113,107 +86,85 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="login-page">
-      <form className="card login-card" onSubmit={handleSubmit}>
+      <div className="login-bg" />
+      <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-brand">
           {showLogo ? (
-            <img
-              src={logoUrl}
-              alt={storeName}
-              className="login-logo"
-              onError={() => setLogoError(true)}
-            />
+            <img src={logoUrl} alt={storeName} className="login-logo" onError={() => setLogoError(true)} />
           ) : (
             <div className="login-logo-placeholder">{initials}</div>
           )}
-          <h1 className="login-store-name">{storeName}</h1>
-          {clubName && <p className="login-club-name">{clubName}</p>}
+          <div className="login-brand-text">
+            <h1 className="login-store-name">{storeName}</h1>
+            {clubName && <p className="login-club-name">{clubName}</p>}
+          </div>
         </div>
-        <h2>Iniciar sesión</h2>
-        <label className="field">
-          Email o usuario
+
+        <div className="login-field">
+          <label className="login-label">Usuario</label>
           {availableUsers.length > 0 ? (
-            <select value={selectedUserId} onChange={handleUserChange} required>
+            <select className="login-select" value={selectedUserId} onChange={handleUserChange} required>
               <option value="" disabled>
-                {usersLoading ? 'Cargando usuarios...' : 'Seleccione un usuario'}
+                {usersLoading ? 'Cargando...' : 'Selecciona un usuario'}
               </option>
-              {availableUsers.map((user) => {
-                const emailLabel = user.email ? ` - ${user.email}` : '';
-                const label = user.externalPosId
-                  ? `${user.name} (${user.externalPosId})${emailLabel}`
-                  : `${user.name}${emailLabel}`;
-                return (
-                  <option key={user.id} value={user.id}>
-                    {label}
-                  </option>
-                );
-              })}
+              {availableUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}{user.email ? ` — ${user.email}` : ''}
+                </option>
+              ))}
             </select>
           ) : (
             <input
+              className="login-input"
               type="text"
               value={identifier}
-              onChange={(event) => setIdentifier(event.target.value)}
-              placeholder={usersLoading ? 'Cargando usuarios...' : 'Ingrese su email o usuario'}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Email o nombre de usuario"
               required
             />
           )}
           {usersLoadError && <p className="error-text">{usersLoadError}</p>}
-        </label>
-        <label className="field">
-          PIN
+        </div>
+
+        <div className="login-field">
+          <label className="login-label">PIN</label>
+          <div className={`login-pin-display ${pinFocused ? 'focused' : ''}`} onClick={() => setPinFocused(true)}>
+            {Array.from({ length: pinLength }).map((_, i) => (
+              <span key={i} className={`login-pin-dot ${i < pin.length ? 'filled' : ''}`} />
+            ))}
+          </div>
           <input
-            type="password"
-            value={pin}
-            onChange={(event) => handlePinChange(event.target.value)}
+            className="login-pin-hidden"
+            type="text"
             inputMode="numeric"
             pattern="[0-9]*"
-            placeholder="••••••"
+            value={pin}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, '').slice(0, pinLength);
+              setPin(v);
+            }}
+            onFocus={() => setPinFocused(true)}
+            onBlur={() => setPinFocused(false)}
             maxLength={pinLength}
-            required
+            autoComplete="off"
           />
-        </label>
-        {!showEmbeddedKeyboard && (
-          <button
-            type="button"
-            className="secondary-button"
-            style={{ marginTop: '0.5rem', width: 'auto' }}
-            onClick={() => setShowTempKeyboard(!showTempKeyboard)}
-          >
-            {showTempKeyboard ? 'Ocultar teclado' : 'Mostrar teclado'}
-          </button>
-        )}
-        {shouldShowKeyboard && (
-          <div className="pin-keypad" aria-label="Teclado numérico">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-              <button
-                key={digit}
-                type="button"
-                className="pin-key"
-                onClick={() => appendDigit(digit)}
-              >
-                {digit}
-              </button>
-            ))}
-            <button type="button" className="pin-key pin-key--secondary" onClick={handleClear}>
-              Limpiar
-            </button>
-            <button type="button" className="pin-key" onClick={() => appendDigit('0')}>
-              0
-            </button>
-            <button type="button" className="pin-key pin-key--secondary" onClick={handleBackspace}>
-              Borrar
-            </button>
-          </div>
-        )}
+        </div>
+
+        <div className={`login-keypad ${showEmbeddedKeyboard ? '' : 'login-keypad--hidden'}`}>
+          {['1','2','3','4','5','6','7','8','9'].map((d) => (
+            <button key={d} type="button" className="login-key" onClick={() => appendDigit(d)}>{d}</button>
+          ))}
+          <button type="button" className="login-key login-key--clear" onClick={handleClear}>Limpiar</button>
+          <button type="button" className="login-key" onClick={() => appendDigit('0')}>0</button>
+          <button type="button" className="login-key login-key--back" onClick={handleBackspace}>⌫</button>
+        </div>
+
         {error && <p className="error-text">{error}</p>}
+
         <button
           type="submit"
-          className="primary-button"
-          disabled={
-            loading ||
-            pin.length < pinLength ||
-            (availableUsers.length > 0 ? !selectedUserId : !identifier)
-          }
+          className="login-submit"
+          disabled={loading || pin.length < pinLength || (availableUsers.length > 0 ? !selectedUserId : !identifier)}
         >
           {loading ? 'Ingresando...' : 'Entrar'}
         </button>

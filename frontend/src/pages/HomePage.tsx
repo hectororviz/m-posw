@@ -25,7 +25,18 @@ export const HomePage: React.FC = () => {
   const { addItem } = useCart();
   const { pushToast } = useToast();
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [cardSize, setCardSize] = useState<'sm' | 'md' | 'lg'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('pos-card-size') as 'sm' | 'md' | 'lg') || 'md';
+    }
+    return 'md';
+  });
   const { data: products, isLoading } = useProductsByCategory(activeCategoryId ?? undefined);
+
+  const handleCardSize = (size: 'sm' | 'md' | 'lg') => {
+    setCardSize(size);
+    if (typeof window !== 'undefined') localStorage.setItem('pos-card-size', size);
+  };
 
   useEffect(() => {
     void prefetchCategories(queryClient);
@@ -61,6 +72,11 @@ export const HomePage: React.FC = () => {
                 {cat.name}
               </button>
             ))}
+            <div className="pos-zoom-control">
+              <button type="button" className={`pos-zoom-btn ${cardSize === 'sm' ? 'active' : ''}`} onClick={() => handleCardSize('sm')}>⊡</button>
+              <button type="button" className={`pos-zoom-btn ${cardSize === 'md' ? 'active' : ''}`} onClick={() => handleCardSize('md')}>◫</button>
+              <button type="button" className={`pos-zoom-btn ${cardSize === 'lg' ? 'active' : ''}`} onClick={() => handleCardSize('lg')}>▣</button>
+            </div>
           </div>
 
           <div className="pos-products">
@@ -68,7 +84,7 @@ export const HomePage: React.FC = () => {
             {!isLoading && products && products.length === 0 && (
               <p style={{ color: '#94a3b8', padding: '2rem', textAlign: 'center' }}>Sin productos en esta categoria.</p>
             )}
-            <div className="pos-product-grid">
+            <div className={`pos-product-grid pos-product-grid--${cardSize}`}>
               {products?.map((product) => {
                 const imageUrl = buildImageUrl(product.imagePath, product.imageUpdatedAt);
                 const iconName = product.iconName?.trim() || '📦';

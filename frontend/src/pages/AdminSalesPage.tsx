@@ -116,11 +116,12 @@ export const AdminSalesPage: React.FC = () => {
   }, [movements, printStart, printEnd]);
 
   const kpis = useMemo(() => {
-    const saleEntries = filteredEntries.filter((e) => e.kind === 'SALE');
-    const totalSales = saleEntries.reduce((acc, s) => acc + toAmount(s.total), 0);
-    const count = saleEntries.length;
+    const today = new Date().toISOString().slice(0, 10);
+    const todaySales = sales.filter((s) => s.createdAt.slice(0, 10) === today);
+    const totalSales = todaySales.reduce((acc, s) => acc + toAmount(s.total), 0);
+    const count = todaySales.length;
     return { totalSales, count, avgTicket: count ? totalSales / count : 0 };
-  }, [filteredEntries]);
+  }, [sales]);
 
   const handleClosePeriod = async () => {
     if (isClosingPeriod) return;
