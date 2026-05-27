@@ -6,6 +6,7 @@ import { App } from './App';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { ToastProvider } from './components/ToastProvider';
+import './styles/tokens.css';
 import './styles/global.css';
 
 const queryClient = new QueryClient({

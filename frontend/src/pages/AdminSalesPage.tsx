@@ -314,7 +314,7 @@ export const AdminSalesPage: React.FC = () => {
 
       {filteredEntries.length === 0 ? (
         <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-          <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.95rem' }}>No hay registros para los filtros seleccionados.</p>
+          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>No hay registros para los filtros seleccionados.</p>
         </div>
       ) : (
         <div className="sales-table-wrapper">
@@ -358,7 +358,7 @@ export const AdminSalesPage: React.FC = () => {
                   <div key={item.id} className="sales-detail-product">{item.quantity} x {item.product.name} <span>{formatCurrency(item.subtotal)}</span></div>
                 ))}
               </div>
-              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setSelectedSaleId(null)}>Cerrar</button>
                 <button type="button" className="btn-secondary" onClick={() => handleReprintTicket(selectedSale.id)}>Reimprimir ticket</button>
               </div>
@@ -384,7 +384,7 @@ export const AdminSalesPage: React.FC = () => {
               <div className="sales-detail-row"><span>Entradas</span><span>{formatCurrency(selectedCashClose.movementsInTotal)}</span></div>
               <div className="sales-detail-row"><span>Salidas</span><span>{formatCurrency(selectedCashClose.movementsOutTotal)}</span></div>
               <div className="sales-detail-row"><span>Neto caja</span><strong>{formatCurrency(selectedCashClose.netCashDelta)}</strong></div>
-              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setSelectedCashCloseId(null)}>Cerrar</button>
                 <button type="button" className="btn-secondary" onClick={() => handleReprintCashCloseTicket(selectedCashClose)}>Reimprimir ticket</button>
               </div>
@@ -400,7 +400,7 @@ export const AdminSalesPage: React.FC = () => {
             <div className="modal-body">
               <div className="settings-field"><label>Desde</label><input type="datetime-local" value={printStart} onChange={(e) => setPrintStart(e.target.value)} /></div>
               <div className="settings-field"><label>Hasta</label><input type="datetime-local" value={printEnd} onChange={(e) => setPrintEnd(e.target.value)} /></div>
-              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setIsPrintOpen(false)}>Cancelar</button>
                 <button type="button" className="btn-primary" onClick={handlePrint}>Imprimir</button>
               </div>
@@ -453,7 +453,7 @@ export const AdminSalesPage: React.FC = () => {
                   </div>
                 </div>
               )}
-              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setIsMovementOpen(false)}>Cancelar</button>
                 <button type="button" className="btn-primary" onClick={handleSaveMovement} disabled={!isMovementValid() || isSavingMovement}>{isSavingMovement ? 'Guardando...' : 'Guardar'}</button>
               </div>
@@ -475,7 +475,7 @@ export const AdminSalesPage: React.FC = () => {
               <div className="sales-detail-row"><span>Entradas</span><span>{formatCurrency(closePreview.summary.movementsInTotal)}</span></div>
               <div className="sales-detail-row"><span>Salidas</span><span>{formatCurrency(closePreview.summary.movementsOutTotal)}</span></div>
               <div className="sales-detail-row"><span>Neto caja</span><strong>{formatCurrency(closePreview.summary.netCashDelta)}</strong></div>
-              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setClosePreview(null)}>Cancelar</button>
                 <button type="button" className="btn-primary" onClick={handleConfirmClosePeriod} disabled={isClosingPeriod}>{isClosingPeriod ? 'Guardando...' : 'Confirmar cierre'}</button>
               </div>

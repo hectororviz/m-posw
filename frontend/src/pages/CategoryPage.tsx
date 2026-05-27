@@ -41,7 +41,7 @@ export const CategoryPage: React.FC = () => {
                   className="card product-card"
                   onClick={() => handleAddItem(product)}
                 >
-                  <div className="product-media" style={{ background: product.colorHex || '#1f2937' }}>
+                  <div className="product-media" style={{ background: product.colorHex || 'var(--color-dark-surface)' }}>
                     {imageUrl ? (
                       <img src={imageUrl} alt={product.name} />
                     ) : (

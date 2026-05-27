@@ -144,7 +144,7 @@ export const AdminCategoriesPage: React.FC = () => {
                 </label>
               </div>
             </div>
-            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
               <button type="button" className="btn-primary" onClick={handleSave}>{editingCategory ? 'Guardar cambios' : 'Crear categoria'}</button>
             </div>
@@ -172,7 +172,7 @@ export const AdminCategoriesPage: React.FC = () => {
               </div>
               <div className="product-card-v2-actions">
                 <button type="button" className="btn-ghost" onClick={() => openEdit(category)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${category.name}`}>✎</button>
-                <button type="button" className="btn-ghost" onClick={() => handleDelete(category.id)} style={{ padding: '0.3rem 0.5rem', color: '#b91c1c' }} aria-label={`Eliminar ${category.name}`}>✕</button>
+                <button type="button" className="btn-ghost" onClick={() => handleDelete(category.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${category.name}`}>✕</button>
               </div>
             </div>
           );

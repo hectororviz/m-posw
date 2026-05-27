@@ -135,7 +135,7 @@ export const AccountingCategoriesPage: React.FC = () => {
         ))}
         {list.length === 0 && (
           <div className="product-table-row product-table-row--4">
-            <span style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#9ca3af' }}>
+            <span style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--color-text-disabled)' }}>
               Sin categorías
             </span>
           </div>

@@ -62,8 +62,8 @@ export const AccountingDashboard: React.FC = () => {
   );
 
   const pieGradient = useMemo(() => {
-    if (expenseByCategory.length === 0) return 'conic-gradient(#e2e8f0 0% 100%)';
-    const palette = ['#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1', '#84cc16'];
+    if (expenseByCategory.length === 0) return 'conic-gradient(var(--color-border) 0% 100%)';
+    const palette = [getComputedStyle(document.documentElement).getPropertyValue('--chart-2').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-5').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-6').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-7').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-8').trim(), 'var(--color-accent)', getComputedStyle(document.documentElement).getPropertyValue('--chart-9').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-10').trim()];
     let current = 0;
     const segments = expenseByCategory.map((cat, i) => {
       const pct = totalExpenseCategory ? (cat.total / totalExpenseCategory) * 100 : 0;
@@ -172,7 +172,7 @@ export const AccountingDashboard: React.FC = () => {
               <div className="admin-stats__pie-chart" style={{ background: pieGradient }} />
               <div className="admin-stats__legend">
                 {expenseByCategory.map((cat, i) => {
-                  const palette = ['#f97316', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1', '#84cc16'];
+                  const palette = [getComputedStyle(document.documentElement).getPropertyValue('--chart-2').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-5').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-6').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-7').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-8').trim(), 'var(--color-accent)', getComputedStyle(document.documentElement).getPropertyValue('--chart-9').trim(), getComputedStyle(document.documentElement).getPropertyValue('--chart-10').trim()];
                   return (
                     <div className="admin-stats__legend-item" key={cat.categoryId}>
                       <span className="admin-stats__legend-color" style={{ background: palette[i % palette.length] }} />

@@ -208,7 +208,7 @@ export const AdminStockPage: React.FC = () => {
 
       {filteredCategories.length === 0 ? (
         <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-          <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.95rem' }}>
+          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>
             {search ? 'No se encontraron productos.' : 'No hay productos que mostrar.'}
           </p>
         </div>

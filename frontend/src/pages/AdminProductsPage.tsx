@@ -305,14 +305,14 @@ export const AdminProductsPage: React.FC = () => {
                         ))}
                       </select>
                       <input type="number" step="0.0001" placeholder="Cant." value={ing.quantity} onChange={(e) => updateIngredient(index, 'quantity', e.target.value)} />
-                      <button type="button" className="btn-ghost" onClick={() => removeIngredient(index)} aria-label="Eliminar ingrediente" style={{ padding: '0.4rem 0.5rem', color: '#b91c1c' }}>✕</button>
+                      <button type="button" className="btn-ghost" onClick={() => removeIngredient(index)} aria-label="Eliminar ingrediente" style={{ padding: '0.4rem 0.5rem', color: 'var(--color-danger-text)' }}>✕</button>
                     </div>
                   ))}
                   <button type="button" className="btn-ghost" onClick={addIngredient} style={{ marginTop: '0.5rem' }}>+ Agregar ingrediente</button>
                 </div>
               )}
             </div>
-            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
               <button type="button" className="btn-primary" onClick={handleSave}>{editingProduct ? 'Guardar cambios' : 'Crear producto'}</button>
             </div>
@@ -322,7 +322,7 @@ export const AdminProductsPage: React.FC = () => {
 
       {filtered.length === 0 ? (
         <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-          <p style={{ color: '#94a3b8', margin: 0, fontSize: '0.95rem' }}>
+          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>
             {search ? 'No se encontraron productos.' : 'No hay productos todavia.'}
           </p>
         </div>
@@ -393,7 +393,7 @@ export const AdminProductsPage: React.FC = () => {
                       )}
                       <div className="product-card-v2-actions">
                         <button type="button" className="btn-ghost" onClick={() => openEdit(product)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${product.name}`}>✎</button>
-                        <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} style={{ padding: '0.3rem 0.5rem', color: '#b91c1c' }} aria-label={`Eliminar ${product.name}`}>✕</button>
+                        <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${product.name}`}>✕</button>
                       </div>
                     </div>
                   );

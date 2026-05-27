@@ -167,7 +167,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
                 <label>{movementReason === 'Otro' ? 'Descripcion (obligatoria)' : 'Descripcion (opcional)'}</label>
                 <textarea rows={movementReason === 'Otro' ? 3 : 2} placeholder="Descripcion" value={movementDescription} onChange={(e) => setMovementDescription(e.target.value)} />
               </div>
-              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setIsMovementOpen(false)}>Cancelar</button>
                 <button type="button" className="btn-primary" onClick={handleSaveMovement} disabled={!isMovementValid() || isSavingMovement}>{isSavingMovement ? 'Guardando...' : 'Guardar'}</button>
               </div>

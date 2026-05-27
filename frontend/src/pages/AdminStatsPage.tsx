@@ -57,15 +57,15 @@ export const AdminStatsPage: React.FC = () => {
 
   const paymentSummary = useMemo(() => {
     const totalAmount = paymentTotals.reduce((acc, i) => acc + i.total, 0);
-    const palette = ['#38bdf8', '#f97316', '#a78bfa', '#4ade80'];
-    let current = 0;
+    const style = getComputedStyle(document.documentElement);
+    const palette = [style.getPropertyValue('--chart-1').trim(), style.getPropertyValue('--chart-2').trim(), style.getPropertyValue('--chart-3').trim(), style.getPropertyValue('--chart-4').trim()];
     const segments = paymentTotals.map((item, idx) => {
       const percent = totalAmount ? (item.total / totalAmount) * 100 : 0;
-      const start = current;
-      current += percent;
-      return { ...item, percent, color: palette[idx % palette.length], gradient: `${palette[idx % palette.length]} ${start}% ${current}%` };
+      const color = palette[idx % palette.length] || '#e2e8f0';
+      const start = paymentTotals.slice(0, idx).reduce((acc, i) => acc + (totalAmount ? (i.total / totalAmount) * 100 : 0), 0);
+      return { ...item, percent, color, gradient: `${color} ${start}% ${start + percent}%` };
     });
-    return { totalAmount, segments, gradient: segments.length ? `conic-gradient(${segments.map((s) => s.gradient).join(', ')})` : 'conic-gradient(#e2e8f0 0% 100%)' };
+    return { totalAmount, segments, gradient: segments.length ? `conic-gradient(${segments.map((s) => s.gradient).join(', ')})` : 'conic-gradient(var(--color-border) 0% 100%)' };
   }, [paymentTotals]);
 
   const dailyTotals = useMemo(() => {
@@ -148,7 +148,7 @@ export const AdminStatsPage: React.FC = () => {
         <div className="settings-section">
           <h3 className="settings-section-header">Productos vendidos</h3>
           {productTotals.length === 0 ? (
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>Sin ventas en el rango.</p>
+            <p style={{ color: 'var(--color-text-faint)', fontSize: '0.9rem', margin: 0 }}>Sin ventas en el rango.</p>
           ) : (
             <div className="stats-bar-chart">
               {productTotals.map((product) => (
@@ -169,7 +169,7 @@ export const AdminStatsPage: React.FC = () => {
         <div className="settings-section">
           <h3 className="settings-section-header">Medios de pago</h3>
           {paymentSummary.totalAmount === 0 ? (
-            <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>Sin ventas en el rango.</p>
+            <p style={{ color: 'var(--color-text-faint)', fontSize: '0.9rem', margin: 0 }}>Sin ventas en el rango.</p>
           ) : (
             <div className="stats-donut">
               <div className="stats-donut-chart" style={{ background: paymentSummary.gradient }} />

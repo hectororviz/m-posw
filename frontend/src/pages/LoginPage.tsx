@@ -6,7 +6,7 @@ import type { AuthResponse } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
-const DEFAULT_ACCENT_COLOR = '#f59e0b';
+const DEFAULT_ACCENT_COLOR = 'var(--color-accent)';
 
 const getInitials = (name?: string | null) => {
   if (!name) return 'MP';

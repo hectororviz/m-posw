@@ -66,7 +66,7 @@ export const HomePage: React.FC = () => {
                 type="button"
                 className={`pos-category-chip ${cat.id === activeCategoryId ? 'active' : ''}`}
                 onClick={() => setActiveCategoryId(cat.id)}
-                style={cat.id === activeCategoryId ? { background: cat.colorHex || 'var(--accent-color)', color: '#fff' } : undefined}
+                style={cat.id === activeCategoryId ? { background: cat.colorHex || 'var(--accent-color)', color: 'var(--color-surface)' } : undefined}
               >
                 {cat.iconName && <span className="pos-category-emoji">{cat.iconName}</span>}
                 {cat.name}
@@ -80,9 +80,9 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div className="pos-products">
-            {isLoading && <p style={{ color: '#94a3b8', padding: '2rem', textAlign: 'center' }}>Cargando productos...</p>}
+            {isLoading && <p style={{ color: 'var(--color-text-faint)', padding: '2rem', textAlign: 'center' }}>Cargando productos...</p>}
             {!isLoading && products && products.length === 0 && (
-              <p style={{ color: '#94a3b8', padding: '2rem', textAlign: 'center' }}>Sin productos en esta categoria.</p>
+              <p style={{ color: 'var(--color-text-faint)', padding: '2rem', textAlign: 'center' }}>Sin productos en esta categoria.</p>
             )}
             <div className={`pos-product-grid pos-product-grid--${cardSize}`}>
               {products?.map((product) => {
@@ -97,7 +97,7 @@ export const HomePage: React.FC = () => {
                     onClick={() => handleAddItem(product)}
                     aria-label={`Agregar ${product.name}`}
                   >
-                    <div className="pos-product-media" style={{ background: product.colorHex || '#1f2937' }}>
+                    <div className="pos-product-media" style={{ background: product.colorHex || 'var(--color-dark-surface)' }}>
                       {imageUrl ? (
                         <img src={imageUrl} alt={product.name} loading="lazy" />
                       ) : (

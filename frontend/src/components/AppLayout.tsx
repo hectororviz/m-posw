@@ -7,7 +7,7 @@ interface AppLayoutProps {
   children: React.ReactNode;
 }
 
-const DEFAULT_ACCENT_COLOR = '#f59e0b';
+const DEFAULT_ACCENT_COLOR = 'var(--color-accent)';
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ title, children }) => {
   const { data: settings, isLoading } = useSettings();

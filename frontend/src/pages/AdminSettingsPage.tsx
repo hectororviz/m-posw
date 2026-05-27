@@ -607,8 +607,8 @@ export const AdminSettingsPage: React.FC = () => {
             </div>
             {(!users || users.length === 0) ? (
               <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-                <p style={{ color: '#94a3b8', margin: '0 0 0.5rem', fontSize: '0.95rem' }}>No hay usuarios registrados.</p>
-                <p style={{ color: '#cbd5e1', margin: 0, fontSize: '0.85rem' }}>Crea el primer usuario para empezar.</p>
+                <p style={{ color: 'var(--color-text-faint)', margin: '0 0 0.5rem', fontSize: '0.95rem' }}>No hay usuarios registrados.</p>
+                <p style={{ color: 'var(--color-border-heavy)', margin: 0, fontSize: '0.85rem' }}>Crea el primer usuario para empezar.</p>
               </div>
             ) : (
               <div className="user-list">
@@ -724,7 +724,7 @@ export const AdminSettingsPage: React.FC = () => {
                   <input id="user-password-edit" type="password" inputMode="numeric" pattern="[0-9]*" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value.replace(/\D/g, '') })} placeholder="Minimo 6 digitos" />
                 </div>
               )}
-              <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => { setUserModalOpen(false); resetUserForm(); }}>
                   Cancelar
                 </button>
@@ -746,14 +746,14 @@ export const AdminSettingsPage: React.FC = () => {
               <button type="button" className="icon-button" onClick={() => setDeleteTarget(null)} aria-label="Cerrar">✕</button>
             </div>
             <div className="modal-body">
-              <p style={{ margin: '0 0 0.5rem', color: '#334155' }}>
+              <p style={{ margin: '0 0 0.5rem', color: 'var(--color-text-body)' }}>
                 <strong>{deleteTarget.name}</strong> ya no podra acceder al sistema.
               </p>
-              <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setDeleteTarget(null)}>
                   Cancelar
                 </button>
-                <button type="button" className="btn-primary" onClick={handleUserDelete} disabled={userDeleting} style={{ background: '#dc2626' }}>
+                <button type="button" className="btn-primary" onClick={handleUserDelete} disabled={userDeleting} style={{ background: 'var(--color-danger)' }}>
                   {userDeleting ? 'Eliminando...' : 'Eliminar'}
                 </button>
               </div>
@@ -894,7 +894,7 @@ export const AdminSettingsPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="button" className="primary-button" onClick={handleSaveMovementReasons}>
                   Guardar motivos
                 </button>
