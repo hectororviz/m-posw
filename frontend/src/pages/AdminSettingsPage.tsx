@@ -4,18 +4,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import * as emoji from 'node-emoji';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useMpOauthStatus, useSettings } from '../api/queries';
-import type { Setting } from '../api/types';
+import { useMpOauthStatus, useSettings, useUsers } from '../api/queries';
+import type { Role, Setting, User } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
-type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'sistema';
+type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'usuarios' | 'sistema';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'ventas', label: 'Ventas' },
   { id: 'mercadopago', label: 'Mercado Pago' },
   { id: 'caja', label: 'Caja' },
+  { id: 'usuarios', label: 'Usuarios' },
   { id: 'sistema', label: 'Sistema' },
 ];
 
@@ -26,6 +27,7 @@ export const AdminSettingsPage: React.FC = () => {
   const { data: mpStatus, refetch: refetchMpStatus } = useMpOauthStatus();
   const { pushToast } = useToast();
   const { showEmbeddedKeyboard, setShowEmbeddedKeyboard } = useEmbeddedKeyboard();
+  const { data: users, refetch: refetchUsers } = useUsers();
   const [activeTab, setActiveTab] = useState<TabId>('general');
   const [saving, setSaving] = useState(false);
 
@@ -51,6 +53,74 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpSetupLoading, setMpSetupLoading] = useState(false);
   const [mpStoreNameInput, setMpStoreNameInput] = useState('');
   const [mpPosNameInput, setMpPosNameInput] = useState('');
+
+  const [userModalOpen, setUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'USER' as Role, active: true });
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [userSaving, setUserSaving] = useState(false);
+  const [userDeleting, setUserDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+
+  const resetUserForm = () => {
+    setUserForm({ name: '', email: '', password: '', role: 'USER', active: true });
+    setShowChangePassword(false);
+    setEditingUser(null);
+  };
+
+  const openCreateUser = () => {
+    resetUserForm();
+    setUserModalOpen(true);
+  };
+
+  const openEditUser = (user: User) => {
+    setEditingUser(user);
+    setUserForm({ name: user.name, email: user.email ?? '', password: '', role: user.role, active: user.active ?? true });
+    setShowChangePassword(false);
+    setUserModalOpen(true);
+  };
+
+  const handleUserSave = async () => {
+    setUserSaving(true);
+    try {
+      if (editingUser) {
+        const payload: Record<string, unknown> = { name: userForm.name, email: userForm.email || undefined, role: userForm.role, active: userForm.active };
+        if (userForm.password) payload.password = userForm.password;
+        await apiClient.patch(`/users/${editingUser.id}`, payload);
+        pushToast('Usuario actualizado', 'success');
+      } else {
+        await apiClient.post('/users', {
+          name: userForm.name,
+          email: userForm.email || undefined,
+          password: userForm.password,
+          role: userForm.role,
+        });
+        pushToast('Usuario creado', 'success');
+      }
+      setUserModalOpen(false);
+      resetUserForm();
+      await refetchUsers();
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setUserSaving(false);
+    }
+  };
+
+  const handleUserDelete = async () => {
+    if (!deleteTarget) return;
+    setUserDeleting(true);
+    try {
+      await apiClient.delete(`/users/${deleteTarget.id}`);
+      pushToast(`Usuario "${deleteTarget.name}" eliminado`, 'success');
+      setDeleteTarget(null);
+      await refetchUsers();
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setUserDeleting(false);
+    }
+  };
 
   useEffect(() => {
     const mpParam = searchParams.get('mp');
@@ -528,6 +598,50 @@ export const AdminSettingsPage: React.FC = () => {
           </div>
         )}
 
+        {/* TAB: Usuarios */}
+        {activeTab === 'usuarios' && (
+          <>
+            <div className="page-header" style={{ marginBottom: '1rem', paddingBottom: '0.75rem' }}>
+              <h2 className="page-header-title">Usuarios</h2>
+              <p className="page-header-subtitle">Gestiona las personas que pueden acceder al sistema.</p>
+            </div>
+            {(!users || users.length === 0) ? (
+              <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+                <p style={{ color: '#94a3b8', margin: '0 0 0.5rem', fontSize: '0.95rem' }}>No hay usuarios registrados.</p>
+                <p style={{ color: '#cbd5e1', margin: 0, fontSize: '0.85rem' }}>Crea el primer usuario para empezar.</p>
+              </div>
+            ) : (
+              <div className="user-list">
+                {users.map((user) => (
+                  <div key={user.id} className="user-list-row">
+                    <div className="user-list-info">
+                      <span className="user-list-name">{user.name}</span>
+                      <span className="user-list-email">{user.email || 'Sin email'}</span>
+                      <span className={`badge ${user.role === 'ADMIN' ? 'badge-info' : 'badge-neutral'}`}>
+                        {user.role === 'ADMIN' ? 'Admin' : 'Caja'}
+                      </span>
+                      <span className={`badge ${user.active !== false ? 'badge-success' : 'badge-neutral'}`} style={{ opacity: user.active !== false ? 1 : 0.5 }}>
+                        {user.active !== false ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </div>
+                    <div className="user-list-actions">
+                      <button type="button" className="btn-ghost" onClick={() => openEditUser(user)} aria-label={`Editar ${user.name}`}>
+                        ✎
+                      </button>
+                      <button type="button" className="btn-ghost" onClick={() => setDeleteTarget(user)} aria-label={`Eliminar ${user.name}`}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" className="fab-button-v2" onClick={openCreateUser} aria-label="Nuevo usuario" title="Nuevo usuario">
+              +
+            </button>
+          </>
+        )}
+
         {/* TAB: Sistema */}
         {activeTab === 'sistema' && (
           <div className="settings-section">
@@ -560,10 +674,96 @@ export const AdminSettingsPage: React.FC = () => {
               </button>
             </div>
           </div>
-        )}
-      </div>
+      )}
 
-      {activeTab !== 'mercadopago' && activeTab !== 'sistema' && (
+      {/* Modal: Crear / Editar Usuario */}
+      {userModalOpen && (
+        <div className="modal-backdrop" onClick={() => { setUserModalOpen(false); resetUserForm(); }}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editingUser ? 'Editar usuario' : 'Nuevo usuario'}</h3>
+              <button type="button" className="icon-button" onClick={() => { setUserModalOpen(false); resetUserForm(); }} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-field">
+                <label htmlFor="user-name">Nombre</label>
+                <input id="user-name" type="text" value={userForm.name} onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} placeholder="Ej: Juan Perez" />
+              </div>
+              <div className="settings-field">
+                <label htmlFor="user-email">Email</label>
+                <input id="user-email" type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} placeholder="Opcional" />
+              </div>
+              <div className="settings-field">
+                <label htmlFor="user-role">Rol</label>
+                <select id="user-role" value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value as Role })} style={{ maxWidth: '220px' }}>
+                  <option value="ADMIN">ADMIN — Acceso completo</option>
+                  <option value="USER">USER — Operacion de caja</option>
+                </select>
+              </div>
+              <div className="settings-field">
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={userForm.active} onChange={(e) => setUserForm({ ...userForm, active: e.target.checked })} />
+                  <span className="toggle-switch-track" />
+                  Activo
+                </label>
+              </div>
+              {!editingUser && (
+                <div className="settings-field">
+                  <label htmlFor="user-password">Contraseña</label>
+                  <input id="user-password" type="password" inputMode="numeric" pattern="[0-9]*" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value.replace(/\D/g, '') })} placeholder="Minimo 6 digitos" />
+                </div>
+              )}
+              {editingUser && !showChangePassword && (
+                <button type="button" className="btn-ghost" onClick={() => setShowChangePassword(true)} style={{ marginBottom: '0.75rem' }}>
+                  Cambiar contraseña
+                </button>
+              )}
+              {editingUser && showChangePassword && (
+                <div className="settings-field">
+                  <label htmlFor="user-password-edit">Nueva contraseña</label>
+                  <input id="user-password-edit" type="password" inputMode="numeric" pattern="[0-9]*" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value.replace(/\D/g, '') })} placeholder="Minimo 6 digitos" />
+                </div>
+              )}
+              <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={() => { setUserModalOpen(false); resetUserForm(); }}>
+                  Cancelar
+                </button>
+                <button type="button" className="btn-primary" onClick={handleUserSave} disabled={userSaving || !userForm.name || (!editingUser && !userForm.password)}>
+                  {userSaving ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Eliminar Usuario */}
+      {deleteTarget && (
+        <div className="modal-backdrop" onClick={() => setDeleteTarget(null)}>
+          <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Eliminar usuario</h3>
+              <button type="button" className="icon-button" onClick={() => setDeleteTarget(null)} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: '0 0 0.5rem', color: '#334155' }}>
+                <strong>{deleteTarget.name}</strong> ya no podra acceder al sistema.
+              </p>
+              <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={() => setDeleteTarget(null)}>
+                  Cancelar
+                </button>
+                <button type="button" className="btn-primary" onClick={handleUserDelete} disabled={userDeleting} style={{ background: '#dc2626' }}>
+                  {userDeleting ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+      {activeTab !== 'mercadopago' && activeTab !== 'sistema' && activeTab !== 'usuarios' && (
         <div style={{ marginTop: '1.5rem' }}>
           <div className="settings-footer">
             <div className="settings-footer-left" />

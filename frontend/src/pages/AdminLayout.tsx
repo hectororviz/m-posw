@@ -26,9 +26,6 @@ export const AdminLayout: React.FC = () => {
           <NavLink to="/admin/stock" className={({ isActive }) => isActive ? 'active' : ''}>
             {navIcon('📐')} Stock
           </NavLink>
-          <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'active' : ''}>
-            {navIcon('👥')} Usuarios
-          </NavLink>
           <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'active' : ''}>
             {navIcon('⚙️')} Configuracion
           </NavLink>

@@ -14,9 +14,7 @@ export class UsersService {
       throw new BadRequestException('Password requerido');
     }
     const role = dto.role || 'USER';
-    if (role === 'USER' && (!dto.externalPosId || dto.externalPosId.trim().length === 0)) {
-      throw new BadRequestException('externalPosId requerido para cajas');
-    }
+    const externalPosId = dto.externalPosId || (role === 'USER' ? `POS-${dto.name.replace(/\s+/g, '')}-${Date.now().toString(36)}` : undefined);
     const existingByName = await this.prisma.user.findUnique({ where: { name: dto.name } });
     if (existingByName) {
       throw new BadRequestException('Usuario ya registrado');
@@ -36,7 +34,7 @@ export class UsersService {
           password,
           role,
           active: true,
-          externalPosId: dto.externalPosId,
+          externalPosId,
           externalStoreId: dto.externalStoreId,
         },
         select: {
@@ -113,6 +111,13 @@ export class UsersService {
         externalPosId: true,
         externalStoreId: true,
       },
+    });
+  }
+
+  async remove(id: string) {
+    return this.prisma.user.delete({
+      where: { id },
+      select: { id: true, name: true },
     });
   }
 }

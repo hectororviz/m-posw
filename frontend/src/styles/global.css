@@ -2936,7 +2936,124 @@ button {
   transform: scale(0.95);
 }
 
-/* Product Create/Edit Modal */
+/* ─── FAB v2 (Config pages) ─────────────────────────────────── */
+.fab-button-v2 {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  color: #ffffff;
+  border: none;
+  font-size: 1.5rem;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2);
+  z-index: 40;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.fab-button-v2:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.28);
+}
+
+.fab-button-v2:active {
+  transform: scale(0.94);
+}
+
+/* ─── User List ──────────────────────────────────────────────── */
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.user-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.1s;
+}
+
+.user-list-row:last-child {
+  border-bottom: none;
+}
+
+.user-list-row:hover {
+  background: #f8fafc;
+}
+
+.user-list-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.user-list-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.user-list-email {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.user-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.user-list-actions .btn-ghost {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+}
+
+/* ─── User Modal ────────────────────────────────────────────── */
+.user-modal {
+  width: min(480px, 95%);
+}
+
+.user-modal .settings-field select {
+  width: 100%;
+  max-width: 460px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.925rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: #ffffff;
+}
+
+/* ─── Delete Modal ──────────────────────────────────────────── */
+.delete-modal {
+  width: min(420px, 92%);
+}
+
+/* ─── Product Create/Edit Modal ─────────────────────────────── */
 .product-modal {
   width: min(580px, 95%);
   max-height: 90vh;
