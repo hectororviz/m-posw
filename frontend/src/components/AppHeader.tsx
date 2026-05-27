@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface AppHeaderProps {
   settings?: Setting;
@@ -25,6 +26,7 @@ const getInitials = (name?: string | null) => {
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => {
   const { user, logout } = useAuth();
+  const { resolved, toggle: toggleTheme } = useTheme();
   const location = useLocation();
   const storeName = settings?.storeName ?? 'm-POSw';
   const logoUrl = buildImageUrl(settings?.logoUrl);
@@ -67,6 +69,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           <span className="user-name" title={user?.name ?? 'Usuario'}>
             {user?.name ?? 'Usuario'}
           </span>
+          <button type="button" onClick={toggleTheme} className="ghost-button header-toggle-button theme-toggle" aria-label="Cambiar tema" title={resolved === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
+            <span aria-hidden="true">{resolved === 'dark' ? '☀️' : '🌙'}</span>
+          </button>
           {showSalesButton && (
             <NavLink
               to={isSalesScreen ? '/' : '/sales'}
