@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings, useStock } from '../api/queries';
-import type { StockCategory, StockProduct } from '../api/types';
+import type { StockProduct } from '../api/types';
 import type { TicketPayload } from '../utils/ticketPrinting';
 
 type StockFilter = 'todos' | 'bajo' | 'sin-stock';
