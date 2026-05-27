@@ -32,7 +32,7 @@ function applyTheme(resolved: 'light' | 'dark') {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(() => {
     if (typeof window === 'undefined') return 'light';
-    return (localStorage.getItem(STORAGE_KEY) as ThemeMode) || 'system';
+    return (localStorage.getItem(STORAGE_KEY) as ThemeMode) || 'light';
   });
 
   const resolved = resolveMode(mode);

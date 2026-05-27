@@ -5707,3 +5707,85 @@ button {
 [data-theme="dark"] .report-tab.active {
   color: var(--color-primary-contrast);
 }
+
+/* ═══ Treasury Sub-navigation ────────────────────────────────── */
+.treasury-subnav {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 20px;
+  padding: 4px;
+  background: var(--color-hover-alt);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.treasury-subnav-link {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.treasury-subnav-link:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.treasury-subnav-link.active {
+  background: var(--color-accent);
+  color: var(--color-primary-contrast);
+  font-weight: 600;
+}
+
+/* ═══ Entry type tabs ────────────────────────────────────────── */
+.entry-type-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: var(--color-hover-alt);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.entry-type-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.entry-type-tab:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+
+.entry-type-tab.active {
+  background: var(--color-accent);
+  color: var(--color-primary-contrast);
+  font-weight: 600;
+}
+
+/* ═══ Treasury content area ──────────────────────────────────── */
+.treasury-content {
+  min-height: 300px;
+}
+
+/* ═══ Dark mode overrides ────────────────────────────────────── */
+[data-theme="dark"] .treasury-subnav-link.active,
+[data-theme="dark"] .entry-type-tab.active {
+  color: var(--color-primary-contrast);
+}

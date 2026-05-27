@@ -51,6 +51,7 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
   });
 
   const [showModal, setShowModal] = useState(false);
+  const [showNewEntryModal, setShowNewEntryModal] = useState(false);
   const [modalMode, setModalMode] = useState<'income' | 'expense' | 'advanced' | 'detail' | 'void'>('income');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const { data: detailEntry } = useJournalEntry(
@@ -102,7 +103,7 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
     try {
       await apiClient.post(`/treasury/entries/${mode}`, data);
       invalidate();
-      closeModal();
+      setShowNewEntryModal(false);
     } catch (err) {
       setError(normalizeApiError(err));
     }
@@ -113,7 +114,7 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
     try {
       await apiClient.post('/treasury/entries', data);
       invalidate();
-      closeModal();
+      setShowNewEntryModal(false);
     } catch (err) {
       setError(normalizeApiError(err));
     }
@@ -131,21 +132,46 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
     }
   };
 
+  const exportLedgerBook = async () => {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    try {
+      const response = await apiClient.get(
+        `/treasury/reports/export/ledger-book?${params.toString()}`,
+        { responseType: 'blob' },
+      );
+      const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'libro-diario.xlsx';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch { /* ignore */ }
+  };
+
   const totalDebit = (e: JournalEntry) =>
     e.lines.reduce((sum, l) => sum + Number(l.debit), 0);
   const totalCredit = (e: JournalEntry) =>
     e.lines.reduce((sum, l) => sum + Number(l.credit), 0);
 
   return (
-    <div className="treasury-page">
+    <>
       <div className="page-header">
         <div>
-          <h2>Libro Diario</h2>
+          <h2>Movimientos</h2>
           <p className="page-subtitle">Registro de asientos contables</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn-primary" onClick={() => openModal('income')}>Nuevo movimiento</button>
-          <button className="btn-ghost" onClick={() => openModal('advanced')}>Crear asiento avanzado</button>
+          <button className="btn-primary" onClick={() => { setError(null); setShowNewEntryModal(true); }}>
+            ＋ Nuevo movimiento
+          </button>
+          <button className="btn-ghost" onClick={() => { setError(null); setShowNewEntryModal(true); }}>
+            Asiento avanzado
+          </button>
+          <button className="btn-ghost" onClick={() => exportLedgerBook()}>
+            Exportar Excel
+          </button>
         </div>
       </div>
 
@@ -219,26 +245,11 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
         </div>
       )}
 
-      {showModal && modalMode === 'income' && (
-        <SimpleEntryModal
-          type="income"
-          onClose={closeModal}
-          onSave={handleQuickSave}
-          error={error}
-        />
-      )}
-      {showModal && modalMode === 'expense' && (
-        <SimpleEntryModal
-          type="expense"
-          onClose={closeModal}
-          onSave={handleQuickSave}
-          error={error}
-        />
-      )}
-      {showModal && modalMode === 'advanced' && (
-        <AdvancedEntryModal
-          onClose={closeModal}
-          onSave={handleAdvancedSave}
+      {showNewEntryModal && (
+        <NewEntryModal
+          onClose={() => setShowNewEntryModal(false)}
+          onSaveSimple={handleQuickSave}
+          onSaveAdvanced={handleAdvancedSave}
           error={error}
         />
       )}
@@ -248,21 +259,29 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
       {showModal && modalMode === 'void' && (
         <VoidModal onClose={closeModal} onVoid={handleVoid} entryNumber={detailEntry?.entryNumber || ''} error={error} />
       )}
-    </div>
+    </>
   );
 };
 
-// Simple entry modal (income or expense)
-const SimpleEntryModal: React.FC<{
-  type: 'income' | 'expense';
+// ─── Unified Nuevo movimiento modal □━━━━━━━━━━━━━━━━━━━━━━━━━
+const NewEntryModal: React.FC<{
   onClose: () => void;
-  onSave: (mode: 'income' | 'expense', data: any) => Promise<void>;
+  onSaveSimple: (mode: 'income' | 'expense', data: any) => Promise<void>;
+  onSaveAdvanced: (data: any) => void;
   error: string | null;
-}> = ({ type, onClose, onSave, error }) => {
+}> = ({ onClose, onSaveSimple, onSaveAdvanced, error }) => {
   const { data: assetAccounts } = useImputableAssetAccounts();
   const { data: revenueAccounts } = useImputableRevenueAccounts();
   const { data: expenseAccounts } = useImputableExpenseAccounts();
+  const { data: allAccounts } = useLedgerAccounts();
+  const imputableAccounts = useMemo(
+    () => (allAccounts || []).filter((a) => a.acceptsEntries && a.active),
+    [allAccounts],
+  );
 
+  const [tab, setTab] = useState<'ingreso' | 'gasto' | 'avanzado'>('ingreso');
+
+  // Simple fields
   const [date, setDate] = useState(todayStr());
   const [assetId, setAssetId] = useState('');
   const [ieAccountId, setIeAccountId] = useState('');
@@ -271,104 +290,11 @@ const SimpleEntryModal: React.FC<{
   const [notes, setNotes] = useState('');
   const [saveAs, setSaveAs] = useState<'DRAFT' | 'POSTED'>('POSTED');
 
-  const title = type === 'income' ? 'Nuevo Ingreso' : 'Nuevo Gasto';
-  const ieLabel = type === 'income' ? 'Concepto de ingreso' : 'Concepto de gasto';
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(type, {
-      date,
-      assetAccountId: assetId,
-      incomeExpenseAccountId: ieAccountId,
-      amount: Number(amount),
-      description,
-      notes: notes || undefined,
-      status: saveAs,
-    });
-  };
-
-  return (
-    <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button type="button" className="icon-button" onClick={onClose}>✕</button>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            {error && <div className="error-banner">{error}</div>}
-            <div className="settings-field">
-              <label>Fecha</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            </div>
-            <div className="settings-field">
-              <label>Cuenta {type === 'income' ? 'donde ingresa' : 'desde donde sale'}</label>
-              <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
-                <option value="">Seleccionar cuenta</option>
-                {(assetAccounts || []).map((a) => (
-                  <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="settings-field">
-              <label>{ieLabel}</label>
-              <select value={ieAccountId} onChange={(e) => setIeAccountId(e.target.value)} required>
-                <option value="">Seleccionar cuenta</option>
-                {type === 'income'
-                  ? (revenueAccounts || []).map((a) => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)
-                  : (expenseAccounts || []).map((a) => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)
-                }
-              </select>
-            </div>
-            <div className="settings-field">
-              <label>Importe</label>
-              <div className="price-input-wrapper">
-                <span className="price-input-symbol">$</span>
-                <input type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-              </div>
-            </div>
-            <div className="settings-field">
-              <label>Descripción</label>
-              <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} required />
-            </div>
-            <div className="settings-field">
-              <label>Observaciones (opcional)</label>
-              <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <label className="toggle-switch" style={{ marginRight: 'auto' }}>
-              <input type="checkbox" checked={saveAs === 'DRAFT'} onChange={(e) => setSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
-              <span className="toggle-switch-track" />
-              Guardar como borrador
-            </label>
-            <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn-primary">
-              {saveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Advanced entry modal
-const AdvancedEntryModal: React.FC<{
-  onClose: () => void;
-  onSave: (data: any) => void;
-  error: string | null;
-}> = ({ onClose, onSave, error }) => {
-  const { data: accounts } = useLedgerAccounts();
-  const imputableAccounts = useMemo(
-    () => (accounts || []).filter((a) => a.acceptsEntries && a.active),
-    [accounts],
-  );
-
-  const [date, setDate] = useState(todayStr());
-  const [description, setDescription] = useState('');
-  const [notes, setNotes] = useState('');
-  const [saveAs, setSaveAs] = useState<'DRAFT' | 'POSTED'>('POSTED');
+  // Advanced fields
+  const [advancedDate, setAdvancedDate] = useState(todayStr());
+  const [advancedDesc, setAdvancedDesc] = useState('');
+  const [advancedNotes, setAdvancedNotes] = useState('');
+  const [advancedSaveAs, setAdvancedSaveAs] = useState<'DRAFT' | 'POSTED'>('POSTED');
   const [lines, setLines] = useState<{ accountId: string; debit: string; credit: string; desc: string }[]>([
     { accountId: '', debit: '', credit: '', desc: '' },
     { accountId: '', debit: '', credit: '', desc: '' },
@@ -379,128 +305,278 @@ const AdvancedEntryModal: React.FC<{
     if (lines.length <= 2) return;
     setLines(lines.filter((_, idx) => idx !== i));
   };
-
   const updateLine = (i: number, field: string, value: string) => {
     const updated = [...lines];
     (updated[i] as any)[field] = value;
-    if (field === 'debit' && value !== '') {
-      updated[i].credit = '';
-    }
-    if (field === 'credit' && value !== '') {
-      updated[i].debit = '';
-    }
+    if (field === 'debit' && value !== '') updated[i].credit = '';
+    if (field === 'credit' && value !== '') updated[i].debit = '';
     setLines(updated);
   };
 
-  const totalDebit = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
-  const totalCredit = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
-  const diff = Math.abs(totalDebit - totalCredit);
-  const isBalanced = diff < 0.005 && totalDebit > 0 && totalCredit > 0;
+  const advTotalDebit = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+  const advTotalCredit = lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+  const advDiff = Math.abs(advTotalDebit - advTotalCredit);
+  const isBalanced = advDiff < 0.005 && advTotalDebit > 0 && advTotalCredit > 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSimpleSubmit = (mode: 'income' | 'expense') => (e: React.FormEvent) => {
     e.preventDefault();
-    const data = {
+    onSaveSimple(mode, {
       date,
+      assetAccountId: assetId,
+      incomeExpenseAccountId: ieAccountId,
+      amount: Number(amount),
       description,
       notes: notes || undefined,
       status: saveAs,
+    });
+  };
+
+  const handleAdvancedSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSaveAdvanced({
+      date: advancedDate,
+      description: advancedDesc,
+      notes: advancedNotes || undefined,
+      status: advancedSaveAs,
       lines: lines.map((l) => ({
         accountId: l.accountId,
         debit: parseFloat(l.debit) || 0,
         credit: parseFloat(l.credit) || 0,
         description: l.desc || undefined,
       })),
-    };
-    onSave(data);
+    });
+  };
+
+  const resetSimple = () => {
+    setDate(todayStr());
+    setAssetId('');
+    setIeAccountId('');
+    setAmount('');
+    setDescription('');
+    setNotes('');
+    setSaveAs('POSTED');
+  };
+
+  const handleTabChange = (newTab: 'ingreso' | 'gasto' | 'avanzado') => {
+    setTab(newTab);
+    resetSimple();
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div className="modal user-modal" style={{ maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal user-modal"
+        style={{ maxWidth: tab === 'avanzado' ? '750px' : '520px' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <h3>Asiento avanzado</h3>
+          <h3>Nuevo movimiento</h3>
           <button type="button" className="icon-button" onClick={onClose}>✕</button>
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            {error && <div className="error-banner">{error}</div>}
-            <div className="settings-field">
-              <label>Fecha</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            </div>
-            <div className="settings-field">
-              <label>Descripción</label>
-              <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} required />
-            </div>
-            <div className="settings-field">
-              <label>Observaciones</label>
-              <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
+        <div className="modal-body">
+          {error && <div className="error-banner">{error}</div>}
 
-            <div className="entry-lines-section">
-              <div className="entry-lines-header">
-                <h4>Líneas del asiento</h4>
-                <button type="button" className="btn-ghost btn-sm" onClick={addLine}>+ Agregar línea</button>
-              </div>
-              {lines.map((line, i) => (
-                <div key={i} className="entry-line-row">
-                  <div className="entry-line-account">
-                    <select value={line.accountId} onChange={(e) => updateLine(i, 'accountId', e.target.value)} required>
-                      <option value="">Seleccionar cuenta</option>
-                      {imputableAccounts.map((a) => (
-                        <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="entry-line-amount">
-                    <div className="price-input-wrapper">
-                      <span className="price-input-symbol">Debe $</span>
-                      <input type="number" inputMode="decimal" min="0" step="0.01" value={line.debit} onChange={(e) => updateLine(i, 'debit', e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="entry-line-amount">
-                    <div className="price-input-wrapper">
-                      <span className="price-input-symbol">Haber $</span>
-                      <input type="number" inputMode="decimal" min="0" step="0.01" value={line.credit} onChange={(e) => updateLine(i, 'credit', e.target.value)} />
-                    </div>
-                  </div>
-                  {lines.length > 2 && (
-                    <button type="button" className="btn-ghost btn-sm" onClick={() => removeLine(i)}>✕</button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="entry-balance-summary">
-              <div className="balance-item">
-                <span>Total Debe:</span>
-                <strong>{formatCurrency(totalDebit)}</strong>
-              </div>
-              <div className="balance-item">
-                <span>Total Haber:</span>
-                <strong>{formatCurrency(totalCredit)}</strong>
-              </div>
-              <div className={`balance-item ${isBalanced ? 'balance-ok' : 'balance-err'}`}>
-                <span>Diferencia:</span>
-                <strong>{formatCurrency(diff)}</strong>
-              </div>
-            </div>
-          </div>
-          <div className="modal-footer">
-            <label className="toggle-switch" style={{ marginRight: 'auto' }}>
-              <input type="checkbox" checked={saveAs === 'DRAFT'} onChange={(e) => setSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
-              <span className="toggle-switch-track" />
-              Guardar como borrador
-            </label>
-            <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn-primary" disabled={!isBalanced && saveAs === 'POSTED'}>
-              {saveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar'}
+          <div className="entry-type-tabs">
+            <button
+              className={`entry-type-tab ${tab === 'ingreso' ? 'active' : ''}`}
+              onClick={() => handleTabChange('ingreso')}
+            >
+              Ingreso
             </button>
-            {!isBalanced && saveAs === 'POSTED' && (
-              <p className="hint-text">El asiento debe estar balanceado para confirmar</p>
-            )}
+            <button
+              className={`entry-type-tab ${tab === 'gasto' ? 'active' : ''}`}
+              onClick={() => handleTabChange('gasto')}
+            >
+              Gasto
+            </button>
+            <button
+              className={`entry-type-tab ${tab === 'avanzado' ? 'active' : ''}`}
+              onClick={() => handleTabChange('avanzado')}
+            >
+              Avanzado
+            </button>
           </div>
-        </form>
+
+          {tab === 'ingreso' && (
+            <form onSubmit={handleSimpleSubmit('income')}>
+              <div className="settings-field">
+                <label>Fecha</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              </div>
+              <div className="settings-field">
+                <label>Cuenta donde ingresa el dinero</label>
+                <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
+                  <option value="">Seleccionar cuenta</option>
+                  {(assetAccounts || []).map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Concepto del ingreso</label>
+                <select value={ieAccountId} onChange={(e) => setIeAccountId(e.target.value)} required>
+                  <option value="">Seleccionar cuenta de ingreso</option>
+                  {(revenueAccounts || []).map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Importe</label>
+                <div className="price-input-wrapper">
+                  <span className="price-input-symbol">$</span>
+                  <input type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                </div>
+              </div>
+              <div className="settings-field">
+                <label>Descripción</label>
+                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} required />
+              </div>
+              <div className="settings-field">
+                <label>Observaciones (opcional)</label>
+                <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </div>
+              <div className="modal-footer" style={{ padding: '16px 0 0 0' }}>
+                <label className="toggle-switch" style={{ marginRight: 'auto' }}>
+                  <input type="checkbox" checked={saveAs === 'DRAFT'} onChange={(e) => setSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
+                  <span className="toggle-switch-track" />
+                  Guardar como borrador
+                </label>
+                <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
+                <button type="submit" className="btn-primary">
+                  {saveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar movimiento'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {tab === 'gasto' && (
+            <form onSubmit={handleSimpleSubmit('expense')}>
+              <div className="settings-field">
+                <label>Fecha</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+              </div>
+              <div className="settings-field">
+                <label>Concepto del gasto</label>
+                <select value={ieAccountId} onChange={(e) => setIeAccountId(e.target.value)} required>
+                  <option value="">Seleccionar cuenta de gasto</option>
+                  {(expenseAccounts || []).map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Cuenta desde donde sale el dinero</label>
+                <select value={assetId} onChange={(e) => setAssetId(e.target.value)} required>
+                  <option value="">Seleccionar cuenta de activo</option>
+                  {(assetAccounts || []).map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Importe</label>
+                <div className="price-input-wrapper">
+                  <span className="price-input-symbol">$</span>
+                  <input type="number" inputMode="decimal" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                </div>
+              </div>
+              <div className="settings-field">
+                <label>Descripción</label>
+                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} required />
+              </div>
+              <div className="settings-field">
+                <label>Observaciones (opcional)</label>
+                <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              </div>
+              <div className="modal-footer" style={{ padding: '16px 0 0 0' }}>
+                <label className="toggle-switch" style={{ marginRight: 'auto' }}>
+                  <input type="checkbox" checked={saveAs === 'DRAFT'} onChange={(e) => setSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
+                  <span className="toggle-switch-track" />
+                  Guardar como borrador
+                </label>
+                <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
+                <button type="submit" className="btn-primary">
+                  {saveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar movimiento'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {tab === 'avanzado' && (
+            <form onSubmit={handleAdvancedSubmit}>
+              <div className="settings-field">
+                <label>Fecha</label>
+                <input type="date" value={advancedDate} onChange={(e) => setAdvancedDate(e.target.value)} required />
+              </div>
+              <div className="settings-field">
+                <label>Descripción</label>
+                <input type="text" value={advancedDesc} onChange={(e) => setAdvancedDesc(e.target.value)} required />
+              </div>
+              <div className="settings-field">
+                <label>Observaciones (opcional)</label>
+                <textarea rows={2} value={advancedNotes} onChange={(e) => setAdvancedNotes(e.target.value)} />
+              </div>
+
+              <div className="entry-lines-section">
+                <div className="entry-lines-header">
+                  <h4>Líneas del asiento</h4>
+                  <button type="button" className="btn-ghost btn-sm" onClick={addLine}>+ Agregar línea</button>
+                </div>
+                {lines.map((line, i) => (
+                  <div key={i} className="entry-line-row">
+                    <div className="entry-line-account">
+                      <select value={line.accountId} onChange={(e) => updateLine(i, 'accountId', e.target.value)} required>
+                        <option value="">Cuenta</option>
+                        {imputableAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="entry-line-amount">
+                      <div className="price-input-wrapper">
+                        <span className="price-input-symbol">D$</span>
+                        <input type="number" inputMode="decimal" min="0" step="0.01" value={line.debit} onChange={(e) => updateLine(i, 'debit', e.target.value)} placeholder="Debe" />
+                      </div>
+                    </div>
+                    <div className="entry-line-amount">
+                      <div className="price-input-wrapper">
+                        <span className="price-input-symbol">H$</span>
+                        <input type="number" inputMode="decimal" min="0" step="0.01" value={line.credit} onChange={(e) => updateLine(i, 'credit', e.target.value)} placeholder="Haber" />
+                      </div>
+                    </div>
+                    {lines.length > 2 && (
+                      <button type="button" className="btn-ghost btn-sm" onClick={() => removeLine(i)}>✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="entry-balance-summary">
+                <div className="balance-item"><span>Total Debe</span><strong>{formatCurrency(advTotalDebit)}</strong></div>
+                <div className="balance-item"><span>Total Haber</span><strong>{formatCurrency(advTotalCredit)}</strong></div>
+                <div className={`balance-item ${isBalanced ? 'balance-ok' : 'balance-err'}`}>
+                  <span>Diferencia</span><strong>{formatCurrency(advDiff)}</strong>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ padding: '16px 0 0 0' }}>
+                <label className="toggle-switch" style={{ marginRight: 'auto' }}>
+                  <input type="checkbox" checked={advancedSaveAs === 'DRAFT'} onChange={(e) => setAdvancedSaveAs(e.target.checked ? 'DRAFT' : 'POSTED')} />
+                  <span className="toggle-switch-track" />
+                  Guardar como borrador
+                </label>
+                <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
+                <button type="submit" className="btn-primary" disabled={!isBalanced && advancedSaveAs === 'POSTED'}>
+                  {advancedSaveAs === 'DRAFT' ? 'Guardar borrador' : 'Confirmar asiento'}
+                </button>
+              </div>
+              {!isBalanced && advancedSaveAs === 'POSTED' && (
+                <p className="hint-text">El asiento debe estar balanceado para confirmar</p>
+              )}
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

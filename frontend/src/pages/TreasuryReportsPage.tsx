@@ -71,7 +71,7 @@ export const TreasuryReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="treasury-page">
+    <>
       <div className="page-header">
         <div>
           <h2>Reportes</h2>
@@ -164,7 +164,7 @@ export const TreasuryReportsPage: React.FC = () => {
         {activeTab === 'results' && <IncomeStatementView data={incomeStatement} loading={resultsLoading} />}
         {activeTab === 'availabilities' && <AvailabilitiesView data={availabilities} loading={availLoading} />}
       </div>
-    </div>
+    </>
   );
 };
 

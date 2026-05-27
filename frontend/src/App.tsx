@@ -9,15 +9,11 @@ import { AdminSalesPage } from './pages/AdminSalesPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminStockPage } from './pages/AdminStockPage';
-import { AccountingDashboard } from './pages/AccountingDashboard';
-import { AccountingMovementsPage } from './pages/AccountingMovementsPage';
-import { AccountingJornadasPage } from './pages/AccountingJornadasPage';
-import { AccountingCategoriesPage } from './pages/AccountingCategoriesPage';
-import { AccountingExportPage } from './pages/AccountingExportPage';
 import { TreasurySummaryPage } from './pages/TreasurySummaryPage';
 import { TreasuryJournalEntriesPage } from './pages/TreasuryJournalEntriesPage';
 import { TreasuryLedgerAccountsPage } from './pages/TreasuryLedgerAccountsPage';
 import { TreasuryReportsPage } from './pages/TreasuryReportsPage';
+import { TreasuryLayout } from './pages/TreasuryLayout';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { OAuthReturnPage } from './pages/OAuthReturnPage';
@@ -106,15 +102,17 @@ export const App: React.FC = () => {
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="stock" element={<AdminStockPage />} />
         <Route path="users" element={<Navigate to="/admin/settings" replace />} />
-        <Route path="contabilidad" element={<AccountingDashboard />} />
-        <Route path="contabilidad/movimientos" element={<AccountingMovementsPage />} />
-        <Route path="contabilidad/jornadas" element={<AccountingJornadasPage />} />
-        <Route path="contabilidad/categorias" element={<AccountingCategoriesPage />} />
-        <Route path="contabilidad/exportar" element={<AccountingExportPage />} />
-        <Route path="tesoreria" element={<TreasurySummaryPage />} />
-        <Route path="tesoreria/movimientos" element={<TreasuryJournalEntriesPage />} />
-        <Route path="tesoreria/cuentas" element={<TreasuryLedgerAccountsPage />} />
-        <Route path="tesoreria/reportes" element={<TreasuryReportsPage />} />
+        <Route path="contabilidad" element={<Navigate to="/admin/tesoreria" replace />} />
+        <Route path="contabilidad/movimientos" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
+        <Route path="contabilidad/jornadas" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
+        <Route path="contabilidad/categorias" element={<Navigate to="/admin/tesoreria/cuentas" replace />} />
+        <Route path="contabilidad/exportar" element={<Navigate to="/admin/tesoreria/reportes" replace />} />
+        <Route path="tesoreria" element={<TreasuryLayout />}>
+          <Route index element={<TreasurySummaryPage />} />
+          <Route path="movimientos" element={<TreasuryJournalEntriesPage />} />
+          <Route path="cuentas" element={<TreasuryLedgerAccountsPage />} />
+          <Route path="reportes" element={<TreasuryReportsPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

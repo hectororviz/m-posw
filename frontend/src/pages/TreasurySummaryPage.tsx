@@ -31,7 +31,7 @@ export const TreasurySummaryPage: React.FC = () => {
   const { data, isLoading } = useTreasurySummary({ from: from || undefined, to: to || undefined });
 
   return (
-    <div className="treasury-page">
+    <>
       <div className="page-header">
         <div>
           <h2>Resumen de Tesorería</h2>
@@ -116,6 +116,6 @@ export const TreasurySummaryPage: React.FC = () => {
           </div>
         </>
       )}
-    </div>
+    </>
   );
 };

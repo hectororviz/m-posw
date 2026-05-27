@@ -64,13 +64,13 @@ export const TreasuryLedgerAccountsPage: React.FC = () => {
   const parentAccounts = (accounts || []).filter((a) => !a.acceptsEntries);
 
   return (
-    <div className="treasury-page">
+    <>
       <div className="page-header">
         <div>
           <h2>Plan de Cuentas</h2>
           <p className="page-subtitle">Gestión de cuentas contables</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>Nueva cuenta</button>
+        <button className="btn-primary" onClick={() => setShowCreate(true)}>＋ Nueva cuenta</button>
       </div>
 
       {error && <div className="error-banner">{error}</div>}
@@ -163,6 +163,6 @@ export const TreasuryLedgerAccountsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
