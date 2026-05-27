@@ -74,7 +74,11 @@ export const LoginPage: React.FC = () => {
             : { name: identifier, pin };
       const response = await apiClient.post<AuthResponse>('/auth/login', payload);
       login(response.data);
-      navigate('/', { replace: true });
+      if (response.data.user.role === 'ADMIN') {
+        navigate('/admin/sales', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err) {
       setError(normalizeApiError(err));
     } finally {
