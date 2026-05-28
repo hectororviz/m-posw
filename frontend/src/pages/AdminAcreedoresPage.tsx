@@ -1,22 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedores, useAcreedorDeuda, useAcreedoresResumen } from '../api/queries';
+import { useAcreedores, useAcreedoresResumen } from '../api/queries';
+import type { Acreedor } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
   `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-const AcreedorSaldo: React.FC<{ acreedorId: number }> = ({ acreedorId }) => {
-  const { data } = useAcreedorDeuda(acreedorId);
-  if (!data) return <span>--</span>;
-  return (
-    <span className={data.saldoPendiente > 0 ? 'warning-text' : 'success-text'}>
-      {formatCurrency(data.saldoPendiente)}
-    </span>
-  );
-};
+type SortMode = 'alpha' | 'deuda';
 
 export const AdminAcreedoresPage: React.FC = () => {
   const { data: acreedores = [], isLoading } = useAcreedores();
@@ -29,6 +22,31 @@ export const AdminAcreedoresPage: React.FC = () => {
   const [form, setForm] = useState({ nombre: '', telefono: '', notas: '', activo: true });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>('alpha');
+
+  const filtered = useMemo(() => {
+    let list = [...acreedores];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((a) => a.nombre.toLowerCase().includes(q));
+    }
+    if (sortMode === 'deuda') {
+      list = list.map((a) => {
+        const totalFiado = (a as any).fiadoVentas
+          ? (a as any).fiadoVentas.reduce((sum: number, fv: any) => sum + Number(fv.monto), 0)
+          : 0;
+        const totalPagado = (a as any).pagos
+          ? (a as any).pagos.reduce((sum: number, p: any) => sum + Number(p.monto), 0)
+          : 0;
+        return { ...a, __saldo: totalFiado - totalPagado };
+      });
+      list.sort((a, b) => (b as any).__saldo - (a as any).__saldo);
+    } else {
+      list.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }
+    return list;
+  }, [acreedores, search, sortMode]);
 
   const resetForm = () => {
     setForm({ nombre: '', telefono: '', notas: '', activo: true });
@@ -88,6 +106,26 @@ export const AdminAcreedoresPage: React.FC = () => {
     }
   };
 
+  const getSaldoDisplay = (a: Acreedor & { __saldo?: number }) => {
+    if (a.__saldo === undefined) return null;
+    if (a.alertaDeuda) {
+      return (
+        <span className="error-text">
+          {formatCurrency(a.__saldo)}
+          {a.diasSinPagar != null && (
+            <span className="acreedor-dias-tooltip" title={`Deuda mas antigua: ${a.diasSinPagar} dias`}>
+              {' '}{a.diasSinPagar}d
+            </span>
+          )}
+        </span>
+      );
+    }
+    if (a.__saldo > 0) {
+      return <span className="warning-text">{formatCurrency(a.__saldo)}</span>;
+    }
+    return <span className="success-text">{formatCurrency(a.__saldo)}</span>;
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -112,14 +150,34 @@ export const AdminAcreedoresPage: React.FC = () => {
         </div>
       )}
 
+      <div className="stock-toolbar">
+        <input
+          type="text"
+          className="stock-search-input"
+          placeholder="Buscar acreedor..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button
+          type="button"
+          className={`btn-ghost ${sortMode === 'alpha' ? 'active-sort' : ''}`}
+          onClick={() => setSortMode(sortMode === 'alpha' ? 'deuda' : 'alpha')}
+          title={sortMode === 'alpha' ? 'Ordenar por deuda' : 'Ordenar alfabeticamente'}
+        >
+          {sortMode === 'alpha' ? 'A-Z' : '$$$'}
+        </button>
+      </div>
+
       {isLoading ? (
         <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
           <div className="spinner" aria-hidden="true" />
           <p style={{ color: 'var(--color-text-faint)', margin: '0.75rem 0 0', fontSize: '0.95rem' }}>Cargando...</p>
         </div>
-      ) : acreedores.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>No hay acreedores registrados.</p>
+          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>
+            {search ? 'Sin resultados para la busqueda.' : 'No hay acreedores registrados.'}
+          </p>
         </div>
       ) : (
         <div className="sales-table-wrapper">
@@ -131,13 +189,11 @@ export const AdminAcreedoresPage: React.FC = () => {
               <span className="col-method">Estado</span>
               <span className="col-action"></span>
             </div>
-            {acreedores.map((a) => (
+            {filtered.map((a) => (
               <div key={a.id} className="sales-table-row">
                 <span className="col-date" style={{ fontWeight: 500 }}>{a.nombre}</span>
                 <span className="col-user">{a.telefono || '--'}</span>
-                <span className="col-total">
-                  <AcreedorSaldo acreedorId={a.id} />
-                </span>
+                <span className="col-total">{getSaldoDisplay(a)}</span>
                 <span className="col-method">
                   {a.activo ? (
                     <span className="badge badge-success">Activo</span>

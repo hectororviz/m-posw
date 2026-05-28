@@ -402,6 +402,8 @@ export interface Acreedor {
   notas?: string | null;
   activo: boolean;
   createdAt: string;
+  alertaDeuda?: boolean;
+  diasSinPagar?: number | null;
 }
 
 export interface FiadoVentaItem {
@@ -409,6 +411,7 @@ export interface FiadoVentaItem {
   monto: number;
   createdAt: string;
   ventaId: string;
+  saldoRestante?: number;
 }
 
 export interface PagoAcreedorItem {
@@ -425,6 +428,9 @@ export interface AcreedorDeuda {
   totalFiado: number;
   totalPagado: number;
   saldoPendiente: number;
+  deudaMasAntigua: string | null;
+  diasSinPagar: number | null;
+  alertaDeuda: boolean;
 }
 
 export interface AcreedoresResumen {

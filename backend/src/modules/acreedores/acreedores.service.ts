@@ -4,9 +4,76 @@ import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
 
+interface FiadoVentaRaw {
+  id: number;
+  monto: number;
+  createdAt: Date;
+  ventaId: string;
+  saldoRestante?: number;
+}
+
+interface PagoRaw {
+  monto: number;
+  fecha: Date;
+}
+
+interface FifoResult {
+  deudaMasAntigua: string | null;
+  diasSinPagar: number | null;
+  alertaDeuda: boolean;
+  fiadoVentasConSaldo: Array<{ id: number; monto: number; createdAt: string; ventaId: string; saldoRestante: number }>;
+}
+
 @Injectable()
 export class AcreedoresService {
   constructor(private prisma: PrismaService) {}
+
+  private calculateFifo(fiadoVentas: FiadoVentaRaw[], pagos: PagoRaw[]): FifoResult {
+    const sortedVentas = [...fiadoVentas].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    const sortedPagos = [...pagos].sort(
+      (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
+    );
+
+    let pagoRemaining = sortedPagos.reduce((sum, p) => sum + Number(p.monto), 0);
+
+    let deudaMasAntigua: string | null = null;
+    const fiadoVentasConSaldo: FifoResult['fiadoVentasConSaldo'] = [];
+
+    for (const venta of sortedVentas) {
+      const monto = Number(venta.monto);
+      const aplicado = Math.min(monto, pagoRemaining);
+      const saldo = monto - aplicado;
+      pagoRemaining -= aplicado;
+
+      if (saldo > 0 && !deudaMasAntigua) {
+        deudaMasAntigua = venta.createdAt.toISOString();
+      }
+
+      fiadoVentasConSaldo.push({
+        id: venta.id,
+        monto,
+        createdAt: venta.createdAt.toISOString(),
+        ventaId: venta.ventaId,
+        saldoRestante: saldo,
+      });
+    }
+
+    let diasSinPagar: number | null = null;
+    let alertaDeuda = false;
+
+    if (deudaMasAntigua) {
+      const ahora = new Date();
+      const fechaDeuda = new Date(deudaMasAntigua);
+      diasSinPagar = Math.floor(
+        (ahora.getTime() - fechaDeuda.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      alertaDeuda = diasSinPagar >= 30;
+    }
+
+    return { deudaMasAntigua, diasSinPagar, alertaDeuda, fiadoVentasConSaldo };
+  }
 
   async getResumen() {
     const acreedores = await this.prisma.acreedor.findMany({
@@ -30,9 +97,30 @@ export class AcreedoresService {
     return { deudaTotal, acreedoresConDeuda };
   }
 
-  findAll() {
-    return this.prisma.acreedor.findMany({
+  async findAll() {
+    const acreedores = await this.prisma.acreedor.findMany({
+      include: {
+        fiadoVentas: { orderBy: { createdAt: 'asc' } },
+        pagos: true,
+      },
       orderBy: { nombre: 'asc' },
+    });
+
+    return acreedores.map((a) => {
+      const { alertaDeuda, diasSinPagar } = this.calculateFifo(
+        a.fiadoVentas as unknown as FiadoVentaRaw[],
+        a.pagos as unknown as PagoRaw[],
+      );
+      return {
+        id: a.id,
+        nombre: a.nombre,
+        telefono: a.telefono,
+        notas: a.notas,
+        activo: a.activo,
+        createdAt: a.createdAt,
+        alertaDeuda,
+        diasSinPagar,
+      };
     });
   }
 
@@ -83,7 +171,19 @@ export class AcreedoresService {
     const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0);
     const saldoPendiente = totalFiado - totalPagado;
 
-    return { fiadoVentas, pagos, totalFiado, totalPagado, saldoPendiente };
+    const { deudaMasAntigua, diasSinPagar, alertaDeuda, fiadoVentasConSaldo } =
+      this.calculateFifo(fiadoVentas as unknown as FiadoVentaRaw[], pagos as unknown as PagoRaw[]);
+
+    return {
+      fiadoVentas: fiadoVentasConSaldo,
+      pagos,
+      totalFiado,
+      totalPagado,
+      saldoPendiente,
+      deudaMasAntigua,
+      diasSinPagar,
+      alertaDeuda,
+    };
   }
 
   async addPago(acreedorId: number, dto: CreatePagoDto) {

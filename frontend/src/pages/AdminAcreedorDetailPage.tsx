@@ -49,6 +49,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
       });
       await queryClient.invalidateQueries({ queryKey: ['acreedor-deuda', acreedorId] });
       await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
+      await queryClient.invalidateQueries({ queryKey: ['acreedores-resumen'] });
       pushToast('Pago registrado', 'success');
       setPagoModal(false);
       setPagoForm({
@@ -97,6 +98,15 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {deuda?.alertaDeuda && (
+        <div className="alerta-deuda-banner">
+          ⚠ Deuda pendiente desde hace {deuda.diasSinPagar} dias.
+          {deuda.deudaMasAntigua && (
+            <> Ultima venta sin saldar: {formatDate(deuda.deudaMasAntigua)}.</>
+          )}
+        </div>
+      )}
+
       {deuda && (
         <div className="sales-kpis" style={{ marginBottom: '1.5rem' }}>
           <div className="sales-kpi-card">
@@ -139,11 +149,18 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                 <div className="sales-table-head">
                   <span className="col-date">Fecha</span>
                   <span className="col-total">Monto</span>
+                  <span className="col-total">Saldo</span>
                 </div>
                 {deuda.fiadoVentas.map((fv) => (
-                  <div key={fv.id} className="sales-table-row">
+                  <div
+                    key={fv.id}
+                    className={`sales-table-row ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'row-pending-debt' : ''}`}
+                  >
                     <span className="col-date">{formatDate(fv.createdAt)}</span>
                     <span className="col-total">{formatCurrency(Number(fv.monto))}</span>
+                    <span className={`col-total ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'warning-text' : 'success-text'}`}>
+                      {fv.saldoRestante !== undefined ? formatCurrency(fv.saldoRestante) : '--'}
+                    </span>
                   </div>
                 ))}
               </div>
