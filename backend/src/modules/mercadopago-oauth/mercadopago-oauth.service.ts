@@ -327,6 +327,8 @@ export class MercadoPagoOauthService {
 
     let posName: string;
     let qrData: string;
+    let externalPosId: string;
+    let externalStoreId: string;
 
     try {
       const posRes = await fetch(`https://api.mercadopago.com/pos/${posId}`, {
@@ -342,10 +344,13 @@ export class MercadoPagoOauthService {
       const posData = (await posRes.json()) as {
         name?: string;
         qr?: { image?: string };
+        external_id?: string;
         external_store_id?: string;
       };
       posName = posData.name ?? '';
       qrData = posData.qr?.image ?? '';
+      externalPosId = posData.external_id ?? posId;
+      externalStoreId = posData.external_store_id ?? storeId;
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logger.error(`MP select store - pos network error: ${error}`);
@@ -362,6 +367,8 @@ export class MercadoPagoOauthService {
         mpStoreName: `Tienda ${storeId}`,
         mpPosName: posName,
         mpQrData: qrData,
+        mpExternalPosId: externalPosId,
+        mpExternalStoreId: externalStoreId,
       },
       update: {
         mpStoreId: storeId,
@@ -369,6 +376,8 @@ export class MercadoPagoOauthService {
         mpStoreName: `Tienda ${storeId}`,
         mpPosName: posName,
         mpQrData: qrData,
+        mpExternalPosId: externalPosId,
+        mpExternalStoreId: externalStoreId,
       },
     });
 
@@ -480,6 +489,8 @@ export class MercadoPagoOauthService {
       throw new HttpException('Error de red al crear el POS en MP', HttpStatus.BAD_GATEWAY);
     }
 
+    const externalPosId = `${subdomain}_pos`;
+
     await this.prisma.setting.upsert({
       where: { id: DEFAULT_SETTING_ID },
       create: {
@@ -490,6 +501,8 @@ export class MercadoPagoOauthService {
         mpStoreName: storeName,
         mpPosName: posName,
         mpQrData: qrData,
+        mpExternalPosId: externalPosId,
+        mpExternalStoreId: storeId,
       },
       update: {
         mpStoreId: storeId,
@@ -497,6 +510,8 @@ export class MercadoPagoOauthService {
         mpStoreName: storeName,
         mpPosName: posName,
         mpQrData: qrData,
+        mpExternalPosId: externalPosId,
+        mpExternalStoreId: storeId,
       },
     });
 
@@ -529,6 +544,8 @@ export class MercadoPagoOauthService {
         mpStoreName: null,
         mpPosName: null,
         mpQrData: null,
+        mpExternalPosId: null,
+        mpExternalStoreId: null,
       },
       update: {
         mpStoreId: null,
@@ -536,6 +553,8 @@ export class MercadoPagoOauthService {
         mpStoreName: null,
         mpPosName: null,
         mpQrData: null,
+        mpExternalPosId: null,
+        mpExternalStoreId: null,
       },
     });
 

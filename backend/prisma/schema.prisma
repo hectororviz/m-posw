@@ -244,6 +244,8 @@ model Setting {
   mpPosId         String?
   mpPosName       String?
   mpStoreName     String?
+  mpExternalPosId   String?
+  mpExternalStoreId String?
   mpQrData        String?
   mpLinked        Boolean  @default(false)
   createdAt   DateTime @default(now())

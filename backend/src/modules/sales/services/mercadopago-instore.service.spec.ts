@@ -21,8 +21,10 @@ describe('MercadoPagoInstoreService', () => {
   const prisma = {
     setting: {
       findFirst: jest.fn().mockResolvedValue({
-        mpStoreId: '65632507',
-        mpPosId: '107200406',
+        mpStoreId: '51775244',
+        mpPosId: '4276937',
+        mpExternalPosId: 'default',
+        mpExternalStoreId: 'STORE_1',
       }),
     },
   } as any;
@@ -72,7 +74,7 @@ describe('MercadoPagoInstoreService', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/stores/65632507/pos/107200406/orders',
+      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/stores/STORE_1/pos/default/orders',
       expect.objectContaining({
         method: 'PUT',
         headers: expect.objectContaining({ Authorization: 'Bearer token' }),
@@ -165,7 +167,7 @@ describe('MercadoPagoInstoreService', () => {
     await service.deleteOrder();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/pos/107200406/orders',
+      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/pos/default/orders',
       expect.objectContaining({
         method: 'DELETE',
         headers: expect.objectContaining({ Authorization: 'Bearer token' }),

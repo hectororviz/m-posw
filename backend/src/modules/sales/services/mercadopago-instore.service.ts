@@ -45,9 +45,9 @@ export class MercadoPagoInstoreService {
   ) {}
 
   async createOrUpdateOrder(input: CreateOrderInput) {
-    const { mpStoreId, mpPosId } = await this.getPosConfig();
+    const { externalStoreId, externalPosId } = await this.getPosConfig();
     const collectorId = await this.getCollectorId();
-    const url = this.buildOrdersUrl(collectorId, mpStoreId, mpPosId);
+    const url = this.buildOrdersUrl(collectorId, externalStoreId, externalPosId);
     const payload = this.buildPayload(input.sale);
     const itemsTotal = payload.items.reduce((sum, item) => sum + item.total_amount, 0);
     this.logger.debug(
@@ -59,17 +59,17 @@ export class MercadoPagoInstoreService {
       `Mercado Pago payload titles: title=${payload.title} first_item_title=${payload.items[0]?.title ?? 'n/a'}`,
     );
     this.logger.debug(
-      `Mercado Pago request: PUT ${url} (collectorId=${collectorId}, storeId=${mpStoreId}, posId=${mpPosId})`,
+      `Mercado Pago request: PUT ${url} (collectorId=${collectorId}, externalStoreId=${externalStoreId}, externalPosId=${externalPosId})`,
     );
     await this.request('PUT', url, payload);
   }
 
   async deleteOrder() {
-    const { mpPosId } = await this.getPosConfig();
+    const { externalPosId } = await this.getPosConfig();
     const collectorId = await this.getCollectorId();
-    const url = this.buildPosOrdersUrl(collectorId, mpPosId);
+    const url = this.buildPosOrdersUrl(collectorId, externalPosId);
     this.logger.debug(
-      `Mercado Pago request: DELETE ${url} (collectorId=${collectorId}, posId=${mpPosId})`,
+      `Mercado Pago request: DELETE ${url} (collectorId=${collectorId}, externalPosId=${externalPosId})`,
     );
     await this.request('DELETE', url);
   }
@@ -162,15 +162,76 @@ export class MercadoPagoInstoreService {
   private async getPosConfig() {
     const setting = await this.prisma.setting.findFirst({
       where: { id: DEFAULT_SETTING_ID },
-      select: { mpStoreId: true, mpPosId: true },
+      select: {
+        mpStoreId: true,
+        mpPosId: true,
+        mpExternalPosId: true,
+        mpExternalStoreId: true,
+      },
     });
+
     if (!setting?.mpStoreId || !setting?.mpPosId) {
       throw new HttpException(
         'Punto de venta QR no configurado. Configuralo en Settings.',
         HttpStatus.BAD_REQUEST,
       );
     }
-    return { mpStoreId: setting.mpStoreId, mpPosId: setting.mpPosId };
+
+    if (!setting.mpExternalPosId) {
+      this.logger.log(`Auto-migrating external IDs for posId=${setting.mpPosId}`);
+      const posData = await this.tryFetchPosInfo(setting.mpPosId);
+
+      if (posData) {
+        const externalPosId = posData.external_id ?? setting.mpPosId;
+        const externalStoreId =
+          posData.external_store_id ?? setting.mpExternalStoreId ?? setting.mpStoreId;
+
+        await this.prisma.setting.upsert({
+          where: { id: DEFAULT_SETTING_ID },
+          create: {
+            id: DEFAULT_SETTING_ID,
+            storeName: 'MiBPS Demo',
+            mpExternalPosId: externalPosId,
+            mpExternalStoreId: externalStoreId,
+          },
+          update: {
+            mpExternalPosId: externalPosId,
+            mpExternalStoreId: externalStoreId,
+          },
+        });
+
+        this.logger.log(
+          `Auto-migration done: externalPosId=${externalPosId} externalStoreId=${externalStoreId}`,
+        );
+
+        return { externalStoreId, externalPosId };
+      }
+
+      this.logger.warn(
+        `Auto-migration failed: could not fetch POS ${setting.mpPosId}, using numeric IDs as fallback`,
+      );
+    }
+
+    const externalPosId = setting.mpExternalPosId ?? setting.mpPosId;
+    const externalStoreId =
+      setting.mpExternalStoreId ?? setting.mpStoreId;
+
+    return { externalStoreId, externalPosId };
+  }
+
+  private async tryFetchPosInfo(posId: string): Promise<{
+    external_id?: string;
+    external_store_id?: string;
+  } | null> {
+    try {
+      return await this.getPosInfo(posId) as {
+        external_id?: string;
+        external_store_id?: string;
+      } | null;
+    } catch (error) {
+      this.logger.warn(`Failed to fetch POS ${posId} for auto-migration: ${error}`);
+      return null;
+    }
   }
 
   private async getCollectorId() {
