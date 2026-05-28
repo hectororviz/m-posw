@@ -18,12 +18,21 @@ describe('MercadoPagoInstoreService', () => {
     getCollectorId: jest.fn().mockResolvedValue('collector-1'),
   } as unknown as MercadoPagoConfigService;
 
+  const prisma = {
+    setting: {
+      findFirst: jest.fn().mockResolvedValue({
+        mpStoreId: '65632507',
+        mpPosId: '107200406',
+      }),
+    },
+  } as any;
+
   afterEach(() => {
     global.fetch = originalFetch;
   });
 
   it('arma la URL de orders con store y pos', () => {
-    const service = new MercadoPagoInstoreService(config, mpConfig);
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
 
     expect(service.buildOrdersUrl('collector-1', 'STORE_1', 'POS_1')).toBe(
       'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/stores/STORE_1/pos/POS_1/orders',
@@ -31,7 +40,7 @@ describe('MercadoPagoInstoreService', () => {
   });
 
   it('arma la URL de orders solo con pos', () => {
-    const service = new MercadoPagoInstoreService(config, mpConfig);
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
 
     expect(service.buildPosOrdersUrl('collector-1', 'POS_1')).toBe(
       'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/pos/POS_1/orders',
@@ -45,11 +54,9 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config, mpConfig);
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
 
     await service.createOrUpdateOrder({
-      externalStoreId: 'STORE_1',
-      externalPosId: 'POS_1',
       sale: {
         id: 'sale-1',
         total: '100.00',
@@ -65,7 +72,7 @@ describe('MercadoPagoInstoreService', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/stores/STORE_1/pos/POS_1/orders',
+      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/stores/65632507/pos/107200406/orders',
       expect.objectContaining({
         method: 'PUT',
         headers: expect.objectContaining({ Authorization: 'Bearer token' }),
@@ -75,7 +82,7 @@ describe('MercadoPagoInstoreService', () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.items).toEqual([
       expect.objectContaining({
-        sku_number: 'prod-1',
+        sku_number: 'prod1',
         category: 'POS',
         title: 'Item A',
         description: 'Item A',
@@ -101,11 +108,9 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config, mpConfig);
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
 
     await service.createOrUpdateOrder({
-      externalStoreId: 'STORE_1',
-      externalPosId: 'POS_1',
       sale: {
         id: 'sale-2',
         total: '6.00',
@@ -126,7 +131,7 @@ describe('MercadoPagoInstoreService', () => {
   });
 
   it('buildPayload calcula total con decimales y currency_id', () => {
-    const service = new MercadoPagoInstoreService(config, mpConfig);
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
 
     const payload = service.buildPayload({
       id: 'sale-3',
@@ -155,15 +160,12 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config, mpConfig);
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
 
-    await service.deleteOrder({
-      externalStoreId: 'STORE_1',
-      externalPosId: 'POS_1',
-    });
+    await service.deleteOrder();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/pos/POS_1/orders',
+      'https://api.mercadopago.com/instore/qr/seller/collectors/collector-1/pos/107200406/orders',
       expect.objectContaining({
         method: 'DELETE',
         headers: expect.objectContaining({ Authorization: 'Bearer token' }),
@@ -178,7 +180,7 @@ describe('MercadoPagoInstoreService', () => {
     });
     global.fetch = fetchMock as any;
 
-    const service = new MercadoPagoInstoreService(config, mpConfig);
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
 
     await (service as any).request('PUT', 'https://api.mercadopago.com/test', {
       total_amount: 10,

@@ -2,16 +2,12 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Sale, SaleItem } from '@prisma/client';
 import { MercadoPagoConfigService } from '../../common/mp-config.service';
+import { PrismaService } from '../../common/prisma.service';
+
+const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
 
 interface CreateOrderInput {
-  externalStoreId: string;
-  externalPosId: string;
   sale: Sale & { items: (SaleItem & { product: { name: string; price: unknown } })[] };
-}
-
-interface OrderIdentity {
-  externalStoreId: string;
-  externalPosId: string;
 }
 
 interface MercadoPagoOrderItem {
@@ -45,13 +41,13 @@ export class MercadoPagoInstoreService {
   constructor(
     private config: ConfigService,
     private mpConfig: MercadoPagoConfigService,
+    private prisma: PrismaService,
   ) {}
 
   async createOrUpdateOrder(input: CreateOrderInput) {
-    this.assertExternalId('externalStoreId', input.externalStoreId);
-    this.assertExternalId('externalPosId', input.externalPosId);
+    const { mpStoreId, mpPosId } = await this.getPosConfig();
     const collectorId = await this.getCollectorId();
-    const url = this.buildOrdersUrl(collectorId, input.externalStoreId, input.externalPosId);
+    const url = this.buildOrdersUrl(collectorId, mpStoreId, mpPosId);
     const payload = this.buildPayload(input.sale);
     const itemsTotal = payload.items.reduce((sum, item) => sum + item.total_amount, 0);
     this.logger.debug(
@@ -63,18 +59,17 @@ export class MercadoPagoInstoreService {
       `Mercado Pago payload titles: title=${payload.title} first_item_title=${payload.items[0]?.title ?? 'n/a'}`,
     );
     this.logger.debug(
-      `Mercado Pago request: PUT ${url} (collectorId=${collectorId}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
+      `Mercado Pago request: PUT ${url} (collectorId=${collectorId}, storeId=${mpStoreId}, posId=${mpPosId})`,
     );
     await this.request('PUT', url, payload);
   }
 
-  async deleteOrder(input: OrderIdentity) {
-    this.assertExternalId('externalStoreId', input.externalStoreId);
-    this.assertExternalId('externalPosId', input.externalPosId);
+  async deleteOrder() {
+    const { mpPosId } = await this.getPosConfig();
     const collectorId = await this.getCollectorId();
-    const url = this.buildPosOrdersUrl(collectorId, input.externalPosId);
+    const url = this.buildPosOrdersUrl(collectorId, mpPosId);
     this.logger.debug(
-      `Mercado Pago request: DELETE ${url} (collectorId=${collectorId}, externalStoreId=${input.externalStoreId}, externalPosId=${input.externalPosId})`,
+      `Mercado Pago request: DELETE ${url} (collectorId=${collectorId}, posId=${mpPosId})`,
     );
     await this.request('DELETE', url);
   }
@@ -156,12 +151,26 @@ export class MercadoPagoInstoreService {
    * - PUT /instore/qr/seller/collectors/{user_id}/stores/{external_store_id}/pos/{external_pos_id}/orders
    * - DELETE /instore/qr/seller/collectors/{user_id}/pos/{external_pos_id}/orders
    */
-  buildOrdersUrl(collectorId: string, externalStoreId: string, externalPosId: string) {
-    return `${this.baseUrl}/instore/qr/seller/collectors/${collectorId}/stores/${externalStoreId}/pos/${externalPosId}/orders`;
+  buildOrdersUrl(collectorId: string, storeId: string, posId: string) {
+    return `${this.baseUrl}/instore/qr/seller/collectors/${collectorId}/stores/${storeId}/pos/${posId}/orders`;
   }
 
-  buildPosOrdersUrl(collectorId: string, externalPosId: string) {
-    return `${this.baseUrl}/instore/qr/seller/collectors/${collectorId}/pos/${externalPosId}/orders`;
+  buildPosOrdersUrl(collectorId: string, posId: string) {
+    return `${this.baseUrl}/instore/qr/seller/collectors/${collectorId}/pos/${posId}/orders`;
+  }
+
+  private async getPosConfig() {
+    const setting = await this.prisma.setting.findFirst({
+      where: { id: DEFAULT_SETTING_ID },
+      select: { mpStoreId: true, mpPosId: true },
+    });
+    if (!setting?.mpStoreId || !setting?.mpPosId) {
+      throw new HttpException(
+        'Punto de venta QR no configurado. Configuralo en Settings.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return { mpStoreId: setting.mpStoreId, mpPosId: setting.mpPosId };
   }
 
   private async getCollectorId() {
@@ -397,21 +406,5 @@ export class MercadoPagoInstoreService {
 
   private roundToCurrency(value: number) {
     return Math.round((value + Number.EPSILON) * 100) / 100;
-  }
-
-  private assertExternalId(field: string, value: string) {
-    const normalized = String(value ?? '').trim();
-    if (!normalized) {
-      throw new HttpException(
-        `${field} requerido: configurá external IDs (external_pos_id/external_store_id)`,
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    if (/^\d+$/.test(normalized)) {
-      throw new HttpException(
-        `${field} inválido: parece un ID numérico. Configurá el external_id correspondiente en Mercado Pago`,
-        HttpStatus.BAD_REQUEST,
-      );
-    }
   }
 }

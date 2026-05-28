@@ -89,17 +89,6 @@ export class SalesService {
       this.handlePrismaError(error, 'crear la venta con QR');
     }
 
-    const externalStoreId =
-      sale.user.externalStoreId?.trim() ||
-      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
-    const externalPosId =
-      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
-    if (!externalStoreId || !externalPosId) {
-      throw new BadRequestException(
-        'externalStoreId y externalPosId requeridos para Mercado Pago',
-      );
-    }
-
     const externalReference = `sale-${sale.id}`;
     const saleWithReference = await this.prisma.sale.update({
       where: { id: sale.id },
@@ -112,8 +101,6 @@ export class SalesService {
 
     try {
       await this.mpService.createOrUpdateOrder({
-        externalStoreId,
-        externalPosId,
         sale: saleWithReference,
       });
     } catch (error) {
@@ -141,7 +128,7 @@ export class SalesService {
     return this.prisma.sale.findMany({
       where: createdAtFilter ? { createdAt: { gte: createdAtFilter } } : undefined,
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true } },
         items: { include: { product: { include: { category: true } } } },
       },
       orderBy: { createdAt: 'desc' },
@@ -195,7 +182,7 @@ export class SalesService {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
       include: {
-        user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
+        user: { select: { id: true, name: true } },
         items: { include: { product: { include: { category: true } } } },
       },
     });
@@ -369,21 +356,7 @@ export class SalesService {
       throw new BadRequestException('La venta ya está aprobada');
     }
 
-    const externalStoreId =
-      sale.user.externalStoreId?.trim() ||
-      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
-    const externalPosId =
-      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
-    if (!externalStoreId || !externalPosId) {
-      throw new BadRequestException(
-        'externalStoreId y externalPosId requeridos para Mercado Pago',
-      );
-    }
-
-    await this.mpService.deleteOrder({
-      externalStoreId,
-      externalPosId,
-    });
+    await this.mpService.deleteOrder();
 
     const updatedSale = await this.prisma.sale.update({
       where: { id: saleId },
@@ -427,7 +400,7 @@ export class SalesService {
       id: string;
       status: SaleStatus;
       paymentStartedAt: Date | null;
-      user: { externalPosId: string | null; externalStoreId: string | null };
+      user: unknown;
     },
   ) {
     if (sale.status !== SaleStatus.PENDING || !sale.paymentStartedAt) {
@@ -437,14 +410,7 @@ export class SalesService {
     if (sale.paymentStartedAt > cutoff) {
       return null;
     }
-    const externalStoreId =
-      sale.user.externalStoreId?.trim() ||
-      this.config.get<string>('MP_DEFAULT_EXTERNAL_STORE_ID');
-    const externalPosId =
-      sale.user.externalPosId?.trim() || this.config.get<string>('MP_DEFAULT_EXTERNAL_POS_ID');
-    if (externalPosId && externalStoreId) {
-      await this.mpService.deleteOrder({ externalStoreId, externalPosId });
-    }
+    await this.mpService.deleteOrder();
     return this.prisma.sale.update({
       where: { id: sale.id },
       data: {
@@ -454,7 +420,7 @@ export class SalesService {
         expiredAt: new Date(),
       },
       include: {
-        user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
+        user: { select: { id: true, name: true } },
         items: { include: { product: { include: { category: true } } } },
       },
     });

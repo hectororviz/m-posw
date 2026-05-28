@@ -28,8 +28,6 @@ describe('SalesService MercadoPago QR auth', () => {
     ],
     user: {
       id: 'owner-1',
-      externalPosId: 'POS-1',
-      externalStoreId: 'STORE-1',
     },
   };
 
