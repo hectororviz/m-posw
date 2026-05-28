@@ -58,7 +58,7 @@ Archivo schema: `backend/prisma/schema.prisma`
 | id | UUID (PK) | Identificador único |
 | name | String | Nombre del producto |
 | price | Decimal(10,2) | Precio |
-| stock | Int | Stock disponible (default: 0) |
+| stock | Decimal(10,4) | Stock disponible (default: 0) |
 | iconName | String? | Nombre del icono |
 | colorHex | String? | Color en hexadecimal |
 | imagePath | String? | Ruta de la imagen |
@@ -256,6 +256,23 @@ Archivo schema: `backend/prisma/schema.prisma`
 | okAnimationUrl | String? | URL de animación OK |
 | errorAnimationUrl | String? | URL de animación error |
 | accentColor | String? | Color de acento |
+| enableCashPayment | Boolean | Habilitar pago en efectivo |
+| enableQrPayment | Boolean | Habilitar QR de MP |
+| enableTransferPayment | Boolean | Habilitar transferencia |
+| movementInReasons | String[] | Motivos de entrada configurados |
+| movementOutReasons | String[] | Motivos de salida configurados |
+| mpAccessToken | String? | Access Token OAuth de MP |
+| mpRefreshToken | String? | Refresh Token OAuth de MP |
+| mpTokenExpiresAt | DateTime? | Expiración del token OAuth |
+| mpCollectorId | String? | Collector ID de MP (OAuth o .env) |
+| mpStoreId | String? | Store ID de MP (OAuth) |
+| mpPosId | String? | POS ID de MP (OAuth) |
+| mpPosName | String? | Nombre del POS (OAuth) |
+| mpStoreName | String? | Nombre de la tienda (OAuth) |
+| mpExternalPosId | String? | External ID del POS (OAuth) |
+| mpExternalStoreId | String? | External ID de la tienda (OAuth) |
+| mpQrData | String? | Datos del QR de MP |
+| mpLinked | Boolean | Cuenta MP vinculada vía OAuth |
 | createdAt | DateTime | Fecha de creación |
 | updatedAt | DateTime | Fecha de actualización |
 
@@ -275,7 +292,74 @@ Archivo schema: `backend/prisma/schema.prisma`
 
 ---
 
-### **14. PaymentEvent** (Eventos de pago)
+### **14. LedgerAccount** (Plan de cuentas)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | UUID (PK) | Identificador único |
+| code | String (unique) | Código de cuenta (ej: 1.1.1) |
+| name | String | Nombre de la cuenta |
+| type | LedgerAccountType (enum) | ASSET/LIABILITY/EQUITY/REVENUE/EXPENSE |
+| active | Boolean | Cuenta activa/inactiva |
+| acceptsEntries | Boolean | Acepta imputaciones (false = agrupadora) |
+| parentId | UUID? (FK) | Cuenta padre (jerarquía) |
+| createdAt | DateTime | Fecha de creación |
+| updatedAt | DateTime | Fecha de actualización |
+
+**Relaciones:**
+- `N:1` → LedgerAccount (padre, self-referencing)
+- `1:N` → LedgerAccount (hijos)
+- `1:N` → JournalEntryLine (líneas)
+
+---
+
+### **15. JournalEntry** (Asientos contables)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | UUID (PK) | Identificador único |
+| entryNumber | String (unique) | Número de asiento (ej: 00001-0526) |
+| sequenceNumber | Int | Secuencia numérica por año fiscal |
+| fiscalYear | Int | Año fiscal |
+| month | Int | Mes |
+| date | DateTime | Fecha del asiento |
+| description | String | Descripción |
+| notes | String? | Notas adicionales |
+| status | JournalEntryStatus (enum) | DRAFT/POSTED/VOIDED |
+| createdById | UUID (FK) | Usuario que creó |
+| postedAt | DateTime? | Fecha de contabilización |
+| voidedAt | DateTime? | Fecha de anulación |
+| voidReason | String? | Motivo de anulación |
+| reversalOfId | UUID? (unique, FK) | Asiento original anulado |
+| createdAt | DateTime | Fecha de creación |
+| updatedAt | DateTime | Fecha de actualización |
+
+**Relaciones:**
+- `N:1` → User (createdBy)
+- `1:1` → JournalEntry (reversalOf → reversalEntry)
+- `1:N` → JournalEntryLine (líneas)
+
+---
+
+### **16. JournalEntryLine** (Líneas de asiento)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | UUID (PK) | Identificador único |
+| entryId | UUID (FK) | Asiento |
+| accountId | UUID (FK) | Cuenta contable |
+| debit | Decimal(12,2) | Importe débito |
+| credit | Decimal(12,2) | Importe crédito |
+| description | String? | Descripción de la línea |
+| createdAt | DateTime | Fecha de creación |
+
+**Relaciones:**
+- `N:1` → JournalEntry (entry)
+- `N:1` → LedgerAccount (account)
+
+---
+
+### **17. PaymentEvent** (Eventos de pago)
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
@@ -294,7 +378,7 @@ Archivo schema: `backend/prisma/schema.prisma`
 │                            USER                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  1:N → Sales, CashCloses, CashMovements, Sessions,              │
-│        ManualMovements                                          │
+│        ManualMovements, JournalEntries                          │
 └─────────────────────────────────────────────────────────────────┘
                               │
         ┌─────────────────────┼─────────────────────┐
@@ -326,6 +410,26 @@ Archivo schema: `backend/prisma/schema.prisma`
 ┌──────────────┐
 │ PaymentEvent │
 └──────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
+│                  TESORERÍA / PARTIDA DOBLE                    │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌───────────────┐         ┌─────────────────┐              │
+│  │ LedgerAccount │◄─1:N────│JournalEntryLine │───N:1────────►│
+│  │ (plan cuentas)│         └────────┬────────┘              │
+│  │   jerárquico  │                  │                        │
+│  └───────┬───────┘                  │                        │
+│          │ self-ref (parent/children)                        │
+│          └──────────────────────────┘                        │
+│                                                              │
+│  ┌──────────────┐         ┌─────────────────┐              │
+│  │ JournalEntry │◄─1:1────│ JournalEntry    │              │
+│  │  (asiento)   │         │ (reversión)     │              │
+│  │ DRAFT/POSTED/│         └─────────────────┘              │
+│  │ VOIDED       │                                           │
+│  └──────────────┘                                           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -339,7 +443,11 @@ Archivo schema: `backend/prisma/schema.prisma`
 | **PaymentMethod** | CASH, MP_QR, TRANSFER |
 | **PaymentStatus** | PENDING, APPROVED, REJECTED, EXPIRED |
 | **MovementType** | ENTRADA, SALIDA |
+| **AccountingMovementType** | INCOME, EXPENSE |
+| **ProductType** | SIMPLE, RAW_MATERIAL, COMPOSITE |
 | **CashMovementType** | INCOME, EXPENSE |
+| **LedgerAccountType** | ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE |
+| **JournalEntryStatus** | DRAFT, POSTED, VOIDED |
 
 ---
 
@@ -364,7 +472,26 @@ Archivo schema: `backend/prisma/schema.prisma`
 - `20261116000000_add_order_number_to_sale_item` - Número de orden en ítems
 - `20261117000000_add_product_order_counter` - Contador de órdenes por producto
 - `20260415000000_add_transfer_payment` - Pago por transferencia
+- `20260501000000_add_lottie_settings` - Configuraciones Lottie
+- `20261007000000_add_ticket_settings` - Configuraciones de ticket
+- `20261007001000_add_ticket_printed_at` - Fecha de impresión de ticket
+- `20261008000000_add_manual_movements` - Movimientos manuales
+- `20261101000000_add_cash_close_and_movements` - Cierre de caja y movimientos de caja
+- `20261115000000_add_order_number` - Número de orden
+- `20261116000000_add_order_number_to_sale_item` - Número de orden en ítems
+- `20261117000000_add_product_order_counter` - Contador de órdenes por producto
+- `add_product_type` - Tipos de producto (SIMPLE/RAW_MATERIAL/COMPOSITE)
+- `add_recipe_ingredient` - Ingredientes de recetas
+- `add_setting_payment_toggles` - Toggles de métodos de pago en config
+- `add_setting_movement_reasons` - Motivos de movimientos configurables
+- `add_mp_oauth` - OAuth MP (access token, refresh token, collector, store, pos)
+- `add_ledger_accounts` - Plan de cuentas contable
+- `add_journal_entries` - Asientos de libro diario
+- `add_journal_entry_lines` - Líneas de asientos
+- `add_accounting_movements` - Movimientos contables (legacy)
+- `add_accounting_categories` - Categorías contables (legacy)
+- `add_sales_transfer_total` - Total de transferencias en cierre de caja
 
 ---
 
-*Generado automáticamente el 16/04/2026*
+*Actualizado el 28/05/2026*

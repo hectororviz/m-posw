@@ -7,31 +7,42 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 ### Punto de venta
 - Interfaz táctil optimizada: **categorías → productos → carrito → venta**.
 - Múltiples métodos de pago en una misma pantalla (efectivo, QR, transferencia).
-- Impresión de ticket térmico 80mm (automática o manual).
+- Impresión de ticket térmico 58mm (automática o manual).
 - Cálculo automático de vuelto en pagos en efectivo.
+- **Zoom de productos**: vista ampliada en el POS táctil.
 
 ### Pagos
 - **Efectivo**: registro de monto recibido, vuelto calculado.
 - **Mercado Pago QR** (Instore v2): genera un QR dinámico que el cliente escanea con su app de MP. Confirmación instantánea vía webhook.
 - **Transferencia bancaria** (CVU/Alias): el sistema detecta automáticamente la transferencia en la cuenta de MP y confirma la venta.
+- **OAuth Mercado Pago**: vinculá tu cuenta de MP vía OAuth 2.0 sin configurar tokens manualmente. Detección automática de tiendas, creación de POS QR y renovación proactiva de tokens.
+
+### Tesorería / Libro Diario
+- **Partida doble**: registrá asientos contables con débito y crédito validados automáticamente.
+- **Plan de cuentas**: estructura jerárquica de cuentas (Activo, Pasivo, Patrimonio, Ingresos, Egresos). Cuentas agrupadoras y cuentas imputables.
+- **Ciclo contable**: asientos en borrador (DRAFT) → contabilizados (POSTED) → anulados (VOIDED) con reversión automática.
+- **Reportes exportables a Excel**: Libro Diario, Mayor Contable, Balance de Sumas y Saldos, Estado de Resultados, Disponibilidades.
 
 ### Gestión de productos
 - CRUD de categorías y productos con imágenes personalizadas.
 - **Productos Compuestos (Recetas)**: al vender un producto, se descuenta stock de sus materias primas automáticamente.
 - **Materias Primas**: insumos con stock decimal para composición de recetas.
-- Control de stock en tiempo real.
+- Control de stock en tiempo real con ajuste rápido (quick adjust) y autoguardado.
 
 ### Administración
 - **Panel de reportes**: ventas por fecha, totals, métricas con filtros y exportación XLSX.
-- **Dashboard de estadísticas**: últimos 15 días, últimos 6 meses, promedios con gráficos.
+- **Dashboard de estadísticas**: KPIs con badges, últimos 15 días, últimos 6 meses, promedios con gráficos.
 - **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia) con movimientos de entrada/salida.
+- **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
 
 ### Personalización
 - Nombre del comercio/club, logo, favicon y color principal de la UI configurable desde el panel admin.
 - Encabezado del ticket personalizable.
+- **Modo Oscuro**: tema dark completo con toggle manual y detección automática de preferencia del sistema.
+- **Sidebar colapsable**: navegación responsive con toggle, ideal para pantallas pequeñas.
 
 ### Roles y seguridad
-- **ADMIN**: acceso completo a configuración, reportes y gestión de usuarios.
+- **ADMIN**: acceso completo a configuración, reportes, tesorería y gestión de usuarios.
 - **USER** (caja): acceso restringido al POS y a sus propias ventas.
 - Autenticación JWT con sesiones revocables.
 
@@ -40,10 +51,10 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | Escenario | Cómo se usa m-POSw |
 |-----------|-------------------|
 | **Jornada deportiva / evento** | Puestos de comida y bebida con tablet. Categorías táctiles, cobro rápido con QR o efectivo. Varias cajas operando en simultáneo. |
-| **Cantina / buffet escolar** | Productos compuestos (ej: "Combo Hamburguesa" descuenta pan, carne y aderezos del stock). Control de insumos automatizado. |
+| **Cantina / buffet escolar** | Productos compuestos (ej: "Combo Hamburguesa" descuenta pan, carne y aderezos del stock). Control de insumos automatizado. Contabilidad por partida doble para rendición. |
 | **Feria / puesto callejero** | App Android en celular con impresión Bluetooth. Sin necesidad de PC ni instalación compleja. |
-| **Comercio minorista** | Catálogo de productos con imágenes, múltiples métodos de cobro, cierre de caja diario. |
-| **Evento con múltiples puestos** | Cada puesto es una caja independiente. Admin centralizado que ve reportes y estadísticas de todas las cajas. |
+| **Comercio minorista** | Catálogo de productos con imágenes, múltiples métodos de cobro, cierre de caja diario, libro diario contable. |
+| **Evento con múltiples puestos** | Cada puesto es una caja independiente. Admin centralizado que ve reportes, estadísticas y tesorería de todas las cajas. |
 
 ## Ventajas
 
@@ -53,7 +64,9 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Actualización centralizada**: los cambios en el frontend se reflejan inmediatamente en todos los dispositivos sin recompilar nada (ni siquiera la APK).
 - **Múltiples métodos de pago**: efectivo, QR y transferencia en una misma pantalla. No hacen falta terminales POS físicas.
 - **Control de inventario inteligente**: productos compuestos con recetas que descuentan automáticamente el stock de materias primas.
-- **Impresión sin drivers**: desde el navegador (ticket térmico 80mm estándar) o desde la APK vía Bluetooth nativo. Sin instalar drivers de impresora.
+- **Impresión sin drivers**: desde el navegador (ticket térmico 58mm estándar) o desde la APK vía Bluetooth nativo. Sin instalar drivers de impresora.
+- **OAuth Mercado Pago**: vinculación en 2 clics sin copiar tokens manualmente. Renovación automática, nunca se vence.
+- **Contabilidad integrada**: libro diario con partida doble, plan de cuentas y reportes contables. Ideal para rendir cuentas a tesorerías de clubes o instituciones.
 - **Código abierto**: generado íntegramente con IA, adaptable a cualquier necesidad.
 
 ## Tecnologías
@@ -64,9 +77,11 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | Backend | NestJS 10 + Prisma ORM |
 | Base de datos | PostgreSQL 16 |
 | Infraestructura | Docker Compose (3 contenedores) |
-| Pagos | API Mercado Pago (Instore QR v2 + Search payments) |
+| Pagos | API Mercado Pago (Instore QR v2 + OAuth 2.0 + Search payments) |
 | Comunicación en tiempo real | WebSockets (Socket.IO) |
 | App Android | Flutter + WebView + impresión Bluetooth nativa |
+| Estilos | CSS Variables + Modo Oscuro |
+| Reportes | ExcelJS (exportación XLSX) |
 | Reverse proxy | Nginx (frontend) + Caddy/Nginx externo (opcional) |
 
 ## Requerimientos del servidor
@@ -102,7 +117,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 
 ### Servicios externos necesarios
 
-- **Mercado Pago**: cuenta de desarrollador (gratuita) con Access Token y Store/POS configurados.
+- **Mercado Pago**: cuenta de desarrollador (gratuita). Con OAuth, la vinculación es automática. Sin OAuth, se requiere Access Token configurado manualmente.
 - **Proxy reverso con HTTPS**: Caddy o Nginx externo para terminación SSL (no incluido en el docker-compose).
 
 ## App Android (APK)
@@ -136,7 +151,7 @@ La APK **no contiene el código de la aplicación**: solo es un "envoltorio" que
 └──────────────────────────────────────────┘
 ```
 
-La comunicación entre el frontend (JS) y la APK (Flutter) se hace mediante `postMessage` / `addJavaScriptHandler`: cuando el usuario toca "Imprimir", el frontend envía los datos del ticket como JSON. El código nativo Flutter los recibe, formatea el ticket para impresora térmica 80mm y lo envía por Bluetooth.
+La comunicación entre el frontend (JS) y la APK (Flutter) se hace mediante `postMessage` / `addJavaScriptHandler`: cuando el usuario toca "Imprimir", el frontend envía los datos del ticket como JSON. El código nativo Flutter los recibe, formatea el ticket para impresora térmica 58mm y lo envía por Bluetooth.
 
 ### Cómo usar la APK
 
@@ -185,11 +200,16 @@ docker compose up -d --build
 | `CAJA01_PASSWORD` | Contraseña de la caja inicial (rol USER) |
 | `CORS_ORIGIN` | Origen permitido para CORS (con protocolo) |
 | `VITE_API_BASE_URL` | `/api` si usás proxy, o URL completa del backend |
-| `MP_ACCESS_TOKEN` | Access Token de Mercado Pago |
-| `MP_COLLECTOR_ID` | Collector ID de Mercado Pago |
-| `MP_DEFAULT_EXTERNAL_STORE_ID` | Store ID externo configurado en MP |
-| `MP_DEFAULT_EXTERNAL_POS_ID` | POS ID externo configurado en MP |
+| `MP_ACCESS_TOKEN` | Access Token de Mercado Pago (opcional si usás OAuth) |
+| `MP_COLLECTOR_ID` | Collector ID de Mercado Pago (opcional si usás OAuth) |
+| `MP_DEFAULT_EXTERNAL_STORE_ID` | Store ID externo configurado en MP (opcional si usás OAuth) |
+| `MP_DEFAULT_EXTERNAL_POS_ID` | POS ID externo configurado en MP (opcional si usás OAuth) |
 | `MP_WEBHOOK_SECRET` | Secreto para validar webhooks de MP |
+| `INSTANCE_SUBDOMAIN` | Subdominio de la instancia para webhook URL dinámica |
+| `MP_CLIENT_ID` | Client ID para OAuth de Mercado Pago |
+| `MP_CLIENT_SECRET` | Client Secret para OAuth de Mercado Pago |
+| `MP_OAUTH_REDIRECT_URI` | URI de callback para OAuth de MP |
+| `MP_INTEGRATOR_ID` | Integrator ID opcional para partners certificados |
 
 Ver `.env.example` para la lista completa.
 
@@ -198,7 +218,7 @@ Ver `.env.example` para la lista completa.
 Al iniciar por primera vez, el seed crea:
 
 - **Admin**: `ADMIN_EMAIL` + `ADMIN_PASSWORD` (o `ADMIN_PIN`, que tiene prioridad si ambos están definidos).
-- **Caja01**: usuario con rol USER y `CAJA01_PASSWORD`. Asignarle `externalPosId` y `externalStoreId` si se usa Mercado Pago QR.
+- **Caja01**: usuario con rol USER y `CAJA01_PASSWORD`.
 
 ## Métodos de pago
 
@@ -206,12 +226,12 @@ Al iniciar por primera vez, el seed crea:
 El cajero ingresa el monto recibido y el sistema calcula el vuelto automáticamente. Se registra en el neto de caja.
 
 ### 2. Mercado Pago QR (Instore v2)
-1. El sistema crea una orden QR en MP.
+1. El sistema crea una orden QR en MP usando las credenciales OAuth (o Access Token del .env).
 2. El cliente escanea el QR con su app de Mercado Pago.
 3. MP notifica al backend vía webhook (`/api/webhooks/mercadopago`).
 4. La venta se marca como pagada automáticamente.
 
-**Requiere**: `externalStoreId` y `externalPosId` configurados por caja en la base de datos.
+**Con OAuth**: la configuración de Store/POS se hace automáticamente al vincular la cuenta. **Sin OAuth**: requiere `externalStoreId` y `externalPosId` configurados por caja.
 
 ### 3. Transferencia bancaria
 1. El sistema consulta periódicamente los pagos recientes de la cuenta de MP.
@@ -219,6 +239,24 @@ El cajero ingresa el monto recibido y el sistema calcula el vuelto automáticame
 3. Si el monto coincide, el cajero confirma la venta.
 
 **No usa webhooks**: funciona por polling contra la API de MP.
+
+### 4. OAuth Mercado Pago (nuevo en v2)
+Vinculá tu cuenta de Mercado Pago en 2 clics desde Configuración → Mercado Pago:
+1. Hacé clic en "Conectar Mercado Pago" — se abre la autorización de MP.
+2. Al volver, el sistema detecta automáticamente tus tiendas y POS existentes.
+3. Seleccioná una tienda existente o creá una nueva automáticamente.
+4. Los tokens se renuevan automáticamente cada 6 horas. No se vencen.
+
+## Módulo de Tesorería (nuevo en v2)
+
+Accesible desde el panel admin en **Tesorería**, con 4 secciones:
+
+| Sección | Descripción |
+|---------|-------------|
+| **Resumen** | Dashboard con disponibilidades (efectivo, MP, banco), totales de ingresos/egresos y últimos asientos. |
+| **Movimientos** | CRUD de asientos contables. Alta de ingresos/egresos simplificados. Numeración automática. Ciclo DRAFT → POSTED → VOIDED. |
+| **Plan de cuentas** | Estructura jerárquica de cuentas contables (Activo, Pasivo, Patrimonio, Ingresos, Egresos). Cuentas agrupadoras y cuentas imputables. |
+| **Reportes** | Libro Diario, Mayor Contable, Balance de Sumas y Saldos, Estado de Resultados y Disponibilidades. Todos exportables a Excel. |
 
 ## Desarrollo
 
@@ -289,15 +327,12 @@ cd backend && npx prisma migrate reset --force
                      ▼
          ┌──────────────────────┐
          │   Mercado Pago       │
-         │  QR │ Transferencia  │
+         │  OAuth │ QR │ Transf │
          └──────────────────────┘
 ```
 
-## Repositorios relacionados
-
-- **Android APK**: [`csdsoler/m_posw_android`](https://github.com/csdsoler/m_posw_android)
-- **m-POSw**: [`csdsoler/m-posw`](https://github.com/csdsoler/m-posw)
-
 ## Licencia
+
+MIT
 
 Programa confeccionado íntegramente con IA (Codex)
