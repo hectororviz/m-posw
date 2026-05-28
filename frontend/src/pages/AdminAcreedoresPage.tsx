@@ -11,6 +11,18 @@ const formatCurrency = (value: number) =>
 
 type SortMode = 'alpha' | 'deuda';
 
+const getAntiguedadLabel = (dias: number | null | undefined, saldo: number) => {
+  if (!dias || saldo <= 0) return '--';
+  return `${dias}d`;
+};
+
+const getAntiguedadColor = (dias: number | null | undefined, saldo: number): string => {
+  if (!dias || saldo <= 0) return '';
+  if (dias >= 30) return 'var(--color-danger)';
+  if (dias >= 15) return 'var(--color-warning, #f59e0b)';
+  return 'var(--color-success)';
+};
+
 export const AdminAcreedoresPage: React.FC = () => {
   const { data: acreedores = [], isLoading } = useAcreedores();
   const { data: resumen } = useAcreedoresResumen();
@@ -25,28 +37,39 @@ export const AdminAcreedoresPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
 
+  const computed = useMemo(() => {
+    return acreedores.map((a) => {
+      const saldo =
+        a.alertaDeuda !== undefined
+          ? 0 // saldo will be shown via separate state, compute from data
+          : 0;
+      return { ...a, __saldo: saldo };
+    });
+  }, [acreedores]);
+
   const filtered = useMemo(() => {
-    let list = [...acreedores];
+    let list = computed.map((a) => {
+      const totalFiado = (a as any).fiadoVentas
+        ? (a as any).fiadoVentas.reduce((sum: number, fv: any) => sum + Number(fv.monto), 0)
+        : 0;
+      const totalPagado = (a as any).pagos
+        ? (a as any).pagos.reduce((sum: number, p: any) => sum + Number(p.monto), 0)
+        : 0;
+      return { ...a, __saldo: totalFiado - totalPagado };
+    });
+
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((a) => a.nombre.toLowerCase().includes(q));
     }
+
     if (sortMode === 'deuda') {
-      list = list.map((a) => {
-        const totalFiado = (a as any).fiadoVentas
-          ? (a as any).fiadoVentas.reduce((sum: number, fv: any) => sum + Number(fv.monto), 0)
-          : 0;
-        const totalPagado = (a as any).pagos
-          ? (a as any).pagos.reduce((sum: number, p: any) => sum + Number(p.monto), 0)
-          : 0;
-        return { ...a, __saldo: totalFiado - totalPagado };
-      });
       list.sort((a, b) => (b as any).__saldo - (a as any).__saldo);
     } else {
       list.sort((a, b) => a.nombre.localeCompare(b.nombre));
     }
     return list;
-  }, [acreedores, search, sortMode]);
+  }, [computed, search, sortMode]);
 
   const resetForm = () => {
     setForm({ nombre: '', telefono: '', notas: '', activo: true });
@@ -106,24 +129,14 @@ export const AdminAcreedoresPage: React.FC = () => {
     }
   };
 
-  const getSaldoDisplay = (a: Acreedor & { __saldo?: number }) => {
-    if (a.__saldo === undefined) return null;
-    if (a.alertaDeuda) {
-      return (
-        <span className="error-text">
-          {formatCurrency(a.__saldo)}
-          {a.diasSinPagar != null && (
-            <span className="acreedor-dias-tooltip" title={`Deuda mas antigua: ${a.diasSinPagar} dias`}>
-              {' '}{a.diasSinPagar}d
-            </span>
-          )}
-        </span>
-      );
-    }
+  const getSaldoDisplay = (a: Acreedor & { __saldo: number }) => {
     if (a.__saldo > 0) {
+      if (a.alertaDeuda) {
+        return <span className="error-text" style={{ fontWeight: 600 }}>{formatCurrency(a.__saldo)}</span>;
+      }
       return <span className="warning-text">{formatCurrency(a.__saldo)}</span>;
     }
-    return <span className="success-text">{formatCurrency(a.__saldo)}</span>;
+    return <span style={{ color: 'var(--color-text-muted)' }}>$0</span>;
   };
 
   return (
@@ -158,14 +171,22 @@ export const AdminAcreedoresPage: React.FC = () => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button
-          type="button"
-          className={`btn-ghost ${sortMode === 'alpha' ? 'active-sort' : ''}`}
-          onClick={() => setSortMode(sortMode === 'alpha' ? 'deuda' : 'alpha')}
-          title={sortMode === 'alpha' ? 'Ordenar por deuda' : 'Ordenar alfabeticamente'}
-        >
-          {sortMode === 'alpha' ? 'A-Z' : '$$$'}
-        </button>
+        <div className="sort-segmented">
+          <button
+            type="button"
+            className={`sort-segment ${sortMode === 'alpha' ? 'sort-segment--active' : ''}`}
+            onClick={() => setSortMode('alpha')}
+          >
+            ABC
+          </button>
+          <button
+            type="button"
+            className={`sort-segment ${sortMode === 'deuda' ? 'sort-segment--active' : ''}`}
+            onClick={() => setSortMode('deuda')}
+          >
+            $$$
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -185,23 +206,34 @@ export const AdminAcreedoresPage: React.FC = () => {
             <div className="sales-table-head">
               <span className="col-date">Nombre</span>
               <span className="col-user">Telefono</span>
-              <span className="col-total">Saldo pendiente</span>
-              <span className="col-method">Estado</span>
-              <span className="col-action"></span>
+              <span className="col-total" style={{ flex: '0 0 110px' }}>Saldo</span>
+              <span className="col-total" style={{ flex: '0 0 90px' }}>Antiguedad</span>
+              <span className="col-method" style={{ flex: '0 0 70px' }}>Estado</span>
+              <span className="col-action" style={{ flex: '0 0 90px' }}></span>
             </div>
             {filtered.map((a) => (
               <div key={a.id} className="sales-table-row">
                 <span className="col-date" style={{ fontWeight: 500 }}>{a.nombre}</span>
                 <span className="col-user">{a.telefono || '--'}</span>
-                <span className="col-total">{getSaldoDisplay(a)}</span>
-                <span className="col-method">
+                <span className="col-total" style={{ flex: '0 0 110px' }}>{getSaldoDisplay(a)}</span>
+                <span
+                  className="col-total"
+                  style={{
+                    flex: '0 0 90px',
+                    color: getAntiguedadColor(a.diasSinPagar, (a as any).__saldo),
+                    fontWeight: 500,
+                  }}
+                >
+                  {getAntiguedadLabel(a.diasSinPagar, (a as any).__saldo)}
+                </span>
+                <span className="col-method" style={{ flex: '0 0 70px' }}>
                   {a.activo ? (
                     <span className="badge badge-success">Activo</span>
                   ) : (
                     <span className="badge badge-neutral">Inactivo</span>
                   )}
                 </span>
-                <span className="col-action" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                <span className="col-action" style={{ flex: '0 0 90px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => navigate(`/admin/acreedores/${a.id}`)}>Ver</button>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(a.id)}>Editar</button>
                 </span>

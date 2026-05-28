@@ -145,21 +145,25 @@ export const AdminAcreedorDetailPage: React.FC = () => {
             {deuda.fiadoVentas.length === 0 ? (
               <p style={{ color: 'var(--color-text-faint)' }}>No hay ventas fiadas registradas.</p>
             ) : (
-              <div className="sales-table">
-                <div className="sales-table-head">
-                  <span className="col-date">Fecha</span>
-                  <span className="col-total">Monto</span>
-                  <span className="col-total">Saldo</span>
+              <div className="fiado-ventas-table">
+                <div className="fiado-ventas-table-head">
+                  <span className="fv-col-fecha">Fecha</span>
+                  <span className="fv-col-monto">Monto</span>
+                  <span className="fv-col-saldo">Saldo</span>
                 </div>
                 {deuda.fiadoVentas.map((fv) => (
                   <div
                     key={fv.id}
-                    className={`sales-table-row ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'row-pending-debt' : ''}`}
+                    className={`fiado-ventas-table-row ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'row-pending-debt' : ''}`}
                   >
-                    <span className="col-date">{formatDate(fv.createdAt)}</span>
-                    <span className="col-total">{formatCurrency(Number(fv.monto))}</span>
-                    <span className={`col-total ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'warning-text' : 'success-text'}`}>
-                      {fv.saldoRestante !== undefined ? formatCurrency(fv.saldoRestante) : '--'}
+                    <span className="fv-col-fecha">{formatDate(fv.createdAt)}</span>
+                    <span className="fv-col-monto">{formatCurrency(Number(fv.monto))}</span>
+                    <span className={`fv-col-saldo ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'fv-saldo-pendiente' : ''}`}>
+                      {fv.saldoRestante !== undefined
+                        ? fv.saldoRestante > 0
+                          ? formatCurrency(fv.saldoRestante)
+                          : <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
+                        : '--'}
                     </span>
                   </div>
                 ))}
