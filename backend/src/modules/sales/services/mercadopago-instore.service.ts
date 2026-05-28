@@ -36,7 +36,6 @@ export class MercadoPagoInstoreService {
   private readonly baseUrl = 'https://api.mercadopago.com';
   private readonly timeoutMs = 15000;
   private readonly logger = new Logger(MercadoPagoInstoreService.name);
-  private readonly notificationUrl = 'https://pos.csdsoler.com.ar/api/webhooks/mercadopago';
 
   constructor(
     private config: ConfigService,
@@ -142,7 +141,7 @@ export class MercadoPagoInstoreService {
       description: saleDescription,
       total_amount: totalAmount,
       items,
-      notification_url: this.notificationUrl,
+      notification_url: this.getNotificationUrl(),
     };
   }
 
@@ -244,6 +243,14 @@ export class MercadoPagoInstoreService {
 
   private getCurrencyId() {
     return this.config.get<string>('MP_CURRENCY_ID') || 'ARS';
+  }
+
+  private getNotificationUrl() {
+    const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN');
+    if (subdomain) {
+      return `https://${subdomain}.mposw.com.ar/api/webhooks/mercadopago`;
+    }
+    return 'https://pos.csdsoler.com.ar/api/webhooks/mercadopago';
   }
 
   private async request<T = unknown>(method: string, url: string, payload?: unknown): Promise<T> {
