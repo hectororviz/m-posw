@@ -2271,6 +2271,17 @@ button {
 }
 
 /* Transfer payment styles */
+.checkout-actions--four {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.checkout-actions--four .primary-button,
+.checkout-actions--four .secondary-button {
+  width: 100%;
+}
+
 .checkout-actions--three {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -2302,6 +2313,40 @@ button {
 .checkout-actions--single .primary-button,
 .checkout-actions--single .secondary-button {
   width: 100%;
+}
+
+.acreedores-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.acreedor-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.acreedor-item:hover {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-faint);
+}
+
+.acreedor-item.selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-faint);
+}
+
+.acreedor-item input[type="radio"] {
+  flex-shrink: 0;
 }
 
 .transfer-instructions {

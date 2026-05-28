@@ -12,6 +12,7 @@ var CategoriesService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CategoriesService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const image_storage_1 = require("../common/image-storage");
 const prisma_service_1 = require("../common/prisma.service");
 let CategoriesService = CategoriesService_1 = class CategoriesService {
@@ -37,6 +38,7 @@ let CategoriesService = CategoriesService_1 = class CategoriesService {
                 ...dto,
                 colorHex: dto.colorHex ?? this.defaultColor,
                 active: dto.active ?? true,
+                ticket: dto.ticket ?? true,
             },
         });
     }
@@ -50,18 +52,43 @@ let CategoriesService = CategoriesService_1 = class CategoriesService {
             data.colorHex = dto.colorHex;
         if (dto.active !== undefined)
             data.active = dto.active;
+        if (dto.ticket !== undefined)
+            data.ticket = dto.ticket;
         if (process.env.NODE_ENV !== 'production') {
             this.logger.debug(`Updating category ${id} with data: ${JSON.stringify(data)}`);
         }
         return this.prisma.category.update({ where: { id }, data });
     }
-    listProducts(categoryId, includeInactive = false) {
-        return this.prisma.product.findMany({
+    async listProducts(categoryId, includeInactive = false) {
+        const products = await this.prisma.product.findMany({
             where: {
                 categoryId,
+                type: { not: client_1.ProductType.RAW_MATERIAL },
                 ...(includeInactive ? {} : { active: true }),
             },
+            include: {
+                recipeAsComposite: {
+                    include: {
+                        rawMaterial: true,
+                    },
+                },
+            },
             orderBy: { name: 'asc' },
+        });
+        return products.map(product => {
+            if (product.type === client_1.ProductType.COMPOSITE && product.recipeAsComposite.length > 0) {
+                const possibleUnits = product.recipeAsComposite.map(ingredient => {
+                    const rawMaterialStock = Number(ingredient.rawMaterial.stock);
+                    const quantityNeeded = Number(ingredient.quantity);
+                    return Math.floor(rawMaterialStock / quantityNeeded);
+                });
+                const calculatedStock = Math.min(...possibleUnits);
+                return {
+                    ...product,
+                    stock: calculatedStock,
+                };
+            }
+            return product;
         });
     }
     async remove(id) {

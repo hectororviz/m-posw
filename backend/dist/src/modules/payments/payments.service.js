@@ -12,19 +12,19 @@ var PaymentsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentsService = void 0;
 const common_1 = require("@nestjs/common");
-const config_1 = require("@nestjs/config");
 const prisma_service_1 = require("../common/prisma.service");
+const mp_config_service_1 = require("../common/mp-config.service");
 let PaymentsService = PaymentsService_1 = class PaymentsService {
-    constructor(prisma, config) {
+    constructor(prisma, mpConfig) {
         this.prisma = prisma;
-        this.config = config;
+        this.mpConfig = mpConfig;
         this.baseUrl = 'https://api.mercadopago.com';
         this.timeoutMs = 8000;
         this.logger = new common_1.Logger(PaymentsService_1.name);
         this.seenPaymentIds = new Set();
     }
     async pollTransfer(montoEsperado, userId) {
-        const token = this.config.get('MP_ACCESS_TOKEN');
+        const token = await this.mpConfig.getAccessToken();
         if (!token) {
             throw new Error('MP_ACCESS_TOKEN no configurado');
         }
@@ -44,9 +44,13 @@ let PaymentsService = PaymentsService_1 = class PaymentsService {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
         try {
+            const headers = { Authorization: `Bearer ${token}` };
+            if (process.env.MP_INTEGRATOR_ID) {
+                headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+            }
             const response = await fetch(url.toString(), {
                 method: 'GET',
-                headers: { Authorization: `Bearer ${token}` },
+                headers,
                 signal: controller.signal,
             });
             const data = (await response.json());
@@ -195,5 +199,5 @@ exports.PaymentsService = PaymentsService;
 exports.PaymentsService = PaymentsService = PaymentsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        config_1.ConfigService])
+        mp_config_service_1.MercadoPagoConfigService])
 ], PaymentsService);

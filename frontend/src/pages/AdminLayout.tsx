@@ -24,6 +24,7 @@ const navItems = [
   { to: '/admin/categories', emoji: '🗂️', label: 'Categorias' },
   { to: '/admin/products',   emoji: '📦', label: 'Productos' },
   { to: '/admin/stock',      emoji: '📐', label: 'Stock' },
+  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores' },
   { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion' },
 ];
 

@@ -17,12 +17,15 @@ let CashMovementsService = class CashMovementsService {
         this.prisma = prisma;
     }
     create(userId, dto) {
+        const fullReason = dto.description
+            ? `${dto.reason}: ${dto.description}`
+            : dto.reason;
         return this.prisma.cashMovement.create({
             data: {
                 createdByUserId: userId,
                 type: dto.type,
                 amount: Math.round(dto.amount * 100) / 100,
-                reason: dto.reason,
+                reason: fullReason,
             },
             include: { createdBy: { select: { id: true, name: true } } },
         });

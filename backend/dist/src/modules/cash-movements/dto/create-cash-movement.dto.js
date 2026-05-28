@@ -25,8 +25,13 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateCashMovementDto.prototype, "amount", void 0);
 __decorate([
-    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MaxLength)(300),
     __metadata("design:type", String)
 ], CreateCashMovementDto.prototype, "reason", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(300),
+    __metadata("design:type", String)
+], CreateCashMovementDto.prototype, "description", void 0);

@@ -11,45 +11,52 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StockService = void 0;
 const common_1 = require("@nestjs/common");
+const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../common/prisma.service");
 let StockService = class StockService {
     constructor(prisma) {
         this.prisma = prisma;
     }
     async getStockGroupedByCategory() {
-        const categories = await this.prisma.category.findMany({
-            where: { active: true },
+        const products = await this.prisma.product.findMany({
+            where: {
+                active: true,
+                type: { in: [client_1.ProductType.SIMPLE, client_1.ProductType.RAW_MATERIAL] },
+            },
             include: {
-                products: {
-                    where: { active: true },
-                    select: {
-                        id: true,
-                        name: true,
-                        price: true,
-                        stock: true,
-                        categoryId: true,
-                    },
-                    orderBy: {
-                        stock: 'asc',
-                    },
-                },
+                category: true,
             },
             orderBy: {
                 name: 'asc',
             },
         });
-        return categories.map((category) => ({
-            id: category.id,
-            name: category.name,
-            colorHex: category.colorHex,
-            products: category.products.map((product) => ({
+        const categoriesMap = new Map();
+        for (const product of products) {
+            const categoryId = product.category?.id || 'uncategorized';
+            const categoryName = product.category?.name || 'Sin categoría';
+            const categoryColor = product.category?.colorHex || '#999999';
+            if (!categoriesMap.has(categoryId)) {
+                categoriesMap.set(categoryId, {
+                    id: categoryId,
+                    name: categoryName,
+                    colorHex: categoryColor,
+                    products: [],
+                });
+            }
+            const stockNumber = Number(product.stock);
+            const displayStock = product.type === client_1.ProductType.RAW_MATERIAL
+                ? Math.round(stockNumber * 10000) / 10000
+                : Math.floor(stockNumber);
+            categoriesMap.get(categoryId).products.push({
                 id: product.id,
                 name: product.name,
-                price: product.price,
-                stock: product.stock,
+                price: Number(product.price),
+                stock: displayStock,
                 categoryId: product.categoryId,
-            })),
-        }));
+                type: product.type,
+            });
+        }
+        return Array.from(categoriesMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
     }
     async updateStock(productId, stock) {
         return this.prisma.product.update({
@@ -61,6 +68,7 @@ let StockService = class StockService {
                 price: true,
                 stock: true,
                 categoryId: true,
+                type: true,
             },
         });
     }

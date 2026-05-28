@@ -3,7 +3,7 @@ import { MovementType, PaymentMethod, PaymentStatus, Prisma, ProductType, SaleSt
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
-import { CreateCashSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
+import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 import {
@@ -120,6 +120,56 @@ export class SalesService {
       status: saleWithReference.status,
       startedAt: saleWithReference.paymentStartedAt,
     };
+  }
+
+  async createFiadoSale(userId: string, dto: CreateFiadoSaleDto) {
+    const { items, total } = await this.buildSaleItems(dto.items);
+    const roundedTotal = this.roundToCurrency(total);
+    this.assertTotal(dto.total, roundedTotal);
+
+    const acreedor = await this.prisma.acreedor.findFirst({
+      where: { id: dto.acreedorId, activo: true },
+    });
+
+    if (!acreedor) {
+      throw new NotFoundException('Acreedor no encontrado o inactivo');
+    }
+
+    try {
+      const sale = await this.prisma.sale.create({
+        data: {
+          userId,
+          total: roundedTotal,
+          status: SaleStatus.APPROVED,
+          paymentStatus: PaymentStatus.APPROVED,
+          paymentMethod: PaymentMethod.FIADO,
+          cashReceived: 0,
+          changeAmount: 0,
+          statusUpdatedAt: new Date(),
+          paidAt: new Date(),
+          items: {
+            create: items,
+          },
+        },
+        include: { items: { include: { product: { include: { category: true } } } } },
+      });
+
+      await this.prisma.fiadoVenta.create({
+        data: {
+          ventaId: sale.id,
+          acreedorId: dto.acreedorId,
+          monto: roundedTotal,
+        },
+      });
+
+      this.logger.log(`Venta fiado creada saleId=${sale.id}, acreedorId=${dto.acreedorId}, decrementando stock...`);
+      await this.decrementStockForSale(sale.id);
+      this.logger.log(`Stock decrementado para saleId=${sale.id}`);
+
+      return sale;
+    } catch (error) {
+      this.handlePrismaError(error, 'crear la venta fiado');
+    }
   }
 
   async listSales(requester?: { id: string; role: string }) {

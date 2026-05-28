@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SalesModule = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../common/prisma.service");
+const mp_config_service_1 = require("../common/mp-config.service");
 const sales_controller_1 = require("./sales.controller");
 const sales_service_1 = require("./sales.service");
 const mercadopago_webhook_controller_1 = require("./webhooks/mercadopago-webhook.controller");
@@ -25,6 +26,7 @@ exports.SalesModule = SalesModule = __decorate([
         providers: [
             sales_service_1.SalesService,
             prisma_service_1.PrismaService,
+            mp_config_service_1.MercadoPagoConfigService,
             mercadopago_instore_service_1.MercadoPagoInstoreService,
             mercadopago_query_service_1.MercadoPagoQueryService,
             mercadopago_webhook_processor_service_1.MercadoPagoWebhookProcessorService,

@@ -47,6 +47,10 @@ export class UpdateSettingDto {
   enableTransferPayment?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  enableFiadoPayment?: boolean;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];

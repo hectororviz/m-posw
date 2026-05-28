@@ -33,17 +33,45 @@ let ProductsController = class ProductsController {
         const products = await this.productsService.listActive(categoryId);
         return (0, product_mapper_1.mapProducts)(products);
     }
+    async listRawMaterials() {
+        const products = await this.productsService.listRawMaterials();
+        return (0, product_mapper_1.mapProducts)(products);
+    }
     async listAll() {
         const products = await this.productsService.listAll();
-        return (0, product_mapper_1.mapProducts)(products);
+        return products.map(product => ({
+            ...(0, product_mapper_1.mapProduct)(product),
+            recipeIngredients: product.recipeAsComposite?.length > 0
+                ? (0, product_mapper_1.mapIngredients)(product.recipeAsComposite.map(ri => ({
+                    ...ri,
+                    rawMaterial: (0, product_mapper_1.mapProduct)(ri.rawMaterial),
+                })))
+                : undefined,
+        }));
     }
     async create(dto) {
         const product = await this.productsService.create(dto);
-        return (0, product_mapper_1.mapProduct)(product);
+        return {
+            ...(0, product_mapper_1.mapProduct)(product),
+            recipeIngredients: product.recipeAsComposite?.length > 0
+                ? (0, product_mapper_1.mapIngredients)(product.recipeAsComposite.map(ri => ({
+                    ...ri,
+                    rawMaterial: (0, product_mapper_1.mapProduct)(ri.rawMaterial),
+                })))
+                : undefined,
+        };
     }
     async update(id, dto) {
         const product = await this.productsService.update(id, dto);
-        return (0, product_mapper_1.mapProduct)(product);
+        return {
+            ...(0, product_mapper_1.mapProduct)(product),
+            recipeIngredients: product.recipeAsComposite?.length > 0
+                ? (0, product_mapper_1.mapIngredients)(product.recipeAsComposite.map(ri => ({
+                    ...ri,
+                    rawMaterial: (0, product_mapper_1.mapProduct)(ri.rawMaterial),
+                })))
+                : undefined,
+        };
     }
     remove(id) {
         return this.productsService.remove(id);
@@ -67,6 +95,14 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], ProductsController.prototype, "listActive", null);
+__decorate([
+    (0, common_1.Get)('raw-materials'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], ProductsController.prototype, "listRawMaterials", null);
 __decorate([
     (0, common_1.Get)('all'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),

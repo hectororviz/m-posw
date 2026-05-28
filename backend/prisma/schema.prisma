@@ -25,6 +25,7 @@ enum PaymentMethod {
   CASH
   MP_QR
   TRANSFER
+  FIADO
 }
 
 enum PaymentStatus {
@@ -174,6 +175,7 @@ model Sale {
   items     SaleItem[]
   mercadoPagoPayments MercadoPagoPayment[]
   movimientosMP MovimientoMP[]
+  fiadoVenta       FiadoVenta?
 }
 
 model SaleItem {
@@ -234,6 +236,7 @@ model Setting {
   enableCashPayment Boolean @default(true)
   enableQrPayment Boolean @default(true)
   enableTransferPayment Boolean @default(true)
+  enableFiadoPayment Boolean @default(false)
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -436,4 +439,41 @@ model JournalEntryLine {
 
   @@index([entryId])
   @@index([accountId])
+}
+
+model Acreedor {
+  id          Int           @id @default(autoincrement())
+  nombre      String
+  telefono    String?
+  notas       String?
+  activo      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  fiadoVentas FiadoVenta[]
+  pagos       PagoAcreedor[]
+}
+
+model FiadoVenta {
+  id         Int      @id @default(autoincrement())
+  ventaId    String   @unique @db.Uuid
+  acreedorId Int
+  monto      Decimal  @db.Decimal(10, 2)
+  createdAt  DateTime @default(now())
+  venta      Sale     @relation(fields: [ventaId], references: [id])
+  acreedor   Acreedor @relation(fields: [acreedorId], references: [id])
+
+  @@index([acreedorId])
+  @@index([ventaId])
+}
+
+model PagoAcreedor {
+  id         Int      @id @default(autoincrement())
+  acreedorId Int
+  monto      Decimal  @db.Decimal(10, 2)
+  medioPago  String
+  fecha      DateTime
+  notas      String?
+  createdAt  DateTime @default(now())
+  acreedor   Acreedor @relation(fields: [acreedorId], references: [id])
+
+  @@index([acreedorId])
 }

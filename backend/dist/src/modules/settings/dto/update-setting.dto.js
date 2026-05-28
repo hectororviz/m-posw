@@ -55,3 +55,30 @@ __decorate([
     (0, class_validator_1.Matches)(/^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/),
     __metadata("design:type", String)
 ], UpdateSettingDto.prototype, "accentColor", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateSettingDto.prototype, "enableCashPayment", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateSettingDto.prototype, "enableQrPayment", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateSettingDto.prototype, "enableTransferPayment", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], UpdateSettingDto.prototype, "movementInReasons", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], UpdateSettingDto.prototype, "movementOutReasons", void 0);

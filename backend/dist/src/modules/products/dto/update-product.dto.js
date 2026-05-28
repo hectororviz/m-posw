@@ -12,6 +12,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateProductDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
+const client_1 = require("@prisma/client");
+class IngredientInputDto {
+}
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], IngredientInputDto.prototype, "rawMaterialId", void 0);
+__decorate([
+    (0, class_transformer_1.Transform)(({ value }) => {
+        if (value === '' || value === null || value === undefined) {
+            return value;
+        }
+        return typeof value === 'string' || typeof value === 'number' ? Number(value) : value;
+    }),
+    (0, class_validator_1.IsNumber)({ allowNaN: false, allowInfinity: false }),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], IngredientInputDto.prototype, "quantity", void 0);
 class UpdateProductDto {
 }
 exports.UpdateProductDto = UpdateProductDto;
@@ -39,6 +57,11 @@ __decorate([
 ], UpdateProductDto.prototype, "categoryId", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(client_1.ProductType),
+    __metadata("design:type", String)
+], UpdateProductDto.prototype, "type", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateProductDto.prototype, "iconName", void 0);
@@ -52,3 +75,10 @@ __decorate([
     (0, class_validator_1.IsBoolean)(),
     __metadata("design:type", Boolean)
 ], UpdateProductDto.prototype, "active", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => IngredientInputDto),
+    __metadata("design:type", Array)
+], UpdateProductDto.prototype, "ingredients", void 0);

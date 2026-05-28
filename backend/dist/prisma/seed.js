@@ -5,16 +5,12 @@ const bcrypt = require("bcrypt");
 const prisma = new client_1.PrismaClient();
 async function main() {
     const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPin = process.env.ADMIN_PIN;
     const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
     const adminName = process.env.ADMIN_NAME || 'admin';
-    const cajaPassword = process.env.CAJA01_PASSWORD || 'Caja01!';
     if (!adminEmail) {
         throw new Error('ADMIN_EMAIL es requerido para el usuario admin.');
     }
-    const adminSecret = adminPin || adminPassword;
-    console.info(`Seed admin: usando ${adminPin ? 'ADMIN_PIN' : 'ADMIN_PASSWORD'}.`);
-    const passwordHash = await bcrypt.hash(adminSecret, 10);
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
     const adminData = {
         name: adminName,
         password: passwordHash,
@@ -27,90 +23,89 @@ async function main() {
         update: adminData,
         create: adminData,
     });
-    const cajaPasswordHash = await bcrypt.hash(cajaPassword, 10);
-    await prisma.user.upsert({
-        where: { name: 'Caja01' },
-        update: {
-            name: 'Caja01',
-            password: cajaPasswordHash,
-            role: client_1.Role.USER,
-            active: true,
-            externalPosId: 'SOLER_POS_001',
-            externalStoreId: 'SOLER_STORE_001',
-        },
-        create: {
-            name: 'Caja01',
-            password: cajaPasswordHash,
-            role: client_1.Role.USER,
-            active: true,
-            externalPosId: 'SOLER_POS_001',
-            externalStoreId: 'SOLER_STORE_001',
-        },
-    });
     const setting = await prisma.setting.findFirst();
     if (!setting) {
         await prisma.setting.create({
             data: {
-                storeName: 'MiBPS Demo',
+                storeName: 'Mi Tienda',
                 accentColor: '#0ea5e9',
             },
         });
     }
-    const category = await prisma.category.findFirst();
-    if (!category) {
-        const bebidas = await prisma.category.create({
-            data: {
-                name: 'Bebidas',
-                iconName: 'local_drink',
-                colorHex: '#38BDF8',
-                active: true,
-            },
-        });
-        const snacks = await prisma.category.create({
-            data: {
-                name: 'Snacks',
-                iconName: 'lunch_dining',
-                colorHex: '#F97316',
-                active: true,
-            },
-        });
-        await prisma.product.createMany({
-            data: [
-                {
-                    name: 'Agua',
-                    price: 1.5,
-                    iconName: 'water_drop',
-                    colorHex: '#0EA5E9',
-                    active: true,
-                    categoryId: bebidas.id,
-                },
-                {
-                    name: 'Gaseosa',
-                    price: 2.0,
-                    iconName: 'sports_bar',
-                    colorHex: '#38BDF8',
-                    active: true,
-                    categoryId: bebidas.id,
-                },
-                {
-                    name: 'Papas Fritas',
-                    price: 2.5,
-                    iconName: 'fastfood',
-                    colorHex: '#F59E0B',
-                    active: true,
-                    categoryId: snacks.id,
-                },
-                {
-                    name: 'Barra de cereal',
-                    price: 1.2,
-                    iconName: 'energy_savings_leaf',
-                    colorHex: '#22C55E',
-                    active: true,
-                    categoryId: snacks.id,
-                },
-            ],
-        });
+    await seedLedgerAccounts();
+}
+async function seedLedgerAccounts() {
+    const accounts = [
+        { code: '1', name: 'Activo', type: 'ASSET', acceptsEntries: false },
+        { code: '1.1', name: 'Disponibilidades', type: 'ASSET', acceptsEntries: false },
+        { code: '1.1.01', name: 'Caja - Efectivo', type: 'ASSET', acceptsEntries: true },
+        { code: '1.1.02', name: 'Mercado Pago', type: 'ASSET', acceptsEntries: true },
+        { code: '1.1.03', name: 'Banco - Cuenta principal', type: 'ASSET', acceptsEntries: true },
+        { code: '1.2', name: 'Créditos', type: 'ASSET', acceptsEntries: false },
+        { code: '1.2.01', name: 'Créditos a cobrar', type: 'ASSET', acceptsEntries: true },
+        { code: '1.2.02', name: 'Anticipos entregados', type: 'ASSET', acceptsEntries: true },
+        { code: '2', name: 'Pasivo', type: 'LIABILITY', acceptsEntries: false },
+        { code: '2.1', name: 'Deudas', type: 'LIABILITY', acceptsEntries: false },
+        { code: '2.1.01', name: 'Proveedores a pagar', type: 'LIABILITY', acceptsEntries: true },
+        { code: '2.1.02', name: 'Gastos pendientes de pago', type: 'LIABILITY', acceptsEntries: true },
+        { code: '3', name: 'Patrimonio Neto', type: 'EQUITY', acceptsEntries: false },
+        { code: '3.1', name: 'Patrimonio', type: 'EQUITY', acceptsEntries: false },
+        { code: '3.1.01', name: 'Patrimonio / Saldo inicial', type: 'EQUITY', acceptsEntries: true },
+        { code: '3.1.02', name: 'Resultados acumulados', type: 'EQUITY', acceptsEntries: true },
+        { code: '4', name: 'Ingresos', type: 'REVENUE', acceptsEntries: false },
+        { code: '4.1', name: 'Ingresos operativos', type: 'REVENUE', acceptsEntries: false },
+        { code: '4.1.01', name: 'Ventas en jornada', type: 'REVENUE', acceptsEntries: true },
+        { code: '4.1.02', name: 'Ventas de entradas', type: 'REVENUE', acceptsEntries: true },
+        { code: '4.1.03', name: 'Cuotas', type: 'REVENUE', acceptsEntries: true },
+        { code: '4.1.04', name: 'Donaciones', type: 'REVENUE', acceptsEntries: true },
+        { code: '4.1.99', name: 'Otros ingresos', type: 'REVENUE', acceptsEntries: true },
+        { code: '5', name: 'Gastos', type: 'EXPENSE', acceptsEntries: false },
+        { code: '5.1', name: 'Compras y gastos operativos', type: 'EXPENSE', acceptsEntries: false },
+        { code: '5.1.01', name: 'Compra de mercadería', type: 'EXPENSE', acceptsEntries: true },
+        { code: '5.1.02', name: 'Compra de bienes', type: 'EXPENSE', acceptsEntries: true },
+        { code: '5.1.03', name: 'Compra de insumos', type: 'EXPENSE', acceptsEntries: true },
+        { code: '5.1.04', name: 'Limpieza', type: 'EXPENSE', acceptsEntries: true },
+        { code: '5.1.05', name: 'Mantenimiento', type: 'EXPENSE', acceptsEntries: true },
+        { code: '5.1.06', name: 'Servicios', type: 'EXPENSE', acceptsEntries: true },
+        { code: '5.1.07', name: 'Transporte', type: 'EXPENSE', acceptsEntries: true },
+        { code: '5.1.99', name: 'Otros gastos', type: 'EXPENSE', acceptsEntries: true },
+    ];
+    const parentMap = {};
+    for (const a of accounts) {
+        const parts = a.code.split('.');
+        if (parts.length > 1) {
+            const parentCode = parts.slice(0, -1).join('.');
+            parentMap[a.code] = parentCode;
+        }
+        else {
+            parentMap[a.code] = null;
+        }
     }
+    const codeToId = {};
+    for (const a of accounts) {
+        const existing = await prisma.ledgerAccount.findUnique({ where: { code: a.code } });
+        const parentCode = parentMap[a.code];
+        const parentId = parentCode ? codeToId[parentCode] || null : null;
+        if (existing) {
+            await prisma.ledgerAccount.update({
+                where: { code: a.code },
+                data: {
+                    name: a.name,
+                    type: a.type,
+                    acceptsEntries: a.acceptsEntries,
+                    parentId: parentId || existing.parentId,
+                },
+            });
+            codeToId[a.code] = existing.id;
+        }
+        else {
+            const created = await prisma.ledgerAccount.create({
+                data: { code: a.code, name: a.name, type: a.type, acceptsEntries: a.acceptsEntries, parentId },
+            });
+            codeToId[a.code] = created.id;
+        }
+    }
+    console.log('Plan de cuentas contable sembrado correctamente.');
 }
 main()
     .catch((error) => {

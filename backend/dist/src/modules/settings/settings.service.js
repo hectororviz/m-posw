@@ -16,12 +16,14 @@ const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
 const DEFAULT_STORE_NAME = 'MiBPS Demo';
 const DEFAULT_ACCENT_COLOR = '#0ea5e9';
 const DEFAULT_CLUB_NAME = '';
+const DEFAULT_OK_ANIMATION_URL = '/animations/ok.json';
+const DEFAULT_ERROR_ANIMATION_URL = '/animations/error.json';
 let SettingsService = class SettingsService {
     constructor(prisma) {
         this.prisma = prisma;
     }
     async get() {
-        return this.prisma.setting.upsert({
+        const settings = await this.prisma.setting.upsert({
             where: { id: DEFAULT_SETTING_ID },
             create: {
                 id: DEFAULT_SETTING_ID,
@@ -33,9 +35,19 @@ let SettingsService = class SettingsService {
                 okAnimationUrl: null,
                 errorAnimationUrl: null,
                 accentColor: DEFAULT_ACCENT_COLOR,
+                enableCashPayment: true,
+                enableQrPayment: true,
+                enableTransferPayment: true,
+                movementInReasons: [],
+                movementOutReasons: [],
             },
             update: {},
         });
+        return {
+            ...settings,
+            okAnimationUrl: settings.okAnimationUrl ?? DEFAULT_OK_ANIMATION_URL,
+            errorAnimationUrl: settings.errorAnimationUrl ?? DEFAULT_ERROR_ANIMATION_URL,
+        };
     }
     async update(dto) {
         return this.prisma.setting.upsert({
@@ -50,6 +62,11 @@ let SettingsService = class SettingsService {
                 okAnimationUrl: dto.okAnimationUrl ?? null,
                 errorAnimationUrl: dto.errorAnimationUrl ?? null,
                 accentColor: dto.accentColor ?? DEFAULT_ACCENT_COLOR,
+                enableCashPayment: dto.enableCashPayment ?? true,
+                enableQrPayment: dto.enableQrPayment ?? true,
+                enableTransferPayment: dto.enableTransferPayment ?? true,
+                movementInReasons: dto.movementInReasons ?? [],
+                movementOutReasons: dto.movementOutReasons ?? [],
             },
             update: {
                 ...(dto.storeName !== undefined ? { storeName: dto.storeName } : {}),
@@ -62,6 +79,11 @@ let SettingsService = class SettingsService {
                 ...(dto.okAnimationUrl !== undefined ? { okAnimationUrl: dto.okAnimationUrl } : {}),
                 ...(dto.errorAnimationUrl !== undefined ? { errorAnimationUrl: dto.errorAnimationUrl } : {}),
                 ...(dto.accentColor !== undefined ? { accentColor: dto.accentColor } : {}),
+                ...(dto.enableCashPayment !== undefined ? { enableCashPayment: dto.enableCashPayment } : {}),
+                ...(dto.enableQrPayment !== undefined ? { enableQrPayment: dto.enableQrPayment } : {}),
+                ...(dto.enableTransferPayment !== undefined ? { enableTransferPayment: dto.enableTransferPayment } : {}),
+                ...(dto.movementInReasons !== undefined ? { movementInReasons: dto.movementInReasons } : {}),
+                ...(dto.movementOutReasons !== undefined ? { movementOutReasons: dto.movementOutReasons } : {}),
             },
         });
     }

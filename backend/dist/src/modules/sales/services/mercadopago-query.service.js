@@ -12,10 +12,10 @@ var MercadoPagoQueryService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MercadoPagoQueryService = void 0;
 const common_1 = require("@nestjs/common");
-const config_1 = require("@nestjs/config");
+const mp_config_service_1 = require("../../common/mp-config.service");
 let MercadoPagoQueryService = MercadoPagoQueryService_1 = class MercadoPagoQueryService {
-    constructor(config) {
-        this.config = config;
+    constructor(mpConfig) {
+        this.mpConfig = mpConfig;
         this.baseUrl = 'https://api.mercadopago.com';
         this.timeoutMs = 8000;
         this.logger = new common_1.Logger(MercadoPagoQueryService_1.name);
@@ -41,7 +41,7 @@ let MercadoPagoQueryService = MercadoPagoQueryService_1 = class MercadoPagoQuery
         return this.request('GET', `${this.baseUrl}/v1/payments/search?external_reference=${encoded}`);
     }
     async request(method, url) {
-        const token = this.config.get('MP_ACCESS_TOKEN');
+        const token = await this.mpConfig.getAccessToken();
         if (!token) {
             throw new common_1.HttpException('MP_ACCESS_TOKEN no configurado', common_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -49,9 +49,13 @@ let MercadoPagoQueryService = MercadoPagoQueryService_1 = class MercadoPagoQuery
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
         try {
+            const headers = { Authorization: `Bearer ${token}` };
+            if (process.env.MP_INTEGRATOR_ID) {
+                headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+            }
             const response = await fetch(url, {
                 method,
-                headers: { Authorization: `Bearer ${token}` },
+                headers,
                 signal: controller.signal,
             });
             const text = await response.text();
@@ -100,5 +104,5 @@ let MercadoPagoQueryService = MercadoPagoQueryService_1 = class MercadoPagoQuery
 exports.MercadoPagoQueryService = MercadoPagoQueryService;
 exports.MercadoPagoQueryService = MercadoPagoQueryService = MercadoPagoQueryService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [config_1.ConfigService])
+    __metadata("design:paramtypes", [mp_config_service_1.MercadoPagoConfigService])
 ], MercadoPagoQueryService);

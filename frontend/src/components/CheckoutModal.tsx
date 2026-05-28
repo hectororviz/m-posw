@@ -9,7 +9,7 @@ import { useToast } from './ToastProvider';
 import { maybePrintTicket } from '../utils/ticketPrinting';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
-type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT' | 'QR_RESULT' | 'TRANSFER_WAIT' | 'TRANSFER_RESULT';
+type CheckoutStep = 'SELECT_METHOD' | 'CASH' | 'QR_WAIT' | 'QR_RESULT' | 'TRANSFER_WAIT' | 'TRANSFER_RESULT' | 'FIADO_SELECT';
 type QrResultType = 'SUCCESS' | 'ERROR';
 type TransferStatus = 'WAITING' | 'EXACT' | 'MORE' | 'LESS' | 'TIMEOUT' | 'ERROR';
 
@@ -83,6 +83,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const [transferResult, setTransferResult] = useState<QrResultType | null>(null);
   const [transferResultMessage, setTransferResultMessage] = useState<string | null>(null);
   
+  const [acreedores, setAcreedores] = useState<Array<{ id: number; nombre: string; activo: boolean }>>([]);
+  const [selectedAcreedorId, setSelectedAcreedorId] = useState<number | null>(null);
+  const [fiadoLoading, setFiadoLoading] = useState(false);
+  const [fiadoError, setFiadoError] = useState<string | null>(null);
+  
   const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
   const qrRequestRef = useRef<AbortController | null>(null);
   const qrPollRef = useRef<number | null>(null);
@@ -102,16 +107,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     const enableCash = settings?.enableCashPayment ?? true;
     const enableQr = settings?.enableQrPayment ?? true;
     const enableTransfer = settings?.enableTransferPayment ?? true;
+    const enableFiado = settings?.enableFiadoPayment ?? false;
 
-    // Si todos están desactivados, activar Efectivo por defecto
-    if (!enableCash && !enableQr && !enableTransfer) {
-      return { enableCashPayment: true, enableQrPayment: false, enableTransferPayment: false };
+    if (!enableCash && !enableQr && !enableTransfer && !enableFiado) {
+      return { enableCashPayment: true, enableQrPayment: false, enableTransferPayment: false, enableFiadoPayment: false };
     }
 
     return {
       enableCashPayment: enableCash,
       enableQrPayment: enableQr,
       enableTransferPayment: enableTransfer,
+      enableFiadoPayment: enableFiado,
     };
   }, [settings]);
 
@@ -142,6 +148,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setTransferError(null);
     setTransferResult(null);
     setTransferResultMessage(null);
+    setAcreedores([]);
+    setSelectedAcreedorId(null);
+    setFiadoLoading(false);
+    setFiadoError(null);
   };
 
   const clearQrTimers = () => {
@@ -643,6 +653,56 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setTimeLeft(120);
   };
 
+  const handleStartFiado = async () => {
+    setFiadoLoading(true);
+    setFiadoError(null);
+    try {
+      const response = await apiClient.get<Array<{ id: number; nombre: string; activo: boolean }>>('/acreedores');
+      const activos = response.data.filter((a) => a.activo);
+      setAcreedores(activos);
+      setSelectedAcreedorId(null);
+      setStep('FIADO_SELECT');
+    } catch (error) {
+      setFiadoError(normalizeApiError(error));
+    } finally {
+      setFiadoLoading(false);
+    }
+  };
+
+  const handleFiadoConfirm = async () => {
+    if (!selectedAcreedorId) {
+      return;
+    }
+    setIsSubmitting(true);
+    setFiadoError(null);
+    try {
+      const response = await apiClient.post<Sale>('/sales/fiado', {
+        items: items.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
+        total,
+        paymentMethod: 'FIADO' as PaymentMethod,
+        acreedorId: selectedAcreedorId,
+      });
+      const sale = response.data;
+      await maybePrintTicket({
+        settings,
+        saleId: sale.id,
+        dateTimeISO: sale.paidAt ?? sale.createdAt,
+        total: sale.total,
+        items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber, categoryTicket: item.product.category?.ticket })),
+        onPopupBlocked: () =>
+          pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
+        onError: (message) => pushToast(message, 'error'),
+      });
+      pushToast('Venta fiada registrada', 'success');
+      clear();
+      handleClose();
+    } catch (error) {
+      setFiadoError(normalizeApiError(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleRetryQr = () => {
     clearQrTimers();
     abortQrRequest();
@@ -777,10 +837,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             <div className="checkout-step">
               <p className="checkout-total">Total: <strong>{formatCurrency(total)}</strong></p>
               <div className={`checkout-actions ${
-                [paymentMethods.enableCashPayment, paymentMethods.enableQrPayment, paymentMethods.enableTransferPayment]
-                  .filter(Boolean).length === 1 ? 'checkout-actions--single' :
-                  [paymentMethods.enableCashPayment, paymentMethods.enableQrPayment, paymentMethods.enableTransferPayment]
-                    .filter(Boolean).length === 2 ? 'checkout-actions--two' : 'checkout-actions--three'
+                (() => {
+                  const count = [paymentMethods.enableCashPayment, paymentMethods.enableQrPayment, paymentMethods.enableTransferPayment, paymentMethods.enableFiadoPayment].filter(Boolean).length;
+                  if (count === 1) return 'checkout-actions--single';
+                  if (count === 2) return 'checkout-actions--two';
+                  if (count === 3) return 'checkout-actions--three';
+                  return 'checkout-actions--four';
+                })()
               }`}>
                 {paymentMethods.enableCashPayment && (
                   <button
@@ -810,6 +873,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                     disabled={items.length === 0}
                   >
                     Transferencia
+                  </button>
+                )}
+                {paymentMethods.enableFiadoPayment && (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleStartFiado}
+                    disabled={items.length === 0}
+                  >
+                    Fiado
                   </button>
                 )}
               </div>
@@ -928,6 +1001,56 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                   OK
                 </button>
               </div>
+            </div>
+          )}
+          {step === 'FIADO_SELECT' && (
+            <div className="checkout-step">
+              <p className="checkout-total">Total: <strong>{formatCurrency(total)}</strong></p>
+              {fiadoLoading && (
+                <div className="qr-wait">
+                  <div className="spinner" aria-hidden="true" />
+                  <p>Cargando acreedores...</p>
+                </div>
+              )}
+              {fiadoError && <p className="error-text">{fiadoError}</p>}
+              {!fiadoLoading && !fiadoError && (
+                <>
+                  {acreedores.length === 0 ? (
+                    <p className="error-text">No hay acreedores activos.</p>
+                  ) : (
+                    <div className="acreedores-list">
+                      {acreedores.map((a) => (
+                        <label
+                          key={a.id}
+                          className={`acreedor-item ${selectedAcreedorId === a.id ? 'selected' : ''}`}
+                        >
+                          <input
+                            type="radio"
+                            name="acreedor"
+                            value={a.id}
+                            checked={selectedAcreedorId === a.id}
+                            onChange={() => setSelectedAcreedorId(a.id)}
+                          />
+                          <span>{a.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <div className="checkout-actions">
+                    <button type="button" className="ghost-button" onClick={() => setStep('SELECT_METHOD')}>
+                      Volver
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={handleFiadoConfirm}
+                      disabled={!selectedAcreedorId || isSubmitting}
+                    >
+                      {isSubmitting ? 'Confirmando...' : 'Confirmar'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
           {step === 'TRANSFER_WAIT' && (

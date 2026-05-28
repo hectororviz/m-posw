@@ -197,6 +197,7 @@ export const AdminSettingsPage: React.FC = () => {
     enableCashPayment: true,
     enableQrPayment: true,
     enableTransferPayment: true,
+    enableFiadoPayment: false,
     movementInReasons: [] as string[],
     movementOutReasons: [] as string[],
   });
@@ -335,6 +336,7 @@ export const AdminSettingsPage: React.FC = () => {
         enableCashPayment: settings.enableCashPayment ?? true,
         enableQrPayment: settings.enableQrPayment ?? true,
         enableTransferPayment: settings.enableTransferPayment ?? true,
+        enableFiadoPayment: settings.enableFiadoPayment ?? false,
         movementInReasons: settings.movementInReasons ?? [],
         movementOutReasons: settings.movementOutReasons ?? [],
       });
@@ -708,6 +710,15 @@ export const AdminSettingsPage: React.FC = () => {
                   />
                   <span className="toggle-switch-track" />
                   Transferencia
+                </label>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={form.enableFiadoPayment}
+                    onChange={(e) => setForm({ ...form, enableFiadoPayment: e.target.checked })}
+                  />
+                  <span className="toggle-switch-track" />
+                  Fiado
                 </label>
               </div>
             </div>

@@ -77,7 +77,7 @@ export interface SaleItemInput {
   quantity: number;
 }
 
-export type PaymentMethod = 'CASH' | 'MP_QR' | 'TRANSFER';
+export type PaymentMethod = 'CASH' | 'MP_QR' | 'TRANSFER' | 'FIADO';
 export type SaleStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
 export type PaymentStatus =
   | 'PENDING'
@@ -141,6 +141,7 @@ export interface Setting {
   enableCashPayment?: boolean | null;
   enableQrPayment?: boolean | null;
   enableTransferPayment?: boolean | null;
+  enableFiadoPayment?: boolean | null;
   movementInReasons?: string[];
   movementOutReasons?: string[];
   mpLinked?: boolean | null;
@@ -392,4 +393,36 @@ export interface AccountingSummary {
     income: number;
     expense: number;
   }>;
+}
+
+export interface Acreedor {
+  id: number;
+  nombre: string;
+  telefono?: string | null;
+  notas?: string | null;
+  activo: boolean;
+  createdAt: string;
+}
+
+export interface FiadoVentaItem {
+  id: number;
+  monto: number;
+  createdAt: string;
+  ventaId: string;
+}
+
+export interface PagoAcreedorItem {
+  id: number;
+  monto: number;
+  medioPago: string;
+  fecha: string;
+  notas?: string | null;
+}
+
+export interface AcreedorDeuda {
+  fiadoVentas: FiadoVentaItem[];
+  pagos: PagoAcreedorItem[];
+  totalFiado: number;
+  totalPagado: number;
+  saldoPendiente: number;
 }

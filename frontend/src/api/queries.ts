@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -325,4 +325,33 @@ export const useAvailabilities = (asOf?: string) =>
       );
       return response.data;
     },
+  });
+
+export const useAcreedores = () =>
+  useQuery({
+    queryKey: ['acreedores'],
+    queryFn: async () => {
+      const response = await apiClient.get<Acreedor[]>('/acreedores');
+      return response.data;
+    },
+  });
+
+export const useAcreedor = (id?: number) =>
+  useQuery({
+    queryKey: ['acreedor', id],
+    queryFn: async () => {
+      const response = await apiClient.get<Acreedor>(`/acreedores/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useAcreedorDeuda = (id?: number) =>
+  useQuery({
+    queryKey: ['acreedor-deuda', id],
+    queryFn: async () => {
+      const response = await apiClient.get<AcreedorDeuda>(`/acreedores/${id}/deuda`);
+      return response.data;
+    },
+    enabled: Boolean(id),
   });

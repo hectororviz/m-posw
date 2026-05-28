@@ -54,7 +54,9 @@ let SalesService = SalesService_1 = class SalesService {
                 },
                 include: { items: { include: { product: { include: { category: true } } } } },
             });
+            this.logger.log(`Venta en efectivo creada saleId=${sale.id}, decrementando stock...`);
             await this.decrementStockForSale(sale.id);
+            this.logger.log(`Stock decrementado para saleId=${sale.id}`);
             return sale;
         }
         catch (error) {
@@ -86,12 +88,6 @@ let SalesService = SalesService_1 = class SalesService {
         catch (error) {
             this.handlePrismaError(error, 'crear la venta con QR');
         }
-        const externalStoreId = sale.user.externalStoreId?.trim() ||
-            this.config.get('MP_DEFAULT_EXTERNAL_STORE_ID');
-        const externalPosId = sale.user.externalPosId?.trim() || this.config.get('MP_DEFAULT_EXTERNAL_POS_ID');
-        if (!externalStoreId || !externalPosId) {
-            throw new common_1.BadRequestException('externalStoreId y externalPosId requeridos para Mercado Pago');
-        }
         const externalReference = `sale-${sale.id}`;
         const saleWithReference = await this.prisma.sale.update({
             where: { id: sale.id },
@@ -103,8 +99,6 @@ let SalesService = SalesService_1 = class SalesService {
         });
         try {
             await this.mpService.createOrUpdateOrder({
-                externalStoreId,
-                externalPosId,
                 sale: saleWithReference,
             });
         }
@@ -130,7 +124,7 @@ let SalesService = SalesService_1 = class SalesService {
         return this.prisma.sale.findMany({
             where: createdAtFilter ? { createdAt: { gte: createdAtFilter } } : undefined,
             include: {
-                user: { select: { id: true, name: true, email: true } },
+                user: { select: { id: true, name: true } },
                 items: { include: { product: { include: { category: true } } } },
             },
             orderBy: { createdAt: 'desc' },
@@ -171,7 +165,7 @@ let SalesService = SalesService_1 = class SalesService {
         const sale = await this.prisma.sale.findUnique({
             where: { id: saleId },
             include: {
-                user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
+                user: { select: { id: true, name: true } },
                 items: { include: { product: { include: { category: true } } } },
             },
         });
@@ -274,8 +268,10 @@ let SalesService = SalesService_1 = class SalesService {
             throw new common_1.BadRequestException('La venta todavía no tiene pago aprobado');
         }
         if (sale.status === client_1.SaleStatus.APPROVED) {
+            this.logger.warn(`Venta ${saleId} ya está aprobada, no se decrementa stock`);
             return sale;
         }
+        this.logger.log(`Completando venta ${saleId}, estado actual: ${sale.status}`);
         const updatedSale = await this.prisma.sale.update({
             where: { id: saleId },
             data: {
@@ -285,7 +281,9 @@ let SalesService = SalesService_1 = class SalesService {
             },
             include: { items: { include: { product: { include: { category: true } } } } },
         });
+        this.logger.log(`Venta ${saleId} completada, decrementando stock...`);
         await this.decrementStockForSale(saleId);
+        this.logger.log(`Stock decrementado para venta ${saleId}`);
         return updatedSale;
     }
     async markTicketPrinted(saleId, requester) {
@@ -318,16 +316,7 @@ let SalesService = SalesService_1 = class SalesService {
         if (sale.status === client_1.SaleStatus.APPROVED) {
             throw new common_1.BadRequestException('La venta ya está aprobada');
         }
-        const externalStoreId = sale.user.externalStoreId?.trim() ||
-            this.config.get('MP_DEFAULT_EXTERNAL_STORE_ID');
-        const externalPosId = sale.user.externalPosId?.trim() || this.config.get('MP_DEFAULT_EXTERNAL_POS_ID');
-        if (!externalStoreId || !externalPosId) {
-            throw new common_1.BadRequestException('externalStoreId y externalPosId requeridos para Mercado Pago');
-        }
-        await this.mpService.deleteOrder({
-            externalStoreId,
-            externalPosId,
-        });
+        await this.mpService.deleteOrder();
         const updatedSale = await this.prisma.sale.update({
             where: { id: saleId },
             data: {
@@ -361,12 +350,7 @@ let SalesService = SalesService_1 = class SalesService {
         if (sale.paymentStartedAt > cutoff) {
             return null;
         }
-        const externalStoreId = sale.user.externalStoreId?.trim() ||
-            this.config.get('MP_DEFAULT_EXTERNAL_STORE_ID');
-        const externalPosId = sale.user.externalPosId?.trim() || this.config.get('MP_DEFAULT_EXTERNAL_POS_ID');
-        if (externalPosId && externalStoreId) {
-            await this.mpService.deleteOrder({ externalStoreId, externalPosId });
-        }
+        await this.mpService.deleteOrder();
         return this.prisma.sale.update({
             where: { id: sale.id },
             data: {
@@ -376,7 +360,7 @@ let SalesService = SalesService_1 = class SalesService {
                 expiredAt: new Date(),
             },
             include: {
-                user: { select: { id: true, name: true, externalPosId: true, externalStoreId: true } },
+                user: { select: { id: true, name: true } },
                 items: { include: { product: { include: { category: true } } } },
             },
         });
@@ -388,6 +372,11 @@ let SalesService = SalesService_1 = class SalesService {
         });
         if (products.length !== productIds.length) {
             throw new common_1.BadRequestException('Producto inválido o inactivo');
+        }
+        for (const product of products) {
+            if (product.type === client_1.ProductType.RAW_MATERIAL) {
+                throw new common_1.BadRequestException(`No se puede vender ${product.name}: es una materia prima`);
+            }
         }
         const saleItems = [];
         for (const item of items) {
@@ -410,15 +399,59 @@ let SalesService = SalesService_1 = class SalesService {
         return { items: saleItems, total };
     }
     async decrementStockForSale(saleId) {
+        this.logger.log(`[STOCK] Procesando venta ${saleId}`);
         const saleItems = await this.prisma.saleItem.findMany({
             where: { saleId },
-            select: { productId: true, quantity: true },
+            include: {
+                product: {
+                    include: {
+                        recipeAsComposite: {
+                            include: {
+                                rawMaterial: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
+        if (saleItems.length === 0) {
+            this.logger.warn(`[STOCK] Venta ${saleId} sin items`);
+            return;
+        }
         for (const item of saleItems) {
-            await this.prisma.product.update({
-                where: { id: item.productId },
-                data: { stock: { decrement: item.quantity } },
-            });
+            const product = item.product;
+            if (!product) {
+                this.logger.error(`[STOCK] Item sin producto`);
+                continue;
+            }
+            if (product.type === client_1.ProductType.COMPOSITE) {
+                for (const ingredient of product.recipeAsComposite) {
+                    const qty = Number(ingredient.quantity);
+                    const totalQty = qty * item.quantity;
+                    const current = await this.prisma.product.findUnique({
+                        where: { id: ingredient.rawMaterialId },
+                        select: { stock: true },
+                    });
+                    const currentStock = Number(current?.stock || 0);
+                    const newStock = currentStock - totalQty;
+                    await this.prisma.$executeRaw `
+            UPDATE "Product" SET stock = ${newStock} WHERE id = ${ingredient.rawMaterialId}::uuid
+          `;
+                    this.logger.log(`[STOCK] ${ingredient.rawMaterial.name}: ${currentStock} -> ${newStock}`);
+                }
+            }
+            else {
+                const current = await this.prisma.product.findUnique({
+                    where: { id: item.productId },
+                    select: { stock: true },
+                });
+                const currentStock = Number(current?.stock || 0);
+                const newStock = currentStock - item.quantity;
+                await this.prisma.$executeRaw `
+          UPDATE "Product" SET stock = ${newStock} WHERE id = ${item.productId}::uuid
+        `;
+                this.logger.log(`[STOCK] ${product.name}: ${currentStock} -> ${newStock}`);
+            }
         }
     }
     roundToCurrency(value) {

@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
-import { CreateCashSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
+import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
 import { SalesService } from './sales.service';
 
 @Controller('sales')
@@ -23,6 +23,12 @@ export class SalesController {
   @Roles(Role.ADMIN, Role.USER)
   createQr(@Req() req: { user: { sub: string } }, @Body() dto: CreateQrSaleDto) {
     return this.salesService.createQrSale(req.user.sub, dto);
+  }
+
+  @Post('fiado')
+  @Roles(Role.ADMIN, Role.USER)
+  createFiado(@Req() req: { user: { sub: string } }, @Body() dto: CreateFiadoSaleDto) {
+    return this.salesService.createFiadoSale(req.user.sub, dto);
   }
 
   @Get()

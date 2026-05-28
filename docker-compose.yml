@@ -22,6 +22,7 @@ services:
   backend:
     image: ghcr.io/hectororviz/m-posw-backend:${DOCKER_TAG:-latest}
     # Rollback a versión estable: image: ghcr.io/hectororviz/m-posw-backend:v1.1.0
+    build: ./backend
 
     restart: unless-stopped
 
@@ -52,6 +53,7 @@ services:
   frontend:
     image: ghcr.io/hectororviz/m-posw-frontend:${DOCKER_TAG:-latest}
     # Rollback a versión estable: image: ghcr.io/hectororviz/m-posw-frontend:v1.1.0
+    build: ./frontend
 
     restart: unless-stopped
 

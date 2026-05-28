@@ -9,6 +9,8 @@ import { AdminSalesPage } from './pages/AdminSalesPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminStockPage } from './pages/AdminStockPage';
+import { AdminAcreedoresPage } from './pages/AdminAcreedoresPage';
+import { AdminAcreedorDetailPage } from './pages/AdminAcreedorDetailPage';
 import { TreasurySummaryPage } from './pages/TreasurySummaryPage';
 import { TreasuryJournalEntriesPage } from './pages/TreasuryJournalEntriesPage';
 import { TreasuryLedgerAccountsPage } from './pages/TreasuryLedgerAccountsPage';
@@ -101,6 +103,8 @@ export const App: React.FC = () => {
         <Route path="stats" element={<AdminStatsPage />} />
         <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="stock" element={<AdminStockPage />} />
+        <Route path="acreedores" element={<AdminAcreedoresPage />} />
+        <Route path="acreedores/:id" element={<AdminAcreedorDetailPage />} />
         <Route path="users" element={<Navigate to="/admin/settings" replace />} />
         <Route path="contabilidad" element={<Navigate to="/admin/tesoreria" replace />} />
         <Route path="contabilidad/movimientos" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />

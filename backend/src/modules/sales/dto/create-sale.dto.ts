@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsInt, IsIn, IsNumber, IsString, Min } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsInt, IsNumber, IsString, Min } from 'class-validator';
 
 export class SaleItemInputDto {
   @IsString()
@@ -16,28 +16,19 @@ export class CreateSaleDto {
 }
 
 export class CreateCashSaleDto extends CreateSaleDto {
-  @IsNumber()
-  @Min(0)
-  total: number;
-
-  @IsNumber()
-  @Min(0)
-  cashReceived: number;
-
-  @IsNumber()
-  changeAmount: number;
-
-  @IsString()
-  @IsIn(['CASH'])
-  paymentMethod: 'CASH';
+  @IsNumber() @Min(0) total: number;
+  @IsNumber() @Min(0) cashReceived: number;
+  @IsNumber() changeAmount: number;
+  @IsString() @IsIn(['CASH']) paymentMethod: 'CASH';
 }
 
 export class CreateQrSaleDto extends CreateSaleDto {
-  @IsNumber()
-  @Min(0)
-  total: number;
+  @IsNumber() @Min(0) total: number;
+  @IsString() @IsIn(['MP_QR']) paymentMethod: 'MP_QR';
+}
 
-  @IsString()
-  @IsIn(['MP_QR'])
-  paymentMethod: 'MP_QR';
+export class CreateFiadoSaleDto extends CreateSaleDto {
+  @IsNumber() @Min(0) total: number;
+  @IsString() @IsIn(['FIADO']) paymentMethod: 'FIADO';
+  @IsInt() acreedorId: number;
 }
