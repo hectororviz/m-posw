@@ -529,7 +529,7 @@ export const AdminSettingsPage: React.FC = () => {
         setMpSetupMode('select_store');
       } else {
         setMpSetupMode('setup_required');
-        if (showToast) pushToast('No se encontraron tiendas en tu cuenta', 'info');
+        if (showToast) pushToast('No se encontraron tiendas en tu cuenta', 'error');
       }
     } catch (err) {
       setMpSetupMode('setup_required');
