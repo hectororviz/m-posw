@@ -120,8 +120,8 @@ npx prisma migrate reset --force
 ./limpiar-datos-operativos.sh --yes
 ```
 
-Elimina: ventas, movimientos manuales, cierres de caja, sesiones.
-Conserva: usuarios, configuración, categorías, productos.
+Elimina: ventas, movimientos manuales, cierres de caja, sesiones, fiado_ventas, pagos_acreedor.
+Conserva: usuarios, configuración, categorías, productos, acreedores.
 
 ## Mercado Pago Integration
 
@@ -194,6 +194,64 @@ frontend/src/pages/
 
 **Rutas legacy** (`/admin/contabilidad/*`) redirigen automáticamente a `/admin/tesoreria/*`.
 
+## Acreedores / Fiado Module
+
+Módulo de control de acreedores para ventas fiadas. Permite vender a crédito, registrar acreedores, y hacer seguimiento de deuda con lógica FIFO. Accesible desde `/admin/acreedores` (solo ADMIN). El medio de pago "Fiado" se habilita desde Configuración → Ventas.
+
+### Modelo de datos
+```
+Acreedor ──1:N──> FiadoVenta ──1:1──> Sale
+Acreedor ──1:N──> PagoAcreedor
+```
+- **Acreedor**: nombre, teléfono, notas, activo/inactivo.
+- **FiadoVenta**: ventaId (unique, 1:1 con Sale), acreedorId, monto.
+- **PagoAcreedor**: acreedorId, monto, medioPago (efectivo/transferencia), fecha, notas.
+- `PaymentMethod.FIADO`: medio de pago en la venta.
+- `Setting.enableFiadoPayment`: toggle en Configuración → Ventas.
+
+### Backend
+```
+backend/src/modules/acreedores/
+├── acreedores.module.ts
+├── acreedores.controller.ts    # CRUD + deuda + pagos + resumen (ADMIN)
+├── acreedores.service.ts       # Lógica FIFO, cálculo de saldos y alertas
+└── dto/
+    ├── create-acreedor.dto.ts
+    ├── update-acreedor.dto.ts
+    └── create-pago.dto.ts
+```
+
+**Endpoints:**
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/acreedores` | Lista todos con saldo, alertaDeuda, diasSinPagar |
+| `GET` | `/acreedores/resumen` | `{ deudaTotal, acreedoresConDeuda }` |
+| `GET` | `/acreedores/:id` | Detalle de un acreedor |
+| `POST` | `/acreedores` | Crear acreedor `{ nombre, telefono?, notas? }` |
+| `PATCH` | `/acreedores/:id` | Editar acreedor |
+| `PATCH` | `/acreedores/:id/toggle` | Alternar activo/inactivo |
+| `GET` | `/acreedores/:id/deuda` | FiadoVentas con saldo FIFO, pagos, totales, alerta |
+| `POST` | `/acreedores/:id/pagos` | Registrar pago `{ monto, medioPago, fecha, notas? }` |
+| `POST` | `/sales/fiado` | Crear venta fiada `{ items, total, paymentMethod, acreedorId }` |
+
+**Lógica FIFO:** Los pagos se aplican a las ventas fiadas por orden cronológico (más antigua primero). La primera venta con saldo restante determina `deudaMasAntigua` y `diasSinPagar`. Si `diasSinPagar >= 30`, se activa `alertaDeuda`.
+
+**Fecha de pago:** Se almacena con `Date.UTC(year, month-1, day, 12, 0, 0)` (mediodía UTC) para evitar desplazamiento de fecha por timezone.
+
+### Frontend
+```
+frontend/src/pages/
+├── AdminAcreedoresPage.tsx       # Lista con KPIs, buscador, orden A-Z/$$$, FAB (+)
+└── AdminAcreedorDetailPage.tsx   # Detalle con alerta, ventas fiadas (FIFO), pagos
+```
+
+**Flujo de venta fiada en POS:** CheckoutModal → botón "Fiado" → select desplegable de acreedores activos → confirmar → `POST /sales/fiado`.
+
+### Configuración
+- **Toggle "Fiado"** en AdminSettingsPage → pestaña Ventas → Medios de pago.
+- Por defecto desactivado (`enableFiadoPayment: false`).
+- Sin acreedores activos, el select del POS muestra "No hay acreedores activos".
+
 ## Theme / Dark Mode
 
 Sistema de theming con CSS variables (`data-theme` attribute en `<html>`):
@@ -240,6 +298,7 @@ m-posw/
 │   ├── src/
 │   │   └── modules/
 │   │       ├── accounting/        # Movimientos contables (legacy, redirige a treasury)
+│   │       ├── acreedores/        # Acreedores y ventas fiadas (FIFO)
 │   │       ├── auth/              # Autenticación JWT
 │   │       ├── cash-close/        # Cierres de caja
 │   │       ├── cash-movements/    # Movimientos de caja
