@@ -70,9 +70,13 @@ export class MercadoPagoOauthService {
     };
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+      if (process.env.MP_INTEGRATOR_ID) {
+        headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+      }
       const response = await fetch('https://api.mercadopago.com/oauth/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers,
         body: body.toString(),
       });
 
@@ -174,10 +178,13 @@ export class MercadoPagoOauthService {
 
     const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
 
-    const mpHeaders = {
+    const mpHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
+    if (process.env.MP_INTEGRATOR_ID) {
+      mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+    }
 
     let storeId: string;
 

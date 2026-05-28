@@ -129,9 +129,13 @@ export class MercadoPagoConfigService {
     });
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+      if (process.env.MP_INTEGRATOR_ID) {
+        headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+      }
       const response = await fetch('https://api.mercadopago.com/oauth/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers,
         body: body.toString(),
       });
 

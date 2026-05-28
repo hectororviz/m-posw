@@ -63,9 +63,13 @@ export class PaymentsService {
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (process.env.MP_INTEGRATOR_ID) {
+        headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+      }
       const response = await fetch(url.toString(), {
         method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
         signal: controller.signal,
       });
 

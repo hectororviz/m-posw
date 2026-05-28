@@ -230,6 +230,9 @@ export class MercadoPagoInstoreService {
       const headers: Record<string, string> = {
         Authorization: `Bearer ${token}`,
       };
+      if (process.env.MP_INTEGRATOR_ID) {
+        headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+      }
       if (hasBody) {
         headers['Content-Type'] = 'application/json';
       }

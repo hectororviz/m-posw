@@ -45,9 +45,13 @@ export class MercadoPagoQueryService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (process.env.MP_INTEGRATOR_ID) {
+        headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+      }
       const response = await fetch(url, {
         method,
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
         signal: controller.signal,
       });
       const text = await response.text();
