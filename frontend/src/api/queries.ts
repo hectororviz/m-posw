@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -354,4 +354,13 @@ export const useAcreedorDeuda = (id?: number) =>
       return response.data;
     },
     enabled: Boolean(id),
+  });
+
+export const useAcreedoresResumen = () =>
+  useQuery({
+    queryKey: ['acreedores-resumen'],
+    queryFn: async () => {
+      const response = await apiClient.get<AcreedoresResumen>('/acreedores/resumen');
+      return response.data;
+    },
   });

@@ -8,6 +8,28 @@ import { CreatePagoDto } from './dto/create-pago.dto';
 export class AcreedoresService {
   constructor(private prisma: PrismaService) {}
 
+  async getResumen() {
+    const acreedores = await this.prisma.acreedor.findMany({
+      include: {
+        fiadoVentas: true,
+        pagos: true,
+      },
+    });
+
+    let deudaTotal = 0;
+    let acreedoresConDeuda = 0;
+
+    for (const a of acreedores) {
+      const totalFiado = a.fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
+      const totalPagado = a.pagos.reduce((sum, p) => sum + Number(p.monto), 0);
+      const saldo = totalFiado - totalPagado;
+      deudaTotal += saldo;
+      if (saldo > 0) acreedoresConDeuda++;
+    }
+
+    return { deudaTotal, acreedoresConDeuda };
+  }
+
   findAll() {
     return this.prisma.acreedor.findMany({
       orderBy: { nombre: 'asc' },

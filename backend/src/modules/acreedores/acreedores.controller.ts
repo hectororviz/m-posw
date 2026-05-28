@@ -14,6 +14,11 @@ import { CreatePagoDto } from './dto/create-pago.dto';
 export class AcreedoresController {
   constructor(private readonly acreedoresService: AcreedoresService) {}
 
+  @Get('resumen')
+  getResumen() {
+    return this.acreedoresService.getResumen();
+  }
+
   @Get()
   findAll() {
     return this.acreedoresService.findAll();

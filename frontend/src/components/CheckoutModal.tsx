@@ -1018,22 +1018,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                   {acreedores.length === 0 ? (
                     <p className="error-text">No hay acreedores activos.</p>
                   ) : (
-                    <div className="acreedores-list">
-                      {acreedores.map((a) => (
-                        <label
-                          key={a.id}
-                          className={`acreedor-item ${selectedAcreedorId === a.id ? 'selected' : ''}`}
-                        >
-                          <input
-                            type="radio"
-                            name="acreedor"
-                            value={a.id}
-                            checked={selectedAcreedorId === a.id}
-                            onChange={() => setSelectedAcreedorId(a.id)}
-                          />
-                          <span>{a.nombre}</span>
-                        </label>
-                      ))}
+                    <div className="settings-field">
+                      <label>Acreedor</label>
+                      <select
+                        value={selectedAcreedorId ?? ''}
+                        onChange={(e) => setSelectedAcreedorId(e.target.value ? Number(e.target.value) : null)}
+                      >
+                        <option value="">Seleccionar acreedor...</option>
+                        {acreedores.map((a) => (
+                          <option key={a.id} value={a.id}>{a.nombre}</option>
+                        ))}
+                      </select>
                     </div>
                   )}
                   <div className="checkout-actions">

@@ -426,3 +426,8 @@ export interface AcreedorDeuda {
   totalPagado: number;
   saldoPendiente: number;
 }
+
+export interface AcreedoresResumen {
+  deudaTotal: number;
+  acreedoresConDeuda: number;
+}

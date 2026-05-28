@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedores, useAcreedorDeuda } from '../api/queries';
+import { useAcreedores, useAcreedorDeuda, useAcreedoresResumen } from '../api/queries';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
@@ -20,30 +20,31 @@ const AcreedorSaldo: React.FC<{ acreedorId: number }> = ({ acreedorId }) => {
 
 export const AdminAcreedoresPage: React.FC = () => {
   const { data: acreedores = [], isLoading } = useAcreedores();
+  const { data: resumen } = useAcreedoresResumen();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({ nombre: '', telefono: '', notas: '' });
+  const [form, setForm] = useState({ nombre: '', telefono: '', notas: '', activo: true });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const resetForm = () => {
-    setForm({ nombre: '', telefono: '', notas: '' });
+    setForm({ nombre: '', telefono: '', notas: '', activo: true });
     setEditingId(null);
     setError(null);
   };
 
-  const openCreateModal = () => {
+  const openCreate = () => {
     resetForm();
     setModalOpen(true);
   };
 
-  const openEditModal = (id: number) => {
+  const openEdit = (id: number) => {
     const a = acreedores.find((ac) => ac.id === id);
     if (!a) return;
-    setForm({ nombre: a.nombre, telefono: a.telefono ?? '', notas: a.notas ?? '' });
+    setForm({ nombre: a.nombre, telefono: a.telefono ?? '', notas: a.notas ?? '', activo: a.activo });
     setEditingId(id);
     setError(null);
     setModalOpen(true);
@@ -63,6 +64,10 @@ export const AdminAcreedoresPage: React.FC = () => {
           telefono: form.telefono || undefined,
           notas: form.notas || undefined,
         });
+        const acreedor = acreedores.find((a) => a.id === editingId);
+        if (acreedor && acreedor.activo !== form.activo) {
+          await apiClient.patch(`/acreedores/${editingId}/toggle`);
+        }
         pushToast('Acreedor actualizado', 'success');
       } else {
         await apiClient.post('/acreedores', {
@@ -73,22 +78,13 @@ export const AdminAcreedoresPage: React.FC = () => {
         pushToast('Acreedor creado', 'success');
       }
       await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
+      await queryClient.invalidateQueries({ queryKey: ['acreedores-resumen'] });
       setModalOpen(false);
       resetForm();
     } catch (err) {
       setError(normalizeApiError(err));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleToggle = async (id: number) => {
-    try {
-      await apiClient.patch(`/acreedores/${id}/toggle`);
-      await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
-      pushToast('Estado actualizado', 'success');
-    } catch (err) {
-      pushToast(normalizeApiError(err), 'error');
     }
   };
 
@@ -100,9 +96,21 @@ export const AdminAcreedoresPage: React.FC = () => {
             <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Acreedores</h2>
             <p className="page-header-subtitle">Control de ventas fiadas y pagos de acreedores.</p>
           </div>
-          <button type="button" className="btn-primary" onClick={openCreateModal}>+ Nuevo acreedor</button>
         </div>
       </div>
+
+      {resumen && (
+        <div className="sales-kpis">
+          <div className="sales-kpi-card">
+            <span className="sales-kpi-label">Deuda total</span>
+            <span className="sales-kpi-value">{formatCurrency(resumen.deudaTotal)}</span>
+          </div>
+          <div className="sales-kpi-card">
+            <span className="sales-kpi-label">Acreedores con deuda</span>
+            <span className="sales-kpi-value">{resumen.acreedoresConDeuda}</span>
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
@@ -139,20 +147,23 @@ export const AdminAcreedoresPage: React.FC = () => {
                 </span>
                 <span className="col-action" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => navigate(`/admin/acreedores/${a.id}`)}>Ver</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEditModal(a.id)}>Editar</button>
-                  <button
-                    type="button"
-                    className="btn-ghost btn-sm"
-                    onClick={() => handleToggle(a.id)}
-                  >
-                    {a.activo ? 'Desactivar' : 'Activar'}
-                  </button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(a.id)}>Editar</button>
                 </span>
               </div>
             ))}
           </div>
         </div>
       )}
+
+      <button
+        type="button"
+        className="fab-button-v2"
+        onClick={openCreate}
+        aria-label="Nuevo acreedor"
+        title="Nuevo acreedor"
+      >
+        +
+      </button>
 
       {modalOpen && (
         <div className="modal-backdrop" onClick={() => { setModalOpen(false); resetForm(); }}>
@@ -190,6 +201,19 @@ export const AdminAcreedoresPage: React.FC = () => {
                   placeholder="Notas adicionales"
                 />
               </div>
+              {editingId && (
+                <div className="settings-field">
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={form.activo}
+                      onChange={(e) => setForm({ ...form, activo: e.target.checked })}
+                    />
+                    <span className="toggle-switch-track" />
+                    Activo
+                  </label>
+                </div>
+              )}
               <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => { setModalOpen(false); resetForm(); }}>Cancelar</button>
                 <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
