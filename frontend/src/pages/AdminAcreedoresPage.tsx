@@ -11,13 +11,8 @@ const formatCurrency = (value: number) =>
 
 type SortMode = 'alpha' | 'deuda';
 
-const getAntiguedadLabel = (dias: number | null | undefined, saldo: number) => {
-  if (!dias || saldo <= 0) return '--';
-  return `${dias}d`;
-};
-
-const getAntiguedadColor = (dias: number | null | undefined, saldo: number): string => {
-  if (!dias || saldo <= 0) return '';
+const getAntiguedadColor = (dias: number | null | undefined, saldo: number | undefined): string => {
+  if (dias == null || !saldo) return '';
   if (dias >= 30) return 'var(--color-danger)';
   if (dias >= 15) return 'var(--color-warning, #f59e0b)';
   return 'var(--color-success)';
@@ -37,26 +32,8 @@ export const AdminAcreedoresPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
 
-  const computed = useMemo(() => {
-    return acreedores.map((a) => {
-      const saldo =
-        a.alertaDeuda !== undefined
-          ? 0 // saldo will be shown via separate state, compute from data
-          : 0;
-      return { ...a, __saldo: saldo };
-    });
-  }, [acreedores]);
-
   const filtered = useMemo(() => {
-    let list = computed.map((a) => {
-      const totalFiado = (a as any).fiadoVentas
-        ? (a as any).fiadoVentas.reduce((sum: number, fv: any) => sum + Number(fv.monto), 0)
-        : 0;
-      const totalPagado = (a as any).pagos
-        ? (a as any).pagos.reduce((sum: number, p: any) => sum + Number(p.monto), 0)
-        : 0;
-      return { ...a, __saldo: totalFiado - totalPagado };
-    });
+    let list = [...acreedores];
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -64,12 +41,12 @@ export const AdminAcreedoresPage: React.FC = () => {
     }
 
     if (sortMode === 'deuda') {
-      list.sort((a, b) => (b as any).__saldo - (a as any).__saldo);
+      list.sort((a, b) => (b.saldo ?? 0) - (a.saldo ?? 0));
     } else {
       list.sort((a, b) => a.nombre.localeCompare(b.nombre));
     }
     return list;
-  }, [computed, search, sortMode]);
+  }, [acreedores, search, sortMode]);
 
   const resetForm = () => {
     setForm({ nombre: '', telefono: '', notas: '', activo: true });
@@ -129,14 +106,21 @@ export const AdminAcreedoresPage: React.FC = () => {
     }
   };
 
-  const getSaldoDisplay = (a: Acreedor & { __saldo: number }) => {
-    if (a.__saldo > 0) {
-      if (a.alertaDeuda) {
-        return <span className="error-text" style={{ fontWeight: 600 }}>{formatCurrency(a.__saldo)}</span>;
-      }
-      return <span className="warning-text">{formatCurrency(a.__saldo)}</span>;
+  const getSaldoDisplay = (a: Acreedor) => {
+    const s = a.saldo ?? 0;
+    if (s > 0 && a.alertaDeuda) {
+      return <span className="error-text" style={{ fontWeight: 600 }}>{formatCurrency(s)}</span>;
+    }
+    if (s > 0) {
+      return <span className="warning-text">{formatCurrency(s)}</span>;
     }
     return <span style={{ color: 'var(--color-text-muted)' }}>$0</span>;
+  };
+
+  const getAntiguedadDisplay = (a: Acreedor) => {
+    const s = a.saldo ?? 0;
+    if (s <= 0) return '--';
+    return `${a.diasSinPagar ?? 0}d`;
   };
 
   return (
@@ -220,11 +204,11 @@ export const AdminAcreedoresPage: React.FC = () => {
                   className="col-total"
                   style={{
                     flex: '0 0 90px',
-                    color: getAntiguedadColor(a.diasSinPagar, (a as any).__saldo),
+                    color: getAntiguedadColor(a.diasSinPagar, a.saldo),
                     fontWeight: 500,
                   }}
                 >
-                  {getAntiguedadLabel(a.diasSinPagar, (a as any).__saldo)}
+                  {getAntiguedadDisplay(a)}
                 </span>
                 <span className="col-method" style={{ flex: '0 0 70px' }}>
                   {a.activo ? (

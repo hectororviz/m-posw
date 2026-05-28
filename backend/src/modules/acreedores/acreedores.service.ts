@@ -107,6 +107,8 @@ export class AcreedoresService {
     });
 
     return acreedores.map((a) => {
+      const totalFiado = a.fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
+      const totalPagado = a.pagos.reduce((sum, p) => sum + Number(p.monto), 0);
       const { alertaDeuda, diasSinPagar } = this.calculateFifo(
         a.fiadoVentas as unknown as FiadoVentaRaw[],
         a.pagos as unknown as PagoRaw[],
@@ -120,6 +122,7 @@ export class AcreedoresService {
         createdAt: a.createdAt,
         alertaDeuda,
         diasSinPagar,
+        saldo: totalFiado - totalPagado,
       };
     });
   }

@@ -404,6 +404,7 @@ export interface Acreedor {
   createdAt: string;
   alertaDeuda?: boolean;
   diasSinPagar?: number | null;
+  saldo?: number;
 }
 
 export interface FiadoVentaItem {
