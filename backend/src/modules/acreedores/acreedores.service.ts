@@ -196,12 +196,14 @@ export class AcreedoresService {
       throw new BadRequestException('El monto debe ser mayor a 0');
     }
 
+    const [year, month, day] = dto.fecha.split('-').map(Number);
+
     return this.prisma.pagoAcreedor.create({
       data: {
         acreedorId,
         monto: dto.monto,
         medioPago: dto.medioPago,
-        fecha: new Date(dto.fecha),
+        fecha: new Date(year, month - 1, day),
         notas: dto.notas,
       },
     });
