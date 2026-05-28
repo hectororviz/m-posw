@@ -221,6 +221,7 @@ export const AdminSettingsPage: React.FC = () => {
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [selectedPosId, setSelectedPosId] = useState('');
   const [mpSelectLoading, setMpSelectLoading] = useState(false);
+  const [mpDetectLoading, setMpDetectLoading] = useState(false);
 
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -508,6 +509,41 @@ export const AdminSettingsPage: React.FC = () => {
   const handleCreateNewStore = () => {
     setMpSetupMode('setup_required');
   };
+
+  const handleDetectStores = async (showToast = false) => {
+    setMpDetectLoading(true);
+    try {
+      const response = await apiClient.get<{
+        status: 'already_configured' | 'no_stores' | 'found_stores';
+        stores?: DetectedStore[];
+      }>('/mp-oauth/detect-stores');
+
+      const detection = response.data;
+
+      if (detection.status === 'already_configured') {
+        await refetchMpStatus();
+        setMpSetupMode(null);
+        if (showToast) pushToast('Punto de venta ya configurado', 'success');
+      } else if (detection.status === 'found_stores' && detection.stores && detection.stores.length > 0) {
+        setDetectedStores(detection.stores);
+        setMpSetupMode('select_store');
+      } else {
+        setMpSetupMode('setup_required');
+        if (showToast) pushToast('No se encontraron tiendas en tu cuenta', 'info');
+      }
+    } catch (err) {
+      setMpSetupMode('setup_required');
+      if (showToast) pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setMpDetectLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mpStatus?.linked && !mpStatus?.mpPosId && mpSetupMode === null) {
+      handleDetectStores();
+    }
+  }, [mpStatus?.linked, mpStatus?.mpPosId, mpSetupMode]);
 
   const handleOpenAbout = async () => {
     try {
@@ -882,6 +918,14 @@ export const AdminSettingsPage: React.FC = () => {
                       <button
                         type="button"
                         className="btn-secondary"
+                        onClick={() => handleDetectStores(true)}
+                        disabled={mpDetectLoading}
+                      >
+                        {mpDetectLoading ? 'Buscando...' : 'Buscar tiendas existentes'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost"
                         onClick={handleDisconnectMp}
                         disabled={mpDisconnecting}
                       >
