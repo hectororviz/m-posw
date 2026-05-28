@@ -418,7 +418,8 @@ export class MercadoPagoOauthService {
   async setupPos(
     storeName: string,
     posName: string,
-    streetAddress: string,
+    streetName: string,
+    streetNumber: string,
     cityName: string,
     stateName: string,
     zipCode: string,
@@ -452,11 +453,11 @@ export class MercadoPagoOauthService {
         body: JSON.stringify({
           name: storeName,
           location: {
-            address_line: streetAddress,
+            street_name: streetName,
+            street_number: streetNumber,
             city_name: cityName,
             state_name: stateName,
             zip_code: zipCode,
-            country_id: 'AR',
             latitude: -34.603722,
             longitude: -58.381592,
           },

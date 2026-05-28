@@ -20,6 +20,155 @@ interface DetectedStore {
   pos: Array<{ id: string; name: string; qrUrl: string }>;
 }
 
+const MP_VALID_CITIES = [
+  '12 De Octubre',
+  '25 de Mayo',
+  '9 de Julio',
+  'Adolfo Alsina',
+  'Adolfo Gonzales Chaves',
+  'Alberti',
+  'Arrecifes',
+  'Avellaneda',
+  'Ayacucho',
+  'Azul',
+  'Bahía Blanca',
+  'Balcarce',
+  'Baradero',
+  'Beccar',
+  'Benito Juárez',
+  'Berazategui',
+  'Berisso',
+  'Bolívar',
+  'Boulogne',
+  'Bragado',
+  'Brandsen',
+  'Campana',
+  'Capitán Sarmiento',
+  'Cariló',
+  'Carlos Casares',
+  'Carlos Tejedor',
+  'Carmen de Areco',
+  'Caseros',
+  'Castelar',
+  'Castelli',
+  'Cañuelas',
+  'Chacabuco',
+  'Chascomús',
+  'Chivilcoy',
+  'Colón',
+  'Coronel Dorrego',
+  'Coronel Pringles',
+  'Coronel Rosales',
+  'Coronel Suárez',
+  'Daireaux',
+  'Del Viso',
+  'Dolores',
+  'Don Torcuato',
+  'Ensenada',
+  'Escobar',
+  'Ezeiza',
+  'Florencio Varela',
+  'Florentino Ameghino',
+  'General Alvarado',
+  'General Alvear',
+  'General Arenales',
+  'General Belgrano',
+  'General Guido',
+  'General La Madrid',
+  'General Las Heras',
+  'General Lavalle',
+  'General Madariaga',
+  'General Paz',
+  'General Pinto',
+  'General Pueyrredón',
+  'General Rodríguez',
+  'General San Martín',
+  'General Viamonte',
+  'General Villegas',
+  'Guaminí',
+  'Hipólito Yrigoyen',
+  'Hurlingham',
+  'Ituzaingó',
+  'José C. Paz',
+  'Junín',
+  'La Matanza',
+  'La Plata',
+  'Lanús',
+  'Laprida',
+  'Las Flores',
+  'Leandro N. Alem',
+  'Lincoln',
+  'Lobería',
+  'Lobos',
+  'Lomas de Zamora',
+  'Luján',
+  'Magdalena',
+  'Maipú',
+  'Malvinas Argentinas',
+  'Mar de Ajo',
+  'Mar del Plata',
+  'Mar del Tuyu',
+  'Marcos Paz',
+  'Mercedes',
+  'Merlo',
+  'Miramar',
+  'Monte',
+  'Monte Hermoso',
+  'Moreno',
+  'Morón',
+  'Navarro',
+  'Necochea',
+  'Olavarría',
+  'Patagones',
+  'Pehuajó',
+  'Pellegrini',
+  'Pergamino',
+  'Pila',
+  'Pilar',
+  'Pinamar',
+  'Presidente Perón',
+  'Puán',
+  'Punta Indio',
+  'Quilmes',
+  'Ramallo',
+  'Ranchos',
+  'Rauch',
+  'Remedios De Escalada',
+  'Rivadavia',
+  'Rojas',
+  'Roque Pérez',
+  'Saavedra',
+  'Saladillo',
+  'Salliqueló',
+  'Salto',
+  'San Andrés de Giles',
+  'San Antonio de Areco',
+  'San Cayetano',
+  'San Clemente',
+  'San Fernando',
+  'San Isidro',
+  'San Miguel',
+  'San Nicolás',
+  'San Pedro',
+  'San Vicente',
+  'Suipacha',
+  'Tandil',
+  'Tapalqué',
+  'Tigre',
+  'Tordillo',
+  'Tornquist',
+  'Trenque Lauquen',
+  'Tres Arroyos',
+  'Tres Lomas',
+  'Tres de febrero',
+  'Vicente López',
+  'Villa Adelina',
+  'Villa Gesell',
+  'Villarino',
+  'Wilde',
+  'Zárate',
+];
+
 const TABS: { id: TabId; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'ventas', label: 'Ventas' },
@@ -62,8 +211,9 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpSetupLoading, setMpSetupLoading] = useState(false);
   const [mpStoreNameInput, setMpStoreNameInput] = useState('');
   const [mpPosNameInput, setMpPosNameInput] = useState('');
-  const [mpStreetAddress, setMpStreetAddress] = useState('');
-  const [mpCityName, setMpCityName] = useState('');
+  const [mpStreetName, setMpStreetName] = useState('');
+  const [mpStreetNumber, setMpStreetNumber] = useState('');
+  const [mpCityName, setMpCityName] = useState('Mar del Plata');
   const [mpStateName, setMpStateName] = useState('');
   const [mpZipCode, setMpZipCode] = useState('');
   const [mpSetupMode, setMpSetupMode] = useState<MpSetupMode>(null);
@@ -299,7 +449,7 @@ export const AdminSettingsPage: React.FC = () => {
   };
 
   const handleSetupPos = async () => {
-    if (!mpStoreNameInput.trim() || !mpPosNameInput.trim() || !mpStreetAddress.trim() || !mpCityName.trim() || !mpStateName.trim() || !mpZipCode.trim()) {
+    if (!mpStoreNameInput.trim() || !mpPosNameInput.trim() || !mpStreetName.trim() || !mpStreetNumber.trim() || !mpCityName.trim() || !mpStateName.trim() || !mpZipCode.trim()) {
       pushToast('Completa todos los campos para configurar el QR', 'error');
       return;
     }
@@ -308,7 +458,8 @@ export const AdminSettingsPage: React.FC = () => {
       await apiClient.post('/mp-oauth/setup-pos', {
         storeName: mpStoreNameInput.trim(),
         posName: mpPosNameInput.trim(),
-        streetAddress: mpStreetAddress.trim(),
+        streetName: mpStreetName.trim(),
+        streetNumber: mpStreetNumber.trim(),
         cityName: mpCityName.trim(),
         stateName: mpStateName.trim(),
         zipCode: mpZipCode.trim(),
@@ -667,24 +818,36 @@ export const AdminSettingsPage: React.FC = () => {
                         />
                       </div>
                       <div className="settings-field">
-                        <label htmlFor="mp-street-address">Direccion</label>
+                        <label htmlFor="mp-street-name">Calle</label>
                         <input
-                          id="mp-street-address"
+                          id="mp-street-name"
                           type="text"
-                          value={mpStreetAddress}
-                          onChange={(e) => setMpStreetAddress(e.target.value)}
-                          placeholder="Ej: Av. Corrientes 1234"
+                          value={mpStreetName}
+                          onChange={(e) => setMpStreetName(e.target.value)}
+                          placeholder="Ej: Av. Corrientes"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-street-number">Numero</label>
+                        <input
+                          id="mp-street-number"
+                          type="text"
+                          value={mpStreetNumber}
+                          onChange={(e) => setMpStreetNumber(e.target.value)}
+                          placeholder="Ej: 1234"
                         />
                       </div>
                       <div className="settings-field">
                         <label htmlFor="mp-city-name">Ciudad</label>
-                        <input
+                        <select
                           id="mp-city-name"
-                          type="text"
                           value={mpCityName}
                           onChange={(e) => setMpCityName(e.target.value)}
-                          placeholder="Ej: Buenos Aires"
-                        />
+                        >
+                          {MP_VALID_CITIES.map((city) => (
+                            <option key={city} value={city}>{city}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="settings-field">
                         <label htmlFor="mp-state-name">Provincia</label>
@@ -693,7 +856,7 @@ export const AdminSettingsPage: React.FC = () => {
                           type="text"
                           value={mpStateName}
                           onChange={(e) => setMpStateName(e.target.value)}
-                          placeholder="Ej: CABA"
+                          placeholder="Ej: Buenos Aires"
                         />
                       </div>
                       <div className="settings-field">

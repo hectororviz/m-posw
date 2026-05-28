@@ -42,11 +42,12 @@ export class MercadoPagoOauthController {
   }
 
   @Post('setup-pos')
-  setupPos(@Body() body: { storeName: string; posName: string; streetAddress: string; cityName: string; stateName: string; zipCode: string }) {
+  setupPos(@Body() body: { storeName: string; posName: string; streetName: string; streetNumber: string; cityName: string; stateName: string; zipCode: string }) {
     return this.mpOauthService.setupPos(
       body.storeName,
       body.posName,
-      body.streetAddress,
+      body.streetName,
+      body.streetNumber,
       body.cityName,
       body.stateName,
       body.zipCode,
