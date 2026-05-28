@@ -42,7 +42,23 @@ export class MercadoPagoOauthService {
     return { url };
   }
 
-  async exchangeToken(code: string): Promise<{ ok: boolean }> {
+  async exchangeToken(code: string): Promise<{
+    ok: boolean;
+    detection: {
+      status: 'already_configured' | 'no_stores' | 'found_stores';
+      stores?: Array<{
+        id: string;
+        name: string;
+        address: string;
+        pos: Array<{ id: string; name: string; qrUrl: string }>;
+      }>;
+      storeId?: string;
+      posId?: string;
+      storeName?: string;
+      posName?: string;
+      qrUrl?: string;
+    };
+  }> {
     const clientId = this.config.get<string>('MP_CLIENT_ID');
     const clientSecret = this.config.get<string>('MP_CLIENT_SECRET');
     const redirectUri = this.config.get<string>('MP_OAUTH_REDIRECT_URI');
@@ -124,7 +140,9 @@ export class MercadoPagoOauthService {
 
     this.logger.log('MP OAuth token guardado correctamente en la BD');
 
-    return { ok: true };
+    const detection = await this.detectStoresInternal();
+
+    return { ok: true, detection };
   }
 
   async getStatus(): Promise<{ linked: boolean; expiresAt: Date | null; mpPosId: string | null; mpQrData: string | null }> {
@@ -165,7 +183,246 @@ export class MercadoPagoOauthService {
     return { ok: true };
   }
 
-  async setupPos(storeName: string, posName: string): Promise<{ ok: boolean; qrUrl: string }> {
+  async detectStores(): Promise<{
+    status: 'already_configured' | 'no_stores' | 'found_stores';
+    stores?: Array<{
+      id: string;
+      name: string;
+      address: string;
+      pos: Array<{ id: string; name: string; qrUrl: string }>;
+    }>;
+    storeId?: string;
+    posId?: string;
+    storeName?: string;
+    posName?: string;
+    qrUrl?: string;
+  }> {
+    return this.detectStoresInternal();
+  }
+
+  private async detectStoresInternal(): Promise<{
+    status: 'already_configured' | 'no_stores' | 'found_stores';
+    stores?: Array<{
+      id: string;
+      name: string;
+      address: string;
+      pos: Array<{ id: string; name: string; qrUrl: string }>;
+    }>;
+    storeId?: string;
+    posId?: string;
+    storeName?: string;
+    posName?: string;
+    qrUrl?: string;
+  }> {
+    const setting = await this.prisma.setting.findUnique({
+      where: { id: DEFAULT_SETTING_ID },
+      select: { mpStoreId: true, mpPosId: true, mpStoreName: true, mpPosName: true, mpQrData: true },
+    });
+
+    if (setting?.mpStoreId && setting?.mpPosId) {
+      return {
+        status: 'already_configured',
+        storeId: setting.mpStoreId,
+        posId: setting.mpPosId,
+        storeName: setting.mpStoreName ?? undefined,
+        posName: setting.mpPosName ?? undefined,
+        qrUrl: setting.mpQrData ?? undefined,
+      };
+    }
+
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) {
+      return { status: 'no_stores' };
+    }
+
+    const collectorId = await this.mpConfig.getCollectorId();
+    if (!collectorId) {
+      return { status: 'no_stores' };
+    }
+
+    const mpHeaders: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+    if (process.env.MP_INTEGRATOR_ID) {
+      mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+    }
+
+    let storesData: Array<{
+      id: string;
+      name: string;
+      location?: { address_line?: string };
+    }> = [];
+
+    try {
+      const storesRes = await fetch(
+        `https://api.mercadopago.com/users/${collectorId}/stores?limit=50`,
+        { method: 'GET', headers: mpHeaders },
+      );
+
+      if (!storesRes.ok) {
+        if (storesRes.status === 404) {
+          return { status: 'no_stores' };
+        }
+        this.logger.error(`MP detect stores failed: HTTP ${storesRes.status}`);
+        return { status: 'no_stores' };
+      }
+
+      const response = await storesRes.json();
+      storesData = (response as { results?: typeof storesData })?.results ?? [];
+      if (!Array.isArray(storesData) && Array.isArray(response)) {
+        storesData = response as typeof storesData;
+      }
+    } catch (error) {
+      this.logger.error(`MP detect stores network error: ${error}`);
+      return { status: 'no_stores' };
+    }
+
+    if (!storesData || storesData.length === 0) {
+      return { status: 'no_stores' };
+    }
+
+    const stores: Array<{
+      id: string;
+      name: string;
+      address: string;
+      pos: Array<{ id: string; name: string; qrUrl: string }>;
+    }> = [];
+
+    for (const store of storesData) {
+      let posList: Array<{ id: string; name: string; qr?: { image?: string } }> = [];
+
+      try {
+        const posRes = await fetch(
+          `https://api.mercadopago.com/pos?store_id=${store.id}`,
+          { method: 'GET', headers: mpHeaders },
+        );
+
+        if (posRes.ok) {
+          const posResponse = await posRes.json();
+          posList = (posResponse as { results?: typeof posList })?.results ?? [];
+          if (!Array.isArray(posList) && Array.isArray(posResponse)) {
+            posList = posResponse as typeof posList;
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`MP detect stores - failed to fetch POS for store ${store.id}: ${error}`);
+      }
+
+      stores.push({
+        id: store.id,
+        name: store.name,
+        address: store.location?.address_line ?? '',
+        pos: posList.map((p) => ({
+          id: p.id,
+          name: p.name,
+          qrUrl: p.qr?.image ?? '',
+        })),
+      });
+    }
+
+    return { status: 'found_stores', stores };
+  }
+
+  async selectStore(
+    storeId: string,
+    posId: string,
+  ): Promise<{ ok: boolean; qrUrl: string }> {
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) {
+      throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    const collectorId = await this.mpConfig.getCollectorId();
+    if (!collectorId) {
+      throw new HttpException('Sin collectorId de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    const mpHeaders: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+    if (process.env.MP_INTEGRATOR_ID) {
+      mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+    }
+
+    let storeName: string;
+
+    try {
+      const storeRes = await fetch(
+        `https://api.mercadopago.com/users/${collectorId}/stores/${storeId}`,
+        { method: 'GET', headers: mpHeaders },
+      );
+
+      if (!storeRes.ok) {
+        this.logger.error(`MP select store - fetch store failed: HTTP ${storeRes.status}`);
+        throw new HttpException('Error al obtener la tienda de MercadoPago', HttpStatus.BAD_REQUEST);
+      }
+
+      const storeData = (await storeRes.json()) as { name?: string };
+      storeName = storeData.name ?? '';
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`MP select store - store network error: ${error}`);
+      throw new HttpException('Error de red al obtener la tienda de MP', HttpStatus.BAD_GATEWAY);
+    }
+
+    let posName: string;
+    let qrData: string;
+
+    try {
+      const posRes = await fetch(
+        `https://api.mercadopago.com/pos/${posId}`,
+        { method: 'GET', headers: mpHeaders },
+      );
+
+      if (!posRes.ok) {
+        this.logger.error(`MP select store - fetch pos failed: HTTP ${posRes.status}`);
+        throw new HttpException('Error al obtener el POS de MercadoPago', HttpStatus.BAD_REQUEST);
+      }
+
+      const posData = (await posRes.json()) as { name?: string; qr?: { image?: string } };
+      posName = posData.name ?? '';
+      qrData = posData.qr?.image ?? '';
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error(`MP select store - pos network error: ${error}`);
+      throw new HttpException('Error de red al obtener el POS de MP', HttpStatus.BAD_GATEWAY);
+    }
+
+    await this.prisma.setting.upsert({
+      where: { id: DEFAULT_SETTING_ID },
+      create: {
+        id: DEFAULT_SETTING_ID,
+        storeName: 'MiBPS Demo',
+        mpStoreId: storeId,
+        mpPosId: posId,
+        mpStoreName: storeName,
+        mpPosName: posName,
+        mpQrData: qrData,
+      },
+      update: {
+        mpStoreId: storeId,
+        mpPosId: posId,
+        mpStoreName: storeName,
+        mpPosName: posName,
+        mpQrData: qrData,
+      },
+    });
+
+    this.logger.log(`MP store/pos seleccionados: storeId=${storeId}, posId=${posId}`);
+
+    return { ok: true, qrUrl: qrData };
+  }
+
+  async setupPos(
+    storeName: string,
+    posName: string,
+    streetAddress: string,
+    cityName: string,
+    stateName: string,
+    zipCode: string,
+  ): Promise<{ ok: boolean; qrUrl: string }> {
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
       throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -195,11 +452,13 @@ export class MercadoPagoOauthService {
         body: JSON.stringify({
           name: storeName,
           location: {
-            street_name: '',
-            street_number: '',
-            city_name: '',
-            state_name: '',
-            country: 'AR',
+            address_line: streetAddress,
+            city_name: cityName,
+            state_name: stateName,
+            zip_code: zipCode,
+            country_id: 'AR',
+            latitude: -34.603722,
+            longitude: -58.381592,
           },
         }),
       });

@@ -11,6 +11,15 @@ import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
 type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'usuarios' | 'sistema';
 
+type MpSetupMode = 'setup_required' | 'select_store' | null;
+
+interface DetectedStore {
+  id: string;
+  name: string;
+  address: string;
+  pos: Array<{ id: string; name: string; qrUrl: string }>;
+}
+
 const TABS: { id: TabId; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'ventas', label: 'Ventas' },
@@ -53,6 +62,15 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpSetupLoading, setMpSetupLoading] = useState(false);
   const [mpStoreNameInput, setMpStoreNameInput] = useState('');
   const [mpPosNameInput, setMpPosNameInput] = useState('');
+  const [mpStreetAddress, setMpStreetAddress] = useState('');
+  const [mpCityName, setMpCityName] = useState('');
+  const [mpStateName, setMpStateName] = useState('');
+  const [mpZipCode, setMpZipCode] = useState('');
+  const [mpSetupMode, setMpSetupMode] = useState<MpSetupMode>(null);
+  const [detectedStores, setDetectedStores] = useState<DetectedStore[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState('');
+  const [selectedPosId, setSelectedPosId] = useState('');
+  const [mpSelectLoading, setMpSelectLoading] = useState(false);
 
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -128,8 +146,30 @@ export const AdminSettingsPage: React.FC = () => {
       pushToast('Mercado Pago conectado correctamente', 'success');
       refetchMpStatus();
       setSearchParams({}, { replace: true });
+      setMpSetupMode(null);
     } else if (mpParam === 'error') {
       pushToast('Error al conectar Mercado Pago, intenta de nuevo', 'error');
+      setSearchParams({}, { replace: true });
+      setMpSetupMode(null);
+    } else if (mpParam === 'setup_required') {
+      setMpSetupMode('setup_required');
+      refetchMpStatus();
+      setSearchParams({}, { replace: true });
+    } else if (mpParam === 'select_store') {
+      const stored = sessionStorage.getItem('mp_detected_stores');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as DetectedStore[];
+          setDetectedStores(parsed);
+          setMpSetupMode('select_store');
+          sessionStorage.removeItem('mp_detected_stores');
+        } catch {
+          setMpSetupMode('setup_required');
+        }
+      } else {
+        setMpSetupMode('setup_required');
+      }
+      refetchMpStatus();
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, pushToast, refetchMpStatus, setSearchParams]);
@@ -259,8 +299,8 @@ export const AdminSettingsPage: React.FC = () => {
   };
 
   const handleSetupPos = async () => {
-    if (!mpStoreNameInput.trim() || !mpPosNameInput.trim()) {
-      pushToast('Completa ambos campos para configurar el QR', 'error');
+    if (!mpStoreNameInput.trim() || !mpPosNameInput.trim() || !mpStreetAddress.trim() || !mpCityName.trim() || !mpStateName.trim() || !mpZipCode.trim()) {
+      pushToast('Completa todos los campos para configurar el QR', 'error');
       return;
     }
     setMpSetupLoading(true);
@@ -268,6 +308,10 @@ export const AdminSettingsPage: React.FC = () => {
       await apiClient.post('/mp-oauth/setup-pos', {
         storeName: mpStoreNameInput.trim(),
         posName: mpPosNameInput.trim(),
+        streetAddress: mpStreetAddress.trim(),
+        cityName: mpCityName.trim(),
+        stateName: mpStateName.trim(),
+        zipCode: mpZipCode.trim(),
       });
       await refetchMpStatus();
       pushToast('Punto de venta configurado correctamente', 'success');
@@ -282,10 +326,36 @@ export const AdminSettingsPage: React.FC = () => {
     try {
       await apiClient.delete('/mp-oauth/setup-pos');
       await refetchMpStatus();
+      setMpSetupMode('setup_required');
       pushToast('Configuracion de POS eliminada. Podes volver a configurarlo.', 'success');
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
     }
+  };
+
+  const handleSelectStore = async () => {
+    if (!selectedStoreId || !selectedPosId) {
+      pushToast('Selecciona una tienda y un punto de venta', 'error');
+      return;
+    }
+    setMpSelectLoading(true);
+    try {
+      await apiClient.post('/mp-oauth/select-store', {
+        storeId: selectedStoreId,
+        posId: selectedPosId,
+      });
+      await refetchMpStatus();
+      setMpSetupMode(null);
+      pushToast('Punto de venta configurado correctamente', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setMpSelectLoading(false);
+    }
+  };
+
+  const handleCreateNewStore = () => {
+    setMpSetupMode('setup_required');
   };
 
   const handleOpenAbout = async () => {
@@ -487,52 +557,176 @@ export const AdminSettingsPage: React.FC = () => {
                   </button>
                 </>
               ) : !mpStatus?.mpPosId ? (
-                <>
-                  <div className="mp-status-row">
-                    <span className="mp-status-label">Estado</span>
-                    <span className="badge badge-warning">Pendiente configurar POS</span>
-                  </div>
-                  <div className="mp-pos-form">
-                    <div className="settings-field">
-                      <label htmlFor="mp-store-name-input">Nombre de la tienda</label>
-                      <input
-                        id="mp-store-name-input"
-                        type="text"
-                        value={mpStoreNameInput}
-                        onChange={(e) => setMpStoreNameInput(e.target.value)}
-                        placeholder="Ej: Tienda Principal"
-                      />
+                mpSetupMode === 'select_store' && detectedStores.length > 0 ? (
+                  <>
+                    <div className="mp-status-row">
+                      <span className="mp-status-label">Estado</span>
+                      <span className="badge badge-warning">Pendiente seleccionar tienda</span>
                     </div>
-                    <div className="settings-field">
-                      <label htmlFor="mp-pos-name-input">Nombre del punto de venta</label>
-                      <input
-                        id="mp-pos-name-input"
-                        type="text"
-                        value={mpPosNameInput}
-                        onChange={(e) => setMpPosNameInput(e.target.value)}
-                        placeholder="Ej: Caja 1"
-                      />
+                    <p className="mp-status-section-msg">
+                      Encontramos tiendas existentes en tu cuenta de Mercado Pago
+                    </p>
+                    <div className="mp-stores-list">
+                      {detectedStores.map((store) => (
+                        <div key={store.id} className="mp-store-group">
+                          <h4 className="mp-store-name">{store.name}</h4>
+                          {store.address && (
+                            <p className="mp-store-address">{store.address}</p>
+                          )}
+                          {store.pos.length === 0 ? (
+                            <p className="mp-no-pos-msg">Sin puntos de venta</p>
+                          ) : (
+                            <div className="mp-pos-list">
+                              {store.pos.map((p) => {
+                                const isSelected =
+                                  selectedStoreId === store.id && selectedPosId === p.id;
+                                return (
+                                  <label
+                                    key={p.id}
+                                    className={`mp-pos-option ${isSelected ? 'mp-pos-option--selected' : ''}`}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="mp-pos-selection"
+                                      value={p.id}
+                                      checked={isSelected}
+                                      onChange={() => {
+                                        setSelectedStoreId(store.id);
+                                        setSelectedPosId(p.id);
+                                      }}
+                                    />
+                                    <span className="mp-pos-option-name">{p.name}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                  <div className="mp-actions">
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      onClick={handleSetupPos}
-                      disabled={mpSetupLoading}
-                    >
-                      {mpSetupLoading ? 'Configurando...' : 'Configurar QR'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={handleDisconnectMp}
-                      disabled={mpDisconnecting}
-                    >
-                      {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
-                    </button>
-                  </div>
-                </>
+                    <div className="mp-actions">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={handleSelectStore}
+                        disabled={mpSelectLoading || !selectedPosId}
+                      >
+                        {mpSelectLoading ? 'Guardando...' : 'Usar seleccionado'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={handleCreateNewStore}
+                      >
+                        Crear nueva tienda
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={handleDisconnectMp}
+                        disabled={mpDisconnecting}
+                      >
+                        {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mp-status-row">
+                      <span className="mp-status-label">Estado</span>
+                      <span className="badge badge-warning">Pendiente configurar POS</span>
+                    </div>
+                    {mpSetupMode === 'setup_required' ? (
+                      <p className="mp-status-section-msg">
+                        No se encontraron tiendas existentes en tu cuenta
+                      </p>
+                    ) : (
+                      <p className="mp-status-section-msg">
+                        Configura el punto de venta para aceptar pagos con QR
+                      </p>
+                    )}
+                    <div className="mp-pos-form">
+                      <div className="settings-field">
+                        <label htmlFor="mp-store-name-input">Nombre de la tienda</label>
+                        <input
+                          id="mp-store-name-input"
+                          type="text"
+                          value={mpStoreNameInput}
+                          onChange={(e) => setMpStoreNameInput(e.target.value)}
+                          placeholder="Ej: Tienda Principal"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-pos-name-input">Nombre del punto de venta</label>
+                        <input
+                          id="mp-pos-name-input"
+                          type="text"
+                          value={mpPosNameInput}
+                          onChange={(e) => setMpPosNameInput(e.target.value)}
+                          placeholder="Ej: Caja 1"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-street-address">Direccion</label>
+                        <input
+                          id="mp-street-address"
+                          type="text"
+                          value={mpStreetAddress}
+                          onChange={(e) => setMpStreetAddress(e.target.value)}
+                          placeholder="Ej: Av. Corrientes 1234"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-city-name">Ciudad</label>
+                        <input
+                          id="mp-city-name"
+                          type="text"
+                          value={mpCityName}
+                          onChange={(e) => setMpCityName(e.target.value)}
+                          placeholder="Ej: Buenos Aires"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-state-name">Provincia</label>
+                        <input
+                          id="mp-state-name"
+                          type="text"
+                          value={mpStateName}
+                          onChange={(e) => setMpStateName(e.target.value)}
+                          placeholder="Ej: CABA"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-zip-code">Codigo Postal</label>
+                        <input
+                          id="mp-zip-code"
+                          type="text"
+                          value={mpZipCode}
+                          onChange={(e) => setMpZipCode(e.target.value)}
+                          placeholder="Ej: 1043"
+                        />
+                      </div>
+                    </div>
+                    <div className="mp-actions">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={handleSetupPos}
+                        disabled={mpSetupLoading}
+                      >
+                        {mpSetupLoading ? 'Configurando...' : 'Crear tienda y punto de venta'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={handleDisconnectMp}
+                        disabled={mpDisconnecting}
+                      >
+                        {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
+                      </button>
+                    </div>
+                  </>
+                )
               ) : (
                 <>
                   <div className="mp-status-row">

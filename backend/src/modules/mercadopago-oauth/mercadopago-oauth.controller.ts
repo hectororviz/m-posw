@@ -31,9 +31,26 @@ export class MercadoPagoOauthController {
     return this.mpOauthService.disconnect();
   }
 
+  @Get('detect-stores')
+  detectStores() {
+    return this.mpOauthService.detectStores();
+  }
+
+  @Post('select-store')
+  selectStore(@Body() body: { storeId: string; posId: string }) {
+    return this.mpOauthService.selectStore(body.storeId, body.posId);
+  }
+
   @Post('setup-pos')
-  setupPos(@Body() body: { storeName: string; posName: string }) {
-    return this.mpOauthService.setupPos(body.storeName, body.posName);
+  setupPos(@Body() body: { storeName: string; posName: string; streetAddress: string; cityName: string; stateName: string; zipCode: string }) {
+    return this.mpOauthService.setupPos(
+      body.storeName,
+      body.posName,
+      body.streetAddress,
+      body.cityName,
+      body.stateName,
+      body.zipCode,
+    );
   }
 
   @Get('qr')
