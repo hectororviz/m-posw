@@ -335,4 +335,4 @@ cd backend && npx prisma migrate reset --force
 
 MIT
 
-Programa confeccionado íntegramente con IA (Codex)
+Programa confeccionado íntegramente con IA
