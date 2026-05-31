@@ -431,8 +431,8 @@ export class MercadoPagoOauthService {
             city_name: cityName,
             state_name: stateName,
             zip_code: zipCode,
-            latitude: latitude ?? -34.603722,
-            longitude: longitude ?? -58.381592,
+            ...(latitude !== undefined && { latitude }),
+            ...(longitude !== undefined && { longitude }),
           },
         }),
       });

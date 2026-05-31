@@ -454,7 +454,7 @@ export const AdminSettingsPage: React.FC = () => {
   };
 
   const handleSetupPos = async () => {
-    if (!mpStoreNameInput.trim() || !mpPosNameInput.trim() || !mpStreetName.trim() || !mpStreetNumber.trim() || !mpCityName.trim() || !mpStateName.trim() || !mpZipCode.trim()) {
+    if (!mpStoreNameInput.trim() || !mpPosNameInput.trim() || !mpStreetName.trim() || !mpStreetNumber.trim() || !mpCityName.trim() || !mpStateName.trim() || !mpZipCode.trim() || !mpLatitude.trim() || !mpLongitude.trim()) {
       pushToast('Completa todos los campos para configurar el QR', 'error');
       return;
     }
@@ -924,7 +924,7 @@ export const AdminSettingsPage: React.FC = () => {
                         />
                       </div>
                       <div className="settings-field">
-                        <label htmlFor="mp-latitude">Latitud (opcional)</label>
+                        <label htmlFor="mp-latitude">Latitud</label>
                         <input
                           id="mp-latitude"
                           type="number"
@@ -935,7 +935,7 @@ export const AdminSettingsPage: React.FC = () => {
                         />
                       </div>
                       <div className="settings-field">
-                        <label htmlFor="mp-longitude">Longitud (opcional)</label>
+                        <label htmlFor="mp-longitude">Longitud</label>
                         <input
                           id="mp-longitude"
                           type="number"
@@ -945,6 +945,9 @@ export const AdminSettingsPage: React.FC = () => {
                           placeholder="Ej: -58.3816"
                         />
                       </div>
+                      <p className="mp-input-note">
+                        Obtene las coordenadas desde Google Maps haciendo clic derecho en la ubicacion de tu negocio y seleccionando la latitud/longitud.
+                      </p>
                     </div>
                     <div className="mp-actions">
                       <button
