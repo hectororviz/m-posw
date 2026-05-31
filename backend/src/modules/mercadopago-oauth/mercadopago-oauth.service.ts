@@ -394,6 +394,8 @@ export class MercadoPagoOauthService {
     cityName: string,
     stateName: string,
     zipCode: string,
+    latitude?: number,
+    longitude?: number,
   ): Promise<{ ok: boolean; qrUrl: string }> {
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
@@ -429,18 +431,26 @@ export class MercadoPagoOauthService {
             city_name: cityName,
             state_name: stateName,
             zip_code: zipCode,
-            latitude: -34.603722,
-            longitude: -58.381592,
+            latitude: latitude ?? -34.603722,
+            longitude: longitude ?? -58.381592,
           },
         }),
       });
 
-      const storeData = (await storeRes.json()) as { id?: string; status?: number; message?: string };
+      const storeData = (await storeRes.json()) as {
+        id?: string;
+        status?: number;
+        message?: string;
+        causes?: Array<{ code: number; description: string }>;
+      };
 
       if (!storeRes.ok || !storeData.id) {
         this.logger.error(`MP POS setup - store creation failed: ${JSON.stringify(storeData)}`);
+        const causeMessages = storeData.causes
+          ?.map((c) => c.description)
+          ?.join('; ');
         throw new HttpException(
-          storeData.message || 'Error al crear la tienda en MercadoPago',
+          causeMessages || storeData.message || 'Error al crear la tienda en MercadoPago',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -471,12 +481,16 @@ export class MercadoPagoOauthService {
         id?: string;
         qr?: { image?: string };
         message?: string;
+        causes?: Array<{ code: number; description: string }>;
       };
 
       if (!posRes.ok || !posData.id) {
         this.logger.error(`MP POS setup - pos creation failed: ${JSON.stringify(posData)}`);
+        const causeMessages = posData.causes
+          ?.map((c) => c.description)
+          ?.join('; ');
         throw new HttpException(
-          posData.message || 'Error al crear el POS en MercadoPago',
+          causeMessages || posData.message || 'Error al crear el POS en MercadoPago',
           HttpStatus.BAD_REQUEST,
         );
       }

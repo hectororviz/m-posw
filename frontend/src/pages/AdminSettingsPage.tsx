@@ -217,6 +217,8 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpCityName, setMpCityName] = useState('Mar del Plata');
   const [mpStateName, setMpStateName] = useState('');
   const [mpZipCode, setMpZipCode] = useState('');
+  const [mpLatitude, setMpLatitude] = useState('');
+  const [mpLongitude, setMpLongitude] = useState('');
   const [mpSetupMode, setMpSetupMode] = useState<MpSetupMode>(null);
   const [detectedStores, setDetectedStores] = useState<DetectedStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
@@ -458,7 +460,7 @@ export const AdminSettingsPage: React.FC = () => {
     }
     setMpSetupLoading(true);
     try {
-      await apiClient.post('/mp-oauth/setup-pos', {
+      const payload: Record<string, unknown> = {
         storeName: mpStoreNameInput.trim(),
         posName: mpPosNameInput.trim(),
         streetName: mpStreetName.trim(),
@@ -466,7 +468,12 @@ export const AdminSettingsPage: React.FC = () => {
         cityName: mpCityName.trim(),
         stateName: mpStateName.trim(),
         zipCode: mpZipCode.trim(),
-      });
+      };
+      const lat = parseFloat(mpLatitude);
+      const lng = parseFloat(mpLongitude);
+      if (!isNaN(lat)) payload.latitude = lat;
+      if (!isNaN(lng)) payload.longitude = lng;
+      await apiClient.post('/mp-oauth/setup-pos', payload);
       await refetchMpStatus();
       pushToast('Punto de venta configurado correctamente', 'success');
     } catch (err) {
@@ -914,6 +921,28 @@ export const AdminSettingsPage: React.FC = () => {
                           value={mpZipCode}
                           onChange={(e) => setMpZipCode(e.target.value)}
                           placeholder="Ej: 1043"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-latitude">Latitud (opcional)</label>
+                        <input
+                          id="mp-latitude"
+                          type="number"
+                          step="any"
+                          value={mpLatitude}
+                          onChange={(e) => setMpLatitude(e.target.value)}
+                          placeholder="Ej: -34.6037"
+                        />
+                      </div>
+                      <div className="settings-field">
+                        <label htmlFor="mp-longitude">Longitud (opcional)</label>
+                        <input
+                          id="mp-longitude"
+                          type="number"
+                          step="any"
+                          value={mpLongitude}
+                          onChange={(e) => setMpLongitude(e.target.value)}
+                          placeholder="Ej: -58.3816"
                         />
                       </div>
                     </div>

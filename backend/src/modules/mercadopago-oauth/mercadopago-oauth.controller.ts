@@ -42,7 +42,17 @@ export class MercadoPagoOauthController {
   }
 
   @Post('setup-pos')
-  setupPos(@Body() body: { storeName: string; posName: string; streetName: string; streetNumber: string; cityName: string; stateName: string; zipCode: string }) {
+  setupPos(@Body() body: {
+    storeName: string;
+    posName: string;
+    streetName: string;
+    streetNumber: string;
+    cityName: string;
+    stateName: string;
+    zipCode: string;
+    latitude?: number;
+    longitude?: number;
+  }) {
     return this.mpOauthService.setupPos(
       body.storeName,
       body.posName,
@@ -51,6 +61,8 @@ export class MercadoPagoOauthController {
       body.cityName,
       body.stateName,
       body.zipCode,
+      body.latitude,
+      body.longitude,
     );
   }
 
