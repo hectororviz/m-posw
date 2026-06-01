@@ -409,15 +409,6 @@ export class MercadoPagoOauthService {
     latitude?: number,
     longitude?: number,
   ): Promise<{ ok: boolean; qrUrl: string }> {
-    // MP AR espera CPA completo: letra + 4 digitos + 3 letras (ej. B1615DFP)
-    const cpaPattern = /^[A-Za-z]\d{4}[A-Za-z]{3}$/;
-    if (!cpaPattern.test(zipCode)) {
-      throw new HttpException(
-        'El codigo postal debe tener formato CPA completo (ej. B1615DFP). Buscalo en https://www.correoargentino.com.ar/formularios/cpa',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
     let resolvedCityName = cityName;
     let resolvedStateName = stateName;
 
