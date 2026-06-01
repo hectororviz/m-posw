@@ -446,7 +446,7 @@ export class MercadoPagoOauthService {
     }
 
     const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
-    const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9_]/g, '');
+    const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9]/g, '');
 
     const mpHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
