@@ -433,12 +433,16 @@ export class MercadoPagoOauthService {
       }
     }
     if (mpCityMapping) {
-      resolvedCityName = mpCityMapping.neighborhoodName;
+      resolvedCityName = mpCityMapping.cityName;
       resolvedStateName = normalizeStateName(mpCityMapping.stateName);
       this.logger.log(`[MpCityMapping] CP ${zipCode} resuelto a ciudad: ${resolvedCityName}`);
     } else {
       this.logger.warn(`[MpCityMapping] CP ${zipCode} no encontrado en tabla, usando ciudad del frontend: ${cityName}`);
     }
+
+    // Extraer solo los 4 digitos numericos del CPA para enviar a MP
+    const numericZipMatch = zipCode.match(/\d{4}/);
+    const mpZipCode = numericZipMatch ? numericZipMatch[0] : zipCode;
 
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
@@ -473,7 +477,7 @@ export class MercadoPagoOauthService {
             street_number: streetNumber,
             city_name: resolvedCityName,
             state_name: resolvedStateName,
-            zip_code: zipCode,
+            zip_code: mpZipCode,
             ...(latitude !== undefined && { latitude }),
             ...(longitude !== undefined && { longitude }),
           },
@@ -629,18 +633,18 @@ export class MercadoPagoOauthService {
   async cityByZip(zipCode: string): Promise<{ cityName: string; stateName: string } | null> {
     let mapping = await this.prisma.mpCityMapping.findUnique({
       where: { zipCode },
-      select: { cityName: true, stateName: true, neighborhoodName: true },
+      select: { cityName: true, stateName: true },
     });
     if (!mapping) {
       const numeric = zipCode.match(/\d{4}/);
       if (numeric) {
         mapping = await this.prisma.mpCityMapping.findUnique({
           where: { zipCode: numeric[0] },
-          select: { cityName: true, stateName: true, neighborhoodName: true },
+          select: { cityName: true, stateName: true },
         });
       }
     }
-    return mapping ? { cityName: mapping.neighborhoodName, stateName: normalizeStateName(mapping.stateName) } : null;
+    return mapping ? { cityName: mapping.cityName, stateName: normalizeStateName(mapping.stateName) } : null;
   }
 
   async searchCities(query: string): Promise<{ cityName: string; stateName: string }[]> {
