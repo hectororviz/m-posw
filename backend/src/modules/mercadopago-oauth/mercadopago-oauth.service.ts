@@ -447,7 +447,8 @@ export class MercadoPagoOauthService {
 
     const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
     const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9]/g, '');
-    const externalPosId = `${safeSubdomain}_pos_${Math.floor(Date.now() / 1000)}`;
+    const externalPosId = `${safeSubdomain}pos${Math.floor(Date.now() / 1000)}`;
+    this.logger.log(`[MpSetup] Generando POS con external_id: ${externalPosId}`);
 
     const mpHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -525,12 +526,12 @@ export class MercadoPagoOauthService {
       };
 
       if (!posRes.ok || !posData.id) {
-        this.logger.error(`MP POS setup - pos creation failed: ${JSON.stringify(posData)}`);
+        this.logger.error(`MP POS setup - pos creation failed (external_id=${externalPosId}): ${JSON.stringify(posData)}`);
         const causeMessages = posData.causes
           ?.map((c) => c.description)
           ?.join('; ');
         throw new HttpException(
-          causeMessages || posData.message || 'Error al crear el POS en MercadoPago',
+          causeMessages || posData.message || `Error al crear el POS en MercadoPago (external_id=${externalPosId})`,
           HttpStatus.BAD_REQUEST,
         );
       }
