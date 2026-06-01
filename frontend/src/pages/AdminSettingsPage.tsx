@@ -755,26 +755,23 @@ export const AdminSettingsPage: React.FC = () => {
                       </div>
                       <div className="settings-field">
                         <label htmlFor="mp-city-name">Ciudad</label>
-                        <select
+                        <input
                           id="mp-city-name"
+                          type="text"
                           value={mpCityName}
                           onChange={(e) => setMpCityName(e.target.value)}
-                          disabled={!mpStateName || mpCitiesLoading}
-                        >
-                          <option value="">
-                            {mpCitiesLoading
-                              ? 'Cargando ciudades...'
-                              : !mpStateName
-                              ? 'Primero selecciona una provincia'
-                              : 'Seleccionar ciudad...'}
-                          </option>
+                          placeholder={mpCitiesLoading ? 'Cargando...' : 'Ej: Ingeniero Pablo Nogues'}
+                          list="mp-cities-list"
+                          autoComplete="off"
+                        />
+                        <datalist id="mp-cities-list">
                           {mpCities.map((city) => (
-                            <option key={city} value={city}>{city}</option>
+                            <option key={city} value={city} />
                           ))}
-                        </select>
+                        </datalist>
                       </div>
                       <p className="mp-input-note">
-                        Selecciona primero la provincia para ver las ciudades disponibles.
+                        Las sugerencias se cargan desde Mercado Libre. Si tu ciudad no aparece, escribila manualmente (ej: &quot;Grand Bourg&quot; en vez de &quot;Malvinas Argentinas&quot;).
                       </p>
                       <div className="settings-field">
                         <label htmlFor="mp-state-name">Provincia</label>
