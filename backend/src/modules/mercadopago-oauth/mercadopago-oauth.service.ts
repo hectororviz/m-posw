@@ -446,6 +446,7 @@ export class MercadoPagoOauthService {
     }
 
     const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
+    const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9_]/g, '');
 
     const mpHeaders: Record<string, string> = {
       Authorization: `Bearer ${token}`,
@@ -511,7 +512,7 @@ export class MercadoPagoOauthService {
           name: posName,
           store_id: storeId,
           category: 621102,
-          external_id: `${subdomain}_pos`,
+          external_id: `${safeSubdomain}_pos`,
         }),
       });
 
@@ -541,7 +542,7 @@ export class MercadoPagoOauthService {
       throw new HttpException('Error de red al crear el POS en MP', HttpStatus.BAD_GATEWAY);
     }
 
-    const externalPosId = `${subdomain}_pos`;
+    const externalPosId = `${safeSubdomain}_pos`;
 
     await this.prisma.setting.upsert({
       where: { id: DEFAULT_SETTING_ID },
