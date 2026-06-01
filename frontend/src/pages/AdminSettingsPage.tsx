@@ -72,9 +72,9 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpLongitude, setMpLongitude] = useState('');
   const [mpSetupMode, setMpSetupMode] = useState<MpSetupMode>(null);
   const [mpCityAutoDetected, setMpCityAutoDetected] = useState(false);
-  const [mpCityList, setMpCityList] = useState<Array<{ cityName: string; stateName: string; zipCode: string }>>([]);
+  const [mpCityList, setMpCityList] = useState<Array<{ cityName: string; stateName: string }>>([]);
   const [mpCityListLoading, setMpCityListLoading] = useState(false);
-  const [mpSelectedCityZip, setMpSelectedCityZip] = useState('');
+  const [mpSelectedCity, setMpSelectedCity] = useState('');
   const [detectedStores, setDetectedStores] = useState<DetectedStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [selectedPosId, setSelectedPosId] = useState('');
@@ -83,7 +83,7 @@ export const AdminSettingsPage: React.FC = () => {
 
   useEffect(() => {
     setMpCityListLoading(true);
-    apiClient.get<Array<{ cityName: string; stateName: string; zipCode: string }>>('/mp-oauth/cities-list')
+    apiClient.get<Array<{ cityName: string; stateName: string }>>('/mp-oauth/cities-list')
       .then(res => setMpCityList(res.data))
       .catch(() => setMpCityList([]))
       .finally(() => setMpCityListLoading(false));
@@ -758,36 +758,34 @@ export const AdminSettingsPage: React.FC = () => {
                         <label htmlFor="mp-city-select">Localidad</label>
                         <select
                           id="mp-city-select"
-                          value={mpSelectedCityZip}
+                          value={mpSelectedCity}
                           onChange={(e) => {
-                            const zip = e.target.value;
-                            setMpSelectedCityZip(zip);
-                            if (zip) {
-                              const selected = mpCityList.find((c) => c.zipCode === zip);
+                            const city = e.target.value;
+                            setMpSelectedCity(city);
+                            if (city) {
+                              const selected = mpCityList.find((c) => c.cityName === city);
                               if (selected) {
                                 setMpCityName(selected.cityName);
                                 setMpStateName(selected.stateName);
-                                setMpZipCode(selected.zipCode);
                                 setMpCityAutoDetected(true);
                               }
                             } else {
                               setMpCityName('');
                               setMpStateName('');
-                              setMpZipCode('');
                               setMpCityAutoDetected(false);
                             }
                           }}
                         >
                           <option value="">{mpCityListLoading ? 'Cargando localidades...' : 'Seleccionar localidad...'}</option>
                           {mpCityList.map((c) => (
-                            <option key={c.zipCode} value={c.zipCode}>
-                              {c.cityName} ({c.zipCode}) - {c.stateName}
+                            <option key={c.cityName} value={c.cityName}>
+                              {c.cityName} - {c.stateName}
                             </option>
                           ))}
                         </select>
                       </div>
                       <div className="settings-field">
-                        <label htmlFor="mp-city-name">Ciudad (para MP)</label>
+                        <label htmlFor="mp-city-name">Ciudad</label>
                         <input
                           id="mp-city-name"
                           type="text"
@@ -811,17 +809,17 @@ export const AdminSettingsPage: React.FC = () => {
                         />
                       </div>
                       <div className="settings-field">
-                        <label htmlFor="mp-zip-code">Codigo Postal</label>
+                        <label htmlFor="mp-zip-code">Codigo Postal (CPA)</label>
                         <input
                           id="mp-zip-code"
                           type="text"
                           value={mpZipCode}
                           onChange={(e) => setMpZipCode(e.target.value)}
-                          placeholder="Ej: 1616"
+                          placeholder="Ej: B1615DFP"
                         />
                       </div>
                       <p className="mp-input-note">
-                        Selecciona la localidad del listado. El codigo postal se completa automaticamente.
+                        Busca tu CPA oficial en correoargentino.com.ar con tu direccion exacta.
                       </p>
                       <div className="settings-field">
                         <label htmlFor="mp-latitude">Latitud</label>

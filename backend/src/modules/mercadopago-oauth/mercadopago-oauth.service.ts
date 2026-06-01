@@ -650,15 +650,15 @@ export class MercadoPagoOauthService {
     return rows.map((r) => ({ cityName: r.cityName, stateName: normalizeStateName(r.stateName) }));
   }
 
-  async getMpCityList(): Promise<{ cityName: string; stateName: string; zipCode: string }[]> {
+  async getMpCityList(): Promise<{ cityName: string; stateName: string }[]> {
     const rows = await this.prisma.mpCityMapping.findMany({
-      select: { cityName: true, stateName: true, zipCode: true },
-      orderBy: [{ stateName: 'asc' }, { cityName: 'asc' }, { zipCode: 'asc' }],
+      distinct: ['cityName'],
+      select: { cityName: true, stateName: true },
+      orderBy: { cityName: 'asc' },
     });
     return rows.map((r) => ({
       cityName: normalizeStateName(r.cityName),
       stateName: normalizeStateName(r.stateName),
-      zipCode: r.zipCode,
     }));
   }
 
