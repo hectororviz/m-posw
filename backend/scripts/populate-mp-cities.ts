@@ -4,6 +4,18 @@ const prisma = new PrismaClient();
 
 const FETCH_TIMEOUT = 15000;
 
+const ML_TO_MP_STATE: Record<string, string> = {
+  'Bs.As. Costa Atlántica': 'Buenos Aires',
+  'Bs.As. G.B.A. Norte': 'Buenos Aires',
+  'Bs.As. G.B.A. Oeste': 'Buenos Aires',
+  'Bs.As. G.B.A. Sur': 'Buenos Aires',
+  'Buenos Aires Interior': 'Buenos Aires',
+};
+
+function normalizeStateName(name: string): string {
+  return ML_TO_MP_STATE[name] || name;
+}
+
 function log(msg: string) {
   process.stdout.write(`LOG: ${msg}\n`);
 }
@@ -111,22 +123,22 @@ async function main() {
         const postcode = nomData.address?.postcode;
 
         if (postcode) {
-          await prisma.mpCityMapping.upsert({
-            where: { zipCode: postcode },
-            create: {
-              zipCode: postcode,
-              cityName: city.name,
-              stateName: state.name,
-              neighborhoodName: city.name,
-              mlCityId: city.id,
-            },
-            update: {
-              cityName: city.name,
-              stateName: state.name,
-              neighborhoodName: city.name,
-              mlCityId: city.id,
-            },
-          });
+            await prisma.mpCityMapping.upsert({
+              where: { zipCode: postcode },
+              create: {
+                zipCode: postcode,
+                cityName: city.name,
+                stateName: normalizeStateName(state.name),
+                neighborhoodName: city.name,
+                mlCityId: city.id,
+              },
+              update: {
+                cityName: city.name,
+                stateName: normalizeStateName(state.name),
+                neighborhoodName: city.name,
+                mlCityId: city.id,
+              },
+            });
           upsertedCount++;
         }
       } catch (e) {

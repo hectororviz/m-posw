@@ -3,6 +3,18 @@ const prisma = new PrismaClient();
 
 const FETCH_TO = 15000;
 
+const ML_TO_MP_STATE = {
+  'Bs.As. Costa Atlántica': 'Buenos Aires',
+  'Bs.As. G.B.A. Norte': 'Buenos Aires',
+  'Bs.As. G.B.A. Oeste': 'Buenos Aires',
+  'Bs.As. G.B.A. Sur': 'Buenos Aires',
+  'Buenos Aires Interior': 'Buenos Aires',
+};
+
+function normalizeStateName(name) {
+  return ML_TO_MP_STATE[name] || name;
+}
+
 function log(msg) { process.stdout.write('LOG: ' + msg + '\n'); }
 function success(msg) { process.stdout.write('SUCCESS: ' + msg + '\n'); }
 function error(msg) { process.stderr.write('ERROR: ' + msg + '\n'); }
@@ -61,8 +73,8 @@ async function main() {
           if (pc) {
             await prisma.mpCityMapping.upsert({
               where: { zipCode: pc },
-              create: { zipCode: pc, cityName: city.name, stateName: state.name, neighborhoodName: city.name, mlCityId: city.id },
-              update: { cityName: city.name, stateName: state.name, neighborhoodName: city.name, mlCityId: city.id },
+              create: { zipCode: pc, cityName: city.name, stateName: normalizeStateName(state.name), neighborhoodName: city.name, mlCityId: city.id },
+              update: { cityName: city.name, stateName: normalizeStateName(state.name), neighborhoodName: city.name, mlCityId: city.id },
             });
             count++;
           }

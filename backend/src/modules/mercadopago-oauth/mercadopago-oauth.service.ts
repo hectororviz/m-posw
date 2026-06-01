@@ -6,6 +6,18 @@ import { PrismaService } from '../common/prisma.service';
 
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
 
+const ML_TO_MP_STATE: Record<string, string> = {
+  'Bs.As. Costa Atlántica': 'Buenos Aires',
+  'Bs.As. G.B.A. Norte': 'Buenos Aires',
+  'Bs.As. G.B.A. Oeste': 'Buenos Aires',
+  'Bs.As. G.B.A. Sur': 'Buenos Aires',
+  'Buenos Aires Interior': 'Buenos Aires',
+};
+
+function normalizeStateName(name: string): string {
+  return ML_TO_MP_STATE[name] || name;
+}
+
 @Injectable()
 export class MercadoPagoOauthService {
   private readonly logger = new Logger(MercadoPagoOauthService.name);
@@ -422,7 +434,7 @@ export class MercadoPagoOauthService {
     }
     if (mpCityMapping) {
       resolvedCityName = mpCityMapping.cityName;
-      resolvedStateName = mpCityMapping.stateName;
+      resolvedStateName = normalizeStateName(mpCityMapping.stateName);
       this.logger.log(`[MpCityMapping] CP ${zipCode} resuelto a ciudad: ${resolvedCityName}`);
     } else {
       this.logger.warn(`[MpCityMapping] CP ${zipCode} no encontrado en tabla, usando ciudad del frontend: ${cityName}`);
@@ -628,7 +640,7 @@ export class MercadoPagoOauthService {
         });
       }
     }
-    return mapping ? { cityName: mapping.cityName, stateName: mapping.stateName } : null;
+    return mapping ? { cityName: mapping.cityName, stateName: normalizeStateName(mapping.stateName) } : null;
   }
 
   async searchCities(query: string): Promise<{ cityName: string; stateName: string }[]> {
@@ -640,7 +652,7 @@ export class MercadoPagoOauthService {
        LIMIT 20`,
       `%${query}%`,
     );
-    return rows.map((r) => ({ cityName: r.cityName, stateName: r.stateName }));
+    return rows.map((r) => ({ cityName: r.cityName, stateName: normalizeStateName(r.stateName) }));
   }
 
   async getCities(stateName?: string): Promise<{ cities: string[] }> {
