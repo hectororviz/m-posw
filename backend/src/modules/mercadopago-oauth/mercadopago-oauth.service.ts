@@ -409,11 +409,11 @@ export class MercadoPagoOauthService {
     latitude?: number,
     longitude?: number,
   ): Promise<{ ok: boolean; qrUrl: string }> {
-    // MP AR espera CPA: letra + 4 digitos + 3 letras (ej. B1615DFP)
+    // MP AR espera CPA completo: letra + 4 digitos + 3 letras (ej. B1615DFP)
     const cpaPattern = /^[A-Za-z]\d{4}[A-Za-z]{3}$/;
-    if (zipCode && /^\d+$/.test(zipCode.trim())) {
+    if (!cpaPattern.test(zipCode)) {
       throw new HttpException(
-        'El codigo postal debe tener formato CPA (ej. B1615DFP), no solo numeros. Buscalo en https://www.correoargentino.com.ar/formularios/cpa',
+        'El codigo postal debe tener formato CPA completo (ej. B1615DFP). Buscalo en https://www.correoargentino.com.ar/formularios/cpa',
         HttpStatus.BAD_REQUEST,
       );
     }
