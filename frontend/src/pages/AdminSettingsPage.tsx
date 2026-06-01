@@ -3,171 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import * as emoji from 'node-emoji';
-import { apiClient, normalizeApiError } from '../api/client';
-import { useMpOauthStatus, useSettings, useUsers } from '../api/queries';
-import type { Role, Setting, User } from '../api/types';
-import { useToast } from '../components/ToastProvider';
-import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
-
-type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'usuarios' | 'sistema';
-
-type MpSetupMode = 'setup_required' | 'select_store' | null;
-
-interface DetectedStore {
-  id: string;
-  name: string;
-  address: string;
-  pos: Array<{ id: string; name: string; qrUrl: string }>;
-}
-
-const MP_VALID_CITIES = [
-  '12 De Octubre',
-  '25 de Mayo',
-  '9 de Julio',
-  'Adolfo Alsina',
-  'Adolfo Gonzales Chaves',
-  'Alberti',
-  'Arrecifes',
-  'Avellaneda',
-  'Ayacucho',
-  'Azul',
-  'Bahía Blanca',
-  'Balcarce',
-  'Baradero',
-  'Beccar',
-  'Benito Juárez',
-  'Berazategui',
-  'Berisso',
-  'Bolívar',
-  'Boulogne',
-  'Bragado',
-  'Brandsen',
-  'Campana',
-  'Capitán Sarmiento',
-  'Cariló',
-  'Carlos Casares',
-  'Carlos Tejedor',
-  'Carmen de Areco',
-  'Caseros',
-  'Castelar',
-  'Castelli',
-  'Cañuelas',
-  'Chacabuco',
-  'Chascomús',
-  'Chivilcoy',
-  'Colón',
-  'Coronel Dorrego',
-  'Coronel Pringles',
-  'Coronel Rosales',
-  'Coronel Suárez',
-  'Daireaux',
-  'Del Viso',
-  'Dolores',
-  'Don Torcuato',
-  'Ensenada',
-  'Escobar',
-  'Ezeiza',
-  'Florencio Varela',
-  'Florentino Ameghino',
-  'General Alvarado',
-  'General Alvear',
-  'General Arenales',
-  'General Belgrano',
-  'General Guido',
-  'General La Madrid',
-  'General Las Heras',
-  'General Lavalle',
-  'General Madariaga',
-  'General Paz',
-  'General Pinto',
-  'General Pueyrredón',
-  'General Rodríguez',
-  'General San Martín',
-  'General Viamonte',
-  'General Villegas',
-  'Guaminí',
-  'Hipólito Yrigoyen',
-  'Hurlingham',
-  'Ituzaingó',
-  'José C. Paz',
-  'Junín',
-  'La Matanza',
-  'La Plata',
-  'Lanús',
-  'Laprida',
-  'Las Flores',
-  'Leandro N. Alem',
-  'Lincoln',
-  'Lobería',
-  'Lobos',
-  'Lomas de Zamora',
-  'Luján',
-  'Magdalena',
-  'Maipú',
-  'Malvinas Argentinas',
-  'Mar de Ajo',
-  'Mar del Plata',
-  'Mar del Tuyu',
-  'Marcos Paz',
-  'Mercedes',
-  'Merlo',
-  'Miramar',
-  'Monte',
-  'Monte Hermoso',
-  'Moreno',
-  'Morón',
-  'Navarro',
-  'Necochea',
-  'Olavarría',
-  'Patagones',
-  'Pehuajó',
-  'Pellegrini',
-  'Pergamino',
-  'Pila',
-  'Pilar',
-  'Pinamar',
-  'Presidente Perón',
-  'Puán',
-  'Punta Indio',
-  'Quilmes',
-  'Ramallo',
-  'Ranchos',
-  'Rauch',
-  'Remedios De Escalada',
-  'Rivadavia',
-  'Rojas',
-  'Roque Pérez',
-  'Saavedra',
-  'Saladillo',
-  'Salliqueló',
-  'Salto',
-  'San Andrés de Giles',
-  'San Antonio de Areco',
-  'San Cayetano',
-  'San Clemente',
-  'San Fernando',
-  'San Isidro',
-  'San Miguel',
-  'San Nicolás',
-  'San Pedro',
-  'San Vicente',
-  'Suipacha',
-  'Tandil',
-  'Tapalqué',
-  'Tigre',
-  'Tordillo',
-  'Tornquist',
-  'Trenque Lauquen',
-  'Tres Arroyos',
-  'Tres Lomas',
-  'Tres de febrero',
-  'Vicente López',
-  'Villa Adelina',
-  'Villa Gesell',
-  'Villarino',
-  'Wilde',
-  'Zárate',
-];
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'general', label: 'General' },
@@ -214,7 +49,7 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpPosNameInput, setMpPosNameInput] = useState('');
   const [mpStreetName, setMpStreetName] = useState('');
   const [mpStreetNumber, setMpStreetNumber] = useState('');
-  const [mpCityName, setMpCityName] = useState('Mar del Plata');
+  const [mpCityName, setMpCityName] = useState('');
   const [mpStateName, setMpStateName] = useState('');
   const [mpZipCode, setMpZipCode] = useState('');
   const [mpLatitude, setMpLatitude] = useState('');
@@ -893,16 +728,17 @@ export const AdminSettingsPage: React.FC = () => {
                       </div>
                       <div className="settings-field">
                         <label htmlFor="mp-city-name">Ciudad</label>
-                        <select
+                        <input
                           id="mp-city-name"
+                          type="text"
                           value={mpCityName}
                           onChange={(e) => setMpCityName(e.target.value)}
-                        >
-                          {MP_VALID_CITIES.map((city) => (
-                            <option key={city} value={city}>{city}</option>
-                          ))}
-                        </select>
+                          placeholder="Ej: Ingeniero Pablo Nogues (no el partido)"
+                        />
                       </div>
+                      <p className="mp-input-note">
+                        Ingresa el nombre de la ciudad tal como figura en Mercado Libre, no el partido. Ej: &quot;Grand Bourg&quot; en vez de &quot;Malvinas Argentinas&quot;, o &quot;Belgrano&quot; en vez de &quot;Capital Federal&quot;.
+                      </p>
                       <div className="settings-field">
                         <label htmlFor="mp-state-name">Provincia</label>
                         <select
