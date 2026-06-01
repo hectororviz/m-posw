@@ -3,6 +3,22 @@ import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import * as emoji from 'node-emoji';
+import { apiClient, normalizeApiError } from '../api/client';
+import { useMpOauthStatus, useSettings, useUsers } from '../api/queries';
+import type { Role, Setting, User } from '../api/types';
+import { useToast } from '../components/ToastProvider';
+import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
+
+type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'usuarios' | 'sistema';
+
+type MpSetupMode = 'setup_required' | 'select_store' | null;
+
+interface DetectedStore {
+  id: string;
+  name: string;
+  address: string;
+  pos: Array<{ id: string; name: string; qrUrl: string }>;
+}
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'general', label: 'General' },
