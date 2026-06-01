@@ -3431,6 +3431,10 @@ button {
   background: var(--color-surface);
 }
 
+.mp-pos-form select option {
+  font-size: 0.85rem;
+}
+
 .mp-pos-form input:focus {
   border-color: var(--accent-color);
   box-shadow: 0 0 0 3px var(--color-accent-ring);

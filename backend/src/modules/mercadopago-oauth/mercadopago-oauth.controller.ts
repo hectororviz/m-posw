@@ -91,6 +91,11 @@ export class MercadoPagoOauthController {
     return this.mpOauthService.getCities(stateName);
   }
 
+  @Get('cities-list')
+  async citiesList() {
+    return this.mpOauthService.getMpCityList();
+  }
+
   @Delete('setup-pos')
   deletePosSetup() {
     return this.mpOauthService.deletePosSetup();
