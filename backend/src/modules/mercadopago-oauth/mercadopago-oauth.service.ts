@@ -591,4 +591,64 @@ export class MercadoPagoOauthService {
     this.logger.debug('Cron: verificando renovacion proactiva de token MP...');
     await this.mpConfig.tryRefreshToken();
   }
+
+  async getCities(stateName?: string): Promise<{ cities: string[] }> {
+    const stateMap: Record<string, string> = {
+      'Buenos Aires': 'AR-B',
+      'Capital Federal': 'AR-C',
+      'Catamarca': 'AR-K',
+      'Chaco': 'AR-H',
+      'Chubut': 'AR-U',
+      'Cordoba': 'AR-X',
+      'Corrientes': 'AR-W',
+      'Entre Rios': 'AR-E',
+      'Formosa': 'AR-P',
+      'Jujuy': 'AR-Y',
+      'La Pampa': 'AR-L',
+      'La Rioja': 'AR-F',
+      'Mendoza': 'AR-M',
+      'Misiones': 'AR-N',
+      'Neuquen': 'AR-Q',
+      'Rio Negro': 'AR-R',
+      'Salta': 'AR-A',
+      'San Juan': 'AR-J',
+      'San Luis': 'AR-D',
+      'Santa Cruz': 'AR-Z',
+      'Santa Fe': 'AR-S',
+      'Santiago del Estero': 'AR-G',
+      'Tierra del Fuego': 'AR-V',
+      'Tucuman': 'AR-T',
+    };
+
+    const stateIds = stateName && stateMap[stateName]
+      ? [stateMap[stateName]]
+      : Object.values(stateMap);
+
+    try {
+      const allCities: string[] = [];
+
+      for (const stateId of stateIds) {
+        const res = await fetch(
+          `https://api.mercadolibre.com/classified_locations/states/${stateId}`,
+        );
+        if (!res.ok) continue;
+        const data = (await res.json()) as {
+          cities?: Array<{ name: string }>;
+        };
+        if (data.cities) {
+          for (const c of data.cities) {
+            allCities.push(c.name);
+          }
+        }
+      }
+
+      const unique = [...new Set(allCities)].sort((a, b) =>
+        a.localeCompare(b, 'es'),
+      );
+      return { cities: unique };
+    } catch (error) {
+      this.logger.error(`MP getCities error: ${error}`);
+      return { cities: [] };
+    }
+  }
 }

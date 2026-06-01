@@ -70,12 +70,23 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpZipCode, setMpZipCode] = useState('');
   const [mpLatitude, setMpLatitude] = useState('');
   const [mpLongitude, setMpLongitude] = useState('');
+  const [mpCities, setMpCities] = useState<string[]>([]);
+  const [mpCitiesLoading, setMpCitiesLoading] = useState(false);
   const [mpSetupMode, setMpSetupMode] = useState<MpSetupMode>(null);
   const [detectedStores, setDetectedStores] = useState<DetectedStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [selectedPosId, setSelectedPosId] = useState('');
   const [mpSelectLoading, setMpSelectLoading] = useState(false);
   const [mpDetectLoading, setMpDetectLoading] = useState(false);
+
+  useEffect(() => {
+    if (!mpStateName) { setMpCities([]); return; }
+    setMpCitiesLoading(true);
+    apiClient.get<{ cities: string[] }>(`/mp-oauth/cities?stateName=${encodeURIComponent(mpStateName)}`)
+      .then(res => setMpCities(res.data.cities))
+      .catch(() => setMpCities([]))
+      .finally(() => setMpCitiesLoading(false));
+  }, [mpStateName]);
 
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -744,16 +755,26 @@ export const AdminSettingsPage: React.FC = () => {
                       </div>
                       <div className="settings-field">
                         <label htmlFor="mp-city-name">Ciudad</label>
-                        <input
+                        <select
                           id="mp-city-name"
-                          type="text"
                           value={mpCityName}
                           onChange={(e) => setMpCityName(e.target.value)}
-                          placeholder="Ej: Ingeniero Pablo Nogues (no el partido)"
-                        />
+                          disabled={!mpStateName || mpCitiesLoading}
+                        >
+                          <option value="">
+                            {mpCitiesLoading
+                              ? 'Cargando ciudades...'
+                              : !mpStateName
+                              ? 'Primero selecciona una provincia'
+                              : 'Seleccionar ciudad...'}
+                          </option>
+                          {mpCities.map((city) => (
+                            <option key={city} value={city}>{city}</option>
+                          ))}
+                        </select>
                       </div>
                       <p className="mp-input-note">
-                        Ingresa el nombre de la ciudad tal como figura en Mercado Libre, no el partido. Ej: &quot;Grand Bourg&quot; en vez de &quot;Malvinas Argentinas&quot;, o &quot;Belgrano&quot; en vez de &quot;Capital Federal&quot;.
+                        Selecciona primero la provincia para ver las ciudades disponibles.
                       </p>
                       <div className="settings-field">
                         <label htmlFor="mp-state-name">Provincia</label>

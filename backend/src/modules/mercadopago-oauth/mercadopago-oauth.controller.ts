@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
@@ -69,6 +69,11 @@ export class MercadoPagoOauthController {
   @Get('qr')
   getQr() {
     return this.mpOauthService.getQr();
+  }
+
+  @Get('cities')
+  async cities(@Query('stateName') stateName?: string) {
+    return this.mpOauthService.getCities(stateName);
   }
 
   @Delete('setup-pos')
