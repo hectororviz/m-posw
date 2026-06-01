@@ -663,6 +663,21 @@ export class MercadoPagoOauthService {
     }));
   }
 
+  async getCityZipcodes(cityName: string): Promise<{ zipCodes: string[] }> {
+    const rows = await this.prisma.mpCityMapping.findMany({
+      where: {
+        OR: [
+          { cityName: { equals: cityName, mode: 'insensitive' } },
+          { cityName: { equals: cityName.replace(/[áéíóúÁÉÍÓÚ]/g, (c) => ({á:'a',é:'e',í:'i',ó:'o',ú:'u',Á:'A',É:'E',Í:'I',Ó:'O',Ú:'U'})[c] as string), mode: 'insensitive' } },
+        ],
+      },
+      select: { zipCode: true },
+      orderBy: { zipCode: 'asc' },
+    });
+    const zipCodes = rows.map((r) => r.zipCode);
+    return { zipCodes };
+  }
+
   async getCities(stateName?: string): Promise<{ cities: string[] }> {
     const stateMap: Record<string, string> = {
       'Buenos Aires': 'AR-B',

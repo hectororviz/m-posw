@@ -75,6 +75,9 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpCityList, setMpCityList] = useState<Array<{ cityName: string; stateName: string }>>([]);
   const [mpCityListLoading, setMpCityListLoading] = useState(false);
   const [mpSelectedCity, setMpSelectedCity] = useState('');
+  const [mpCityZipcodes, setMpCityZipcodes] = useState<string[]>([]);
+  const [mpCityZipcodesLoading, setMpCityZipcodesLoading] = useState(false);
+  const [mpSelectedZip, setMpSelectedZip] = useState('');
   const [detectedStores, setDetectedStores] = useState<DetectedStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [selectedPosId, setSelectedPosId] = useState('');
@@ -762,6 +765,8 @@ export const AdminSettingsPage: React.FC = () => {
                           onChange={(e) => {
                             const city = e.target.value;
                             setMpSelectedCity(city);
+                            setMpSelectedZip('');
+                            setMpZipCode('');
                             if (city) {
                               const selected = mpCityList.find((c) => c.cityName === city);
                               if (selected) {
@@ -769,10 +774,16 @@ export const AdminSettingsPage: React.FC = () => {
                                 setMpStateName(selected.stateName);
                                 setMpCityAutoDetected(true);
                               }
+                              setMpCityZipcodesLoading(true);
+                              apiClient.get<{ zipCodes: string[] }>(`/mp-oauth/city-zipcodes?city=${encodeURIComponent(city)}`)
+                                .then(res => setMpCityZipcodes(res.data.zipCodes))
+                                .catch(() => setMpCityZipcodes([]))
+                                .finally(() => setMpCityZipcodesLoading(false));
                             } else {
                               setMpCityName('');
                               setMpStateName('');
                               setMpCityAutoDetected(false);
+                              setMpCityZipcodes([]);
                             }
                           }}
                         >
@@ -784,8 +795,27 @@ export const AdminSettingsPage: React.FC = () => {
                           ))}
                         </select>
                       </div>
+                      {mpSelectedCity && (
+                        <div className="settings-field">
+                          <label htmlFor="mp-zip-select">Codigo Postal</label>
+                          <select
+                            id="mp-zip-select"
+                            value={mpSelectedZip}
+                            onChange={(e) => {
+                              const zip = e.target.value;
+                              setMpSelectedZip(zip);
+                              setMpZipCode(zip);
+                            }}
+                          >
+                            <option value="">{mpCityZipcodesLoading ? 'Cargando CPs...' : 'Seleccionar CP...'}</option>
+                            {mpCityZipcodes.map((z) => (
+                              <option key={z} value={z}>{z}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="settings-field">
-                        <label htmlFor="mp-city-name">Ciudad</label>
+                        <label htmlFor="mp-city-name">Ciudad (para MP)</label>
                         <input
                           id="mp-city-name"
                           type="text"
@@ -819,7 +849,7 @@ export const AdminSettingsPage: React.FC = () => {
                         />
                       </div>
                       <p className="mp-input-note">
-                        Busca tu CPA oficial en correoargentino.com.ar con tu direccion exacta.
+                        Selecciona la localidad y el CP del listado. Si no aparece el correcto, buscalo en correoargentino.com.ar.
                       </p>
                       <div className="settings-field">
                         <label htmlFor="mp-latitude">Latitud</label>

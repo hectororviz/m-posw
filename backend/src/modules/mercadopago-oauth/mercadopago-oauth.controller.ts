@@ -96,6 +96,14 @@ export class MercadoPagoOauthController {
     return this.mpOauthService.getMpCityList();
   }
 
+  @Get('city-zipcodes')
+  async cityZipcodes(@Query('city') city?: string) {
+    if (!city) {
+      throw new HttpException('Parametro "city" requerido', HttpStatus.BAD_REQUEST);
+    }
+    return this.mpOauthService.getCityZipcodes(city);
+  }
+
   @Delete('setup-pos')
   deletePosSetup() {
     return this.mpOauthService.deletePosSetup();
