@@ -433,7 +433,7 @@ export class MercadoPagoOauthService {
       }
     }
     if (mpCityMapping) {
-      resolvedCityName = mpCityMapping.cityName;
+      resolvedCityName = mpCityMapping.neighborhoodName;
       resolvedStateName = normalizeStateName(mpCityMapping.stateName);
       this.logger.log(`[MpCityMapping] CP ${zipCode} resuelto a ciudad: ${resolvedCityName}`);
     } else {
@@ -629,18 +629,18 @@ export class MercadoPagoOauthService {
   async cityByZip(zipCode: string): Promise<{ cityName: string; stateName: string } | null> {
     let mapping = await this.prisma.mpCityMapping.findUnique({
       where: { zipCode },
-      select: { cityName: true, stateName: true },
+      select: { cityName: true, stateName: true, neighborhoodName: true },
     });
     if (!mapping) {
       const numeric = zipCode.match(/\d{4}/);
       if (numeric) {
         mapping = await this.prisma.mpCityMapping.findUnique({
           where: { zipCode: numeric[0] },
-          select: { cityName: true, stateName: true },
+          select: { cityName: true, stateName: true, neighborhoodName: true },
         });
       }
     }
-    return mapping ? { cityName: mapping.cityName, stateName: normalizeStateName(mapping.stateName) } : null;
+    return mapping ? { cityName: mapping.neighborhoodName, stateName: normalizeStateName(mapping.stateName) } : null;
   }
 
   async searchCities(query: string): Promise<{ cityName: string; stateName: string }[]> {
