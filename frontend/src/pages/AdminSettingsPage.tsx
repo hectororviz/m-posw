@@ -905,13 +905,37 @@ export const AdminSettingsPage: React.FC = () => {
                       </div>
                       <div className="settings-field">
                         <label htmlFor="mp-state-name">Provincia</label>
-                        <input
+                        <select
                           id="mp-state-name"
-                          type="text"
                           value={mpStateName}
                           onChange={(e) => setMpStateName(e.target.value)}
-                          placeholder="Ej: Buenos Aires"
-                        />
+                        >
+                          <option value="">Seleccionar provincia...</option>
+                          <option value="Buenos Aires">Buenos Aires</option>
+                          <option value="Capital Federal">Capital Federal</option>
+                          <option value="Catamarca">Catamarca</option>
+                          <option value="Chaco">Chaco</option>
+                          <option value="Chubut">Chubut</option>
+                          <option value="Cordoba">Cordoba</option>
+                          <option value="Corrientes">Corrientes</option>
+                          <option value="Entre Rios">Entre Rios</option>
+                          <option value="Formosa">Formosa</option>
+                          <option value="Jujuy">Jujuy</option>
+                          <option value="La Pampa">La Pampa</option>
+                          <option value="La Rioja">La Rioja</option>
+                          <option value="Mendoza">Mendoza</option>
+                          <option value="Misiones">Misiones</option>
+                          <option value="Neuquen">Neuquen</option>
+                          <option value="Rio Negro">Rio Negro</option>
+                          <option value="Salta">Salta</option>
+                          <option value="San Juan">San Juan</option>
+                          <option value="San Luis">San Luis</option>
+                          <option value="Santa Cruz">Santa Cruz</option>
+                          <option value="Santa Fe">Santa Fe</option>
+                          <option value="Santiago del Estero">Santiago del Estero</option>
+                          <option value="Tierra del Fuego">Tierra del Fuego</option>
+                          <option value="Tucuman">Tucuman</option>
+                        </select>
                       </div>
                       <div className="settings-field">
                         <label htmlFor="mp-zip-code">Codigo Postal</label>
@@ -920,9 +944,12 @@ export const AdminSettingsPage: React.FC = () => {
                           type="text"
                           value={mpZipCode}
                           onChange={(e) => setMpZipCode(e.target.value)}
-                          placeholder="Ej: 1043"
+                          placeholder="Ej: B1615DFP"
                         />
                       </div>
+                      <p className="mp-input-note">
+                        El codigo postal debe tener formato CPA (letra + 4 numeros + 3 letras). Buscalo en correoargentino.com.ar/formularios/cpa
+                      </p>
                       <div className="settings-field">
                         <label htmlFor="mp-latitude">Latitud</label>
                         <input

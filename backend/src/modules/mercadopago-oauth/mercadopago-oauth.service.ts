@@ -397,6 +397,15 @@ export class MercadoPagoOauthService {
     latitude?: number,
     longitude?: number,
   ): Promise<{ ok: boolean; qrUrl: string }> {
+    // MP AR espera CPA: letra + 4 digitos + 3 letras (ej. B1615DFP)
+    const cpaPattern = /^[A-Za-z]\d{4}[A-Za-z]{3}$/;
+    if (zipCode && /^\d+$/.test(zipCode.trim())) {
+      throw new HttpException(
+        'El codigo postal debe tener formato CPA (ej. B1615DFP), no solo numeros. Buscalo en https://www.correoargentino.com.ar/formularios/cpa',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
       throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
