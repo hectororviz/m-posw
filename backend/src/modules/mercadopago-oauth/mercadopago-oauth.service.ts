@@ -406,6 +406,28 @@ export class MercadoPagoOauthService {
       );
     }
 
+    let resolvedCityName = cityName;
+    let resolvedStateName = stateName;
+
+    let mpCityMapping = await this.prisma.mpCityMapping.findUnique({
+      where: { zipCode },
+    });
+    if (!mpCityMapping) {
+      const numeric = zipCode.match(/\d{4}/);
+      if (numeric) {
+        mpCityMapping = await this.prisma.mpCityMapping.findUnique({
+          where: { zipCode: numeric[0] },
+        });
+      }
+    }
+    if (mpCityMapping) {
+      resolvedCityName = mpCityMapping.cityName;
+      resolvedStateName = mpCityMapping.stateName;
+      this.logger.log(`[MpCityMapping] CP ${zipCode} resuelto a ciudad: ${resolvedCityName}`);
+    } else {
+      this.logger.warn(`[MpCityMapping] CP ${zipCode} no encontrado en tabla, usando ciudad del frontend: ${cityName}`);
+    }
+
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
       throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -437,8 +459,8 @@ export class MercadoPagoOauthService {
           location: {
             street_name: streetName,
             street_number: streetNumber,
-            city_name: cityName,
-            state_name: stateName,
+            city_name: resolvedCityName,
+            state_name: resolvedStateName,
             zip_code: zipCode,
             ...(latitude !== undefined && { latitude }),
             ...(longitude !== undefined && { longitude }),
@@ -590,6 +612,35 @@ export class MercadoPagoOauthService {
   async handleTokenRefresh() {
     this.logger.debug('Cron: verificando renovacion proactiva de token MP...');
     await this.mpConfig.tryRefreshToken();
+  }
+
+  async cityByZip(zipCode: string): Promise<{ cityName: string; stateName: string } | null> {
+    let mapping = await this.prisma.mpCityMapping.findUnique({
+      where: { zipCode },
+      select: { cityName: true, stateName: true },
+    });
+    if (!mapping) {
+      const numeric = zipCode.match(/\d{4}/);
+      if (numeric) {
+        mapping = await this.prisma.mpCityMapping.findUnique({
+          where: { zipCode: numeric[0] },
+          select: { cityName: true, stateName: true },
+        });
+      }
+    }
+    return mapping ? { cityName: mapping.cityName, stateName: mapping.stateName } : null;
+  }
+
+  async searchCities(query: string): Promise<{ cityName: string; stateName: string }[]> {
+    const rows = await this.prisma.$queryRawUnsafe<Array<{ cityName: string; stateName: string }>>(
+      `SELECT DISTINCT city_name AS "cityName", state_name AS "stateName"
+       FROM mp_city_mappings
+       WHERE unaccent(city_name) ILIKE unaccent($1)
+       ORDER BY city_name ASC
+       LIMIT 20`,
+      `%${query}%`,
+    );
+    return rows.map((r) => ({ cityName: r.cityName, stateName: r.stateName }));
   }
 
   async getCities(stateName?: string): Promise<{ cities: string[] }> {

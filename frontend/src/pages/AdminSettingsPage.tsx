@@ -73,6 +73,8 @@ export const AdminSettingsPage: React.FC = () => {
   const [mpCities, setMpCities] = useState<string[]>([]);
   const [mpCitiesLoading, setMpCitiesLoading] = useState(false);
   const [mpSetupMode, setMpSetupMode] = useState<MpSetupMode>(null);
+  const [mpCityAutoDetected, setMpCityAutoDetected] = useState(false);
+  const [mpCityLookupText, setMpCityLookupText] = useState('');
   const [detectedStores, setDetectedStores] = useState<DetectedStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState('');
   const [selectedPosId, setSelectedPosId] = useState('');
@@ -312,6 +314,25 @@ export const AdminSettingsPage: React.FC = () => {
       pushToast(normalizeApiError(err), 'error');
     } finally {
       setMpDisconnecting(false);
+    }
+  };
+
+  const handleZipBlur = async () => {
+    const zip = mpZipCode.trim();
+    if (zip.length < 4) {
+      setMpCityAutoDetected(false);
+      setMpCityLookupText('');
+      return;
+    }
+    try {
+      const res = await apiClient.get<{ cityName: string; stateName: string }>(`/mp-oauth/city-by-zip?zip=${encodeURIComponent(zip)}`);
+      setMpCityName(res.data.cityName);
+      setMpStateName(res.data.stateName);
+      setMpCityAutoDetected(true);
+      setMpCityLookupText('✓ Ciudad detectada automaticamente por codigo postal');
+    } catch {
+      setMpCityAutoDetected(false);
+      setMpCityLookupText('Ciudad no detectada, ingresala manualmente');
     }
   };
 
@@ -759,26 +780,34 @@ export const AdminSettingsPage: React.FC = () => {
                           id="mp-city-name"
                           type="text"
                           value={mpCityName}
-                          onChange={(e) => setMpCityName(e.target.value)}
+                          onChange={(e) => { setMpCityName(e.target.value); setMpCityAutoDetected(false); }}
                           placeholder={mpCitiesLoading ? 'Cargando...' : 'Ej: Ingeniero Pablo Nogues'}
-                          list="mp-cities-list"
+                          list={mpCityAutoDetected ? undefined : 'mp-cities-list'}
                           autoComplete="off"
+                          readOnly={mpCityAutoDetected}
+                          className={mpCityAutoDetected ? 'mp-auto-filled' : ''}
                         />
-                        <datalist id="mp-cities-list">
-                          {mpCities.map((city) => (
-                            <option key={city} value={city} />
-                          ))}
-                        </datalist>
+                        {!mpCityAutoDetected && (
+                          <datalist id="mp-cities-list">
+                            {mpCities.map((city) => (
+                              <option key={city} value={city} />
+                            ))}
+                          </datalist>
+                        )}
                       </div>
-                      <p className="mp-input-note">
-                        Las sugerencias se cargan desde Mercado Libre. Si tu ciudad no aparece, escribila manualmente (ej: &quot;Grand Bourg&quot; en vez de &quot;Malvinas Argentinas&quot;).
-                      </p>
+                      {mpCityLookupText && (
+                        <p className={`mp-input-note ${mpCityAutoDetected ? 'mp-input-note--success' : ''}`}>
+                          {mpCityLookupText}
+                        </p>
+                      )}
                       <div className="settings-field">
                         <label htmlFor="mp-state-name">Provincia</label>
                         <select
                           id="mp-state-name"
                           value={mpStateName}
-                          onChange={(e) => setMpStateName(e.target.value)}
+                          onChange={(e) => { setMpStateName(e.target.value); setMpCityAutoDetected(false); }}
+                          disabled={mpCityAutoDetected}
+                          className={mpCityAutoDetected ? 'mp-auto-filled' : ''}
                         >
                           <option value="">Seleccionar provincia...</option>
                           <option value="Buenos Aires">Buenos Aires</option>
@@ -814,6 +843,7 @@ export const AdminSettingsPage: React.FC = () => {
                           type="text"
                           value={mpZipCode}
                           onChange={(e) => setMpZipCode(e.target.value)}
+                          onBlur={handleZipBlur}
                           placeholder="Ej: B1615DFP"
                         />
                       </div>

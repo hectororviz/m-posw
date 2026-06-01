@@ -477,3 +477,14 @@ model PagoAcreedor {
 
   @@index([acreedorId])
 }
+
+model MpCityMapping {
+  zipCode          String   @id @map("zip_code")
+  cityName         String   @map("city_name")
+  stateName        String   @map("state_name")
+  neighborhoodName String   @map("neighborhood_name")
+  mlCityId         String   @map("ml_city_id")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("mp_city_mappings")
+}

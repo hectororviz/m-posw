@@ -3421,9 +3421,40 @@ button {
   border-radius: 0.5rem;
 }
 
+.mp-pos-form select {
+  width: 100%;
+  max-width: 360px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+}
+
 .mp-pos-form input:focus {
   border-color: var(--accent-color);
   box-shadow: 0 0 0 3px var(--color-accent-ring);
+  outline: none;
+}
+
+.mp-input-note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: -0.25rem 0 0.25rem;
+}
+
+.mp-input-note--success {
+  color: var(--color-success, #16a34a);
+}
+
+.mp-auto-filled {
+  background: var(--color-hover, #f8fafc);
+  cursor: default;
+}
+
+.mp-auto-filled:focus {
+  border-color: var(--color-border-strong);
+  box-shadow: none;
   outline: none;
 }
 

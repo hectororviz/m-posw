@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
@@ -71,8 +71,23 @@ export class MercadoPagoOauthController {
     return this.mpOauthService.getQr();
   }
 
+  @Get('city-by-zip')
+  async cityByZip(@Query('zip') zip?: string) {
+    if (!zip) {
+      throw new HttpException('Parametro "zip" requerido', HttpStatus.BAD_REQUEST);
+    }
+    const result = await this.mpOauthService.cityByZip(zip);
+    if (!result) {
+      throw new HttpException('Ciudad no encontrada para ese codigo postal', HttpStatus.NOT_FOUND);
+    }
+    return result;
+  }
+
   @Get('cities')
-  async cities(@Query('stateName') stateName?: string) {
+  async cities(@Query('stateName') stateName?: string, @Query('q') q?: string) {
+    if (q) {
+      return this.mpOauthService.searchCities(q);
+    }
     return this.mpOauthService.getCities(stateName);
   }
 
