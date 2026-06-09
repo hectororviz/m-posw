@@ -537,7 +537,8 @@ export class SociosService {
 
     if (!socio) throw new NotFoundException('Socio no encontrado');
 
-    const setting = await this.prisma.setting.findFirst({
+    const setting = await this.prisma.setting.findUnique({
+      where: { id: '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca' },
       select: { logoUrl: true, storeName: true, clubName: true, accentColor: true },
     });
 
