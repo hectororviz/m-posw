@@ -438,3 +438,14 @@ export interface AcreedoresResumen {
   deudaTotal: number;
   acreedoresConDeuda: number;
 }
+
+export interface StatsSummary {
+  totalSales: number;
+  salesCount: number;
+  avgTicket: number;
+  totalProducts: number;
+  topProduct: string;
+  byProduct: { name: string; quantity: number }[];
+  byPaymentMethod: { method: string; total: number }[];
+  byDay: { date: string; total: number }[];
+}

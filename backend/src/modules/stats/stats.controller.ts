@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
@@ -10,6 +10,14 @@ import { StatsService } from './stats.service';
 @Roles(Role.ADMIN)
 export class StatsController {
   constructor(private readonly statsService: StatsService) {}
+
+  @Get('summary')
+  summary(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.statsService.summary(from, to);
+  }
 
   @Get('totals-by-day')
   totalsByDay() {

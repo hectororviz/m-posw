@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StatsSummary, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -361,6 +361,18 @@ export const useAcreedoresResumen = () =>
     queryKey: ['acreedores-resumen'],
     queryFn: async () => {
       const response = await apiClient.get<AcreedoresResumen>('/acreedores/resumen');
+      return response.data;
+    },
+  });
+
+export const useStatsSummary = (from?: string, to?: string) =>
+  useQuery({
+    queryKey: ['stats-summary', from, to],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const response = await apiClient.get<StatsSummary>(`/stats/summary?${params.toString()}`);
       return response.data;
     },
   });
