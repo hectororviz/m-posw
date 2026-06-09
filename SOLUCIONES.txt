@@ -1,0 +1,353 @@
+============================================================
+PLAN DE SOLUCIÓN — Auditoría m-POSw (Junio 2025)
+============================================================
+
+
+✅ [CRIT-01] GET /settings exponía tokens OAuth sin autenticación
+--------------------------------------------------------------------
+Archivo: backend/src/modules/settings/settings.service.ts
+
+Problema:
+  El método get() hacía spread completo del modelo Setting (...settings),
+  exponiendo en GET /api/settings (sin auth) campos como mpAccessToken,
+  mpRefreshToken, mpCollectorId, mpStoreId, mpPosId, mpQrData, etc.
+
+Solución:
+  Se reemplazó el spread `...settings` por un return explícito con solo
+  los 14 campos públicos que el frontend realmente consume: storeName,
+  clubName, enableTicketPrinting, logoUrl, faviconUrl, okAnimationUrl,
+  errorAnimationUrl, accentColor, enableCashPayment, enableQrPayment,
+  enableTransferPayment, enableFiadoPayment, movementInReasons,
+  movementOutReasons.
+
+Impacto frontend:
+  Ninguno. Se verificó que ningún componente lee campos OAuth desde
+  settings.mpAccessToken ni similares. La UI usa una API separada
+  (GET /mp-oauth/status) para el estado de vinculación MP.
+
+Estado: Corregido ✓
+
+
+✅ [CRIT-02] Tokens OAuth se logueaban completos en mensajes de error
+--------------------------------------------------------------------
+Archivos:
+  backend/src/modules/mercadopago-oauth/mercadopago-oauth.service.ts (línea 114)
+  backend/src/modules/common/mp-config.service.ts (línea 145)
+
+Problema:
+  Cuando fallaba el intercambio de código OAuth o el refresh de token,
+  se logueaba la respuesta completa de la API de MP con JSON.stringify(...),
+  incluyendo access_token y refresh_token en texto plano dentro de los
+  logs del contenedor.
+
+Solución:
+  En ambos archivos, antes del logger.error() se agregó:
+    const { access_token, refresh_token, ...safeData } = <response>;
+    this.logger.error(`... ${JSON.stringify(safeData)}`);
+  Esto redacta los campos sensibles manteniendo la información útil de
+  diagnóstico (error code, message, user_id, etc.).
+
+Estado: Corregido ✓
+
+
+✅ [ALTA-03] Sin security headers (Helmet)
+--------------------------------------------------------------------
+Archivo: backend/package.json
+         backend/src/main.ts
+
+Problema:
+  El backend no seteaba ningún header de seguridad HTTP (CSP, HSTS,
+  X-Content-Type-Options, X-Frame-Options, Referrer-Policy, etc.),
+  dejando la API vulnerable a clickjacking, MIME sniffing, y downgrade
+  de HTTPS.
+
+Solución:
+  1. Se agregó "helmet": "^8.0.0" a las dependencies de package.json.
+  2. Se agregó `import helmet from 'helmet'` en main.ts.
+  3. Se agregó `app.use(helmet())` como primera línea después de crear
+     la app, antes de CORS y cualquier otra configuración.
+
+Headers resultantes en todas las respuestas:
+  Content-Security-Policy, Cross-Origin-Opener-Policy,
+  Cross-Origin-Resource-Policy, Origin-Agent-Cluster,
+  Referrer-Policy: no-referrer, Strict-Transport-Security,
+  X-Content-Type-Options: nosniff, X-DNS-Prefetch-Control: off,
+  X-Download-Options: noopen, X-Frame-Options: SAMEORIGIN,
+  X-Permitted-Cross-Domain-Policies: none, X-XSS-Protection: 0.
+
+Impacto frontend:
+  Ninguno. El frontend lo sirve nginx, el backend es solo API. El CSP
+  de helmet no interfiere con las llamadas desde el navegador.
+
+Estado: Corregido ✓
+
+
+✅ [ALTA-01] CORS fallback a wildcard "*"
+--------------------------------------------------------------------
+Archivo: backend/src/main.ts
+
+Problema:
+  Si CORS_ORIGIN no estaba definido en el .env, el backend permitía
+  requests desde cualquier origen (origin: '*'). Esto permitía que
+  cualquier sitio web malicioso hiciera peticiones AJAX al backend.
+
+Solución:
+  Se eliminó el fallback `|| '*'`. Si CORS_ORIGIN no está configurado,
+  se loguea un error de alerta y CORS se deshabilita (same-origin only).
+  El valor real se toma del .env de cada instancia.
+
+Verificación:
+  - soler: CORS_ORIGIN=https://soler.mposw.com.ar ✓
+  - noe7: CORS_ORIGIN=https://noe7.mposw.com.ar ✓
+  - m-posw: CORS_ORIGIN=https://pos.csdsoler.com.ar ✓
+
+  Header resultante: Access-Control-Allow-Origin: https://pos.csdsoler.com.ar
+  (en vez del wildcard '*')
+
+Estado: Corregido ✓
+
+
+✅ [ALTA-02] Sin rate limiting (fuerza bruta en login)
+--------------------------------------------------------------------
+Archivos: backend/package.json
+          backend/src/modules/app.module.ts
+          backend/src/modules/auth/auth.controller.ts
+          backend/src/modules/sales/webhooks/mercadopago-webhook.controller.ts
+          backend/src/main.ts
+
+Problema:
+  No existía ningún mecanismo de rate limiting. El endpoint POST /auth/login
+  y GET /auth/login-users aceptaban requests ilimitados, permitiendo
+  ataques de fuerza bruta y enumeración de usuarios.
+
+Solución:
+  1. Se agregó "@nestjs/throttler": "^6.0.0" a package.json.
+  2. ThrottlerModule configurado en app.module.ts como guard global:
+     - Límite general: 60 requests/minuto por IP
+  3. trust proxy habilitado en main.ts para que el backend lea
+     X-Forwarded-For de Caddy/nginx y detecte la IP real del cliente.
+  4. Endpoint login: @Throttle({ default: { ttl: 60000, limit: 5 } })
+     = 5 intentos/minuto por IP
+  5. Endpoint login-users: mismo límite de 5/minuto por IP
+  6. Webhooks: @SkipThrottle() — excluidos del rate limiting porque
+     MercadoPago puede enviar múltiples webhooks en ráfaga.
+
+Verificación:
+  - 6 requests a /auth/login → 6to devuelve HTTP 429 ✓
+  - 6 requests a /auth/login-users → 6to devuelve HTTP 429 ✓
+  - 65 requests a /webhooks/mercadopago → todos HTTP 200 ✓
+  - /settings con 6 requests → todos HTTP 200 (dentro del límite 60/min) ✓
+
+Estado: Corregido ✓
+
+
+✅ [MED-03] GET /auth/login-users exponía role y externalPosId
+--------------------------------------------------------------------
+Archivo: backend/src/modules/users/users.service.ts
+
+Problema:
+  El endpoint público GET /auth/login-users devolvía `role` y `externalPosId`
+  de cada usuario activo sin necesidad. El frontend no los usa desde este
+  endpoint. Esto revelaba qué usuarios son admins y datos de configuración
+  de MercadoPago.
+
+Solución:
+  Se eliminaron `role` y `externalPosId` del select en listForLogin().
+  Ahora el endpoint devuelve solo: id, name, email, active.
+
+Verificación frontend:
+  - LoginPage usa de este endpoint: id, name, email, active → todos intactos.
+  - Ningún componente lee .role ni .externalPosId de useLoginUsers().
+  - AdminSettingsPage y AdminUsersPage obtienen role de GET /users (otro endpoint).
+
+Estado: Corregido ✓
+
+
+✅ [MED-04] GET /products y GET /categories sin autenticación
+--------------------------------------------------------------------
+Archivos: backend/src/modules/products/products.controller.ts
+          backend/src/modules/categories/categories.controller.ts
+
+Problema:
+  Tres endpoints públicos exponían el catálogo completo sin requerir
+  autenticación:
+  - GET /products → productos activos con precios y stock
+  - GET /categories → categorías activas
+  - GET /categories/:id/products → productos por categoría
+
+Solución:
+  Se agregó @UseGuards(JwtAuthGuard) a los tres métodos (listActive en
+  products, listActive en categories, listProducts en categories).
+
+Verificación:
+  - GET /products sin token → 401 ✓
+  - GET /categories sin token → 401 ✓
+  - GET /categories/:id/products sin token → 401 ✓
+  - Con token JWT válido → 200 ✓ (catálogo normal)
+
+Impacto frontend:
+  Ninguno. El POS carga productos y categorías solo después del login,
+  cuando el token JWT ya está disponible. El interceptor de Axios lo
+  envía automáticamente en cada request.
+
+Estado: Corregido ✓
+
+
+✅ [MED-05] SVG malicioso en uploads de logo, favicon y animación
+--------------------------------------------------------------------
+Archivo: backend/src/modules/settings/settings.controller.ts
+
+Problema:
+  - Logo: aceptaba cualquier image/* (incluyendo image/svg+xml). Extensión
+    user-controlled vía extname(file.originalname). Sin procesar con Sharp.
+  - Favicon: incluía image/svg+xml en el allowlist explícito.
+  - Animación: no validaba que el contenido fuera JSON parseable.
+  - Un SVG con <script> embebido cargado como logo ejecuta XSS almacenado.
+
+Solución:
+  1. Logo: allowlist estricta image/png, image/jpeg, image/webp. Archivo
+     procesado con Sharp y convertido a WebP (resize 768px, quality 80).
+     PNG original eliminado después de la conversión.
+  2. Favicon: removido image/svg+xml del allowlist. Solo image/png,
+     image/x-icon, image/vnd.microsoft.icon.
+  3. Animación: validación JSON.parse() antes de guardar. Si falla,
+     archivo eliminado y HTTP 400.
+  4. Extensión: función safeFilename() que mapea MIME_TO_EXT en vez de
+     usar extname(file.originalname). Extensiones predecibles y seguras.
+
+Verificación:
+  - Subir SVG como logo → 400 "Tipo de archivo inválido" ✓
+  - Subir SVG como favicon → 400 "Tipo de archivo inválido" ✓
+  - Subir JSON inválido como animación → 400 "no contiene JSON válido" ✓
+  - Subir PNG válido como logo → 201, guardado como .webp procesado ✓
+  - Subir JSON válido como animación → 201 ✓
+
+Estado: Corregido ✓
+
+
+✅ [MED-06] Nginx corriendo como root en el contenedor frontend
+--------------------------------------------------------------------
+Archivo: frontend/Dockerfile
+
+Problema:
+  El contenedor del frontend corría nginx como root (USER no definido).
+  Si un atacante lograba explotar nginx o la app, obtenía acceso root
+  dentro del contenedor.
+
+Solución:
+  1. Se agregó setcap cap_net_bind_service=+ep sobre /usr/sbin/nginx
+     para permitir al usuario nginx bindear al puerto 80 sin ser root.
+  2. Se movió el PID file de /run/nginx.pid a /tmp/nginx.pid (nginx
+     no tiene permisos de escritura en /run).
+  3. Se ajustaron permisos con chown -R nginx:nginx sobre
+     /var/cache/nginx, /var/run y /usr/share/nginx/html.
+  4. Se agregó USER nginx al final del Dockerfile.
+
+Verificación:
+  - docker compose exec frontend whoami → "nginx" ✓
+  - ps aux → "nginx: master process nginx" (uid=nginx) ✓
+  - Frontend sirviendo correctamente en puerto 80 ✓
+
+Estado: Corregido ✓
+
+
+✅ [MED-07] Sin DTO validation en endpoints de OAuth
+--------------------------------------------------------------------
+Archivos: backend/src/modules/mercadopago-oauth/mercadopago-oauth.controller.ts
+          backend/src/modules/mercadopago-oauth/dto/token-exchange.dto.ts (nuevo)
+          backend/src/modules/mercadopago-oauth/dto/select-store.dto.ts (nuevo)
+          backend/src/modules/mercadopago-oauth/dto/setup-pos.dto.ts (nuevo)
+
+Problema:
+  Tres endpoints del controlador OAuth aceptaban datos con tipos inline
+  de TypeScript sin validación de class-validator. Campos como storeName,
+  posName, streetName, etc. (8 campos en setup-pos) pasaban sin filtrar.
+
+Solución:
+  Se crearon 3 DTOs con validación:
+  1. TokenExchangeDto: code (@IsString, @IsNotEmpty)
+  2. SelectStoreDto: storeId, posId (@IsString, @IsNotEmpty)
+  3. SetupPosDto: 7 campos requeridos + latitude/longitude opcionales
+     con validación de rango (@Min(-90), @Max(90) / @Min(-180), @Max(180))
+
+Verificación:
+  - token con code vacío → 400 "code should not be empty" ✓
+  - token body vacío → 400 "code should not be empty, must be string" ✓
+  - select-store body vacío → 400 ambos campos requeridos ✓
+  - setup-pos body vacío → 400 los 7 campos requeridos ✓
+  - latitude=999 → 400 "must not be greater than 90" ✓
+
+Impacto en producción:
+  Ninguno. Soler y noe7 usan OAuth activo pero los inputs válidos no
+  cambian de comportamiento. Solo se rechazan inputs inválidos que antes
+  pasaban silenciosamente.
+
+Estado: Corregido ✓
+
+
+✅ [MED-08] Condición de carrera en decremento de stock
+--------------------------------------------------------------------
+Archivo: backend/src/modules/sales/sales.service.ts
+
+Problema:
+  El método decrementStockForSale() usaba un patrón no atómico:
+    1. findUnique → leer stock actual
+    2. calcular newStock = current - cantidad
+    3. $executeRaw UPDATE SET stock = newStock
+  Entre los pasos 1 y 3, otra venta concurrente podía leer el mismo stock,
+  causando que uno de los decrementos se pierda.
+
+Solución:
+  Se reemplazó por un update atómico de Prisma:
+    this.prisma.product.update({
+      where: { id },
+      data: { stock: { decrement: cantidad } }
+    })
+  Prisma genera UPDATE SET stock = stock - cantidad WHERE id = ...
+  que es atómico a nivel base de datos sin bloqueo explícito.
+
+  Nota: el webhook processor (mercadopago-webhook-processor.service.ts)
+  ya usaba el patrón atómico correcto. Solo faltaba en sales.service.ts.
+
+Verificación:
+  - Build exitoso sin errores ✓
+  - $executeRaw eliminado del código compilado (de 2 ocurrencias a 0) ✓
+  - Backend levanta sin errores ✓
+
+Estado: Corregido ✓
+
+
+✅ [MED-09] Items de ConfirmTransfer sin validación anidada
+--------------------------------------------------------------------
+Archivos: backend/src/modules/payments/dto/transfer.dto.ts
+          backend/src/modules/payments/payments.controller.ts
+
+Problema:
+  ConfirmTransferWithItemsDto era una interface inline en el controller
+  sin validación class-validator. El array items aceptaba cualquier string
+  como productId y cualquier número como quantity (incluso 0 o negativos).
+
+Solución:
+  1. Se creó ConfirmTransferItemDto con @IsUUID en productId y @IsInt + @Min(1)
+     en quantity.
+  2. ConfirmTransferWithItemsDto ahora es una clase que extiende ConfirmTransferDto
+     con @ArrayMinSize(1) + @ValidateNested({ each: true }) en items.
+  3. Se eliminó la interface inline del controller.
+
+Verificación:
+  - items vacío → 400 "items must contain at least 1 elements" ✓
+  - quantity=0 → 400 "items.0.quantity must not be less than 1" ✓
+  - productId="no-es-uuid" → 400 "items.0.productId must be a UUID" ✓
+
+Estado: Corregido ✓
+
+
+
+
+
+
+
+
+
+
+

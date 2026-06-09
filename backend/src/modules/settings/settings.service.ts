@@ -36,9 +36,20 @@ export class SettingsService {
       update: {},
     });
     return {
-      ...settings,
+      storeName: settings.storeName,
+      clubName: settings.clubName,
+      enableTicketPrinting: settings.enableTicketPrinting,
+      logoUrl: settings.logoUrl,
+      faviconUrl: settings.faviconUrl,
       okAnimationUrl: settings.okAnimationUrl ?? DEFAULT_OK_ANIMATION_URL,
       errorAnimationUrl: settings.errorAnimationUrl ?? DEFAULT_ERROR_ANIMATION_URL,
+      accentColor: settings.accentColor,
+      enableCashPayment: settings.enableCashPayment,
+      enableQrPayment: settings.enableQrPayment,
+      enableTransferPayment: settings.enableTransferPayment,
+      enableFiadoPayment: settings.enableFiadoPayment,
+      movementInReasons: settings.movementInReasons,
+      movementOutReasons: settings.movementOutReasons,
     };
   }
 

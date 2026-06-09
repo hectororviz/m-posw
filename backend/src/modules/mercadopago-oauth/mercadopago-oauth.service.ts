@@ -111,7 +111,8 @@ export class MercadoPagoOauthService {
       tokenData = (await response.json()) as typeof tokenData;
 
       if (!response.ok || !tokenData.access_token) {
-        this.logger.error(`MP OAuth token exchange failed: ${JSON.stringify(tokenData)}`);
+        const { access_token, refresh_token, ...safeData } = tokenData;
+        this.logger.error(`MP OAuth token exchange failed: ${JSON.stringify(safeData)}`);
         throw new HttpException(
           'Error al intercambiar el código por token de MercadoPago',
           HttpStatus.BAD_GATEWAY,

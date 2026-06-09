@@ -1,9 +1,11 @@
 import { Body, Controller, Headers, Logger, Post, Query, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { MercadoPagoWebhookProcessorService } from '../services/mercadopago-webhook-processor.service';
 import { getManifestId, getResourceId, verifySignature } from './mercadopago-webhook.utils';
 
+@SkipThrottle()
 @Controller('webhooks')
 export class MercadoPagoWebhookController {
   private readonly logger = new Logger(MercadoPagoWebhookController.name);

@@ -33,6 +33,7 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   listActive() {
     return this.categoriesService.listActive();
   }
@@ -62,6 +63,7 @@ export class CategoriesController {
   }
 
   @Get(':id/products')
+  @UseGuards(JwtAuthGuard)
   async listProducts(
     @Param('id') id: string,
     @Query('includeInactive') includeInactive?: string,

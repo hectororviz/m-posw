@@ -84,11 +84,9 @@ export class UsersService {
       where: { active: true },
       select: {
         id: true,
-        email: true,
         name: true,
-        role: true,
+        email: true,
         active: true,
-        externalPosId: true,
       },
       orderBy: { name: 'asc' },
     });

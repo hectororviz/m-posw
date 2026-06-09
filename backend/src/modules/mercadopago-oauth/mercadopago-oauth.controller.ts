@@ -3,6 +3,9 @@ import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
+import { SelectStoreDto } from './dto/select-store.dto';
+import { SetupPosDto } from './dto/setup-pos.dto';
+import { TokenExchangeDto } from './dto/token-exchange.dto';
 import { MercadoPagoOauthService } from './mercadopago-oauth.service';
 
 @Controller('mp-oauth')
@@ -17,7 +20,7 @@ export class MercadoPagoOauthController {
   }
 
   @Post('token')
-  token(@Body() body: { code: string }) {
+  token(@Body() body: TokenExchangeDto) {
     return this.mpOauthService.exchangeToken(body.code);
   }
 
@@ -37,22 +40,12 @@ export class MercadoPagoOauthController {
   }
 
   @Post('select-store')
-  selectStore(@Body() body: { storeId: string; posId: string }) {
+  selectStore(@Body() body: SelectStoreDto) {
     return this.mpOauthService.selectStore(body.storeId, body.posId);
   }
 
   @Post('setup-pos')
-  setupPos(@Body() body: {
-    storeName: string;
-    posName: string;
-    streetName: string;
-    streetNumber: string;
-    cityName: string;
-    stateName: string;
-    zipCode: string;
-    latitude?: number;
-    longitude?: number;
-  }) {
+  setupPos(@Body() body: SetupPosDto) {
     return this.mpOauthService.setupPos(
       body.storeName,
       body.posName,

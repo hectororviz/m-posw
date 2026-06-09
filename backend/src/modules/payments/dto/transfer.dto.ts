@@ -1,5 +1,15 @@
-import { IsNumber, IsPositive, IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsNumber, IsPositive, IsString, IsUUID, IsInt, Min, ValidateNested, IsArray, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class ConfirmTransferItemDto {
+  @IsUUID()
+  productId: string;
+
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  quantity: number;
+}
 
 export class PollTransferDto {
   @IsNumber({ maxDecimalPlaces: 2 })
@@ -21,6 +31,14 @@ export class ConfirmTransferDto {
   @IsPositive()
   @Type(() => Number)
   monto_esperado!: number;
+}
+
+export class ConfirmTransferWithItemsDto extends ConfirmTransferDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ConfirmTransferItemDto)
+  items: ConfirmTransferItemDto[];
 }
 
 export interface PollTransferResponse {

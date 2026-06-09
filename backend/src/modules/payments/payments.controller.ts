@@ -4,11 +4,7 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { PaymentsService } from './payments.service';
-import { PollTransferDto, ConfirmTransferDto } from './dto/transfer.dto';
-
-interface ConfirmTransferWithItemsDto extends ConfirmTransferDto {
-  items: { productId: string; quantity: number }[];
-}
+import { PollTransferDto, ConfirmTransferWithItemsDto } from './dto/transfer.dto';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard, RolesGuard)

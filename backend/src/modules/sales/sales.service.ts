@@ -555,35 +555,21 @@ export class SalesService {
         for (const ingredient of product.recipeAsComposite) {
           const qty = Number(ingredient.quantity);
           const totalQty = qty * item.quantity;
-          
-          const current = await this.prisma.product.findUnique({
+
+          await this.prisma.product.update({
             where: { id: ingredient.rawMaterialId },
-            select: { stock: true },
+            data: { stock: { decrement: totalQty } },
           });
-          
-          const currentStock = Number(current?.stock || 0);
-          const newStock = currentStock - totalQty;
-          
-          await this.prisma.$executeRaw`
-            UPDATE "Product" SET stock = ${newStock} WHERE id = ${ingredient.rawMaterialId}::uuid
-          `;
-          
-          this.logger.log(`[STOCK] ${ingredient.rawMaterial.name}: ${currentStock} -> ${newStock}`);
+
+          this.logger.log(`[STOCK] ${ingredient.rawMaterial.name}: decrementado ${totalQty}`);
         }
       } else {
-        const current = await this.prisma.product.findUnique({
+        await this.prisma.product.update({
           where: { id: item.productId },
-          select: { stock: true },
+          data: { stock: { decrement: item.quantity } },
         });
-        
-        const currentStock = Number(current?.stock || 0);
-        const newStock = currentStock - item.quantity;
-        
-        await this.prisma.$executeRaw`
-          UPDATE "Product" SET stock = ${newStock} WHERE id = ${item.productId}::uuid
-        `;
-        
-        this.logger.log(`[STOCK] ${product.name}: ${currentStock} -> ${newStock}`);
+
+        this.logger.log(`[STOCK] ${product.name}: decrementado ${item.quantity}`);
       }
     }
   }

@@ -1,0 +1,718 @@
+============================================================
+AUDITORÍA DE SEGURIDAD — m-POSw
+Fecha: Junio 2025
+============================================================
+
+
+============================================================
+PRIORIDAD CRÍTICA — Corregir inmediatamente
+============================================================
+
+
+[CRIT-01] GET /settings expone tokens OAuth sin autenticación
+--------------------------------------------------------------------
+Archivo: backend/src/modules/settings/settings.controller.ts (línea 77-79)
+         backend/src/modules/settings/settings.service.ts (línea 16-43)
+
+Funcionamiento actual:
+  El endpoint GET /api/settings no tiene ningún guard de autenticación
+  (@UseGuards). Cualquier persona, sin login, puede hacer una petición
+  GET y recibir TODA la configuración del sistema. El método get() del
+  servicio hace un spread completo del registro Setting de Prisma
+  (...settings), lo que incluye campos sensibles como:
+  - mpAccessToken  (token de acceso OAuth de Mercado Pago)
+  - mpRefreshToken (token para renovar el access token)
+  - mpTokenExpiresAt
+  - mpCollectorId  (ID de cuenta de Mercado Pago)
+  - mpStoreId / mpPosId (IDs de tienda y punto de venta)
+  - mpQrData       (datos del QR del POS)
+
+Riesgo:
+  Un atacante puede obtener tokens OAuth válidos y operar la cuenta de
+  Mercado Pago vinculada. Puede crear órdenes de pago, leer transacciones,
+  y potencialmente desviar pagos.
+
+Solución propuesta:
+  - Agregar @UseGuards(JwtAuthGuard) al método GET.
+  - En el servicio, excluir explícitamente los campos sensibles
+    (mpAccessToken, mpRefreshToken) del objeto de respuesta con un select
+    o delete.
+
+
+[CRIT-02] Tokens OAuth se loguean completos en mensajes de error
+--------------------------------------------------------------------
+Archivo: backend/src/modules/mercadopago-oauth/mercadopago-oauth.service.ts (línea 114)
+         backend/src/modules/common/mp-config.service.ts (línea 145)
+
+Funcionamiento actual:
+  Cuando falla una llamada a la API de Mercado Pago (intercambio de código
+  OAuth o refresh de token), el código actual loguea el objeto de respuesta
+  COMPLETO usando JSON.stringify():
+  - this.logger.error(`MP OAuth token exchange failed: ${JSON.stringify(tokenData)}`)
+  - this.logger.error(`MP OAuth refresh failed: ${JSON.stringify(data)}`)
+  El objeto contiene access_token y refresh_token en texto plano.
+
+Riesgo:
+  Los logs de contenedor suelen enviarse a sistemas centralizados (ELK,
+  CloudWatch, Datadog, etc.). Los tokens quedan expuestos en esos sistemas
+  y cualquiera con acceso a los logs puede extraerlos.
+
+Solución propuesta:
+  - Antes de loguear, crear una copia del objeto y eliminar/redactar los
+    campos access_token y refresh_token. Ejemplo:
+    const { access_token, refresh_token, ...safe } = tokenData;
+    this.logger.error(`MP error: ${JSON.stringify(safe)}`);
+
+
+============================================================
+PRIORIDAD ALTA — Corregir con urgencia
+============================================================
+
+
+[ALTA-01] CORS hace fallback a wildcard "*"
+--------------------------------------------------------------------
+Archivo: backend/src/main.ts (línea 15)
+
+Funcionamiento actual:
+  const corsOrigin = config.get<string>('CORS_ORIGIN') || '*';
+  app.enableCors({ origin: corsOrigin });
+  Si la variable de entorno CORS_ORIGIN no está definida, se usa '*' como
+  origen permitido. Esto significa que cualquier dominio puede hacer
+  peticiones AJAX al backend. Tampoco se restringen métodos HTTP ni headers.
+
+Riesgo:
+  Cualquier sitio web malicioso puede hacer peticiones autenticadas al
+  backend si el usuario tiene una sesión activa (el navegador envía
+  cookies y tokens automáticamente en peticiones cross-origin sin
+  credenciales restringidas).
+
+Solución propuesta:
+  - Eliminar el fallback || '*'. Hacer que CORS_ORIGIN sea obligatorio.
+  - Si no está definido, lanzar un error en startup.
+  - Agregar restricción de methods: ['GET','POST','PATCH','DELETE'] y
+    allowedHeaders explícitos.
+
+
+[ALTA-02] Sin rate limiting en ningún endpoint
+--------------------------------------------------------------------
+Archivo: No implementado en todo el backend
+
+Funcionamiento actual:
+  El proyecto no tiene instalado @nestjs/throttler ni ningún mecanismo
+  de rate limiting. Todos los endpoints aceptan requests ilimitados sin
+  ningún tipo de control de frecuencia, incluyendo:
+  - POST /auth/login (sin límite de intentos)
+  - GET /auth/login-users (endpoint sin auth que expone usuarios)
+  - POST /webhooks/mercadopago (potencial DoS)
+
+Riesgo:
+  - Fuerza bruta contra login: un atacante puede probar miles de
+    contraseñas por minuto sin ser bloqueado.
+  - Enumeración de usuarios vía /auth/login-users sin restricción.
+  - Denegación de servicio por saturación de endpoints.
+
+Solución propuesta:
+  - Instalar @nestjs/throttler.
+  - Configurar límites por IP: 5 intentos/min en /auth/login,
+    30 req/min en endpoints generales.
+  - Opcional: implementar bloqueo progresivo de cuenta tras N fallos.
+
+
+[ALTA-03] Sin security headers (Helmet)
+--------------------------------------------------------------------
+Archivo: backend/package.json (helmet no instalado)
+         backend/src/main.ts (no se configura helmet)
+
+Funcionamiento actual:
+  El proyecto no usa el paquete helmet ni configura manualmente headers
+  de seguridad HTTP. Faltan headers como:
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: DENY
+  - Strict-Transport-Security (HSTS)
+  - Content-Security-Policy
+  - Referrer-Policy
+  - Permissions-Policy
+
+Riesgo:
+  - Clickjacking: el sitio puede ser embebido en un iframe malicioso.
+  - MIME sniffing: el navegador puede interpretar archivos como otro
+    tipo de contenido.
+  - Sin HSTS, conexiones HTTP sin protección contra downgrade.
+  - Sin CSP, mayor superficie de ataque XSS.
+
+Solución propuesta:
+  - Instalar helmet: npm install helmet
+  - En main.ts: app.use(helmet()) antes de cualquier otra configuración.
+
+
+[ALTA-04] Contraseña admin por defecto hardcodeada
+--------------------------------------------------------------------
+Archivo: backend/prisma/seed.ts (línea 8)
+         docker-compose.yml (RUN_SEED: "1")
+
+Funcionamiento actual:
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
+  El seed corre en cada inicio del contenedor (RUN_SEED=1 en
+  docker-compose.yml). Si el administrador no configura la variable
+  ADMIN_PASSWORD en el .env, el usuario admin se crea/actualiza con la
+  contraseña predecible "Admin123!".
+
+Riesgo:
+  Es una de las primeras contraseñas que un atacante prueba. Si se olvida
+  configurar la variable de entorno en producción, el sistema queda con
+  una contraseña por defecto conocida.
+
+Solución propuesta:
+  - Eliminar el valor por defecto 'Admin123!'.
+  - Si ADMIN_PASSWORD no está definida, lanzar error y detener el seed.
+  - Alternativa: generar una contraseña aleatoria y mostrarla en logs
+    solo en el primer inicio.
+
+
+[ALTA-05] Webhook de MercadoPago loguea request completo
+--------------------------------------------------------------------
+Archivo: backend/src/modules/sales/webhooks/mercadopago-webhook.controller.ts (línea 24-32)
+
+Funcionamiento actual:
+  Cuando llega un webhook de Mercado Pago, el controlador loguea el
+  request entero con JSON.stringify:
+  {
+    method, url, query,
+    headers,  // incluye x-signature, x-request-id
+    body      // incluye datos de pago, resource, topic
+  }
+  Esto se ejecuta en cada webhook recibido, antes de cualquier validación.
+
+Riesgo:
+  - El header x-signature queda registrado en logs (aunque no es
+    suficiente para falsificar webhooks sin el secret, es información
+    innecesaria).
+  - Los datos de pago (amount, payer, payment_id) quedan en logs.
+  - Si los logs se almacenan en servicios externos, datos de clientes
+    quedan expuestos.
+
+Solución propuesta:
+  - Loguear solo campos esenciales: topic, resourceId, requestId.
+  - No loguear headers completos ni body completo.
+  - Usar nivel debug para datos detallados y solo en development.
+
+
+[ALTA-06] Webhook signature bypass para topic merchant_order
+--------------------------------------------------------------------
+Archivo: backend/src/modules/sales/webhooks/mercadopago-webhook.utils.ts (línea 106-110)
+         backend/src/modules/sales/webhooks/mercadopago-webhook.controller.ts
+
+Funcionamiento actual:
+  En la verificación de firma del webhook, si el topic es "merchant_order",
+  aunque la firma sea inválida, el sistema devuelve { shouldReject: false }
+  y continúa procesando. Esto significa que cualquier persona que conozca
+  la URL del webhook puede enviar peticiones con topic=merchant_order y
+  datos arbitrarios, y serán procesadas sin verificación de autenticidad.
+
+Riesgo:
+  Un atacante podría enviar merchant_order falsos que disparen lógica de
+  negocio indebida (actualización de estados de órdenes, notificaciones,
+  etc.).
+
+Solución propuesta:
+  - Tratar merchant_order igual que payment: validar firma siempre.
+  - Si MP_WEBHOOK_STRICT_PAYMENT=true, rechazar órdenes sin firma válida.
+  - Como mínimo, loguear una alerta de seguridad cuando se recibe un
+    merchant_order con firma inválida.
+
+
+[ALTA-07] Bypass de firma en entornos no-producción
+--------------------------------------------------------------------
+Archivo: backend/src/modules/sales/webhooks/mercadopago-webhook.utils.ts (línea 88-90)
+
+Funcionamiento actual:
+  Si NODE_ENV !== 'production' y no hay MP_WEBHOOK_SECRET configurado,
+  la verificación de firma se saltea completamente y retorna { isValid: true }.
+  Esto permite que cualquier request al webhook sea aceptado como válido
+  en entornos de development/staging.
+
+Riesgo:
+  Si una instancia se despliega accidentalmente con NODE_ENV=development
+  (o simplemente no se configura NODE_ENV), los webhooks no se verifican.
+  Un atacante que descubra la URL del webhook puede enviar payloads
+  arbitrarios que serán procesados como legítimos.
+
+Solución propuesta:
+  - Siempre verificar la firma si MP_WEBHOOK_SECRET está configurado,
+    independientemente del entorno.
+  - Solo saltear la verificación si no hay secreto Y es development,
+    y en ese caso loguear una advertencia muy visible.
+
+
+[ALTA-08] MP_WEBHOOK_STRICT_PAYMENT=false por defecto
+--------------------------------------------------------------------
+Archivo: .env.example (línea 52)
+
+Funcionamiento actual:
+  La variable MP_WEBHOOK_STRICT_PAYMENT controla si un pago con firma
+  inválida debe ser rechazado. Por defecto está en "false", lo que
+  significa que el sistema acepta pagos con firma inválida (solo loguea
+  una advertencia). Para habilitar el rechazo estricto, hay que poner
+  explícitamente MP_WEBHOOK_STRICT_PAYMENT=true.
+
+Riesgo:
+  En producción, si no se configura explícitamente, un atacante puede
+  enviar webhooks de pago falsos que serán aceptados sin verificación
+  de firma, permitiendo crear pagos fraudulentos en el sistema.
+
+Solución propuesta:
+  - Cambiar el default en el código para que sea true cuando NODE_ENV
+    sea production. La lógica actual ya tiene un isProduction check;
+    asegurarse de que strict sea true en producción siempre.
+
+
+============================================================
+PRIORIDAD MEDIA — Corregir a corto plazo
+============================================================
+
+
+[MED-01] JWT almacenado en localStorage (vulnerable a XSS)
+--------------------------------------------------------------------
+Archivo: frontend/src/api/client.ts (línea 11)
+         frontend/src/context/AuthContext.tsx (línea 20, 30)
+
+Funcionamiento actual:
+  Al hacer login, el backend devuelve { accessToken } en el body JSON.
+  El frontend guarda este token en localStorage.getItem/setItem('authToken').
+  En cada request, el interceptor de Axios lee el token de localStorage y
+  lo agrega al header Authorization: Bearer <token>.
+
+Riesgo:
+  Cualquier script JavaScript que se ejecute en el contexto de la página
+  (por ejemplo, un ataque XSS o una extensión maliciosa del navegador)
+  puede leer localStorage y robar el token JWT. A diferencia de las
+  cookies httpOnly, localStorage es accesible desde JavaScript.
+
+Solución propuesta:
+  - Ideal: usar cookies httpOnly + secure + sameSite para el token.
+  - Alternativa más simple: mantener localStorage pero agregar una capa
+    de refresh token con rotación y expiración corta (15-30 min).
+  - Implementar Content-Security-Policy estricta para mitigar XSS.
+
+
+[MED-02] Contraseñas débiles (mínimo 6 caracteres)
+--------------------------------------------------------------------
+Archivo: backend/src/modules/users/dto/create-user.dto.ts (línea 14)
+         backend/src/modules/auth/dto/login.dto.ts
+
+Funcionamiento actual:
+  El DTO de creación de usuario y el de login usan @MinLength(6) como
+  única restricción de contraseña. No se requiere mayúsculas, números,
+  ni caracteres especiales. El login también acepta un campo "pin"
+  numérico de mínimo 6 dígitos como alternativa a la contraseña.
+
+Riesgo:
+  Contraseñas de 6 caracteres sin complejidad son vulnerables a fuerza
+  bruta y ataques de diccionario. Un PIN de 6 dígitos tiene solo 10^6
+  combinaciones (1 millón), lo cual es trivial para un ataque automatizado
+  sin rate limiting.
+
+Solución propuesta:
+  - Aumentar mínimo a 8 caracteres.
+  - Agregar requisitos de complejidad: al menos 1 mayúscula, 1 número.
+  - Para PIN: mínimo 6 dígitos está bien si hay rate limiting, pero
+    considerar aumentar a 8 dígitos o bloquear tras N intentos.
+
+
+[MED-03] GET /auth/login-users expone usuarios sin autenticación
+--------------------------------------------------------------------
+Archivo: backend/src/modules/auth/auth.controller.ts (línea 19-22)
+         backend/src/modules/auth/auth.service.ts
+
+Funcionamiento actual:
+  El endpoint GET /auth/login-users no tiene @UseGuards. Devuelve para
+  cada usuario activo: id, email, name, role, active, externalPosId.
+  Se usa en la pantalla de login para mostrar una lista de usuarios
+  disponibles para iniciar sesión (tipo "selector de perfil").
+
+Riesgo:
+  Un atacante puede enumerar todos los usuarios y sus roles sin
+  autenticarse. Esto facilita ataques dirigidos (sabe exactamente qué
+  emails probar). También expone externalPosId que revela configuración
+  de Mercado Pago.
+
+Solución propuesta:
+  - Si el endpoint es necesario para el flujo de login, al menos agregar
+    rate limiting agresivo (ej: 1 request por IP cada 30 segundos).
+  - Evaluar si realmente se necesita exponer emails completos o si se
+    puede limitar a name + role.
+  - Alternativa: mover esta lógica a un endpoint autenticado y hacer la
+    pantalla de login sin selector de usuarios.
+
+
+[MED-04] GET /products y GET /categories sin autenticación
+--------------------------------------------------------------------
+Archivo: backend/src/modules/products/products.controller.ts (línea 32)
+         backend/src/modules/categories/categories.controller.ts (línea 35, 64)
+
+Funcionamiento actual:
+  Los endpoints GET /products (listActive), GET /categories (listActive),
+  y GET /categories/:id/products no tienen guards. Devuelven el catálogo
+  completo de productos activos con precios, categorías y stock.
+
+Riesgo:
+  Competidores pueden scrapear el catálogo completo con precios. Si bien
+  no es un riesgo de seguridad alto, expone información del negocio.
+
+Solución propuesta:
+  - Agregar JwtAuthGuard si el catálogo debe ser solo para usuarios
+    autenticados.
+  - Si el catálogo debe ser público, al menos agregar rate limiting.
+
+
+[MED-05] Extensión de archivo controlada por usuario en uploads
+--------------------------------------------------------------------
+Archivo: backend/src/modules/settings/settings.controller.ts (línea 31-33)
+
+Funcionamiento actual:
+  Los uploads de logo y favicon usan diskStorage. El nombre del archivo
+  se genera como:
+    `${Date.now()}-${Math.random()}${extname(file.originalname)}`
+  La extensión se toma de file.originalname (controlado por el usuario)
+  con extname(). Aunque hay validación de mimetype (image/*), un archivo
+  con mimetype image/svg+xml y extensión .svg se guardaría como SVG.
+  El SVG puede contener JavaScript embebido que se ejecutaría si el
+  navegador lo carga como imagen en un contexto que permita scripts.
+
+Riesgo:
+  Stored XSS mediante SVG malicioso subido como logo. Si el SVG se sirve
+  con Content-Type: image/svg+xml, los scripts embebidos se ejecutan.
+
+Solución propuesta:
+  - No usar extname(file.originalname). Generar la extensión basada en
+    el mimetype validado (ej: image/png → .png).
+  - Procesar el logo con Sharp y convertirlo a PNG/WebP siempre,
+    eliminando cualquier posibilidad de SVG malicioso.
+  - Agregar Content-Security-Policy que bloquee scripts en imágenes.
+
+
+[MED-06] Nginx corre como root
+--------------------------------------------------------------------
+Archivo: frontend/Dockerfile (línea 13-15)
+         frontend/nginx.conf
+
+Funcionamiento actual:
+  El Dockerfile del frontend usa FROM nginx:1.27-alpine sin directiva
+  USER. Por defecto, el proceso nginx corre como root dentro del
+  contenedor. La configuración de nginx no tiene restricciones especiales.
+
+Riesgo:
+  Si un atacante logra explotar una vulnerabilidad en nginx o en la
+  aplicación, tendrá acceso como root dentro del contenedor, facilitando
+  la escalación de privilegios y el escape del contenedor.
+
+Solución propuesta:
+  - Agregar USER nginx al final del Dockerfile.
+  - Asegurarse que los puertos > 1024 (ya está en 8080, correcto).
+  - Verificar permisos de archivos servidos por nginx.
+
+
+[MED-07] Sin DTO validation en endpoints de OAuth
+--------------------------------------------------------------------
+Archivo: backend/src/modules/mercadopago-oauth/mercadopago-oauth.controller.ts (líneas 20, 40, 45-54)
+
+Funcionamiento actual:
+  Los endpoints del controlador de OAuth aceptan datos con tipos inline
+  de TypeScript en vez de usar DTOs con class-validator:
+  - POST /mp-oauth/token: @Body() body: { code: string }
+  - POST /mp-oauth/select-store: @Body() body: { storeId: string; posId: string }
+  - POST /mp-oauth/setup-pos: 8 campos string sin validación
+
+Riesgo:
+  Sin @IsString, @IsNotEmpty, @MaxLength, etc., el ValidationPipe
+  (que está configurado con forbidNonWhitelisted) no valida estos campos.
+  Se pueden enviar valores vacíos, strings enormes, o propiedades
+  adicionales que no deberían aceptarse.
+
+Solución propuesta:
+  - Crear DTOs: TokenExchangeDto, SelectStoreDto, SetupPosDto.
+  - Agregar decoradores de class-validator (@IsString, @IsNotEmpty, etc.)
+    a cada campo.
+  - Usar los DTOs en los parámetros @Body().
+
+
+[MED-08] Condición de carrera en decremento de stock
+--------------------------------------------------------------------
+Archivo: backend/src/modules/sales/sales.service.ts (líneas 565-585)
+
+Funcionamiento actual:
+  Al registrar una venta con productos que tienen recetas (ingredientes),
+  el sistema primero lee el stock actual con findUnique y luego actualiza
+  con $executeRaw:
+    1. SELECT stock FROM "Product" WHERE id = ...
+    2. UPDATE "Product" SET stock = ${nuevo_stock} WHERE id = ...
+  Entre el SELECT y el UPDATE, otra venta concurrente puede leer el mismo
+  stock. Ambas calcularán el nuevo stock basándose en el valor original,
+  causando que uno de los decrementos se "pierda".
+
+Riesgo:
+  El stock puede quedar inconsistente (más alto de lo real) bajo carga
+  concurrente. Esto puede llevar a vender productos sin stock real.
+
+Solución propuesta:
+  - Usar Prisma update con decrement atómico:
+    prisma.product.update({
+      where: { id },
+      data: { stock: { decrement: cantidad } }
+    })
+  - O usar transacción con bloqueo pesimista (SELECT ... FOR UPDATE).
+
+
+[MED-09] Items de ConfirmTransfer sin validación anidada
+--------------------------------------------------------------------
+Archivo: backend/src/modules/payments/payments.controller.ts
+         backend/src/modules/payments/dto/transfer.dto.ts
+
+Funcionamiento actual:
+  El endpoint POST /payments/confirm-transfer usa un tipo
+  ConfirmTransferWithItemsDto que extiende ConfirmTransferDto pero agrega
+  un array items: { productId: string; quantity: number }[] sin DTO
+  separado ni @ValidateNested. Los elementos del array no tienen
+  validación de @IsUUID para productId ni @Min(1) para quantity.
+
+Riesgo:
+  Se pueden enviar strings arbitrarios como productId o cantidades
+  negativas/cero. El servicio valida la existencia del producto en BD,
+  pero la falta de validación temprana puede causar errores 500 en vez
+  de 400.
+
+Solución propuesta:
+  - Crear un DTO ConfirmTransferItemDto con @IsUUID y @Min(1).
+  - Usar @ValidateNested({ each: true }) y @Type(() => ConfirmTransferItemDto)
+    en el array items del DTO principal.
+
+
+============================================================
+PRIORIDAD BAJA — Mejoras recomendadas
+============================================================
+
+
+[BAJ-01] console.log del DTO de settings
+--------------------------------------------------------------------
+Archivo: backend/src/modules/settings/settings.controller.ts (línea 86)
+
+Funcionamiento actual:
+  console.log('Update settings dto:', dto) en el método PATCH /settings.
+  Usa console.log en vez del logger de NestJS, lo que significa que no
+  respeta los niveles de log configurados.
+
+Riesgo:
+  Bajo. El endpoint requiere autenticación ADMIN, pero si los logs se
+  envían a sistemas externos, los cambios de configuración quedan
+  registrados en texto plano.
+
+Solución propuesta:
+  - Cambiar a this.logger.debug() y solo si no es producción.
+  - O directamente eliminar el log.
+
+
+[BAJ-02] $queryRawUnsafe en searchCities
+--------------------------------------------------------------------
+Archivo: backend/src/modules/mercadopago-oauth/mercadopago-oauth.service.ts (línea 643)
+
+Funcionamiento actual:
+  La búsqueda de ciudades usa this.prisma.$queryRawUnsafe(...) con la
+  query parametrizada vía $1. El valor del usuario se pasa como parámetro
+  bind (%${query}%), no interpolado en el string SQL.
+
+Riesgo:
+  Bajo. Técnicamente no hay SQL injection porque usa placeholder $1.
+  Pero el uso de $queryRawUnsafe es una mala práctica y puede confundir
+  en auditorías futuras.
+
+Solución propuesta:
+  - Cambiar $queryRawUnsafe por $queryRaw con Prisma.sql:
+    Prisma.sql`SELECT ... WHERE unaccent(city_name) ILIKE unaccent(${query})`
+
+
+[BAJ-03] Longitud del webhook secret logueada al inicio
+--------------------------------------------------------------------
+Archivo: backend/src/main.ts (línea 34)
+
+Funcionamiento actual:
+  logger.debug(`MercadoPago webhook secret length: ${webhookSecretLength}`)
+  En cada inicio del servidor se loguea la longitud del secreto del
+  webhook de Mercado Pago.
+
+Riesgo:
+  Muy bajo. Un atacante que vea los logs sabrá la longitud exacta de la
+  clave, reduciendo marginalmente el espacio de búsqueda. Es información
+  innecesaria en logs.
+
+Solución propuesta:
+  - Eliminar esta línea de log.
+
+
+[BAJ-04] ReportQueryDto acepta cualquier string para fechas
+--------------------------------------------------------------------
+Archivo: backend/src/modules/reports/dto/report-query.dto.ts
+
+Funcionamiento actual:
+  Los campos from y to del DTO de reportes usan @IsString y @IsOptional
+  sin validación de formato de fecha. Se acepta cualquier string.
+
+Riesgo:
+  Bajo. El servicio probablemente falle al parsear fechas inválidas,
+  pero no debería causar problemas de seguridad.
+
+Solución propuesta:
+  - Agregar @IsDateString() o @Matches(/^\d{4}-\d{2}-\d{2}$/).
+
+
+[BAJ-05] Sin límites de recursos en docker-compose
+--------------------------------------------------------------------
+Archivo: docker-compose.yml
+
+Funcionamiento actual:
+  Los servicios backend, frontend y db no tienen restrictciones de
+  CPU o memoria (deploy.resources.limits).
+
+Riesgo:
+  Un memory leak o ataque de DoS puede consumir todos los recursos del
+  host.
+
+Solución propuesta:
+  - Agregar deploy.resources.limits.memory y limits.cpus a cada servicio.
+    Ejemplo: backend con 512MB, frontend con 256MB, db con 1GB.
+
+
+[BAJ-06] Sin HEALTHCHECK en Dockerfiles
+--------------------------------------------------------------------
+Archivo: backend/Dockerfile, frontend/Dockerfile
+
+Funcionamiento actual:
+  Ninguno de los Dockerfiles define HEALTHCHECK. Docker no puede detectar
+  si el proceso está realmente respondiendo o está colgado.
+
+Riesgo:
+  Bajo. En producción con orquestadores, los contenedores colgados no se
+  reinician automáticamente.
+
+Solución propuesta:
+  - Agregar HEALTHCHECK en cada Dockerfile.
+  - Backend: curl -f http://localhost:3000/api/health || exit 1
+  - Frontend: curl -f http://localhost:8080/health || exit 1
+
+
+[BAJ-07] Sin limpieza de sesiones antiguas
+--------------------------------------------------------------------
+Archivo: backend/src/modules/auth/auth.service.ts
+
+Funcionamiento actual:
+  Las sesiones se marcan como revocadas solo al hacer logout o al iniciar
+  sesión desde otro dispositivo (single-session). No hay un cron job que
+  limpie sesiones expiradas (donde el JWT ya venció hace días). La tabla
+  Session crece indefinidamente.
+
+Riesgo:
+  Bajo. Es más un problema operativo que de seguridad. Sin embargo,
+  sesiones no revocadas de usuarios que no volvieron a hacer login quedan
+  técnicamente "válidas" en la BD para siempre.
+
+Solución propuesta:
+  - Agregar un cron job que ejecute DELETE FROM sessions WHERE
+    revokedAt IS NULL AND createdAt < NOW() - INTERVAL '30 days'.
+  - O ejecutarlo como parte del startup.
+
+
+[BAJ-08] JWT sin claims iss/aud
+--------------------------------------------------------------------
+Archivo: backend/src/modules/auth/auth.service.ts (método login)
+         backend/src/modules/auth/jwt.strategy.ts
+
+Funcionamiento actual:
+  El payload del JWT contiene: { sub: user.id, email, name, role, sessionId }.
+  No se incluyen claims estándar como iss (issuer) ni aud (audience).
+
+Riesgo:
+  Muy bajo. Son claims recomendados para prevenir el uso de tokens en
+  sistemas incorrectos. En una arquitectura simple como esta, el riesgo
+  es mínimo.
+
+Solución propuesta:
+  - Agregar iss: 'm-posw-api' y aud: 'm-posw-client' al payload.
+  - Validarlos en JwtStrategy si se agregan.
+
+
+[BAJ-09] JWT sin algoritmo explícito en la estrategia
+--------------------------------------------------------------------
+Archivo: backend/src/modules/auth/jwt.strategy.ts
+
+Funcionamiento actual:
+  La estrategia JWT de Passport no especifica el campo algorithms en
+  sus opciones. Usa el default (HS256). Si bien Passport-jwt maneja
+  correctamente el algoritmo, es buena práctica ser explícito.
+
+Riesgo:
+  Muy bajo. Passport-jwt extrae el algoritmo del token decodificado
+  y lo valida contra la clave. La ausencia de configuración explícita
+  no debería causar problemas con versiones actuales.
+
+Solución propuesta:
+  - Agregar algorithms: ['HS256'] en las opciones de JwtStrategy.
+
+
+============================================================
+RESUMEN DE HALLAZGOS POSITIVOS
+============================================================
+
+Los siguientes aspectos del código están correctamente implementados:
+
+ ✓ bcrypt con 10 salt rounds para hash de contraseñas
+ ✓ Sesiones con revocación en BD (JWT incluye sessionId validado en cada request)
+ ✓ timingSafeEqual para comparación HMAC (protege contra timing attacks)
+ ✓ ValidationPipe global con whitelist, transform, forbidNonWhitelisted
+ ✓ Sharp para procesamiento de imágenes (strippea EXIF, redimensiona, webp)
+ ✓ Protección anti path-traversal en image-storage.ts (startsWith + sep)
+ ✓ Sin eval(), new Function(), exec(), child_process en todo el código
+ ✓ Idempotencia de webhooks vía tabla PaymentEvent con unique constraint
+ ✓ Validación de tipo MIME y tamaño en uploads de imágenes
+ ✓ Nombre de archivo de imágenes generado por servidor (no user-controlled)
+ ✓ Excepción global que no expone stack traces al cliente
+ ✓ Puerto de PostgreSQL no expuesto al host en docker-compose
+ ✓ .env correctamente gitignorado
+ ✓ Raw queries de Prisma usan parameterización ($1, template literals)
+ ✓ RolesGuard + @Roles en todos los endpoints administrativos
+
+
+============================================================
+PLAN DE ACCIÓN RECOMENDADO
+============================================================
+
+Semana 1 (Crítico + Alto):
+  □ CRIT-01: Proteger GET /settings y filtrar campos sensibles
+  □ CRIT-02: Sanitizar logs de OAuth (quitar access_token/refresh_token)
+  □ ALTA-04: Eliminar contraseña admin por defecto en seed
+  □ ALTA-01: Endurecer CORS (eliminar fallback wildcard)
+  □ ALTA-03: Instalar y configurar helmet
+  □ ALTA-07: Eliminar bypass de firma en desarrollo
+  □ ALTA-08: Activar MP_WEBHOOK_STRICT_PAYMENT=true por defecto en prod
+
+Semana 2 (Alto + Medio):
+  □ ALTA-02: Instalar @nestjs/throttler con límites por endpoint
+  □ ALTA-05: Reducir lo que se loguea en webhooks
+  □ ALTA-06: Validar firma para merchant_order igual que payment
+  □ MED-07: Crear DTOs para endpoints OAuth
+  □ MED-08: Cambiar decremento de stock a operación atómica
+  □ MED-09: Agregar validación anidada en items de transferencia
+
+Semana 3 (Medio):
+  □ MED-01: Evaluar migración de JWT a cookies httpOnly
+  □ MED-02: Subir mínimo de contraseña a 8 chars + complejidad
+  □ MED-03: Proteger GET /auth/login-users (auth + rate limit)
+  □ MED-04: Proteger GET /products y GET /categories
+  □ MED-05: Sanitizar extensión en uploads de settings
+  □ MED-06: Agregar USER nginx en Dockerfile
+
+Semana 4 (Bajo):
+  □ BAJ-01 a BAJ-09: Mejoras varias de hardening
+
+
+============================================================
+FIN DE LA AUDITORÍA
+============================================================

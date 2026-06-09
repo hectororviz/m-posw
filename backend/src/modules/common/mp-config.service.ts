@@ -142,7 +142,8 @@ export class MercadoPagoConfigService {
       const data = (await response.json()) as MpTokenResponse;
 
       if (!response.ok || !data.access_token) {
-        this.logger.error(`MP OAuth refresh failed: ${JSON.stringify(data)}`);
+        const { access_token, refresh_token, ...safeData } = data;
+        this.logger.error(`MP OAuth refresh failed: ${JSON.stringify(safeData)}`);
         return null;
       }
 

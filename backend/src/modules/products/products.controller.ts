@@ -30,6 +30,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   async listActive(@Query('categoryId') categoryId?: string) {
     const products = await this.productsService.listActive(categoryId);
     return mapProducts(products);
