@@ -11,10 +11,9 @@ import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminStockPage } from './pages/AdminStockPage';
 import { AdminAcreedoresPage } from './pages/AdminAcreedoresPage';
 import { AdminAcreedorDetailPage } from './pages/AdminAcreedorDetailPage';
+import { AdminSociosLayout } from './pages/AdminSociosLayout';
 import { AdminSociosTiposPage } from './pages/AdminSociosTiposPage';
 import { AdminSociosPage } from './pages/AdminSociosPage';
-import { AdminSocioDetailPage } from './pages/AdminSocioDetailPage';
-import { AdminSocioFormPage } from './pages/AdminSocioFormPage';
 import { AdminSociosMatrizPage } from './pages/AdminSociosMatrizPage';
 import { TreasurySummaryPage } from './pages/TreasurySummaryPage';
 import { TreasuryJournalEntriesPage } from './pages/TreasuryJournalEntriesPage';
@@ -110,12 +109,11 @@ export const App: React.FC = () => {
         <Route path="stock" element={<AdminStockPage />} />
         <Route path="acreedores" element={<AdminAcreedoresPage />} />
         <Route path="acreedores/:id" element={<AdminAcreedorDetailPage />} />
-        <Route path="socios" element={<AdminSociosPage />} />
-        <Route path="socios/tipos" element={<AdminSociosTiposPage />} />
-        <Route path="socios/nuevo" element={<AdminSocioFormPage />} />
-        <Route path="socios/matriz" element={<AdminSociosMatrizPage />} />
-        <Route path="socios/:id" element={<AdminSocioDetailPage />} />
-        <Route path="socios/:id/editar" element={<AdminSocioFormPage />} />
+        <Route path="socios" element={<AdminSociosLayout />}>
+          <Route index element={<AdminSociosPage />} />
+          <Route path="matriz" element={<AdminSociosMatrizPage />} />
+          <Route path="configuracion" element={<AdminSociosTiposPage />} />
+        </Route>
         <Route path="users" element={<Navigate to="/admin/settings" replace />} />
         <Route path="contabilidad" element={<Navigate to="/admin/tesoreria" replace />} />
         <Route path="contabilidad/movimientos" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />

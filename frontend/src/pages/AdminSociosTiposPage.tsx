@@ -98,12 +98,8 @@ export const AdminSociosTiposPage: React.FC = () => {
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Tipos de Socio</h2>
-            <p className="page-header-subtitle">Administra las categorias y montos mensuales.</p>
-          </div>
-        </div>
+        <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Tipos de Socio</h2>
+        <p className="page-header-subtitle">Administra las categorias y montos mensuales.</p>
       </div>
 
       {isLoading ? (

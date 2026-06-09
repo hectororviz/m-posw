@@ -1,18 +1,57 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useSocios, useSociosTipos, useSociosTesoreriaResumen } from '../api/queries';
-import type { Socio } from '../api/types';
+import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas } from '../api/queries';
+import type { Socio, SocioCuotaItem } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
   `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+
+const MONTH_NAMES = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+];
+
+const MONTH_NAMES_FULL = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
 const estadoBadge = (estado: string) => {
   if (estado === 'ACTIVO') return <span className="badge badge-success">Activo</span>;
   if (estado === 'SUSPENDIDO') return <span className="badge badge-warning">Suspendido</span>;
   return <span className="badge badge-neutral">Inactivo</span>;
+};
+
+const cuotaEstadoBadge = (estado: string) => {
+  if (estado === 'PAGADO') return <span className="badge badge-success">Pagado</span>;
+  if (estado === 'PARCIAL') return <span className="badge badge-warning">Parcial</span>;
+  return <span className="badge badge-danger">Pendiente</span>;
+};
+
+type ModalMode = 'create' | 'view' | 'edit' | null;
+
+const emptyForm = {
+  nroSocio: '',
+  dni: '',
+  apellido: '',
+  nombre: '',
+  fechaNacimiento: '',
+  telefono: '',
+  direccion: '',
+  socioTipoId: '',
+  fechaAlta: new Date().toISOString().slice(0, 10),
+  estado: 'ACTIVO' as string,
+};
+
+const emptyPagoForm = {
+  monto: '',
+  fecha: new Date().toISOString().slice(0, 10),
+  observacion: '',
 };
 
 export const AdminSociosPage: React.FC = () => {
@@ -22,9 +61,27 @@ export const AdminSociosPage: React.FC = () => {
   const { data: tipos = [] } = useSociosTipos();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
-  const navigate = useNavigate();
   const [search, setSearch] = useState('');
 
+  // ─── Modal state ──────────────────────────────────────
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // ─── Detail modal ─────────────────────────────────────
+  const { data: viewedSocio } = useSocio(modalMode === 'view' && selectedId ? selectedId : undefined);
+  const { data: viewedCuotas = [], isLoading: cuotasLoading } = useSocioCuotas(
+    modalMode === 'view' && selectedId ? selectedId : undefined,
+  );
+
+  // ─── Pago modal (dentro del modal de detalle) ─────────
+  const [pagoModal, setPagoModal] = useState(false);
+  const [pagoCuotaId, setPagoCuotaId] = useState<number | null>(null);
+  const [pagoForm, setPagoForm] = useState(emptyPagoForm);
+
+  // ─── Filters ──────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!search.trim()) return socios;
     const q = search.toLowerCase();
@@ -37,6 +94,92 @@ export const AdminSociosPage: React.FC = () => {
     );
   }, [socios, search]);
 
+  // ─── Close modal ──────────────────────────────────────
+  const closeModal = () => {
+    setModalMode(null);
+    setSelectedId(null);
+    setError(null);
+    setSaving(false);
+    setPagoModal(false);
+    setPagoCuotaId(null);
+  };
+
+  // ─── Create ───────────────────────────────────────────
+  const openCreate = () => {
+    setForm(emptyForm);
+    setModalMode('create');
+  };
+
+  // ─── View ─────────────────────────────────────────────
+  const openView = (id: number) => {
+    setSelectedId(id);
+    setModalMode('view');
+  };
+
+  // ─── Edit ─────────────────────────────────────────────
+  const openEdit = (id: number) => {
+    const s = socios.find((x) => x.id === id);
+    if (!s) return;
+    setSelectedId(id);
+    setForm({
+      nroSocio: String(s.nroSocio),
+      dni: s.dni,
+      apellido: s.apellido,
+      nombre: s.nombre,
+      fechaNacimiento: s.fechaNacimiento ? s.fechaNacimiento.slice(0, 10) : '',
+      telefono: s.telefono ?? '',
+      direccion: s.direccion ?? '',
+      socioTipoId: String(s.socioTipoId),
+      fechaAlta: s.fechaAlta.slice(0, 10),
+      estado: s.estado,
+    });
+    setModalMode('edit');
+  };
+
+  // ─── Save (create / update) ───────────────────────────
+  const handleSave = async () => {
+    if (!form.apellido.trim() || !form.nombre.trim() || !form.dni.trim()) {
+      setError('Apellido, nombre y DNI son obligatorios');
+      return;
+    }
+    if (!form.nroSocio || !form.socioTipoId) {
+      setError('Numero de socio y tipo son obligatorios');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        nroSocio: Number(form.nroSocio),
+        dni: form.dni,
+        apellido: form.apellido,
+        nombre: form.nombre,
+        fechaNacimiento: form.fechaNacimiento || undefined,
+        telefono: form.telefono || undefined,
+        direccion: form.direccion || undefined,
+        socioTipoId: Number(form.socioTipoId),
+        fechaAlta: form.fechaAlta,
+        estado: form.estado,
+      };
+
+      if (modalMode === 'edit' && selectedId) {
+        await apiClient.put(`/socios/${selectedId}`, payload);
+        pushToast('Socio actualizado', 'success');
+      } else {
+        await apiClient.post('/socios', payload);
+        pushToast('Socio creado', 'success');
+      }
+      await queryClient.invalidateQueries({ queryKey: ['socios'] });
+      await queryClient.invalidateQueries({ queryKey: ['socios-tesoreria-resumen'] });
+      closeModal();
+    } catch (err) {
+      setError(normalizeApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ─── Deactivate ───────────────────────────────────────
   const handleDeactivate = async (id: number) => {
     try {
       await apiClient.delete(`/socios/${id}`);
@@ -48,23 +191,60 @@ export const AdminSociosPage: React.FC = () => {
     }
   };
 
+  // ─── Pago de cuota ────────────────────────────────────
+  const openPagoModal = (cuota: SocioCuotaItem) => {
+    setPagoCuotaId(cuota.id);
+    const pendiente = Number(cuota.montoOriginal) - Number(cuota.montoPagado);
+    setPagoForm({
+      monto: String(pendiente),
+      fecha: new Date().toISOString().slice(0, 10),
+      observacion: '',
+    });
+    setError(null);
+    setPagoModal(true);
+  };
+
+  const handlePagoSave = async () => {
+    const monto = Number(pagoForm.monto);
+    if (!monto || monto <= 0) {
+      setError('El monto debe ser mayor a 0');
+      return;
+    }
+    if (!pagoCuotaId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiClient.post(`/socios/cuotas/${pagoCuotaId}/pagar`, {
+        monto,
+        fecha: pagoForm.fecha,
+        observacion: pagoForm.observacion || undefined,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['socio-cuotas', selectedId] });
+      await queryClient.invalidateQueries({ queryKey: ['socios'] });
+      await queryClient.invalidateQueries({ queryKey: ['socios-tesoreria-resumen'] });
+      pushToast('Pago registrado', 'success');
+      setPagoModal(false);
+      setPagoCuotaId(null);
+    } catch (err) {
+      setError(normalizeApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ─── Carnet ───────────────────────────────────────────
+  const handleCarnet = () => {
+    const token = localStorage.getItem('authToken');
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    window.open(`${baseUrl}/socios/${selectedId}/carnet?token=${token}`, '_blank');
+  };
+
+  // ─── Render ───────────────────────────────────────────
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Socios</h2>
-            <p className="page-header-subtitle">Gestion del padron de socios del club.</p>
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="button" className="btn-ghost" onClick={() => navigate('/admin/socios/tipos')}>
-              Tipos
-            </button>
-            <button type="button" className="btn-ghost" onClick={() => navigate('/admin/socios/matriz')}>
-              Matriz
-            </button>
-          </div>
-        </div>
+        <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Socios</h2>
+        <p className="page-header-subtitle">Gestion del padron de socios del club.</p>
       </div>
 
       {resumen && (
@@ -168,8 +348,8 @@ export const AdminSociosPage: React.FC = () => {
                   )}
                 </span>
                 <span className="col-action" style={{ flex: '0 0 130px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => navigate(`/admin/socios/${s.id}`)}>Ver</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => navigate(`/admin/socios/${s.id}/editar`)}>Editar</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openView(s.id)}>Ver</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(s.id)}>Editar</button>
                   {s.estado === 'ACTIVO' && (
                     <button type="button" className="btn-ghost btn-sm" onClick={() => handleDeactivate(s.id)}>Baja</button>
                   )}
@@ -180,15 +360,211 @@ export const AdminSociosPage: React.FC = () => {
         </div>
       )}
 
-      <button
-        type="button"
-        className="fab-button-v2"
-        onClick={() => navigate('/admin/socios/nuevo')}
-        aria-label="Nuevo socio"
-        title="Nuevo socio"
-      >
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo socio" title="Nuevo socio">
         +
       </button>
+
+      {/* ─── Modal: Create / Edit ─────────────────────── */}
+      {(modalMode === 'create' || modalMode === 'edit') && (
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
+            <div className="modal-header">
+              <h3>{modalMode === 'edit' ? 'Editar socio' : 'Nuevo socio'}</h3>
+              <button className="icon-button" onClick={closeModal}>✕</button>
+            </div>
+            <div className="modal-body">
+              {error && <p className="error-text" style={{ marginBottom: '0.75rem' }}>{error}</p>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
+                <div className="settings-field">
+                  <label>Nº Socio *</label>
+                  <input type="number" value={form.nroSocio} onChange={(e) => setForm({ ...form, nroSocio: e.target.value })} placeholder="Numero" />
+                </div>
+                <div className="settings-field">
+                  <label>DNI *</label>
+                  <input type="text" value={form.dni} onChange={(e) => setForm({ ...form, dni: e.target.value })} placeholder="DNI" />
+                </div>
+                <div className="settings-field">
+                  <label>Apellido *</label>
+                  <input type="text" value={form.apellido} onChange={(e) => setForm({ ...form, apellido: e.target.value })} placeholder="Apellido" />
+                </div>
+                <div className="settings-field">
+                  <label>Nombre *</label>
+                  <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre" />
+                </div>
+                <div className="settings-field">
+                  <label>Fecha Nacimiento</label>
+                  <input type="date" value={form.fechaNacimiento} onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })} />
+                </div>
+                <div className="settings-field">
+                  <label>Telefono</label>
+                  <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="Telefono" />
+                </div>
+                <div className="settings-field">
+                  <label>Direccion</label>
+                  <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} placeholder="Direccion" />
+                </div>
+                <div className="settings-field">
+                  <label>Tipo *</label>
+                  <select value={form.socioTipoId} onChange={(e) => setForm({ ...form, socioTipoId: e.target.value })}>
+                    <option value="">Seleccionar tipo</option>
+                    {tipos.filter(t => t.activo).map((t) => (
+                      <option key={t.id} value={t.id}>{t.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label>Fecha Alta *</label>
+                  <input type="date" value={form.fechaAlta} onChange={(e) => setForm({ ...form, fechaAlta: e.target.value })} />
+                </div>
+                <div className="settings-field">
+                  <label>Estado</label>
+                  <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
+                    <option value="ACTIVO">Activo</option>
+                    <option value="INACTIVO">Inactivo</option>
+                    <option value="SUSPENDIDO">Suspendido</option>
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
+                  {saving ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: View Detail ────────────────────────── */}
+      {modalMode === 'view' && (
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px', maxHeight: '90vh', overflow: 'auto' }}>
+            <div className="modal-header">
+              <h3>{viewedSocio ? `${viewedSocio.apellido}, ${viewedSocio.nombre}` : 'Cargando...'}</h3>
+              <button className="icon-button" onClick={closeModal}>✕</button>
+            </div>
+            <div className="modal-body">
+              {!viewedSocio ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div>
+              ) : (() => {
+                const s = viewedSocio;
+                const fechaAlta = new Date(s.fechaAlta);
+                const mesAlta = MONTH_NAMES_FULL[fechaAlta.getUTCMonth()];
+                const anioAlta = fechaAlta.getUTCFullYear();
+                const deudaTotal = viewedCuotas
+                  .filter((c) => c.estado !== 'PAGADO')
+                  .reduce((sum, c) => sum + (Number(c.montoOriginal) - Number(c.montoPagado)), 0);
+
+                return (
+                  <>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <span style={{ marginRight: '1rem' }}><strong>Nº Socio:</strong> #{s.nroSocio}</span>
+                      <span style={{ marginRight: '1rem' }}><strong>DNI:</strong> {s.dni}</span>
+                      <span style={{ marginRight: '1rem' }}>{estadoBadge(s.estado)}</span>
+                      <span style={{ marginRight: '1rem' }}><strong>Tipo:</strong> {s.socioTipo?.nombre}</span>
+                      <span><strong>Miembro desde:</strong> {mesAlta} {anioAlta}</span>
+                      {s.telefono && <span style={{ marginLeft: '1rem' }}><strong>Tel:</strong> {s.telefono}</span>}
+                    </div>
+
+                    <div className="sales-kpis" style={{ marginBottom: '1rem' }}>
+                      <div className="sales-kpi-card">
+                        <span className="sales-kpi-label">Deuda pendiente</span>
+                        <span className={`sales-kpi-value ${deudaTotal > 0 ? 'warning-text' : 'success-text'}`} style={{ fontSize: '1rem' }}>
+                          {formatCurrency(deudaTotal)}
+                        </span>
+                      </div>
+                      <div className="sales-kpi-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <button type="button" className="btn-ghost" onClick={() => { closeModal(); setTimeout(() => openEdit(s.id), 100); }}>Editar</button>
+                        <button type="button" className="btn-primary" onClick={handleCarnet}>Generar carnet</button>
+                      </div>
+                    </div>
+
+                    <div className="settings-section">
+                      <h3 className="settings-section-header">Cuotas</h3>
+                      {cuotasLoading ? (
+                        <div style={{ textAlign: 'center', padding: '1.5rem' }}><div className="spinner" /></div>
+                      ) : viewedCuotas.length === 0 ? (
+                        <p style={{ color: 'var(--color-text-faint)' }}>No hay cuotas registradas.</p>
+                      ) : (
+                        <div className="sales-table">
+                          <div className="sales-table-head">
+                            <span className="col-date" style={{ flex: '0 0 100px' }}>Periodo</span>
+                            <span className="col-total" style={{ flex: '0 0 85px' }}>Monto</span>
+                            <span className="col-total" style={{ flex: '0 0 85px' }}>Pagado</span>
+                            <span className="col-total" style={{ flex: '0 0 85px' }}>Pendiente</span>
+                            <span className="col-method" style={{ flex: '0 0 80px' }}>Estado</span>
+                            <span className="col-user" style={{ flex: 1 }}>Pagos</span>
+                            <span className="col-action" style={{ flex: '0 0 70px' }}></span>
+                          </div>
+                          {viewedCuotas.map((c: SocioCuotaItem) => {
+                            const pendiente = Math.max(0, Number(c.montoOriginal) - Number(c.montoPagado));
+                            return (
+                              <div key={c.id} className="sales-table-row">
+                                <span className="col-date" style={{ flex: '0 0 100px' }}>{MONTH_NAMES[c.mes - 1]} {c.anio}</span>
+                                <span className="col-total" style={{ flex: '0 0 85px' }}>{formatCurrency(Number(c.montoOriginal))}</span>
+                                <span className="col-total" style={{ flex: '0 0 85px', color: 'var(--color-success)' }}>{formatCurrency(Number(c.montoPagado))}</span>
+                                <span className="col-total" style={{ flex: '0 0 85px', color: pendiente > 0 ? 'var(--color-danger)' : undefined, fontWeight: pendiente > 0 ? 600 : undefined }}>{formatCurrency(pendiente)}</span>
+                                <span className="col-method" style={{ flex: '0 0 80px' }}>{cuotaEstadoBadge(c.estado)}</span>
+                                <span className="col-user" style={{ flex: 1, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                                  {c.pagos && c.pagos.length > 0
+                                    ? c.pagos.map((p) => `${formatDate(p.fecha)} $${p.monto}`).join(' · ')
+                                    : '--'}
+                                </span>
+                                <span className="col-action" style={{ flex: '0 0 70px' }}>
+                                  {c.estado !== 'PAGADO' && (
+                                    <button type="button" className="btn-ghost btn-sm" onClick={() => openPagoModal(c)}>Pagar</button>
+                                  )}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn-ghost" onClick={closeModal}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Pago de cuota ──────────────────────── */}
+      {pagoModal && (
+        <div className="modal-backdrop" onClick={() => setPagoModal(false)} style={{ zIndex: 1001 }}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Registrar pago</h3>
+              <button className="icon-button" onClick={() => setPagoModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {error && <p className="error-text">{error}</p>}
+              <div className="settings-field">
+                <label>Monto *</label>
+                <input type="number" min="0" step="0.01" value={pagoForm.monto} onChange={(e) => setPagoForm({ ...pagoForm, monto: e.target.value })} placeholder="0.00" />
+              </div>
+              <div className="settings-field">
+                <label>Fecha *</label>
+                <input type="date" value={pagoForm.fecha} onChange={(e) => setPagoForm({ ...pagoForm, fecha: e.target.value })} />
+              </div>
+              <div className="settings-field">
+                <label>Observacion</label>
+                <textarea rows={2} value={pagoForm.observacion} onChange={(e) => setPagoForm({ ...pagoForm, observacion: e.target.value })} placeholder="Notas adicionales" />
+              </div>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={() => setPagoModal(false)}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={handlePagoSave} disabled={saving}>
+                  {saving ? 'Guardando...' : 'Registrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

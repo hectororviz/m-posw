@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useSociosMatriz } from '../api/queries';
 import type { SocioMatrizFilas } from '../api/types';
 
@@ -23,7 +22,6 @@ export const AdminSociosMatrizPage: React.FC = () => {
   const currentYear = now.getUTCFullYear();
   const [anio, setAnio] = useState(currentYear);
   const { data: matriz, isLoading } = useSociosMatriz(anio);
-  const navigate = useNavigate();
 
   const years = useMemo(() => {
     const list: number[] = [];
@@ -36,20 +34,8 @@ export const AdminSociosMatrizPage: React.FC = () => {
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => navigate('/admin/socios')}
-              style={{ marginBottom: '0.5rem' }}
-            >
-              &larr; Volver
-            </button>
-            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Matriz de Cuotas</h2>
-            <p className="page-header-subtitle">Estado de cuotas por socio y mes.</p>
-          </div>
-        </div>
+        <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Matriz de Cuotas</h2>
+        <p className="page-header-subtitle">Estado de cuotas por socio y mes.</p>
       </div>
 
       <div className="stock-toolbar">
