@@ -131,12 +131,12 @@ export class SociosController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ) {
-    const pdf = await this.sociosService.generateCarnetPdf(id);
+    const { buffer, filename } = await this.sociosService.generateCarnetPdf(id);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="carnet-socio-${id}.pdf"`,
-      'Content-Length': pdf.length,
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': buffer.length,
     });
-    res.end(pdf);
+    res.end(buffer);
   }
 }

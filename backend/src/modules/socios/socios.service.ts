@@ -529,7 +529,7 @@ export class SociosService {
 
   // ─── Carnet PDF ──────────────────────────────────────────
 
-  async generateCarnetPdf(socioId: number): Promise<Buffer> {
+  async generateCarnetPdf(socioId: number): Promise<{ buffer: Buffer; filename: string }> {
     const socio = await this.prisma.socio.findUnique({
       where: { id: socioId },
       include: { socioTipo: true },
@@ -538,151 +538,145 @@ export class SociosService {
     if (!socio) throw new NotFoundException('Socio no encontrado');
 
     const setting = await this.prisma.setting.findFirst({
-      select: { logoUrl: true, storeName: true, clubName: true },
+      select: { logoUrl: true, storeName: true, clubName: true, accentColor: true },
     });
-
-    const fechaAlta = new Date(socio.fechaAlta);
-    const mesAlta = MONTH_NAMES[fechaAlta.getUTCMonth()];
-    const anioAlta = fechaAlta.getUTCFullYear();
 
     const storeName = setting?.storeName || 'Club';
     const clubName = setting?.clubName || '';
+    const accentColor = setting?.accentColor || '#1e3a5f';
 
-    // A4 landscape (for each carnet) within an A4 portrait sheet
-    // Page = A4 portrait (595.28 x 841.89 pt)
-    // Each carnet = half height = ~420pt tall, full width
-    const pageWidth = 595.28;
-    const pageHeight = 841.89;
-    const carnetHeight = pageHeight / 2;
-    const margin = 20;
-    const cardWidth = pageWidth - margin * 2;
-    const cardHeight = carnetHeight - margin * 2;
+    const fechaAlta = new Date(socio.fechaAlta);
+    const diaAlta = String(fechaAlta.getUTCDate()).padStart(2, '0');
+    const mesAlta = String(fechaAlta.getUTCMonth() + 1).padStart(2, '0');
+    const anioAlta = fechaAlta.getUTCFullYear();
+    const fechaAltaStr = `${diaAlta}/${mesAlta}/${anioAlta}`;
 
-    return new Promise<Buffer>((resolve, reject) => {
+    const dniFormateado = socio.dni.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    // CR80: 85.6mm x 54mm = 242.65pt x 153.07pt
+    const cardW = 242.65;
+    const cardH = 153.07;
+    const filename = `credencial-socio-${socio.nroSocio}.pdf`;
+
+    return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const doc = new PDFDocument({
-        size: 'A4',
-        layout: 'portrait',
+        size: [cardW, cardH],
+        layout: 'landscape',
         margin: 0,
       });
 
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), filename }));
       doc.on('error', reject);
 
-      // Helper to render one carnet at (x, y)
-      const drawCarnet = (offsetY: number) => {
-        const cardX = margin;
-        const cardY = offsetY + margin;
+      // Fondo blanco
+      doc.rect(0, 0, cardW, cardH).fill('#ffffff');
 
-        // Card border
-        doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 8).stroke('#cccccc');
+      // Franja vertical de acento a la izquierda
+      const stripeW = 8;
+      doc.rect(0, 0, stripeW, cardH).fill(accentColor);
 
-        const innerX = cardX + 14;
-        const innerY = cardY + 14;
-        const innerW = cardWidth - 32;
-        const innerH = cardHeight - 28;
+      // Margen interno
+      const marginX = stripeW + 12;
+      const marginY = 10;
+      const contentW = cardW - marginX - 12;
 
-        // Header background
-        doc.roundedRect(cardX + 8, cardY + 8, cardWidth - 16, 70, 4)
-          .fill('#1e3a5f');
-        // Fill bottom corners square
-        doc.rect(cardX + 8, cardY + 70 - 4, cardWidth - 16, 4).fill('#1e3a5f');
+      // ─── HEADER: nombre club (izq) + logo (der) ──────
+      const logoUrl = setting?.logoUrl || null;
+      const logoSize = 28;
+      const logoX = cardW - 12 - logoSize;
+      const logoY = marginY;
 
-        // Store name in header
-        doc.fill('#ffffff')
-          .fontSize(16)
-          .font('Helvetica-Bold')
-          .text(storeName.toUpperCase(), innerX, cardY + 20, {
-            width: innerW - 80,
-            align: 'left',
-          });
+      if (logoUrl) {
+        const logoPath = logoUrl.startsWith('/')
+          ? path.join('/data/uploads', logoUrl.replace('/uploads/', ''))
+          : logoUrl;
 
-        if (clubName) {
-          doc.fill('#c8d6e5')
-            .fontSize(8)
-            .font('Helvetica')
-            .text(clubName, innerX, cardY + 42, {
-              width: innerW - 80,
-              align: 'left',
+        if (logoPath.startsWith('/data/uploads') && fs.existsSync(logoPath)) {
+          try {
+            doc.image(logoPath, logoX, logoY, {
+              fit: [logoSize, logoSize],
             });
-        }
-
-        // Logo area on the right side of header
-        const logoUrl = setting?.logoUrl || null;
-        if (logoUrl) {
-          const logoPath = logoUrl.startsWith('/')
-            ? path.join('/data/uploads', logoUrl.replace('/uploads/', ''))
-            : logoUrl;
-
-          if (logoPath.startsWith('/data/uploads') && fs.existsSync(logoPath)) {
-            try {
-              doc.image(logoPath, cardX + cardWidth - 80, cardY + 10, {
-                fit: [60, 50],
-                align: 'center',
-                valign: 'center',
-              });
-            } catch (_) {
-              // Ignore logo errors
-            }
+          } catch (_) {
+            // Logo error ignored
           }
         }
+      }
 
-        // Separator line
-        doc.strokeColor('#1e3a5f')
-          .lineWidth(1.5)
-          .moveTo(innerX, cardY + 80)
-          .lineTo(cardX + cardWidth - 16, cardY + 80)
-          .stroke();
+      // Nombre del club
+      doc.fill(accentColor)
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .text(storeName.toUpperCase(), marginX, marginY, {
+          width: contentW - logoSize - 8,
+          align: 'left',
+          lineBreak: false,
+        });
 
-        // Body
-        const bodyStartY = cardY + 90;
-        const col1X = innerX;
-        const col2X = innerX + 200;
-        const lineHeight = 22;
-
-        const drawField = (label: string, value: string, y: number) => {
-          doc.fill('#666666').fontSize(8).font('Helvetica')
-            .text(label, col1X, y, { width: 190, continued: false });
-          doc.fill('#111111').fontSize(12).font('Helvetica-Bold')
-            .text(value, col1X, y + 11, { width: 190, continued: false });
-        };
-
-        const nombreCompleto = `${socio.apellido}, ${socio.nombre}`;
-        drawField('SOCIO', nombreCompleto, bodyStartY);
-
-        let rowY = bodyStartY + 30;
-        drawField('Nº SOCIO', `#${socio.nroSocio}`, rowY);
-
-        rowY += 30;
-        drawField('TIPO', socio.socioTipo.nombre, rowY);
-
-        rowY += 30;
-        drawField('MIEMBRO DESDE', `${mesAlta} ${anioAlta}`, rowY);
-
-        if (socio.dni) {
-          rowY += 30;
-          drawField('DNI', socio.dni, rowY);
-        }
-
-        // Footer line
-        const footerY = cardY + cardHeight - 35;
-        doc.strokeColor('#cccccc')
-          .lineWidth(0.5)
-          .moveTo(innerX, footerY)
-          .lineTo(cardX + cardWidth - 16, footerY)
-          .stroke();
-
-        doc.fill('#999999').fontSize(7).font('Helvetica')
-          .text(`Carnet generado por ${storeName}`, innerX, footerY + 8, {
-            width: innerW,
-            align: 'center',
+      if (clubName) {
+        doc.fill('#888888')
+          .fontSize(6)
+          .font('Helvetica')
+          .text(clubName, marginX, marginY + 12, {
+            width: contentW - logoSize - 8,
+            align: 'left',
+            lineBreak: false,
           });
-      };
+      }
 
-      // Draw two carnets
-      drawCarnet(0);
-      drawCarnet(carnetHeight);
+      // Línea separadora fina bajo el header
+      const headerBottom = marginY + (clubName ? 26 : 14);
+      doc.strokeColor(accentColor)
+        .lineWidth(0.5)
+        .moveTo(marginX, headerBottom)
+        .lineTo(cardW - 12, headerBottom)
+        .stroke();
+
+      // ─── BODY ────────────────────────────────────────
+      const bodyY = headerBottom + 10;
+
+      const nombreCompleto = `${socio.apellido}, ${socio.nombre}`;
+
+      doc.fill('#111111')
+        .fontSize(12)
+        .font('Helvetica-Bold')
+        .text(nombreCompleto, marginX, bodyY, {
+          width: contentW,
+          align: 'left',
+        });
+
+      doc.fill('#333333')
+        .fontSize(10)
+        .font('Helvetica')
+        .text(`Socio Nº ${String(socio.nroSocio).padStart(6, '0')}`, marginX, bodyY + 18, {
+          width: contentW,
+          align: 'left',
+        });
+
+      const infoY = bodyY + 38;
+      const lineH = 14;
+
+      doc.fill('#555555').fontSize(7).font('Helvetica');
+      doc.text(`Tipo: ${socio.socioTipo.nombre}`, marginX, infoY);
+      doc.text(`DNI: ${dniFormateado}`, marginX, infoY + lineH);
+      doc.text(`Socio desde: ${fechaAltaStr}`, marginX, infoY + lineH * 2);
+
+      // ─── FOOTER ──────────────────────────────────────
+      const footerY = cardH - 16;
+      doc.strokeColor('#dddddd')
+        .lineWidth(0.3)
+        .moveTo(marginX, footerY - 4)
+        .lineTo(cardW - 12, footerY - 4)
+        .stroke();
+
+      doc.fill('#aaaaaa')
+        .fontSize(5.5)
+        .font('Helvetica')
+        .text(storeName, marginX, footerY, {
+          width: contentW,
+          align: 'center',
+        });
 
       doc.end();
     });
