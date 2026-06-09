@@ -196,6 +196,7 @@ export class SociosService {
     }
 
     const data: any = { ...dto };
+    delete data.socioTipoId;
 
     if (dto.fechaNacimiento !== undefined) {
       data.fechaNacimiento = dto.fechaNacimiento ? new Date(dto.fechaNacimiento) : null;
@@ -210,7 +211,10 @@ export class SociosService {
 
     return this.prisma.socio.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        ...(dto.socioTipoId != null ? { socioTipo: { connect: { id: dto.socioTipoId } } } : {}),
+      },
       include: { socioTipo: true },
     });
   }

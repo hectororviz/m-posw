@@ -1,11 +1,20 @@
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { SocioEstado } from '@prisma/client';
 
-const emptyToNull = ({ value }: { value: unknown }) => (value === '' ? null : value);
+const emptyToNull = ({ value }: { value: unknown }) => {
+  if (value === '' || value === null || value === undefined) return null;
+  return value;
+};
+
+const toIntOrNull = ({ value }: { value: unknown }) => {
+  if (value === '' || value === null || value === undefined) return null;
+  const n = Number(value);
+  return isNaN(n) ? null : n;
+};
 
 export class CreateSocioDto {
-  @Type(() => Number)
+  @Transform(toIntOrNull)
   @IsInt()
   nroSocio: number;
 
@@ -33,7 +42,7 @@ export class CreateSocioDto {
   @Transform(emptyToNull)
   direccion?: string;
 
-  @Type(() => Number)
+  @Transform(toIntOrNull)
   @IsInt()
   socioTipoId: number;
 
