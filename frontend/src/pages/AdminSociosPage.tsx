@@ -183,18 +183,6 @@ export const AdminSociosPage: React.FC = () => {
     }
   };
 
-  // ─── Deactivate ───────────────────────────────────────
-  const handleDeactivate = async (id: number) => {
-    try {
-      await apiClient.delete(`/socios/${id}`);
-      await queryClient.invalidateQueries({ queryKey: ['socios'] });
-      await queryClient.invalidateQueries({ queryKey: ['socios-tesoreria-resumen'] });
-      pushToast('Socio dado de baja', 'success');
-    } catch (err) {
-      pushToast(normalizeApiError(err), 'error');
-    }
-  };
-
   // ─── Pago de cuota ────────────────────────────────────
   const openPagoModal = (cuota: SocioCuotaItem) => {
     setPagoCuotaId(cuota.id);
@@ -237,10 +225,20 @@ export const AdminSociosPage: React.FC = () => {
   };
 
   // ─── Carnet ───────────────────────────────────────────
-  const handleCarnet = () => {
-    const token = localStorage.getItem('authToken');
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
-    window.open(`${baseUrl}/socios/${selectedId}/carnet?token=${token}`, '_blank');
+  const handleCarnet = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      const token = localStorage.getItem('authToken');
+      const resp = await fetch(`${baseUrl}/socios/${selectedId}/carnet`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) throw new Error('Error al generar el carnet');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      pushToast('Error al generar el carnet', 'error');
+    }
   };
 
   // ─── Render ───────────────────────────────────────────
@@ -330,7 +328,7 @@ export const AdminSociosPage: React.FC = () => {
               <span className="col-method" style={{ flex: '0 0 100px' }}>Tipo</span>
               <span className="col-method" style={{ flex: '0 0 90px' }}>Estado</span>
               <span className="col-total" style={{ flex: '0 0 100px' }}>Deuda</span>
-              <span className="col-action" style={{ flex: '0 0 130px' }}></span>
+              <span className="col-action" style={{ flex: '0 0 110px' }}></span>
             </div>
             {filtered.map((s: Socio) => (
               <div key={s.id} className="sales-table-row">
@@ -351,12 +349,9 @@ export const AdminSociosPage: React.FC = () => {
                     <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
                   )}
                 </span>
-                <span className="col-action" style={{ flex: '0 0 130px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                <span className="col-action" style={{ flex: '0 0 110px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => openView(s.id)}>Ver</button>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(s.id)}>Editar</button>
-                  {s.estado === 'ACTIVO' && (
-                    <button type="button" className="btn-ghost btn-sm" onClick={() => handleDeactivate(s.id)}>Baja</button>
-                  )}
                 </span>
               </div>
             ))}
@@ -494,13 +489,16 @@ export const AdminSociosPage: React.FC = () => {
 
                 return (
                   <>
-                    <div style={{ marginBottom: '1rem' }}>
-                      <span style={{ marginRight: '1rem' }}><strong>Nº Socio:</strong> #{s.nroSocio}</span>
-                      <span style={{ marginRight: '1rem' }}><strong>DNI:</strong> {s.dni}</span>
-                      <span style={{ marginRight: '1rem' }}>{estadoBadge(s.estado)}</span>
-                      <span style={{ marginRight: '1rem' }}><strong>Tipo:</strong> {s.socioTipo?.nombre}</span>
-                      <span><strong>Miembro desde:</strong> {mesAlta} {anioAlta}</span>
-                      {s.telefono && <span style={{ marginLeft: '1rem' }}><strong>Tel:</strong> {s.telefono}</span>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div>
+                        <p style={{ margin: '0 0 0.15rem', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>DNI: {s.dni}</p>
+                        <p style={{ margin: '0 0 0.15rem', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>Nº Socio: #{s.nroSocio}</p>
+                        <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>Miembro desde: {mesAlta} {anioAlta}</p>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+                        {estadoBadge(s.estado)}
+                        <span className="badge badge-neutral" style={{ fontSize: '0.82rem' }}>{s.socioTipo?.nombre}</span>
+                      </div>
                     </div>
 
                     <div className="sales-kpis" style={{ marginBottom: '1rem' }}>

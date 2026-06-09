@@ -114,23 +114,6 @@ export const AdminSociosMatrizPage: React.FC = () => {
                   </span>
                 </div>
               ))}
-              <div className="sales-table-row" style={{ background: 'var(--color-surface)', fontWeight: 600, borderTop: '2px solid var(--color-border)' }}>
-                <span className="col-user" style={{ flex: '0 0 240px' }}>TOTAL POR MES</span>
-                {MONTH_NAMES.map((_, i) => {
-                  const mes = i + 1;
-                  const total = matriz.totalesPorMes[mes] || 0;
-                  return (
-                    <span
-                      key={mes}
-                      className="col-total"
-                      style={{ flex: '0 0 55px', textAlign: 'center', fontSize: '0.8rem', color: total > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}
-                    >
-                      {total > 0 ? formatCurrency(total) : '$0'}
-                    </span>
-                  );
-                })}
-                <span className="col-total" style={{ flex: '0 0 90px' }}></span>
-              </div>
             </div>
           </div>
         </div>
