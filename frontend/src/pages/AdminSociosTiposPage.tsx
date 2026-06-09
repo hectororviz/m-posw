@@ -115,19 +115,19 @@ export const AdminSociosTiposPage: React.FC = () => {
         <div className="sales-table-wrapper">
           <div className="sales-table">
             <div className="sales-table-head">
-              <span className="col-date" style={{ flex: '0 0 180px' }}>Nombre</span>
-              <span className="col-total" style={{ flex: '0 0 130px' }}>Monto mensual</span>
-              <span className="col-user" style={{ flex: 1 }}>Comentario</span>
+              <span className="col-date" style={{ flex: '0 0 160px' }}>Nombre</span>
+              <span className="col-total" style={{ flex: '0 0 140px' }}>Monto mensual</span>
+              <span className="col-user" style={{ flex: 1, paddingLeft: '1rem' }}>Comentario</span>
               <span className="col-method" style={{ flex: '0 0 80px' }}>Estado</span>
               <span className="col-action" style={{ flex: '0 0 130px' }}></span>
             </div>
             {tipos.map((t: SocioTipo) => (
               <div key={t.id} className="sales-table-row">
-                <span className="col-date" style={{ flex: '0 0 180px', fontWeight: 500 }}>{t.nombre}</span>
-                <span className="col-total" style={{ flex: '0 0 130px', fontWeight: 600 }}>
+                <span className="col-date" style={{ flex: '0 0 160px', fontWeight: 500 }}>{t.nombre}</span>
+                <span className="col-total" style={{ flex: '0 0 140px', fontWeight: 600 }}>
                   {formatCurrency(Number(t.montoMensual))}
                 </span>
-                <span className="col-user" style={{ flex: 1, color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                <span className="col-user" style={{ flex: 1, paddingLeft: '1rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
                   {t.comentario || '--'}
                 </span>
                 <span className="col-method" style={{ flex: '0 0 80px' }}>

@@ -67,6 +67,7 @@ export const AdminSociosPage: React.FC = () => {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [formTab, setFormTab] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +99,7 @@ export const AdminSociosPage: React.FC = () => {
   const closeModal = () => {
     setModalMode(null);
     setSelectedId(null);
+    setFormTab(0);
     setError(null);
     setSaving(false);
     setPagoModal(false);
@@ -107,6 +109,7 @@ export const AdminSociosPage: React.FC = () => {
   // ─── Create ───────────────────────────────────────────
   const openCreate = () => {
     setForm(emptyForm);
+    setFormTab(0);
     setModalMode('create');
   };
 
@@ -121,6 +124,7 @@ export const AdminSociosPage: React.FC = () => {
     const s = socios.find((x) => x.id === id);
     if (!s) return;
     setSelectedId(id);
+    setFormTab(0);
     setForm({
       nroSocio: String(s.nroSocio),
       dni: s.dni,
@@ -374,57 +378,89 @@ export const AdminSociosPage: React.FC = () => {
             </div>
             <div className="modal-body">
               {error && <p className="error-text" style={{ marginBottom: '0.75rem' }}>{error}</p>}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.75rem' }}>
-                <div className="settings-field">
-                  <label>Nº Socio *</label>
-                  <input type="number" value={form.nroSocio} onChange={(e) => setForm({ ...form, nroSocio: e.target.value })} placeholder="Numero" />
-                </div>
-                <div className="settings-field">
-                  <label>DNI *</label>
-                  <input type="text" value={form.dni} onChange={(e) => setForm({ ...form, dni: e.target.value })} placeholder="DNI" />
-                </div>
-                <div className="settings-field">
-                  <label>Apellido *</label>
-                  <input type="text" value={form.apellido} onChange={(e) => setForm({ ...form, apellido: e.target.value })} placeholder="Apellido" />
-                </div>
-                <div className="settings-field">
-                  <label>Nombre *</label>
-                  <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre" />
-                </div>
-                <div className="settings-field">
-                  <label>Fecha Nacimiento</label>
-                  <input type="date" value={form.fechaNacimiento} onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })} />
-                </div>
-                <div className="settings-field">
-                  <label>Telefono</label>
-                  <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="Telefono" />
-                </div>
-                <div className="settings-field">
-                  <label>Direccion</label>
-                  <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} placeholder="Direccion" />
-                </div>
-                <div className="settings-field">
-                  <label>Tipo *</label>
-                  <select value={form.socioTipoId} onChange={(e) => setForm({ ...form, socioTipoId: e.target.value })}>
-                    <option value="">Seleccionar tipo</option>
-                    {tipos.filter(t => t.activo).map((t) => (
-                      <option key={t.id} value={t.id}>{t.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="settings-field">
-                  <label>Fecha Alta *</label>
-                  <input type="date" value={form.fechaAlta} onChange={(e) => setForm({ ...form, fechaAlta: e.target.value })} />
-                </div>
-                <div className="settings-field">
-                  <label>Estado</label>
-                  <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
-                    <option value="ACTIVO">Activo</option>
-                    <option value="INACTIVO">Inactivo</option>
-                    <option value="SUSPENDIDO">Suspendido</option>
-                  </select>
-                </div>
+
+              {/* Tab navigation */}
+              <div className="sort-segmented" style={{ marginBottom: '1rem', width: '100%', display: 'flex' }}>
+                {['Datos personales', 'Socio', 'Contacto'].map((label, i) => (
+                  <button
+                    key={label}
+                    type="button"
+                    className={`sort-segment ${formTab === i ? 'sort-segment--active' : ''}`}
+                    onClick={() => setFormTab(i)}
+                    style={{ flex: 1 }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
+
+              {/* Tab 0: Datos personales */}
+              {formTab === 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="settings-field">
+                    <label>Nombre *</label>
+                    <input type="text" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Nombre" />
+                  </div>
+                  <div className="settings-field">
+                    <label>Apellido *</label>
+                    <input type="text" value={form.apellido} onChange={(e) => setForm({ ...form, apellido: e.target.value })} placeholder="Apellido" />
+                  </div>
+                  <div className="settings-field">
+                    <label>DNI *</label>
+                    <input type="text" value={form.dni} onChange={(e) => setForm({ ...form, dni: e.target.value })} placeholder="DNI" />
+                  </div>
+                  <div className="settings-field">
+                    <label>Fecha de Nacimiento</label>
+                    <input type="date" value={form.fechaNacimiento} onChange={(e) => setForm({ ...form, fechaNacimiento: e.target.value })} />
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 1: Socio */}
+              {formTab === 1 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="settings-field">
+                    <label>Numero de Socio *</label>
+                    <input type="number" value={form.nroSocio} onChange={(e) => setForm({ ...form, nroSocio: e.target.value })} placeholder="Numero" />
+                  </div>
+                  <div className="settings-field">
+                    <label>Tipo *</label>
+                    <select value={form.socioTipoId} onChange={(e) => setForm({ ...form, socioTipoId: e.target.value })}>
+                      <option value="">Seleccionar tipo</option>
+                      {tipos.filter(t => t.activo).map((t) => (
+                        <option key={t.id} value={t.id}>{t.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="settings-field">
+                    <label>Fecha de Alta *</label>
+                    <input type="date" value={form.fechaAlta} onChange={(e) => setForm({ ...form, fechaAlta: e.target.value })} />
+                  </div>
+                  <div className="settings-field">
+                    <label>Estado</label>
+                    <select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })}>
+                      <option value="ACTIVO">Activo</option>
+                      <option value="INACTIVO">Inactivo</option>
+                      <option value="SUSPENDIDO">Suspendido</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Contacto */}
+              {formTab === 2 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="settings-field">
+                    <label>Telefono</label>
+                    <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="Telefono" />
+                  </div>
+                  <div className="settings-field">
+                    <label>Direccion</label>
+                    <input type="text" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} placeholder="Direccion" />
+                  </div>
+                </div>
+              )}
+
               <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
                 <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
