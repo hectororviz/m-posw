@@ -196,8 +196,17 @@ export class SociosService {
     }
 
     const data: any = { ...dto };
-    if (dto.fechaNacimiento) data.fechaNacimiento = new Date(dto.fechaNacimiento);
-    if (dto.fechaAlta) data.fechaAlta = new Date(dto.fechaAlta);
+
+    if (dto.fechaNacimiento !== undefined) {
+      data.fechaNacimiento = dto.fechaNacimiento ? new Date(dto.fechaNacimiento) : null;
+    }
+    if (dto.fechaAlta !== undefined) {
+      data.fechaAlta = dto.fechaAlta ? new Date(dto.fechaAlta) : null;
+    }
+
+    // Clean empty strings that would fail Prisma validation
+    if (data.telefono === '') data.telefono = null;
+    if (data.direccion === '') data.direccion = null;
 
     return this.prisma.socio.update({
       where: { id },
