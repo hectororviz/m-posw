@@ -439,6 +439,79 @@ export interface AcreedoresResumen {
   acreedoresConDeuda: number;
 }
 
+export interface SocioTipo {
+  id: number;
+  nombre: string;
+  montoMensual: number;
+  comentario?: string | null;
+  activo: boolean;
+  createdAt: string;
+}
+
+export interface Socio {
+  id: number;
+  nroSocio: number;
+  dni: string;
+  apellido: string;
+  nombre: string;
+  fechaNacimiento?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  socioTipoId: number;
+  socioTipo?: SocioTipo;
+  fechaAlta: string;
+  estado: 'ACTIVO' | 'INACTIVO' | 'SUSPENDIDO';
+  deudaTotal?: number;
+  createdAt?: string;
+}
+
+export interface SocioCuotaItem {
+  id: number;
+  socioId: number;
+  mes: number;
+  anio: number;
+  montoOriginal: number;
+  montoPagado: number;
+  estado: 'PENDIENTE' | 'PARCIAL' | 'PAGADO';
+  pagos: SocioPagoItem[];
+  createdAt: string;
+}
+
+export interface SocioPagoItem {
+  id: number;
+  socioCuotaId: number;
+  monto: number;
+  fecha: string;
+  observacion?: string | null;
+}
+
+export interface SocioMatrizFilas {
+  socioId: number;
+  nroSocio: number;
+  apellido: string;
+  nombre: string;
+  tipo: string;
+  estadoSocio: string;
+  meses: Record<number, {
+    estado: string;
+    pendiente?: number;
+    cuotaId?: number;
+  }>;
+  deudaAnual: number;
+}
+
+export interface SocioMatriz {
+  anio: number;
+  filas: SocioMatrizFilas[];
+  totalesPorMes: Record<number, number>;
+}
+
+export interface SociosTesoreriaResumen {
+  deudaTotal: number;
+  sociosActivos: number;
+  sociosConDeuda: number;
+}
+
 export interface StatsSummary {
   totalSales: number;
   salesCount: number;

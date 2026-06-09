@@ -17,6 +17,7 @@ import { SalesModule } from './sales/sales.module';
 import { SettingsModule } from './settings/settings.module';
 import { StatsModule } from './stats/stats.module';
 import { StockModule } from './stock/stock.module';
+import { SociosModule } from './socios/socios.module';
 import { TreasuryModule } from './treasury/treasury.module';
 import { UsersModule } from './users/users.module';
 
@@ -40,6 +41,7 @@ import { UsersModule } from './users/users.module';
     ReportsModule,
     StatsModule,
     SettingsModule,
+    SociosModule,
     StockModule,
   ],
   providers: [

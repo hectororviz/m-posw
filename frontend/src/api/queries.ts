@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, StatsSummary, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -373,6 +373,69 @@ export const useStatsSummary = (from?: string, to?: string) =>
       if (from) params.set('from', from);
       if (to) params.set('to', to);
       const response = await apiClient.get<StatsSummary>(`/stats/summary?${params.toString()}`);
+      return response.data;
+    },
+  });
+
+// ─── Socios ─────────────────────────────────────────────
+
+export const useSociosTipos = () =>
+  useQuery({
+    queryKey: ['socios-tipos'],
+    queryFn: async () => {
+      const response = await apiClient.get<SocioTipo[]>('/socios/tipos');
+      return response.data;
+    },
+  });
+
+export const useSocios = (filters?: { estado?: string; socioTipoId?: string; deuda?: string }) =>
+  useQuery({
+    queryKey: ['socios', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters?.estado) params.set('estado', filters.estado);
+      if (filters?.socioTipoId) params.set('socioTipoId', filters.socioTipoId);
+      if (filters?.deuda) params.set('deuda', filters.deuda);
+      const response = await apiClient.get<Socio[]>(`/socios?${params.toString()}`);
+      return response.data;
+    },
+  });
+
+export const useSocio = (id?: number) =>
+  useQuery({
+    queryKey: ['socio', id],
+    queryFn: async () => {
+      const response = await apiClient.get<Socio>(`/socios/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useSocioCuotas = (id?: number) =>
+  useQuery({
+    queryKey: ['socio-cuotas', id],
+    queryFn: async () => {
+      const response = await apiClient.get<SocioCuotaItem[]>(`/socios/${id}/cuotas`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useSociosMatriz = (anio: number) =>
+  useQuery({
+    queryKey: ['socios-matriz', anio],
+    queryFn: async () => {
+      const response = await apiClient.get<SocioMatriz>(`/socios/reporte/matriz?anio=${anio}`);
+      return response.data;
+    },
+    enabled: Boolean(anio),
+  });
+
+export const useSociosTesoreriaResumen = () =>
+  useQuery({
+    queryKey: ['socios-tesoreria-resumen'],
+    queryFn: async () => {
+      const response = await apiClient.get<SociosTesoreriaResumen>('/socios/tesoreria/resumen');
       return response.data;
     },
   });
