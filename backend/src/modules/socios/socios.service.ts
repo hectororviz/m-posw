@@ -182,7 +182,7 @@ export class SociosService {
   async update(id: number, dto: UpdateSocioDto) {
     await this.findOne(id);
 
-    if (dto.nroSocio !== undefined) {
+    if (dto.nroSocio != null) {
       const existing = await this.prisma.socio.findUnique({
         where: { nroSocio: dto.nroSocio },
       });
@@ -191,7 +191,7 @@ export class SociosService {
       }
     }
 
-    if (dto.socioTipoId !== undefined) {
+    if (dto.socioTipoId != null) {
       await this.getTipo(dto.socioTipoId);
     }
 
