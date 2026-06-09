@@ -541,8 +541,7 @@ export class SociosService {
       select: { logoUrl: true, storeName: true, clubName: true, accentColor: true },
     });
 
-    const storeName = setting?.storeName || 'Club';
-    const clubName = setting?.clubName || '';
+    const displayName = setting?.clubName?.trim() || setting?.storeName || 'Club';
     const accentColor = setting?.accentColor || '#1e3a5f';
 
     const fechaAlta = new Date(socio.fechaAlta);
@@ -561,8 +560,8 @@ export class SociosService {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const doc = new PDFDocument({
-        size: [cardW, cardH],
-        layout: 'landscape',
+        size: 'A4',
+        layout: 'portrait',
         margin: 0,
       });
 
@@ -570,22 +569,28 @@ export class SociosService {
       doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), filename }));
       doc.on('error', reject);
 
-      // Fondo blanco
-      doc.rect(0, 0, cardW, cardH).fill('#ffffff');
+      // Posicion del recuadro CR80 centrado en A4 portrait (595.28 x 841.89 pt)
+      const pageW = 595.28;
+      const cardX = (pageW - cardW) / 2;
+      const cardY = 40;
 
-      // Franja vertical de acento a la izquierda
+      // Fondo del recuadro
+      doc.roundedRect(cardX, cardY, cardW, cardH, 6).fill('#ffffff');
+      doc.roundedRect(cardX, cardY, cardW, cardH, 6).stroke('#cccccc');
+
+      // Franja vertical de acento a la izquierda (dentro del recuadro)
       const stripeW = 8;
-      doc.rect(0, 0, stripeW, cardH).fill(accentColor);
+      doc.rect(cardX, cardY, stripeW, cardH).fill(accentColor);
 
-      // Margen interno
-      const marginX = stripeW + 12;
-      const marginY = 10;
-      const contentW = cardW - marginX - 12;
+      // Margen interno del recuadro
+      const marginX = cardX + stripeW + 12;
+      const marginY = cardY + 10;
+      const contentW = cardW - stripeW - 24;
 
-      // ─── HEADER: nombre club (izq) + logo (der) ──────
+      // ─── HEADER ──────────────────────────────────────
       const logoUrl = setting?.logoUrl || null;
       const logoSize = 28;
-      const logoX = cardW - 12 - logoSize;
+      const logoX = cardX + cardW - 12 - logoSize;
       const logoY = marginY;
 
       if (logoUrl) {
@@ -595,42 +600,28 @@ export class SociosService {
 
         if (logoPath.startsWith('/data/uploads') && fs.existsSync(logoPath)) {
           try {
-            doc.image(logoPath, logoX, logoY, {
-              fit: [logoSize, logoSize],
-            });
+            doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
           } catch (_) {
-            // Logo error ignored
+            // Ignore logo errors
           }
         }
       }
 
-      // Nombre del club
       doc.fill(accentColor)
         .fontSize(8)
         .font('Helvetica-Bold')
-        .text(storeName.toUpperCase(), marginX, marginY, {
-          width: contentW - logoSize - 8,
+        .text(displayName.toUpperCase(), marginX, marginY, {
+          width: cardW - stripeW - 24 - logoSize - 8,
           align: 'left',
           lineBreak: false,
         });
 
-      if (clubName) {
-        doc.fill('#888888')
-          .fontSize(6)
-          .font('Helvetica')
-          .text(clubName, marginX, marginY + 12, {
-            width: contentW - logoSize - 8,
-            align: 'left',
-            lineBreak: false,
-          });
-      }
-
-      // Línea separadora fina bajo el header
-      const headerBottom = marginY + (clubName ? 26 : 14);
+      // Línea separadora bajo el header
+      const headerBottom = marginY + 16;
       doc.strokeColor(accentColor)
         .lineWidth(0.5)
         .moveTo(marginX, headerBottom)
-        .lineTo(cardW - 12, headerBottom)
+        .lineTo(cardX + cardW - 12, headerBottom)
         .stroke();
 
       // ─── BODY ────────────────────────────────────────
@@ -663,17 +654,17 @@ export class SociosService {
       doc.text(`Socio desde: ${fechaAltaStr}`, marginX, infoY + lineH * 2);
 
       // ─── FOOTER ──────────────────────────────────────
-      const footerY = cardH - 16;
+      const footerY = cardY + cardH - 14;
       doc.strokeColor('#dddddd')
         .lineWidth(0.3)
         .moveTo(marginX, footerY - 4)
-        .lineTo(cardW - 12, footerY - 4)
+        .lineTo(cardX + cardW - 12, footerY - 4)
         .stroke();
 
       doc.fill('#aaaaaa')
         .fontSize(5.5)
         .font('Helvetica')
-        .text(storeName, marginX, footerY, {
+        .text(displayName, marginX, footerY, {
           width: contentW,
           align: 'center',
         });
