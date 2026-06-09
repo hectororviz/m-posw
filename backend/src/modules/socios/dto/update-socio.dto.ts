@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { SocioEstado } from '@prisma/client';
 
@@ -6,6 +6,7 @@ const emptyToNull = ({ value }: { value: unknown }) => (value === '' ? null : va
 
 export class UpdateSocioDto {
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Transform(emptyToNull)
   nroSocio?: number;
@@ -41,6 +42,7 @@ export class UpdateSocioDto {
   direccion?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @Transform(emptyToNull)
   socioTipoId?: number;
