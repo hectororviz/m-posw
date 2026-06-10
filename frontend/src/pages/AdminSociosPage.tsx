@@ -33,7 +33,7 @@ const cuotaEstadoBadge = (estado: string) => {
   return <span className="badge badge-danger">Pendiente</span>;
 };
 
-type ModalMode = 'create' | 'view' | 'edit' | null;
+type ModalMode = 'create' | 'view' | 'edit' | 'pay' | null;
 
 const emptyForm = {
   nroSocio: '',
@@ -82,6 +82,27 @@ export const AdminSociosPage: React.FC = () => {
   const [pagoCuotaId, setPagoCuotaId] = useState<number | null>(null);
   const [pagoForm, setPagoForm] = useState(emptyPagoForm);
 
+  // ─── Pago masivo (desde la tabla) ─────────────────────
+  const [pagoMasivoSocioId, setPagoMasivoSocioId] = useState<number | null>(null);
+  const { data: pagoMasivoCuotas = [], isLoading: pagoMasivoLoading } = useSocioCuotas(
+    modalMode === 'pay' && pagoMasivoSocioId ? pagoMasivoSocioId : undefined,
+  );
+  const [pagoMasivoChecked, setPagoMasivoChecked] = useState<Record<number, boolean>>({});
+  const [pagoMasivoTotal, setPagoMasivoTotal] = useState('');
+  const [pagoMasivoFecha, setPagoMasivoFecha] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [pagoMasivoError, setPagoMasivoError] = useState<string | null>(null);
+  const [pagoMasivoSaving, setPagoMasivoSaving] = useState(false);
+  const [pagoMasivoInputMode, setPagoMasivoInputMode] = useState<'total' | 'check'>('check');
+  const [pagoMasivoPartialMonth, setPagoMasivoPartialMonth] = useState<{
+    cuotaId: number;
+    mes: number;
+    anio: number;
+    monto: number;
+    saldo: number;
+  } | null>(null);
+
   // ─── Filters ──────────────────────────────────────────
   const filtered = useMemo(() => {
     if (!search.trim()) return socios;
@@ -104,6 +125,13 @@ export const AdminSociosPage: React.FC = () => {
     setSaving(false);
     setPagoModal(false);
     setPagoCuotaId(null);
+    setPagoMasivoSocioId(null);
+    setPagoMasivoChecked({});
+    setPagoMasivoTotal('');
+    setPagoMasivoError(null);
+    setPagoMasivoSaving(false);
+    setPagoMasivoInputMode('check');
+    setPagoMasivoPartialMonth(null);
   };
 
   // ─── Create ───────────────────────────────────────────
@@ -224,6 +252,127 @@ export const AdminSociosPage: React.FC = () => {
     }
   };
 
+  // ─── Pago masivo ───────────────────────────────────────
+  const openPayModal = (id: number) => {
+    setPagoMasivoSocioId(id);
+    setPagoMasivoChecked({});
+    setPagoMasivoTotal('');
+    setPagoMasivoFecha(new Date().toISOString().slice(0, 10));
+    setPagoMasivoError(null);
+    setPagoMasivoSaving(false);
+    setPagoMasivoInputMode('check');
+    setPagoMasivoPartialMonth(null);
+    setModalMode('pay');
+  };
+
+  const cuotasAdeudadas = useMemo(() => {
+    return pagoMasivoCuotas
+      .filter((c) => c.estado !== 'PAGADO')
+      .sort((a, b) => a.anio !== b.anio ? a.anio - b.anio : a.mes - b.mes)
+      .map((c) => ({
+        ...c,
+        saldo: Number(c.montoOriginal) - Number(c.montoPagado),
+      }));
+  }, [pagoMasivoCuotas]);
+
+  const sumChecked = () => {
+    let total = 0;
+    for (const c of cuotasAdeudadas) {
+      if (pagoMasivoChecked[c.id]) {
+        total += c.saldo;
+      }
+    }
+    return total;
+  };
+
+  const handleToggleCheck = (cuotaId: number) => {
+    setPagoMasivoInputMode('check');
+    setPagoMasivoPartialMonth(null);
+    setPagoMasivoChecked((prev) => {
+      const next = { ...prev, [cuotaId]: !prev[cuotaId] };
+      const total = cuotasAdeudadas
+        .filter((c) => next[c.id])
+        .reduce((s, c) => s + c.saldo, 0);
+      setPagoMasivoTotal(total > 0 ? String(total) : '');
+      return next;
+    });
+  };
+
+  const handleTotalChange = (raw: string) => {
+    setPagoMasivoInputMode('total');
+    setPagoMasivoTotal(raw);
+    setPagoMasivoPartialMonth(null);
+
+    const monto = Number(raw);
+    if (!monto || monto <= 0 || isNaN(monto)) {
+      setPagoMasivoChecked({});
+      return;
+    }
+
+    let restante = monto;
+    const newChecked: Record<number, boolean> = {};
+    let partial: typeof pagoMasivoPartialMonth = null;
+
+    for (const c of cuotasAdeudadas) {
+      if (restante <= 0) break;
+      if (restante >= c.saldo) {
+        newChecked[c.id] = true;
+        restante = Math.round((restante - c.saldo) * 100) / 100;
+      } else {
+        newChecked[c.id] = true;
+        partial = {
+          cuotaId: c.id,
+          mes: c.mes,
+          anio: c.anio,
+          monto: restante,
+          saldo: c.saldo,
+        };
+        restante = 0;
+        break;
+      }
+    }
+
+    setPagoMasivoPartialMonth(partial);
+    setPagoMasivoChecked(newChecked);
+  };
+
+  const handleConfirmPagoMasivo = async () => {
+    const selected = cuotasAdeudadas.filter((c) => pagoMasivoChecked[c.id]);
+    if (selected.length === 0) return;
+
+    setPagoMasivoSaving(true);
+    setPagoMasivoError(null);
+
+    for (const c of selected) {
+      let monto = c.saldo;
+      if (
+        pagoMasivoPartialMonth &&
+        pagoMasivoPartialMonth.cuotaId === c.id
+      ) {
+        monto = pagoMasivoPartialMonth.monto;
+      }
+
+      try {
+        await apiClient.post(`/socios/cuotas/${c.id}/pagar`, {
+          monto,
+          fecha: pagoMasivoFecha,
+        });
+      } catch (err) {
+        setPagoMasivoError(
+          `Error al pagar ${MONTH_NAMES_FULL[c.mes - 1]} ${c.anio}: ${normalizeApiError(err)}`,
+        );
+        setPagoMasivoSaving(false);
+        return;
+      }
+    }
+
+    await queryClient.invalidateQueries({ queryKey: ['socios'] });
+    await queryClient.invalidateQueries({ queryKey: ['socios-tesoreria-resumen'] });
+    await queryClient.invalidateQueries({ queryKey: ['socio-cuotas', pagoMasivoSocioId] });
+    pushToast('Pago registrado correctamente', 'success');
+    closeModal();
+  };
+
   // ─── Carnet ───────────────────────────────────────────
   const handleCarnet = async () => {
     try {
@@ -328,7 +477,7 @@ export const AdminSociosPage: React.FC = () => {
               <span className="col-method" style={{ flex: '0 0 100px' }}>Tipo</span>
               <span className="col-method" style={{ flex: '0 0 90px' }}>Estado</span>
               <span className="col-total" style={{ flex: '0 0 100px' }}>Deuda</span>
-              <span className="col-action" style={{ flex: '0 0 110px' }}></span>
+              <span className="col-action" style={{ flex: '0 0 180px' }}></span>
             </div>
             {filtered.map((s: Socio) => (
               <div key={s.id} className="sales-table-row">
@@ -349,9 +498,12 @@ export const AdminSociosPage: React.FC = () => {
                     <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
                   )}
                 </span>
-                <span className="col-action" style={{ flex: '0 0 110px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                <span className="col-action" style={{ flex: '0 0 180px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => openView(s.id)}>Ver</button>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(s.id)}>Editar</button>
+                  {(s.deudaTotal ?? 0) > 0 && (
+                    <button type="button" className="btn-ghost btn-sm" onClick={() => openPayModal(s.id)}>Pagar</button>
+                  )}
                 </span>
               </div>
             ))}
@@ -599,6 +751,114 @@ export const AdminSociosPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ─── Modal: Pago masivo ─────────────────────── */}
+      {modalMode === 'pay' && (() => {
+        const socio = socios.find((x) => x.id === pagoMasivoSocioId);
+        const displayTotal = pagoMasivoInputMode === 'check'
+          ? sumChecked()
+          : (Number(pagoMasivoTotal) || 0);
+        const isValid = displayTotal > 0 && cuotasAdeudadas.some((c) => pagoMasivoChecked[c.id]);
+
+        return (
+          <div className="modal-backdrop" onClick={closeModal}>
+            <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', maxHeight: '90vh', overflow: 'auto' }}>
+              <div className="modal-header">
+                <h3>Registrar pago{socio ? ` — ${socio.apellido}, ${socio.nombre} (Nº ${socio.nroSocio})` : ''}</h3>
+                <button className="icon-button" onClick={closeModal}>✕</button>
+              </div>
+              <div className="modal-body">
+                {pagoMasivoError && <p className="error-text" style={{ marginBottom: '0.75rem' }}>{pagoMasivoError}</p>}
+
+                {pagoMasivoLoading ? (
+                  <div style={{ textAlign: 'center', padding: '2rem' }}><div className="spinner" /></div>
+                ) : cuotasAdeudadas.length === 0 ? (
+                  <p style={{ color: 'var(--color-text-faint)', textAlign: 'center', padding: '1rem' }}>No hay cuotas pendientes.</p>
+                ) : (
+                  <>
+                    <div className="settings-section" style={{ marginBottom: '0.75rem' }}>
+                      <div className="sales-table">
+                        <div className="sales-table-head">
+                          <span className="col-action" style={{ flex: '0 0 36px' }}></span>
+                          <span className="col-date" style={{ flex: 1 }}>Periodo</span>
+                          <span className="col-total" style={{ flex: '0 0 110px' }}>Saldo pendiente</span>
+                          <span className="col-method" style={{ flex: '0 0 80px' }}>Estado</span>
+                        </div>
+                        {cuotasAdeudadas.map((c) => {
+                          const isPartial =
+                            pagoMasivoPartialMonth && pagoMasivoPartialMonth.cuotaId === c.id;
+                          return (
+                            <div
+                              key={c.id}
+                              className={`sales-table-row${isPartial ? ' row-pending-debt' : ''}`}
+                            >
+                              <span className="col-action" style={{ flex: '0 0 36px', display: 'flex', alignItems: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!!pagoMasivoChecked[c.id]}
+                                  onChange={() => handleToggleCheck(c.id)}
+                                />
+                              </span>
+                              <span className="col-date" style={{ flex: 1 }}>
+                                {MONTH_NAMES_FULL[c.mes - 1]} {c.anio}
+                              </span>
+                              <span className="col-total" style={{ flex: '0 0 110px', fontWeight: 500 }}>
+                                {formatCurrency(c.saldo)}
+                              </span>
+                              <span className="col-method" style={{ flex: '0 0 80px' }}>
+                                {cuotaEstadoBadge(c.estado)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {pagoMasivoPartialMonth && (
+                      <div className="alerta-deuda-banner" style={{ marginBottom: '0.75rem', background: 'var(--color-warning-bg, #fef3c7)', color: 'var(--color-warning-text, #92400e)', border: '1px solid var(--color-warning, #f59e0b)' }}>
+                        El mes {MONTH_NAMES_FULL[pagoMasivoPartialMonth.mes - 1]} {pagoMasivoPartialMonth.anio} quedara con pago parcial de {formatCurrency(pagoMasivoPartialMonth.monto)} sobre {formatCurrency(pagoMasivoPartialMonth.saldo)}
+                      </div>
+                    )}
+
+                    <div className="settings-field">
+                      <label>Total a pagar</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={pagoMasivoInputMode === 'check' ? (sumChecked() || '') : pagoMasivoTotal}
+                        onChange={(e) => handleTotalChange(e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="settings-field">
+                      <label>Fecha</label>
+                      <input
+                        type="date"
+                        value={pagoMasivoFecha}
+                        onChange={(e) => setPagoMasivoFecha(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleConfirmPagoMasivo}
+                    disabled={!isValid || pagoMasivoSaving}
+                  >
+                    {pagoMasivoSaving ? 'Procesando...' : 'Confirmar pago'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
