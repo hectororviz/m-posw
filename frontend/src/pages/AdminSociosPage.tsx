@@ -253,7 +253,7 @@ export const AdminSociosPage: React.FC = () => {
   };
 
   // ─── Pago masivo ───────────────────────────────────────
-  const openPayModal = (id: number) => {
+  const openPayModal = async (id: number) => {
     setPagoMasivoSocioId(id);
     setPagoMasivoChecked({});
     setPagoMasivoTotal('');
@@ -263,6 +263,26 @@ export const AdminSociosPage: React.FC = () => {
     setPagoMasivoInputMode('check');
     setPagoMasivoPartialMonth(null);
     setModalMode('pay');
+
+    // Generar cuotas faltantes de meses vencidos (idempotente)
+    const ahora = new Date();
+    const anio = ahora.getUTCFullYear();
+    try {
+      await Promise.all(
+        Array.from({ length: 12 }, (_, i) => {
+          const mes = i + 1;
+          const dia10 = new Date(Date.UTC(anio, mes - 1, 10, 12, 0, 0));
+          if (ahora >= dia10) {
+            return apiClient.post('/socios/cuotas/generar', { anio, mes });
+          }
+          return Promise.resolve();
+        }),
+      );
+      await queryClient.invalidateQueries({ queryKey: ['socio-cuotas', id] });
+      await queryClient.invalidateQueries({ queryKey: ['socios'] });
+    } catch (_) {
+      // Si falla la generación, continuamos igual
+    }
   };
 
   const cuotasAdeudadas = useMemo(() => {
