@@ -63,6 +63,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
         productoNombre: b.productoNombre,
         porcentaje: b.porcentaje,
         descuentoMaximo: b.descuentoMaximo,
+        limiteDiario: b.limiteDiario,
       })),
     });
     setIsQrOpen(false);

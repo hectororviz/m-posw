@@ -82,6 +82,7 @@ export class SociosQrService {
             productoNombre: b.producto?.name || null,
             porcentaje: Number(b.porcentaje),
             descuentoMaximo: b.descuentoMaximo ? Number(b.descuentoMaximo) : null,
+            limiteDiario: b.limiteDiario || null,
             disponible,
             motivoNoDisponible,
           };

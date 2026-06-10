@@ -26,6 +26,7 @@ export interface SocioCartData {
     productoNombre: string | null;
     porcentaje: number;
     descuentoMaximo: number | null;
+    limiteDiario: number | null;
   }>;
 }
 
@@ -45,29 +46,69 @@ const CartContext = createContext<CartContextValue | undefined>(undefined);
 
 const recalcDiscounts = (items: CartItem[], data: SocioCartData | null): CartDiscount[] => {
   if (!data) return [];
-  return data.beneficios
-    .map((b) => {
-      const targetItems = b.productoId
-        ? items.filter((item) => item.product.id === b.productoId)
-        : items.filter((item) => item.product.categoryId === b.categoriaId);
 
-      if (targetItems.length === 0) return null;
-      const subtotal = targetItems.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
-      const porcentaje = Number(b.porcentaje);
-      const tope = b.descuentoMaximo != null ? Number(b.descuentoMaximo) : null;
-      let desc = subtotal * (porcentaje / 100);
-      if (tope !== null && desc > tope) {
-        desc = tope;
-      }
-      const label = b.productoNombre || b.categoriaNombre || 'Beneficio';
-      return {
-        categoriaNombre: label,
+  // Separar beneficios por producto y por categoria
+  const prodBenefits = data.beneficios.filter((b) => b.productoId);
+  const catBenefits = data.beneficios.filter((b) => !b.productoId && b.categoriaId);
+
+  const result: CartDiscount[] = [];
+  const productosCubiertos = new Map<string, number>(); // productoId -> unidades ya cubiertas por beneficio de producto
+
+  // 1. Aplicar beneficios de producto (tienen prioridad)
+  for (const b of prodBenefits) {
+    const item = items.find((i) => i.product.id === b.productoId);
+    if (!item) continue;
+
+    const limite = b.limiteDiario || item.quantity;
+    const unidadesDescontar = Math.min(limite, item.quantity);
+    if (unidadesDescontar <= 0) continue;
+
+    const precio = Number(item.product.price);
+    const porcentaje = Number(b.porcentaje);
+    const tope = b.descuentoMaximo != null ? Number(b.descuentoMaximo) : null;
+    let desc = precio * unidadesDescontar * (porcentaje / 100);
+    if (tope !== null && desc > tope) desc = tope;
+
+    if (desc > 0) {
+      productosCubiertos.set(b.productoId!, unidadesDescontar);
+      result.push({
+        categoriaNombre: b.productoNombre || 'Beneficio',
         porcentaje,
         monto: Math.round(desc * 100) / 100,
         beneficioId: b.id,
-      };
-    })
-    .filter((d): d is CartDiscount => d !== null && d.monto > 0);
+      });
+    }
+  }
+
+  // 2. Aplicar beneficios de categoria (solo sobre productos no cubiertos por beneficio de producto)
+  for (const b of catBenefits) {
+    let subtotal = 0;
+    for (const item of items) {
+      if (item.product.categoryId !== b.categoriaId) continue;
+      const cubiertas = productosCubiertos.get(item.product.id) || 0;
+      const disponibles = Math.max(0, item.quantity - cubiertas);
+      if (disponibles > 0) {
+        subtotal += Number(item.product.price) * disponibles;
+      }
+    }
+    if (subtotal <= 0) continue;
+
+    const porcentaje = Number(b.porcentaje);
+    const tope = b.descuentoMaximo != null ? Number(b.descuentoMaximo) : null;
+    let desc = subtotal * (porcentaje / 100);
+    if (tope !== null && desc > tope) desc = tope;
+
+    if (desc > 0) {
+      result.push({
+        categoriaNombre: b.categoriaNombre || 'Beneficio',
+        porcentaje,
+        monto: Math.round(desc * 100) / 100,
+        beneficioId: b.id,
+      });
+    }
+  }
+
+  return result;
 };
 
 export const CartProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
