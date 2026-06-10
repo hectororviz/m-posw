@@ -20,12 +20,12 @@ const navIcon = (emoji: string) => <span className="nav-icon" aria-hidden="true"
 const navItems = [
   { to: '/admin/sales',      emoji: '📋', label: 'Ventas' },
   { to: '/admin/stats',      emoji: '📊', label: 'Estadisticas' },
-  { to: '/admin/tesoreria',  emoji: '📒', label: 'Tesorería' },
+  { to: '/admin/tesoreria',  emoji: '📒', label: 'Tesorería',     moduleKey: 'enableTreasuryModule' as const },
   { to: '/admin/categories', emoji: '🗂️', label: 'Categorias' },
   { to: '/admin/products',   emoji: '📦', label: 'Productos' },
   { to: '/admin/stock',      emoji: '📐', label: 'Stock' },
-  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores' },
-  { to: '/admin/socios',     emoji: '🪪', label: 'Socios' },
+  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores',    moduleKey: 'enableAcreedoresModule' as const },
+  { to: '/admin/socios',     emoji: '🪪', label: 'Socios',        moduleKey: 'enableSociosModule' as const },
   { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion' },
 ];
 
@@ -114,7 +114,13 @@ export const AdminLayout: React.FC = () => {
             </button>
           </div>
 
-          {navItems.map(({ to, emoji, label }) => (
+          {navItems
+            .filter((item) => {
+              if (!item.moduleKey) return true;
+              const key = item.moduleKey as 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule';
+              return settings?.[key] ?? true;
+            })
+            .map(({ to, emoji, label }) => (
             <NavLink
               key={to}
               to={to}

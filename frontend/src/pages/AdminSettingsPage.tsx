@@ -9,7 +9,7 @@ import type { Role, Setting, User } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
-type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'usuarios' | 'sistema';
+type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'usuarios' | 'modulos' | 'sistema';
 
 type MpSetupMode = 'setup_required' | 'select_store' | null;
 
@@ -26,6 +26,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'mercadopago', label: 'Mercado Pago' },
   { id: 'caja', label: 'Caja' },
   { id: 'usuarios', label: 'Usuarios' },
+  { id: 'modulos', label: 'Módulos' },
   { id: 'sistema', label: 'Sistema' },
 ];
 
@@ -49,6 +50,9 @@ export const AdminSettingsPage: React.FC = () => {
     enableQrPayment: true,
     enableTransferPayment: true,
     enableFiadoPayment: false,
+    enableSociosModule: true,
+    enableTreasuryModule: true,
+    enableAcreedoresModule: true,
     movementInReasons: [] as string[],
     movementOutReasons: [] as string[],
   });
@@ -204,6 +208,9 @@ export const AdminSettingsPage: React.FC = () => {
         enableQrPayment: settings.enableQrPayment ?? true,
         enableTransferPayment: settings.enableTransferPayment ?? true,
         enableFiadoPayment: settings.enableFiadoPayment ?? false,
+        enableSociosModule: settings.enableSociosModule ?? true,
+        enableTreasuryModule: settings.enableTreasuryModule ?? true,
+        enableAcreedoresModule: settings.enableAcreedoresModule ?? true,
         movementInReasons: settings.movementInReasons ?? [],
         movementOutReasons: settings.movementOutReasons ?? [],
       });
@@ -583,6 +590,7 @@ export const AdminSettingsPage: React.FC = () => {
                   <span className="toggle-switch-track" />
                   Transferencia
                 </label>
+                {form.enableAcreedoresModule && (
                 <label className="toggle-switch">
                   <input
                     type="checkbox"
@@ -592,6 +600,7 @@ export const AdminSettingsPage: React.FC = () => {
                   <span className="toggle-switch-track" />
                   Fiado
                 </label>
+                )}
               </div>
             </div>
           </>
@@ -975,6 +984,55 @@ export const AdminSettingsPage: React.FC = () => {
               +
             </button>
           </>
+        )}
+
+        {/* TAB: Módulos */}
+        {activeTab === 'modulos' && (
+          <div className="settings-section">
+            <h3 className="settings-section-header">Modulos del sistema</h3>
+            <p className="settings-section-desc">Habilita o deshabilita modulos del sistema. Al desactivar un modulo se ocultan sus entradas de menu y funciones asociadas.</p>
+            <div className="settings-toggle-group">
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableSociosModule}
+                  onChange={(e) => setForm({ ...form, enableSociosModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Socios</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu y el boton QR de la pantalla POS</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableTreasuryModule}
+                  onChange={(e) => setForm({ ...form, enableTreasuryModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Tesoreria</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableAcreedoresModule}
+                  onChange={(e) => setForm({ ...form, enableAcreedoresModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Acreedores</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu, la opcion Fiado del checkout y el toggle de Fiado en Ventas</small>
+                </span>
+              </label>
+            </div>
+          </div>
         )}
 
         {/* TAB: Sistema */}

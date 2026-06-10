@@ -111,7 +111,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     const enableCash = settings?.enableCashPayment ?? true;
     const enableQr = settings?.enableQrPayment ?? true;
     const enableTransfer = settings?.enableTransferPayment ?? true;
-    const enableFiado = settings?.enableFiadoPayment ?? false;
+    const enableFiado = (settings?.enableFiadoPayment ?? false) && (settings?.enableAcreedoresModule ?? true);
 
     if (!enableCash && !enableQr && !enableTransfer && !enableFiado) {
       return { enableCashPayment: true, enableQrPayment: false, enableTransferPayment: false, enableFiadoPayment: false };

@@ -51,6 +51,18 @@ export class UpdateSettingDto {
   enableFiadoPayment?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  enableSociosModule?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enableTreasuryModule?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enableAcreedoresModule?: boolean;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];

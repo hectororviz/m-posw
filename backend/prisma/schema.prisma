@@ -239,6 +239,9 @@ model Setting {
   enableQrPayment Boolean @default(true)
   enableTransferPayment Boolean @default(true)
   enableFiadoPayment Boolean @default(false)
+  enableSociosModule Boolean @default(true)
+  enableTreasuryModule Boolean @default(true)
+  enableAcreedoresModule Boolean @default(true)
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?

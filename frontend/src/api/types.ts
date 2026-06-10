@@ -142,6 +142,9 @@ export interface Setting {
   enableQrPayment?: boolean | null;
   enableTransferPayment?: boolean | null;
   enableFiadoPayment?: boolean | null;
+  enableSociosModule?: boolean | null;
+  enableTreasuryModule?: boolean | null;
+  enableAcreedoresModule?: boolean | null;
   movementInReasons?: string[];
   movementOutReasons?: string[];
   mpLinked?: boolean | null;

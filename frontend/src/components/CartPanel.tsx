@@ -174,7 +174,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
                 <strong>{formatAmount(total)}</strong>
               </div>
               <div style={{ display: 'flex', gap: '0.4rem' }}>
-                {items.length > 0 && (
+                {items.length > 0 && (settings?.enableSociosModule ?? true) && (
                   <button type="button" className="cart-checkout-btn" style={{ flex: 1 }} onClick={() => setIsQrOpen(true)}>
                     QR
                   </button>
