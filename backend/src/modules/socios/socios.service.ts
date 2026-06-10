@@ -451,9 +451,11 @@ export class SociosService {
           };
         } else if (s.estado === 'ACTIVO' && s.socioTipo.activo && Number(s.socioTipo.montoMensual) > 0) {
           const fechaAlta = new Date(s.fechaAlta);
-          const mesDate = new Date(Date.UTC(anio, mes - 1, 1, 12, 0, 0));
+          const dia10delMes = new Date(Date.UTC(anio, mes - 1, 10, 12, 0, 0));
+          const ahora = new Date();
 
-          if (fechaAlta.getTime() > new Date(Date.UTC(anio, mes - 1, 10, 12, 0, 0)).getTime()) {
+          // Solo mostrar pendiente si el vencimiento (dia 10) ya paso
+          if (fechaAlta.getTime() > dia10delMes.getTime() || ahora.getTime() < dia10delMes.getTime()) {
             meses[mes] = { estado: 'NO_APLICA' };
           } else {
             meses[mes] = { estado: 'PENDIENTE_SIN_CUOTA', pendiente: Number(s.socioTipo.montoMensual) };
