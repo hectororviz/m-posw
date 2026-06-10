@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Product } from '../api/types';
 
 export interface CartItem {
@@ -34,17 +34,43 @@ interface CartContextValue {
   addItem: (product: Product) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
-  setDiscounts: (discounts: CartDiscount[]) => void;
   setSocioData: (data: SocioCartData | null) => void;
+  removeDiscounts: () => void;
   clear: () => void;
 }
 
 const CartContext = createContext<CartContextValue | undefined>(undefined);
 
+const recalcDiscounts = (items: CartItem[], data: SocioCartData | null): CartDiscount[] => {
+  if (!data) return [];
+  return data.beneficios
+    .map((b) => {
+      const catItems = items.filter((item) => item.product.categoryId === b.categoriaId);
+      if (catItems.length === 0) return null;
+      const catSubtotal = catItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      let desc = catSubtotal * (b.porcentaje / 100);
+      if (b.descuentoMaximo !== null && desc > b.descuentoMaximo) {
+        desc = b.descuentoMaximo;
+      }
+      return {
+        categoriaNombre: b.categoriaNombre,
+        porcentaje: b.porcentaje,
+        monto: Math.round(desc * 100) / 100,
+        beneficioId: b.id,
+      };
+    })
+    .filter((d): d is CartDiscount => d !== null && d.monto > 0);
+};
+
 export const CartProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [discounts, setDiscounts] = useState<CartDiscount[]>([]);
   const [socioData, setSocioData] = useState<SocioCartData | null>(null);
+  const [discounts, setDiscounts] = useState<CartDiscount[]>([]);
+
+  // Recalcular descuentos cada vez que cambian items o socioData
+  useEffect(() => {
+    setDiscounts(recalcDiscounts(items, socioData));
+  }, [items, socioData]);
 
   const addItem = (product: Product) => {
     setItems((prev) => {
@@ -70,13 +96,20 @@ export const CartProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     );
   };
 
+  const removeDiscounts = () => {
+    setSocioData(null);
+    setDiscounts([]);
+  };
+
   const clear = () => {
     setItems([]);
     setDiscounts([]);
     setSocioData(null);
   };
 
-  const value = useMemo(() => ({ items, discounts, socioData, addItem, removeItem, updateQuantity, setDiscounts, setSocioData, clear }), [items, discounts, socioData]);
+  const value = useMemo(() => ({
+    items, discounts, socioData, addItem, removeItem, updateQuantity, setSocioData, removeDiscounts, clear,
+  }), [items, discounts, socioData]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };

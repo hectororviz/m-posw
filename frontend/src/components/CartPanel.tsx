@@ -20,7 +20,7 @@ interface CartPanelProps {
 }
 
 export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
-  const { items, discounts, socioData, updateQuantity, removeItem, setDiscounts, setSocioData } = useCart();
+  const { items, discounts, socioData, updateQuantity, removeItem, setSocioData, removeDiscounts } = useCart();
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
   const { pushToast } = useToast();
@@ -50,27 +50,6 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
 
   const handleApplyDiscounts = (qrData: any) => {
     const available = qrData.beneficios.filter((b: any) => b.disponible) as any[];
-    const newDiscounts: typeof discounts = [];
-
-    for (const b of available) {
-      const catItems = items.filter((item) => item.product.categoryId === b.categoriaId);
-      if (catItems.length === 0) continue;
-
-      const catSubtotal = catItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-      let desc = catSubtotal * (b.porcentaje / 100);
-      if (b.descuentoMaximo !== null && desc > b.descuentoMaximo) {
-        desc = b.descuentoMaximo;
-      }
-
-      newDiscounts.push({
-        categoriaNombre: b.categoriaNombre,
-        porcentaje: b.porcentaje,
-        monto: Math.round(desc * 100) / 100,
-        beneficioId: b.id,
-      });
-    }
-
-    setDiscounts(newDiscounts);
     setSocioData({
       socioId: qrData.socio.id || 0,
       uuid: '',
@@ -171,15 +150,16 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
                 <ul className="cart-items" style={{ borderTop: '1px dashed var(--color-border)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
                   {discounts.map((d, i) => (
                     <li key={i} className="cart-item" style={{ color: 'var(--color-success)' }}>
-                      <div className="cart-item__info">
+                      <div className="cart-item__info" style={{ flex: 1 }}>
                         <span className="cart-item__name" style={{ fontSize: '0.85rem' }}>Descuento socio - {d.categoriaNombre} ({d.porcentaje}%)</span>
                         <span className="cart-item__unit">-{formatAmount(d.monto)}</span>
                       </div>
                     </li>
                   ))}
                   {socioData && (
-                    <li className="cart-item" style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                      Socio: {socioData.nombre} (#{socioData.nroSocio})
+                    <li className="cart-item" style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Socio: {socioData.nombre} (#{socioData.nroSocio})</span>
+                      <button type="button" className="cart-item-remove" onClick={removeDiscounts} title="Quitar descuentos">×</button>
                     </li>
                   )}
                 </ul>
