@@ -47,14 +47,16 @@ const recalcDiscounts = (items: CartItem[], data: SocioCartData | null): CartDis
     .map((b) => {
       const catItems = items.filter((item) => item.product.categoryId === b.categoriaId);
       if (catItems.length === 0) return null;
-      const catSubtotal = catItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-      let desc = catSubtotal * (b.porcentaje / 100);
-      if (b.descuentoMaximo !== null && desc > b.descuentoMaximo) {
-        desc = b.descuentoMaximo;
+      const catSubtotal = catItems.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
+      const porcentaje = Number(b.porcentaje);
+      const tope = b.descuentoMaximo != null ? Number(b.descuentoMaximo) : null;
+      let desc = catSubtotal * (porcentaje / 100);
+      if (tope !== null && desc > tope) {
+        desc = tope;
       }
       return {
         categoriaNombre: b.categoriaNombre,
-        porcentaje: b.porcentaje,
+        porcentaje,
         monto: Math.round(desc * 100) / 100,
         beneficioId: b.id,
       };
