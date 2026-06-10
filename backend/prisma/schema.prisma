@@ -528,6 +528,7 @@ model SocioTipoHistorial {
 
 model Socio {
   id              Int          @id @default(autoincrement())
+  uuid            String       @unique @default(uuid()) @db.Uuid
   nroSocio        Int
   dni             String
   apellido        String

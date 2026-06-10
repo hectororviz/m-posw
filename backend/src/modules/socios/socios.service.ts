@@ -8,6 +8,7 @@ import { Cron } from '@nestjs/schedule';
 import * as PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../common/prisma.service';
 import { CreateSocioTipoDto } from './dto/create-socio-tipo.dto';
 import { UpdateSocioTipoDto } from './dto/update-socio-tipo.dto';
@@ -591,6 +592,12 @@ export class SociosService {
     const cardH = 153.07;
     const filename = `credencial-socio-${socio.nroSocio}.pdf`;
 
+    const qrBuffer = await QRCode.toBuffer(socio.uuid, {
+      type: 'png',
+      width: 120,
+      margin: 1,
+    });
+
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const doc = new PDFDocument({
@@ -707,6 +714,12 @@ export class SociosService {
           width: contentW,
           align: 'center',
         });
+
+      // QR code en la esquina inferior derecha
+      const qrSize = 60;
+      const qrX = cardX + cardW - qrSize - 8;
+      const qrY = cardY + cardH - qrSize - 8;
+      doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
 
       doc.end();
     });
