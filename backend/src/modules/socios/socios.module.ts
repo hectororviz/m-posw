@@ -5,11 +5,18 @@ import { SociosController } from './socios.controller';
 import { SociosService } from './socios.service';
 import { SociosQrController } from './socios-qr.controller';
 import { SociosQrService } from './socios-qr.service';
+import { SociosBeneficiosController, SociosCanjesController } from './socios-beneficios.controller';
+import { SociosBeneficiosService } from './socios-beneficios.service';
 
 @Module({
   imports: [ScheduleModule.forRoot()],
-  controllers: [SociosController, SociosQrController],
-  providers: [SociosService, SociosQrService, PrismaService],
-  exports: [SociosService],
+  controllers: [
+    SociosController,
+    SociosQrController,
+    SociosBeneficiosController,
+    SociosCanjesController,
+  ],
+  providers: [SociosService, SociosQrService, SociosBeneficiosService, PrismaService],
+  exports: [SociosService, SociosBeneficiosService],
 })
 export class SociosModule {}

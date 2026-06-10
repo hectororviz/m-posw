@@ -15,6 +15,7 @@ import { AdminSociosLayout } from './pages/AdminSociosLayout';
 import { AdminSociosTiposPage } from './pages/AdminSociosTiposPage';
 import { AdminSociosPage } from './pages/AdminSociosPage';
 import { AdminSociosMatrizPage } from './pages/AdminSociosMatrizPage';
+import { AdminSociosBeneficiosPage } from './pages/AdminSociosBeneficiosPage';
 import { TreasurySummaryPage } from './pages/TreasurySummaryPage';
 import { TreasuryJournalEntriesPage } from './pages/TreasuryJournalEntriesPage';
 import { TreasuryLedgerAccountsPage } from './pages/TreasuryLedgerAccountsPage';
@@ -113,6 +114,7 @@ export const App: React.FC = () => {
           <Route index element={<AdminSociosPage />} />
           <Route path="matriz" element={<AdminSociosMatrizPage />} />
           <Route path="configuracion" element={<AdminSociosTiposPage />} />
+          <Route path="beneficios" element={<AdminSociosBeneficiosPage />} />
         </Route>
         <Route path="users" element={<Navigate to="/admin/settings" replace />} />
         <Route path="contabilidad" element={<Navigate to="/admin/tesoreria" replace />} />

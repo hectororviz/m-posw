@@ -13,6 +13,9 @@ export const AdminSociosLayout: React.FC = () => {
         <NavLink to="/admin/socios/configuracion" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
           Configuracion
         </NavLink>
+        <NavLink to="/admin/socios/beneficios" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
+          Beneficios
+        </NavLink>
       </nav>
       <div className="treasury-content">
         <Outlet />

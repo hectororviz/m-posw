@@ -41,6 +41,49 @@ export class SociosQrService {
       estado = cuotasAtrasadas.length > 0 ? 'ATRASADO' : 'AL_DIA';
     }
 
+    let beneficios: any[] = [];
+
+    if (estado === 'AL_DIA') {
+      const beneficiosActivos = await this.prisma.socioBeneficio.findMany({
+        where: { socioTipoId: socio.socioTipoId, activo: true },
+        include: { categoria: { select: { id: true, name: true } } },
+      });
+
+      const hoyInicio = new Date();
+      hoyInicio.setUTCHours(3, 0, 0, 0);
+
+      beneficios = await Promise.all(
+        beneficiosActivos.map(async (b) => {
+          let disponible = true;
+          let motivoNoDisponible: string | null = null;
+
+          if (b.limiteDiario) {
+            const canjesHoy = await this.prisma.socioCanje.count({
+              where: {
+                socioBeneficioId: b.id,
+                socioId: socio.id,
+                fecha: { gte: hoyInicio },
+              },
+            });
+            if (canjesHoy >= b.limiteDiario) {
+              disponible = false;
+              motivoNoDisponible = 'Ya canjeado hoy';
+            }
+          }
+
+          return {
+            id: b.id,
+            categoriaId: b.categoria.id,
+            categoriaNombre: b.categoria.name,
+            porcentaje: Number(b.porcentaje),
+            descuentoMaximo: b.descuentoMaximo ? Number(b.descuentoMaximo) : null,
+            disponible,
+            motivoNoDisponible,
+          };
+        }),
+      );
+    }
+
     return {
       socio: {
         nombre: `${socio.apellido}, ${socio.nombre}`,
@@ -48,7 +91,7 @@ export class SociosQrService {
         tipo: socio.socioTipo.nombre,
       },
       estado,
-      beneficios: [],
+      beneficios,
     };
   }
 }

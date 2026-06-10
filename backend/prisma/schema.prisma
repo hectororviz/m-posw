@@ -106,6 +106,7 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   products  Product[]
+  socioBeneficios SocioBeneficio[]
 }
 
 model Product {
@@ -513,6 +514,7 @@ model SocioTipo {
   updatedAt    DateTime            @updatedAt
   historial    SocioTipoHistorial[]
   socios       Socio[]
+  beneficios   SocioBeneficio[]
 }
 
 model SocioTipoHistorial {
@@ -543,6 +545,7 @@ model Socio {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   cuotas          SocioCuota[]
+  canjes          SocioCanje[]
 
   @@unique([nroSocio])
   @@index([socioTipoId])
@@ -577,4 +580,41 @@ model SocioPago {
   createdAt    DateTime  @default(now())
 
   @@index([socioCuotaId])
+}
+
+model SocioBeneficio {
+  id              String        @id @default(uuid()) @db.Uuid
+  socioTipoId     Int
+  socioTipo       SocioTipo     @relation(fields: [socioTipoId], references: [id])
+  categoriaProdId String        @db.Uuid
+  categoria       Category      @relation(fields: [categoriaProdId], references: [id])
+  porcentaje      Decimal       @db.Decimal(5, 2)
+  descuentoMaximo Decimal?      @db.Decimal(10, 2)
+  limiteDiario    Int?
+  activo          Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  canjes          SocioCanje[]
+
+  @@unique([socioTipoId, categoriaProdId])
+  @@index([socioTipoId])
+  @@index([categoriaProdId])
+}
+
+model SocioCanje {
+  id                String         @id @default(uuid()) @db.Uuid
+  socioBeneficioId  String         @db.Uuid
+  socioBeneficio    SocioBeneficio @relation(fields: [socioBeneficioId], references: [id])
+  socioId           Int
+  socio             Socio          @relation(fields: [socioId], references: [id])
+  ventaId           String?        @db.Uuid
+  montoDescontado   Decimal        @db.Decimal(10, 2)
+  fecha             DateTime       @default(now())
+  usuarioId         String         @db.Uuid
+  posId             String?
+  createdAt         DateTime       @default(now())
+
+  @@index([socioBeneficioId])
+  @@index([socioId])
+  @@index([fecha])
 }
