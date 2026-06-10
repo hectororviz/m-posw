@@ -127,6 +127,7 @@ model Product {
   // Relaciones para recetas
   recipeAsComposite RecipeIngredient[]   @relation("CompositeProduct")
   recipeAsRawMaterial RecipeIngredient[] @relation("RawMaterialProduct")
+  socioBeneficios   SocioBeneficio[]
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
 }
@@ -586,8 +587,10 @@ model SocioBeneficio {
   id              String        @id @default(uuid()) @db.Uuid
   socioTipoId     Int
   socioTipo       SocioTipo     @relation(fields: [socioTipoId], references: [id])
-  categoriaProdId String        @db.Uuid
-  categoria       Category      @relation(fields: [categoriaProdId], references: [id])
+  categoriaProdId String?       @db.Uuid
+  categoria       Category?     @relation(fields: [categoriaProdId], references: [id])
+  productoId      String?       @db.Uuid
+  producto        Product?      @relation(fields: [productoId], references: [id])
   porcentaje      Decimal       @db.Decimal(5, 2)
   descuentoMaximo Decimal?      @db.Decimal(10, 2)
   limiteDiario    Int?
@@ -597,8 +600,10 @@ model SocioBeneficio {
   canjes          SocioCanje[]
 
   @@unique([socioTipoId, categoriaProdId])
+  @@unique([socioTipoId, productoId])
   @@index([socioTipoId])
   @@index([categoriaProdId])
+  @@index([productoId])
 }
 
 model SocioCanje {

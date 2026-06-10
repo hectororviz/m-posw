@@ -59,6 +59,8 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
         id: b.id,
         categoriaId: b.categoriaId,
         categoriaNombre: b.categoriaNombre,
+        productoId: b.productoId,
+        productoNombre: b.productoNombre,
         porcentaje: b.porcentaje,
         descuentoMaximo: b.descuentoMaximo,
       })),

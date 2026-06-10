@@ -46,7 +46,10 @@ export class SociosQrService {
     if (estado === 'AL_DIA') {
       const beneficiosActivos = await this.prisma.socioBeneficio.findMany({
         where: { socioTipoId: socio.socioTipoId, activo: true },
-        include: { categoria: { select: { id: true, name: true } } },
+        include: {
+          categoria: { select: { id: true, name: true } },
+          producto: { select: { id: true, name: true } },
+        },
       });
 
       const hoyInicio = new Date();
@@ -73,8 +76,10 @@ export class SociosQrService {
 
           return {
             id: b.id,
-            categoriaId: b.categoria.id,
-            categoriaNombre: b.categoria.name,
+            categoriaId: b.categoria?.id || null,
+            categoriaNombre: b.categoria?.name || null,
+            productoId: b.producto?.id || null,
+            productoNombre: b.producto?.name || null,
             porcentaje: Number(b.porcentaje),
             descuentoMaximo: b.descuentoMaximo ? Number(b.descuentoMaximo) : null,
             disponible,

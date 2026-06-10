@@ -1,11 +1,21 @@
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsNumber, IsOptional, IsUUID, Max, Min, ValidateIf } from 'class-validator';
 
 export class CreateBeneficioDto {
   @IsInt()
   socioTipoId: number;
 
+  @IsOptional()
   @IsUUID()
-  categoriaProdId: string;
+  categoriaProdId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productoId?: string;
+
+  @ValidateIf((o) => !o.categoriaProdId && !o.productoId)
+  _validateAtLeastOne() {
+    // validator will fail — at least one of categoriaProdId or productoId is required
+  }
 
   @IsNumber()
   @Min(0)

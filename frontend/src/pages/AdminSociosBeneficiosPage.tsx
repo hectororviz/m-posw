@@ -6,13 +6,15 @@ import { useToast } from '../components/ToastProvider';
 interface Beneficio {
   id: string;
   socioTipoId: number;
-  categoriaProdId: string;
+  categoriaProdId?: string | null;
+  productoId?: string | null;
   porcentaje: number;
   descuentoMaximo?: number | null;
   limiteDiario?: number | null;
   activo: boolean;
   socioTipo: { id: number; nombre: string };
-  categoria: { id: string; name: string };
+  categoria?: { id: string; name: string } | null;
+  producto?: { id: string; name: string } | null;
   createdAt: string;
 }
 
@@ -29,7 +31,9 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     socioTipoId: '',
+    tipoBeneficio: 'categoria' as 'categoria' | 'producto',
     categoriaProdId: '',
+    productoId: '',
     porcentaje: '',
     descuentoMaximo: '',
     limiteDiario: '',
@@ -39,6 +43,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [categorias, setCategorias] = useState<any[]>([]);
+  const [productos, setProductos] = useState<any[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -56,8 +61,15 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
     } catch (_) {}
   };
 
+  const fetchProductos = async () => {
+    try {
+      const res = await apiClient.get<any[]>('/products');
+      setProductos(res.data.filter((p: any) => p.active));
+    } catch (_) {}
+  };
+
   const resetForm = () => {
-    setForm({ socioTipoId: '', categoriaProdId: '', porcentaje: '', descuentoMaximo: '', limiteDiario: '', activo: true });
+    setForm({ socioTipoId: '', tipoBeneficio: 'categoria', categoriaProdId: '', productoId: '', porcentaje: '', descuentoMaximo: '', limiteDiario: '', activo: true });
     setEditingId(null);
     setError(null);
   };
@@ -65,6 +77,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
   const openCreate = () => {
     resetForm();
     fetchCategorias();
+    fetchProductos();
     setModalOpen(true);
   };
 
@@ -72,33 +85,43 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
     setEditingId(b.id);
     setForm({
       socioTipoId: String(b.socioTipoId),
-      categoriaProdId: b.categoriaProdId,
+      tipoBeneficio: b.productoId ? 'producto' : 'categoria',
+      categoriaProdId: b.categoriaProdId || '',
+      productoId: b.productoId || '',
       porcentaje: String(b.porcentaje),
       descuentoMaximo: b.descuentoMaximo ? String(b.descuentoMaximo) : '',
       limiteDiario: b.limiteDiario ? String(b.limiteDiario) : '',
       activo: b.activo,
     });
     fetchCategorias();
+    fetchProductos();
     setError(null);
     setModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.socioTipoId || !form.categoriaProdId || !form.porcentaje) {
-      setError('Tipo de socio, categoria y porcentaje son obligatorios');
+    const targetId = form.tipoBeneficio === 'categoria' ? form.categoriaProdId : form.productoId;
+    if (!form.socioTipoId || !targetId || !form.porcentaje) {
+      setError('Tipo de socio, destino y porcentaje son obligatorios');
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const payload = {
+      const payload: any = {
         socioTipoId: Number(form.socioTipoId),
-        categoriaProdId: form.categoriaProdId,
         porcentaje: Number(form.porcentaje),
         descuentoMaximo: form.descuentoMaximo ? Number(form.descuentoMaximo) : undefined,
         limiteDiario: form.limiteDiario ? Number(form.limiteDiario) : undefined,
         activo: form.activo,
       };
+      if (form.tipoBeneficio === 'categoria') {
+        payload.categoriaProdId = form.categoriaProdId;
+        payload.productoId = null;
+      } else {
+        payload.productoId = form.productoId;
+        payload.categoriaProdId = null;
+      }
 
       if (editingId) {
         await apiClient.put(`/socios/beneficios/${editingId}`, payload);
@@ -171,7 +194,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
           <div className="sales-table">
             <div className="sales-table-head">
               <span className="col-user" style={{ flex: '0 0 120px' }}>Tipo</span>
-              <span className="col-user" style={{ flex: '0 0 140px' }}>Categoria</span>
+              <span className="col-user" style={{ flex: '0 0 140px' }}>Destino</span>
               <span className="col-total" style={{ flex: '0 0 90px' }}>Descuento</span>
               <span className="col-total" style={{ flex: '0 0 100px' }}>Tope max</span>
               <span className="col-total" style={{ flex: '0 0 100px' }}>Limite diario</span>
@@ -181,7 +204,9 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
             {beneficios.map((b) => (
               <div key={b.id} className="sales-table-row">
                 <span className="col-user" style={{ flex: '0 0 120px', fontWeight: 500 }}>{b.socioTipo.nombre}</span>
-                <span className="col-user" style={{ flex: '0 0 140px' }}>{b.categoria.name}</span>
+                <span className="col-user" style={{ flex: '0 0 140px' }}>
+                  {b.producto ? b.producto.name : b.categoria?.name || '--'}
+                </span>
                 <span className="col-total" style={{ flex: '0 0 90px', fontWeight: 600 }}>{b.porcentaje}%</span>
                 <span className="col-total" style={{ flex: '0 0 100px' }}>
                   {b.descuentoMaximo ? formatCurrency(Number(b.descuentoMaximo)) : <span style={{ color: 'var(--color-text-muted)' }}>Sin tope</span>}
@@ -225,14 +250,33 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
                   </select>
                 </div>
                 <div className="settings-field">
-                  <label>Categoria de producto *</label>
-                  <select value={form.categoriaProdId} onChange={(e) => setForm({ ...form, categoriaProdId: e.target.value })}>
-                    <option value="">Seleccionar categoria</option>
-                    {categorias.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
+                  <label>Tipo de destino</label>
+                  <select value={form.tipoBeneficio} onChange={(e) => setForm({ ...form, tipoBeneficio: e.target.value as 'categoria' | 'producto', categoriaProdId: '', productoId: '' })}>
+                    <option value="categoria">Categoria</option>
+                    <option value="producto">Producto</option>
                   </select>
                 </div>
+                {form.tipoBeneficio === 'categoria' ? (
+                  <div className="settings-field">
+                    <label>Categoria *</label>
+                    <select value={form.categoriaProdId} onChange={(e) => setForm({ ...form, categoriaProdId: e.target.value })}>
+                      <option value="">Seleccionar categoria</option>
+                      {categorias.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="settings-field">
+                    <label>Producto *</label>
+                    <select value={form.productoId} onChange={(e) => setForm({ ...form, productoId: e.target.value })}>
+                      <option value="">Seleccionar producto</option>
+                      {productos.map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="settings-field">
                   <label>Porcentaje de descuento (%) *</label>
                   <input type="number" min="0" max="100" step="0.01" value={form.porcentaje}

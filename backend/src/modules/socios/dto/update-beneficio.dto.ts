@@ -6,6 +6,10 @@ export class UpdateBeneficioDto {
   categoriaProdId?: string;
 
   @IsOptional()
+  @IsUUID()
+  productoId?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(100)

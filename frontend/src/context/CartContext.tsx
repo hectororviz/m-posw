@@ -20,8 +20,10 @@ export interface SocioCartData {
   nroSocio: number;
   beneficios: Array<{
     id: string;
-    categoriaId: string;
-    categoriaNombre: string;
+    categoriaId: string | null;
+    categoriaNombre: string | null;
+    productoId: string | null;
+    productoNombre: string | null;
     porcentaje: number;
     descuentoMaximo: number | null;
   }>;
@@ -45,17 +47,21 @@ const recalcDiscounts = (items: CartItem[], data: SocioCartData | null): CartDis
   if (!data) return [];
   return data.beneficios
     .map((b) => {
-      const catItems = items.filter((item) => item.product.categoryId === b.categoriaId);
-      if (catItems.length === 0) return null;
-      const catSubtotal = catItems.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
+      const targetItems = b.productoId
+        ? items.filter((item) => item.product.id === b.productoId)
+        : items.filter((item) => item.product.categoryId === b.categoriaId);
+
+      if (targetItems.length === 0) return null;
+      const subtotal = targetItems.reduce((sum, item) => sum + Number(item.product.price) * item.quantity, 0);
       const porcentaje = Number(b.porcentaje);
       const tope = b.descuentoMaximo != null ? Number(b.descuentoMaximo) : null;
-      let desc = catSubtotal * (porcentaje / 100);
+      let desc = subtotal * (porcentaje / 100);
       if (tope !== null && desc > tope) {
         desc = tope;
       }
+      const label = b.productoNombre || b.categoriaNombre || 'Beneficio';
       return {
-        categoriaNombre: b.categoriaNombre,
+        categoriaNombre: label,
         porcentaje,
         monto: Math.round(desc * 100) / 100,
         beneficioId: b.id,

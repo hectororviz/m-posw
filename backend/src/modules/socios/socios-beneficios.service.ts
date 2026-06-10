@@ -17,6 +17,7 @@ export class SociosBeneficiosService {
       include: {
         socioTipo: { select: { id: true, nombre: true } },
         categoria: { select: { id: true, name: true } },
+        producto: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -29,12 +30,28 @@ export class SociosBeneficiosService {
   }
 
   async create(dto: CreateBeneficioDto) {
-    const existing = await this.prisma.socioBeneficio.findUnique({
-      where: { socioTipoId_categoriaProdId: { socioTipoId: dto.socioTipoId, categoriaProdId: dto.categoriaProdId } },
-    });
-    if (existing) {
-      throw new BadRequestException('Ya existe un beneficio para este tipo de socio en esta categoria');
+    if (!dto.categoriaProdId && !dto.productoId) {
+      throw new BadRequestException('Debe seleccionar una categoria o un producto');
     }
+
+    if (dto.categoriaProdId) {
+      const existing = await this.prisma.socioBeneficio.findFirst({
+        where: { socioTipoId: dto.socioTipoId, categoriaProdId: dto.categoriaProdId },
+      });
+      if (existing) {
+        throw new BadRequestException('Ya existe un beneficio para este tipo de socio en esta categoria');
+      }
+    }
+
+    if (dto.productoId) {
+      const existing = await this.prisma.socioBeneficio.findFirst({
+        where: { socioTipoId: dto.socioTipoId, productoId: dto.productoId },
+      });
+      if (existing) {
+        throw new BadRequestException('Ya existe un beneficio para este tipo de socio en este producto');
+      }
+    }
+
     return this.prisma.socioBeneficio.create({ data: dto });
   }
 
