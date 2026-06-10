@@ -121,7 +121,7 @@ npx prisma migrate reset --force
 ```
 
 Elimina: ventas, movimientos manuales, cierres de caja, sesiones, fiado_ventas, pagos_acreedor.
-Conserva: usuarios, configuración, categorías, productos, acreedores.
+Conserva: usuarios, configuración, categorías, productos, acreedores, socios.
 
 ## Mercado Pago Integration
 
@@ -194,61 +194,117 @@ frontend/src/pages/
 
 **Rutas legacy** (`/admin/contabilidad/*`) redirigen automáticamente a `/admin/tesoreria/*`.
 
-## Acreedores / Fiado Module
+## Socios / Padrón de Socios Module
 
-Módulo de control de acreedores para ventas fiadas. Permite vender a crédito, registrar acreedores, y hacer seguimiento de deuda con lógica FIFO. Accesible desde `/admin/acreedores` (solo ADMIN). El medio de pago "Fiado" se habilita desde Configuración → Ventas.
+Módulo integral de gestión de socios para clubes e instituciones. Accesible desde `/admin/socios` (solo ADMIN).
+
+### Estructura
+```
+backend/src/modules/socios/
+├── socios.module.ts
+├── socios.controller.ts              # CRUD socios + cuotas + tipos + carnets
+├── socios.service.ts                 # Lógica de negocio + generación de carnets PDF
+├── socios-qr.controller.ts           # Endpoint QR: GET /socios/qr/:uuid
+├── socios-qr.service.ts              # Búsqueda de socio por UUID para escaneo QR
+├── socios-beneficios.controller.ts   # CRUD de beneficios
+├── socios-beneficios.service.ts      # Lógica de beneficios y canjes
+└── dto/
+    ├── create-socio.dto.ts
+    ├── update-socio.dto.ts
+    ├── create-socio-tipo.dto.ts
+    ├── update-socio-tipo.dto.ts
+    ├── create-socio-pago.dto.ts
+    ├── generar-cuotas.dto.ts
+    ├── create-beneficio.dto.ts
+    ├── update-beneficio.dto.ts
+    ├── create-canjes.dto.ts
+    └── bulk-carnets.dto.ts
+```
 
 ### Modelo de datos
 ```
-Acreedor ──1:N──> FiadoVenta ──1:1──> Sale
-Acreedor ──1:N──> PagoAcreedor
-```
-- **Acreedor**: nombre, teléfono, notas, activo/inactivo.
-- **FiadoVenta**: ventaId (unique, 1:1 con Sale), acreedorId, monto.
-- **PagoAcreedor**: acreedorId, monto, medioPago (efectivo/transferencia), fecha, notas.
-- `PaymentMethod.FIADO`: medio de pago en la venta.
-- `Setting.enableFiadoPayment`: toggle en Configuración → Ventas.
-
-### Backend
-```
-backend/src/modules/acreedores/
-├── acreedores.module.ts
-├── acreedores.controller.ts    # CRUD + deuda + pagos + resumen (ADMIN)
-├── acreedores.service.ts       # Lógica FIFO, cálculo de saldos y alertas
-└── dto/
-    ├── create-acreedor.dto.ts
-    ├── update-acreedor.dto.ts
-    └── create-pago.dto.ts
+SocioTipo ──1:N──> Socio ──1:N──> SocioCuota ──1:N──> SocioPago
+SocioTipo ──1:N──> SocioBeneficio ──1:N──> SocioCanje
+Socio ──1:N──> SocioCanje
+SocioBeneficio ──N:1──> Category (categoriaProdId, optional)
+SocioBeneficio ──N:1──> Product  (productoId, optional)
 ```
 
-**Endpoints:**
+- **SocioTipo**: categoría de socio (ej: Activo, Vitalicio, Cadete). Define `montoMensual`.
+- **Socio**: datos personales (nombre, apellido, DNI, UUID para QR, nroSocio). Estado: ACTIVO/INACTIVO/SUSPENDIDO.
+- **SocioCuota**: cuota mensual generada por `POST /socios/cuotas/generar`. Estado: PENDIENTE/ PARCIAL/ PAGADO.
+- **SocioPago**: pago aplicado a una cuota. Un pago por registro.
+- **SocioBeneficio**: descuentos por tipo de socio sobre categorías o productos específicos. Campos: porcentaje, descuentoMaximo, limiteDiario.
+- **SocioCanje**: registro de uso de un beneficio en una venta. Relacionado a la venta vía `ventaId`.
+
+### Endpoints
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/acreedores` | Lista todos con saldo, alertaDeuda, diasSinPagar |
-| `GET` | `/acreedores/resumen` | `{ deudaTotal, acreedoresConDeuda }` |
-| `GET` | `/acreedores/:id` | Detalle de un acreedor |
-| `POST` | `/acreedores` | Crear acreedor `{ nombre, telefono?, notas? }` |
-| `PATCH` | `/acreedores/:id` | Editar acreedor |
-| `PATCH` | `/acreedores/:id/toggle` | Alternar activo/inactivo |
-| `GET` | `/acreedores/:id/deuda` | FiadoVentas con saldo FIFO, pagos, totales, alerta |
-| `POST` | `/acreedores/:id/pagos` | Registrar pago `{ monto, medioPago, fecha, notas? }` |
-| `POST` | `/sales/fiado` | Crear venta fiada `{ items, total, paymentMethod, acreedorId }` |
+| `GET` | `/socios` | Lista todos con filtros (`?estado=`, `?socioTipoId=`, `?deuda=con-deuda\|al-dia`) |
+| `POST` | `/socios` | Crear socio |
+| `GET` | `/socios/:id` | Detalle de un socio |
+| `PUT` | `/socios/:id` | Editar socio |
+| `DELETE` | `/socios/:id` | Desactivar socio (soft delete → INACTIVO) |
+| `GET` | `/socios/:id/cuotas` | Cuotas del socio |
+| `GET` | `/socios/:id/carnet` | Generar PDF de credencial individual (CR80 en A4) |
+| `POST` | `/socios/carnets` | Generar PDF con múltiples credenciales. Body: `{ ids: number[] }`. Grilla 2×4 (8 por hoja A4). |
+| `POST` | `/socios/cuotas/generar` | Generar cuotas masivas para un mes/año. Body: `{ anio, mes }` |
+| `POST` | `/socios/cuotas/:cuotaId/pagar` | Registrar pago de cuota. Body: `{ monto, fecha, observacion? }` |
+| `GET` | `/socios/tipos` | Listar tipos de socio |
+| `POST` | `/socios/tipos` | Crear tipo de socio. Body: `{ nombre, montoMensual }` |
+| `PUT` | `/socios/tipos/:id` | Editar tipo de socio |
+| `DELETE` | `/socios/tipos/:id` | Soft-delete tipo |
+| `GET` | `/socios/tesoreria/resumen` | KPIs: `{ deudaTotal, sociosActivos, sociosConDeuda }` |
+| `GET` | `/socios/reporte/matriz?anio=` | Matriz de cuotas por socio/mes para un año |
+| `GET` | `/socios/qr/:uuid` | Buscar socio por UUID (usado por escáner QR del POS) |
+| `GET` | `/socios/beneficios` | Listar beneficios |
+| `POST` | `/socios/beneficios` | Crear beneficio. Body: `{ socioTipoId, categoriaProdId?, productoId?, porcentaje, descuentoMaximo?, limiteDiario? }` |
+| `PUT` | `/socios/beneficios/:id` | Editar beneficio |
+| `DELETE` | `/socios/beneficios/:id` | Eliminar beneficio |
+| `POST` | `/socios/canjes` | Registrar canje de beneficio en venta |
 
-**Lógica FIFO:** Los pagos se aplican a las ventas fiadas por orden cronológico (más antigua primero). La primera venta con saldo restante determina `deudaMasAntigua` y `diasSinPagar`. Si `diasSinPagar >= 30`, se activa `alertaDeuda`.
+### Carnets / Credenciales
+- **Individual**: `GET /socios/:id/carnet` → PDF con una credencial CR80 (85.6×54mm) centrada en A4.
+- **Masivo**: `POST /socios/carnets` → PDF con grilla 2 columnas × 4 filas = 8 credenciales por hoja A4. Múltiples páginas automáticas. Orden alfabético.
+- **Diseño**: franja de acento vertical, logo 42pt, nombre del club en 14pt, datos del socio, QR en esquina inferior derecha.
+- El escáner QR del POS (`SocioQrModal`) lee el UUID del socio desde cualquier QR impreso en el carnet.
 
-**Fecha de pago:** Se almacena con `Date.UTC(year, month-1, day, 12, 0, 0)` (mediodía UTC) para evitar desplazamiento de fecha por timezone.
+### Beneficios y descuentos en el POS
+- Al escanear el QR de un socio en el POS, se aplican automáticamente los beneficios (descuentos) asociados a su tipo de socio.
+- Los beneficios pueden ser por categoría de producto o por producto específico.
+- Límites configurables: `descuentoMaximo` (tope en $), `limiteDiario` (cantidad de usos por día).
+- Los canjes se registran en `SocioCanje` con referencia a la venta.
 
 ### Frontend
 ```
 frontend/src/pages/
-├── AdminAcreedoresPage.tsx       # Lista con KPIs, buscador, orden A-Z/$$$, FAB (+)
-└── AdminAcreedorDetailPage.tsx   # Detalle con alerta, ventas fiadas (FIFO), pagos
+├── AdminSociosPage.tsx       # Lista con KPIs, filtros, checkboxes de selección múltiple, barra de acciones flotante para carnets masivos, modales CRUD, detalle con cuotas y pagos
+└── SocioQrModal.tsx          # Escáner QR en el POS para leer credenciales de socios
 ```
 
-**Flujo de venta fiada en POS:** CheckoutModal → botón "Fiado" → select desplegable de acreedores activos → confirmar → `POST /sales/fiado`.
+### Generación de cuotas
+- `POST /socios/cuotas/generar` con `{ anio, mes }` genera una cuota para cada socio ACTIVO con el `montoMensual` de su tipo.
+- Idempotente: no duplica cuotas ya existentes para el mismo mes/año/socio.
 
+### Configuración relacionada
+- `Setting.enableSociosModule` (default: true): toggle en Configuración → Módulos que oculta la entrada del menú y el botón QR del POS.
+
+## Módulos del Sistema (Configuración)
+
+Solapa "Módulos" en Configuración (entre Usuarios y Sistema) para habilitar/deshabilitar secciones del sistema:
+
+| Setting | Default | Efecto al desactivar |
+|---------|---------|---------------------|
+| `enableSociosModule` | true | Oculta "Socios" del menú y el botón QR del POS |
+| `enableTreasuryModule` | true | Oculta "Tesorería" del menú |
+| `enableAcreedoresModule` | true | Oculta "Acreedores" del menú, el toggle Fiado en Ventas y el botón Fiado del checkout |
+
+Los toggles se persisten en la tabla `Setting` y se aplican en tiempo real sin recargar.
+
+## Acreedores / Fiado Module
+...
 ### Configuración
-- **Toggle "Fiado"** en AdminSettingsPage → pestaña Ventas → Medios de pago.
+- **Toggle "Fiado"** en AdminSettingsPage → pestaña Ventas → Medios de pago (visible solo si `enableAcreedoresModule === true`).
 - Por defecto desactivado (`enableFiadoPayment: false`).
 - Sin acreedores activos, el select del POS muestra "No hay acreedores activos".
 
@@ -311,6 +367,7 @@ m-posw/
 │   │       ├── reports/           # Reportes generales
 │   │       ├── sales/             # Ventas + MP Instore + Webhooks + WebSockets
 │   │       ├── settings/          # Configuración del sistema
+│   │       ├── socios/            # Padrón de socios + Cuotas + Beneficios + Carnets
 │   │       ├── stats/             # Estadísticas y dashboard
 │   │       ├── stock/             # Control de stock
 │   │       ├── treasury/          # Tesorería / Libro Diario (partida doble)

@@ -1,6 +1,6 @@
 # m-POSw — Mini POS Web
 
-Sistema de punto de venta web para tablet/celular, diseñado para jornadas, eventos y comercios que necesitan cobrar con agilidad usando **efectivo, Mercado Pago QR o transferencia bancaria**.
+Sistema de punto de venta web para tablet/celular, diseñado para jornadas, eventos y comercios que necesitan cobrar con agilidad usando **efectivo, Mercado Pago QR, transferencia bancaria o fiado**. Incluye módulo de socios con carnets imprimibles, cuotas, beneficios y descuentos.
 
 ## Funcionalidades
 
@@ -34,6 +34,15 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Dashboard de estadísticas**: KPIs con badges, últimos 15 días, últimos 6 meses, promedios con gráficos.
 - **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia) con movimientos de entrada/salida.
 - **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
+- **Módulos configurables**: activar/desactivar Socios, Tesorería y Acreedores según necesidad desde Configuración → Módulos.
+
+### Padrón de Socios
+- **CRUD de socios**: datos personales, tipo de socio, estado (activo/inactivo/suspendido), fecha de alta.
+- **Cuotas mensuales**: generación masiva por mes/año, registro de pagos individuales, control de deuda.
+- **Beneficios y descuentos**: descuentos por tipo de socio (porcentaje sobre categorías o productos), topes en $ y límites diarios.
+- **Credenciales imprimibles**: carnets individuales (PDF con diseño CR80) o masivos (grilla 2×4, 8 por hoja A4) con QR escaneable. Selección múltiple desde la tabla de socios.
+- **Escáner QR en el POS**: al escanear el QR de un socio se aplican automáticamente sus descuentos en la venta.
+- **KPIs**: deuda total, cantidad de socios activos, socios con deuda.
 
 ### Personalización
 - Nombre del comercio/club, logo, favicon y color principal de la UI configurable desde el panel admin.
@@ -51,9 +60,10 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | Escenario | Cómo se usa m-POSw |
 |-----------|-------------------|
 | **Jornada deportiva / evento** | Puestos de comida y bebida con tablet. Categorías táctiles, cobro rápido con QR o efectivo. Varias cajas operando en simultáneo. |
-| **Cantina / buffet escolar** | Productos compuestos (ej: "Combo Hamburguesa" descuenta pan, carne y aderezos del stock). Control de insumos automatizado. Contabilidad por partida doble para rendición. |
+| **Club / institución** | Padrón de socios con cuotas mensuales, carnets imprimibles con QR, beneficios y descuentos para socios. Tesorería con partida doble para rendición de cuentas. |
+| **Cantina / buffet escolar** | Productos compuestos (ej: "Combo Hamburguesa" descuenta pan, carne y aderezos del stock). Control de insumos automatizado. Contabilidad por partida doble para rendición. Socios con descuentos en el buffet. |
 | **Feria / puesto callejero** | App Android en celular con impresión Bluetooth. Sin necesidad de PC ni instalación compleja. |
-| **Comercio minorista** | Catálogo de productos con imágenes, múltiples métodos de cobro, cierre de caja diario, libro diario contable. |
+| **Comercio minorista** | Catálogo de productos con imágenes, múltiples métodos de cobro, cierre de caja diario, libro diario contable. Ventas fiadas con control de acreedores. |
 | **Evento con múltiples puestos** | Cada puesto es una caja independiente. Admin centralizado que ve reportes, estadísticas y tesorería de todas las cajas. |
 
 ## Ventajas
@@ -77,7 +87,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | Backend | NestJS 10 + Prisma ORM |
 | Base de datos | PostgreSQL 16 |
 | Infraestructura | Docker Compose (3 contenedores) |
-| Pagos | API Mercado Pago (Instore QR v2 + OAuth 2.0 + Search payments) |
+| Pagos | API Mercado Pago (Instore QR v2 + OAuth 2.0 + Search payments) + Fiado |
 | Comunicación en tiempo real | WebSockets (Socket.IO) |
 | App Android | Flutter + WebView + impresión Bluetooth nativa |
 | Estilos | CSS Variables + Modo Oscuro |

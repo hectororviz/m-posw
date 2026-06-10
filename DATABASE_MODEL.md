@@ -259,6 +259,10 @@ Archivo schema: `backend/prisma/schema.prisma`
 | enableCashPayment | Boolean | Habilitar pago en efectivo |
 | enableQrPayment | Boolean | Habilitar QR de MP |
 | enableTransferPayment | Boolean | Habilitar transferencia |
+| enableFiadoPayment | Boolean | Habilitar pago fiado |
+| enableSociosModule | Boolean | Habilitar módulo de socios |
+| enableTreasuryModule | Boolean | Habilitar módulo de tesorería |
+| enableAcreedoresModule | Boolean | Habilitar módulo de acreedores |
 | movementInReasons | String[] | Motivos de entrada configurados |
 | movementOutReasons | String[] | Motivos de salida configurados |
 | mpAccessToken | String? | Access Token OAuth de MP |
@@ -278,7 +282,131 @@ Archivo schema: `backend/prisma/schema.prisma`
 
 ---
 
-### **13. ProductOrderCounter** (Contador de órdenes por producto)
+### **13. SocioTipo** (Tipos de socio)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | Int (PK, autoincrement) | Identificador único |
+| nombre | String (unique) | Nombre del tipo (ej: Activo, Vitalicio) |
+| montoMensual | Decimal(10,2) | Monto de la cuota mensual |
+| comentario | String? | Comentario opcional |
+| activo | Boolean | Activo/inactivo |
+| createdAt | DateTime | Fecha de creación |
+| updatedAt | DateTime | Fecha de actualización |
+
+**Relaciones:**
+- `1:N` → Socio
+- `1:N` → SocioBeneficio
+- `1:N` → SocioTipoHistorial
+
+---
+
+### **14. Socio** (Socios del padrón)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | Int (PK, autoincrement) | Identificador único |
+| uuid | UUID (unique) | UUID para QR del carnet |
+| nroSocio | Int (unique) | Número de socio |
+| dni | String | Documento de identidad |
+| apellido | String | Apellido |
+| nombre | String | Nombre |
+| fechaNacimiento | DateTime? | Fecha de nacimiento |
+| telefono | String? | Teléfono |
+| direccion | String? | Dirección |
+| socioTipoId | Int (FK) | Tipo de socio |
+| fechaAlta | DateTime | Fecha de alta |
+| estado | SocioEstado (enum) | ACTIVO/INACTIVO/SUSPENDIDO |
+| createdAt | DateTime | Fecha de creación |
+| updatedAt | DateTime | Fecha de actualización |
+
+**Relaciones:**
+- `N:1` → SocioTipo
+- `1:N` → SocioCuota
+- `1:N` → SocioCanje
+
+---
+
+### **15. SocioCuota** (Cuotas mensuales)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | Int (PK, autoincrement) | Identificador único |
+| socioId | Int (FK) | Socio |
+| mes | Int | Mes (1-12) |
+| anio | Int | Año |
+| montoOriginal | Decimal(10,2) | Monto original de la cuota |
+| montoPagado | Decimal(10,2) | Monto pagado acumulado |
+| estado | SocioCuotaEstado (enum) | PENDIENTE/PARCIAL/PAGADO |
+| createdAt | DateTime | Fecha de creación |
+| updatedAt | DateTime | Fecha de actualización |
+
+**Relaciones:**
+- `N:1` → Socio
+- `1:N` → SocioPago
+
+---
+
+### **16. SocioPago** (Pagos de cuotas)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | Int (PK, autoincrement) | Identificador único |
+| socioCuotaId | Int (FK) | Cuota asociada |
+| monto | Decimal(10,2) | Monto del pago |
+| fecha | DateTime | Fecha del pago |
+| observacion | String? | Observación |
+| createdAt | DateTime | Fecha de creación |
+
+**Relaciones:**
+- `N:1` → SocioCuota
+
+---
+
+### **17. SocioBeneficio** (Beneficios/descuentos por tipo de socio)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | UUID (PK) | Identificador único |
+| socioTipoId | Int (FK) | Tipo de socio |
+| categoriaProdId | UUID? (FK) | Categoría de producto (opcional) |
+| productoId | UUID? (FK) | Producto (opcional) |
+| porcentaje | Decimal(5,2) | Porcentaje de descuento |
+| descuentoMaximo | Decimal(10,2)? | Tope máximo en $ |
+| limiteDiario | Int? | Cantidad de usos por día |
+| activo | Boolean | Activo/inactivo |
+| createdAt | DateTime | Fecha de creación |
+| updatedAt | DateTime | Fecha de actualización |
+
+**Relaciones:**
+- `N:1` → SocioTipo
+- `N:1` → Category (opcional)
+- `N:1` → Product (opcional)
+- `1:N` → SocioCanje
+
+---
+
+### **18. SocioCanje** (Canjes de beneficios en ventas)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | UUID (PK) | Identificador único |
+| socioBeneficioId | UUID (FK) | Beneficio utilizado |
+| socioId | Int (FK) | Socio |
+| ventaId | UUID? (FK) | Venta asociada |
+| montoDescontado | Decimal(10,2) | Monto del descuento aplicado |
+| fecha | DateTime | Fecha del canje |
+| usuarioId | UUID | Usuario que realizó el canje |
+| posId | String? | ID del POS |
+| createdAt | DateTime | Fecha de creación |
+
+**Relaciones:**
+- `N:1` → SocioBeneficio
+- `N:1` → Socio
+
+---
+
+### **19. ProductOrderCounter** (Contador de órdenes por producto)
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
@@ -292,7 +420,7 @@ Archivo schema: `backend/prisma/schema.prisma`
 
 ---
 
-### **14. LedgerAccount** (Plan de cuentas)
+### **20. LedgerAccount** (Plan de cuentas)
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
@@ -313,7 +441,7 @@ Archivo schema: `backend/prisma/schema.prisma`
 
 ---
 
-### **15. JournalEntry** (Asientos contables)
+### **21. JournalEntry** (Asientos contables)
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
@@ -341,7 +469,7 @@ Archivo schema: `backend/prisma/schema.prisma`
 
 ---
 
-### **16. JournalEntryLine** (Líneas de asiento)
+### **22. JournalEntryLine** (Líneas de asiento)
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
@@ -359,7 +487,7 @@ Archivo schema: `backend/prisma/schema.prisma`
 
 ---
 
-### **17. PaymentEvent** (Eventos de pago)
+### **23. PaymentEvent** (Eventos de pago)
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
@@ -412,6 +540,28 @@ Archivo schema: `backend/prisma/schema.prisma`
 └──────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
+│                     SOCIOS / PADRÓN                            │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌───────────┐     ┌───────────┐     ┌───────────┐          │
+│  │ SocioTipo │◄1:N─│   Socio   │◄1:N─│SocioCuota │◄1:N────►│
+│  └─────┬─────┘     └─────┬─────┘     └───────────┘          │
+│        │                 │                       │           │
+│        │                 │                  ┌────┴─────┐     │
+│        │                 │                  │SocioPago │     │
+│        │                 │                  └──────────┘     │
+│        │ N:1            N:1                                  │
+│        ▼                 ▼                                   │
+│  ┌──────────────┐  ┌───────────┐                             │
+│  │SocioBeneficio│  │SocioCanje │─────────────────► Sale     │
+│  │ (descuentos) │  │ (canjes)  │                    (venta)  │
+│  └──┬────┬──────┘  └───────────┘                             │
+│     │    │                                                    │
+│     ▼    ▼                                                    │
+│  Category Product                                             │
+└──────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────┐
 │                  TESORERÍA / PARTIDA DOBLE                    │
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
@@ -440,8 +590,10 @@ Archivo schema: `backend/prisma/schema.prisma`
 |------|---------|
 | **Role** | ADMIN, USER |
 | **SaleStatus** | PENDING, APPROVED, REJECTED, EXPIRED, CANCELLED |
-| **PaymentMethod** | CASH, MP_QR, TRANSFER |
+| **PaymentMethod** | CASH, MP_QR, TRANSFER, FIADO |
 | **PaymentStatus** | PENDING, APPROVED, REJECTED, EXPIRED |
+| **SocioEstado** | ACTIVO, INACTIVO, SUSPENDIDO |
+| **SocioCuotaEstado** | PENDIENTE, PARCIAL, PAGADO |
 | **MovementType** | ENTRADA, SALIDA |
 | **AccountingMovementType** | INCOME, EXPENSE |
 | **ProductType** | SIMPLE, RAW_MATERIAL, COMPOSITE |
@@ -488,10 +640,13 @@ Archivo schema: `backend/prisma/schema.prisma`
 - `add_ledger_accounts` - Plan de cuentas contable
 - `add_journal_entries` - Asientos de libro diario
 - `add_journal_entry_lines` - Líneas de asientos
-- `add_accounting_movements` - Movimientos contables (legacy)
-- `add_accounting_categories` - Categorías contables (legacy)
-- `add_sales_transfer_total` - Total de transferencias en cierre de caja
+- `add_fiado_module` - Acreedores, FiadoVenta, PagoAcreedor, enableFiadoPayment
+- `add_socios_models` - SocioTipo, Socio, SocioCuota, SocioPago
+- `add_socio_uuid` - UUID en Socio para QR
+- `add_socios_beneficios` - SocioBeneficio, SocioCanje
+- `add_beneficio_producto` - FK productoId en SocioBeneficio
+- `add_module_toggles` - enableSociosModule, enableTreasuryModule, enableAcreedoresModule
 
 ---
 
-*Actualizado el 28/05/2026*
+*Actualizado el 10/06/2026*
