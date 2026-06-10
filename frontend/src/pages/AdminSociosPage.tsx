@@ -642,7 +642,7 @@ export const AdminSociosPage: React.FC = () => {
       {/* ─── Modal: View Detail ────────────────────────── */}
       {modalMode === 'view' && (
         <div className="modal-backdrop" onClick={closeModal}>
-          <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '960px', maxHeight: '90vh', overflow: 'auto' }}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ width: '960px', maxWidth: '98vw', maxHeight: '92vh', overflow: 'auto' }}>
             <div className="modal-header">
               <h3>{viewedSocio ? `${viewedSocio.apellido}, ${viewedSocio.nombre}` : 'Cargando...'}</h3>
               <button className="icon-button" onClick={closeModal}>✕</button>

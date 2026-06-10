@@ -103,8 +103,7 @@ export class SociosService {
       include: {
         socioTipo: { select: { id: true, nombre: true, montoMensual: true, activo: true } },
         cuotas: {
-          where: { estado: { in: ['PENDIENTE', 'PARCIAL'] } },
-          select: { montoOriginal: true, montoPagado: true, mes: true, anio: true },
+          select: { montoOriginal: true, montoPagado: true, mes: true, anio: true, estado: true },
         },
       },
       orderBy: { nroSocio: 'asc' },
@@ -136,7 +135,9 @@ export class SociosService {
 
           const dia10 = new Date(Date.UTC(anioActual, mes - 1, 10, 12, 0, 0));
 
+          // Solo proyectar deuda de meses ya vencidos, no del mes en curso
           if (
+            mes < mesActual &&
             fechaAlta.getTime() <= dia10.getTime() &&
             ahora.getTime() >= dia10.getTime()
           ) {
