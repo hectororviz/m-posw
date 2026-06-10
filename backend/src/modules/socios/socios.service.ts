@@ -636,7 +636,7 @@ export class SociosService {
       const logoSize = 42;
 
       // Línea separadora bajo el header (se dibuja antes que el logo)
-      const headerBottom = marginY + logoSize + 4;
+      const headerBottom = marginY + 20;
       doc.strokeColor(accentColor)
         .lineWidth(0.5)
         .moveTo(marginX, headerBottom)
