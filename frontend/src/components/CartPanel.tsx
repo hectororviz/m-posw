@@ -5,6 +5,7 @@ import { useSettings } from '../api/queries';
 import { useCart } from '../context/CartContext';
 import { useToast } from './ToastProvider';
 import { CheckoutModal } from './CheckoutModal';
+import { SocioQrModal } from './SocioQrModal';
 
 const STORAGE_KEY = 'pos-cart-collapsed';
 
@@ -19,7 +20,7 @@ interface CartPanelProps {
 }
 
 export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
-  const { items, updateQuantity, removeItem } = useCart();
+  const { items, discounts, socioData, updateQuantity, removeItem, setDiscounts, setSocioData } = useCart();
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
   const { pushToast } = useToast();
@@ -28,6 +29,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
     return localStorage.getItem(STORAGE_KEY) === 'true';
   });
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isQrOpen, setIsQrOpen] = useState(false);
 
   const [isMovementOpen, setIsMovementOpen] = useState(false);
   const [movementType, setMovementType] = useState<'ENTRADA' | 'SALIDA'>('ENTRADA');
@@ -36,10 +38,54 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
   const [movementDescription, setMovementDescription] = useState('');
   const [isSavingMovement, setIsSavingMovement] = useState(false);
 
-  const total = useMemo(
+  const subtotal = useMemo(
     () => items.reduce((acc, item) => acc + item.product.price * item.quantity, 0),
     [items],
   );
+  const discountTotal = useMemo(
+    () => discounts.reduce((acc, d) => acc + d.monto, 0),
+    [discounts],
+  );
+  const total = subtotal - discountTotal;
+
+  const handleApplyDiscounts = (qrData: any) => {
+    const available = qrData.beneficios.filter((b: any) => b.disponible) as any[];
+    const newDiscounts: typeof discounts = [];
+
+    for (const b of available) {
+      const catItems = items.filter((item) => item.product.categoryId === b.categoriaId);
+      if (catItems.length === 0) continue;
+
+      const catSubtotal = catItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+      let desc = catSubtotal * (b.porcentaje / 100);
+      if (b.descuentoMaximo !== null && desc > b.descuentoMaximo) {
+        desc = b.descuentoMaximo;
+      }
+
+      newDiscounts.push({
+        categoriaNombre: b.categoriaNombre,
+        porcentaje: b.porcentaje,
+        monto: Math.round(desc * 100) / 100,
+        beneficioId: b.id,
+      });
+    }
+
+    setDiscounts(newDiscounts);
+    setSocioData({
+      socioId: qrData.socio.id || 0,
+      uuid: '',
+      nombre: qrData.socio.nombre,
+      nroSocio: qrData.socio.nroSocio,
+      beneficios: available.map((b: any) => ({
+        id: b.id,
+        categoriaId: b.categoriaId,
+        categoriaNombre: b.categoriaNombre,
+        porcentaje: b.porcentaje,
+        descuentoMaximo: b.descuentoMaximo,
+      })),
+    });
+    setIsQrOpen(false);
+  };
 
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
@@ -102,7 +148,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
         {!isCollapsed && (
           <>
             <div className="cart-panel__content">
-              {items.length === 0 && <p className="empty-cart">Selecciona productos para empezar.</p>}
+              {items.length === 0 && discounts.length === 0 && <p className="empty-cart">Selecciona productos para empezar.</p>}
               {items.length > 0 && (
                 <ul className="cart-items">
                   {items.map((item) => (
@@ -121,25 +167,55 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
                   ))}
                 </ul>
               )}
+              {discounts.length > 0 && (
+                <ul className="cart-items" style={{ borderTop: '1px dashed var(--color-border)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                  {discounts.map((d, i) => (
+                    <li key={i} className="cart-item" style={{ color: 'var(--color-success)' }}>
+                      <div className="cart-item__info">
+                        <span className="cart-item__name" style={{ fontSize: '0.85rem' }}>Descuento socio - {d.categoriaNombre} ({d.porcentaje}%)</span>
+                        <span className="cart-item__unit">-{formatAmount(d.monto)}</span>
+                      </div>
+                    </li>
+                  ))}
+                  {socioData && (
+                    <li className="cart-item" style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                      Socio: {socioData.nombre} (#{socioData.nroSocio})
+                    </li>
+                  )}
+                </ul>
+              )}
             </div>
             <div className="cart-panel__footer">
               <div className="cart-total">
                 <span>TOTAL</span>
                 <strong>{formatAmount(total)}</strong>
               </div>
-              <button type="button" className="cart-checkout-btn" onClick={() => setIsCheckoutOpen(true)} disabled={items.length === 0}>
-                Cobrar
-              </button>
-              {showMovementButton && (
-                <button type="button" className="cart-movement-btn" onClick={handleOpenMovement}>
-                  Movimientos
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                {items.length > 0 && (
+                  <button type="button" className="cart-checkout-btn" style={{ flex: 1 }} onClick={() => setIsQrOpen(true)}>
+                    QR
+                  </button>
+                )}
+                <button type="button" className="cart-checkout-btn" style={{ flex: 1 }} onClick={() => setIsCheckoutOpen(true)} disabled={items.length === 0}>
+                  Cobrar
                 </button>
-              )}
+                {showMovementButton && (
+                  <button type="button" className="cart-movement-btn" onClick={handleOpenMovement}>
+                    Movimientos
+                  </button>
+                )}
+              </div>
             </div>
           </>
         )}
       </aside>
       <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} />
+      {isQrOpen && (
+        <SocioQrModal
+          onApplyDiscounts={handleApplyDiscounts}
+          onClose={() => setIsQrOpen(false)}
+        />
+      )}
 
       {isMovementOpen && (
         <div className="modal-backdrop" onClick={() => setIsMovementOpen(false)}>

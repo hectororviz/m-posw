@@ -57,7 +57,7 @@ interface CheckoutModalProps {
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
-  const { items, clear } = useCart();
+  const { items, discounts, socioData, clear } = useCart();
   const { pushToast } = useToast();
   const { data: settings } = useSettings();
   const navigate = useNavigate();
@@ -97,9 +97,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const pollingInFlight = useRef(false);
   const itemsSnapshotRef = useRef(items);
 
+  const discountSum = useMemo(
+    () => discounts.reduce((acc, d) => acc + d.monto, 0),
+    [discounts],
+  );
   const total = useMemo(
-    () => roundToCurrency(items.reduce((acc, item) => acc + item.product.price * item.quantity, 0)),
-    [items],
+    () => roundToCurrency(items.reduce((acc, item) => acc + item.product.price * item.quantity, 0) - discountSum),
+    [items, discountSum],
   );
 
   // Calcular qué métodos de pago están habilitados
@@ -382,6 +386,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
             onError: (message) => pushToast(message, 'error'),
           });
+          registerCanjes(saleId);
           clear();
           setQrResult('SUCCESS');
           setQrResultMessage('Pago confirmado.');
@@ -580,6 +585,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
           onError: (message) => pushToast(message, 'error'),
         });
 
+        registerCanjes(data.saleId);
         clear();
         setTransferResult('SUCCESS');
         setTransferResultMessage(`Pago confirmado. Venta #${data.orderNumber}`);
@@ -598,6 +604,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     }
   };
 
+  const registerCanjes = async (saleId: string) => {
+    if (!socioData || discounts.length === 0) return;
+    try {
+      await apiClient.post('/socios/canjes', {
+        socioId: String(socioData.socioId),
+        ventaId: saleId,
+        canjes: discounts.map((d) => ({
+          socioBeneficioId: d.beneficioId,
+          montoDescontado: d.monto,
+        })),
+      });
+    } catch (_) {
+      // No bloquea la venta si falla el registro de canjes
+    }
+  };
+
   const handleCashConfirm = async () => {
     if (!isCashValid) {
       return;
@@ -613,6 +635,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         changeAmount,
       });
       const sale = response.data;
+      registerCanjes(sale.id);
       await maybePrintTicket({
         settings,
         saleId: sale.id,
@@ -683,6 +706,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         acreedorId: selectedAcreedorId,
       });
       const sale = response.data;
+      registerCanjes(sale.id);
       await maybePrintTicket({
         settings,
         saleId: sale.id,
