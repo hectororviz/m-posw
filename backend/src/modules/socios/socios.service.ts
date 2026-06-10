@@ -633,8 +633,10 @@ export class SociosService {
       const marginY = cardY + 10;
       const contentW = cardW - stripeW - 24;
 
+      const logoSize = 42;
+
       // Línea separadora bajo el header (se dibuja antes que el logo)
-      const headerBottom = marginY + 16;
+      const headerBottom = marginY + logoSize + 4;
       doc.strokeColor(accentColor)
         .lineWidth(0.5)
         .moveTo(marginX, headerBottom)
@@ -643,7 +645,6 @@ export class SociosService {
 
       // ─── HEADER: logo (encima de la linea) + nombre ───
       const logoUrl = setting?.logoUrl || null;
-      const logoSize = 28;
       const logoX = cardX + cardW - 12 - logoSize;
       const logoY = marginY;
 
@@ -662,7 +663,7 @@ export class SociosService {
       }
 
       doc.fill(accentColor)
-        .fontSize(8)
+        .fontSize(14)
         .font('Helvetica-Bold')
         .text(displayName.toUpperCase(), marginX, marginY, {
           width: cardW - stripeW - 24 - logoSize - 8,
