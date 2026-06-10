@@ -61,6 +61,11 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _initBluetooth();
     _loadSavedUrl();
+    _requestCameraPermission();
+  }
+
+  Future<void> _requestCameraPermission() async {
+    await Permission.camera.request();
   }
 
   @override
@@ -781,6 +786,12 @@ class _HomePageState extends State<HomePage> {
                         },
                         onReceivedError: (controller, request, error) {
                           debugPrint('Error: ${error.description}');
+                        },
+                        onPermissionRequest: (controller, request) async {
+                          return PermissionResponse(
+                            resources: request.resources,
+                            action: PermissionResponseAction.GRANT,
+                          );
                         },
                         shouldOverrideUrlLoading:
                             (controller, navigationAction) async {
