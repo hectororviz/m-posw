@@ -575,20 +575,33 @@ export class SociosService {
       const cardX = (pageW - cardW) / 2;
       const cardY = 40;
 
-      // Fondo del recuadro
+      // Fondo blanco del recuadro
       doc.roundedRect(cardX, cardY, cardW, cardH, 6).fill('#ffffff');
-      doc.roundedRect(cardX, cardY, cardW, cardH, 6).stroke('#cccccc');
 
-      // Franja vertical de acento a la izquierda (dentro del recuadro)
+      // Franja vertical de acento recortada al borde redondeado
       const stripeW = 8;
+      doc.save();
+      doc.roundedRect(cardX, cardY, cardW, cardH, 6).clip();
       doc.rect(cardX, cardY, stripeW, cardH).fill(accentColor);
+      doc.restore();
+
+      // Borde del recuadro (encima de la franja)
+      doc.roundedRect(cardX, cardY, cardW, cardH, 6).stroke('#cccccc');
 
       // Margen interno del recuadro
       const marginX = cardX + stripeW + 12;
       const marginY = cardY + 10;
       const contentW = cardW - stripeW - 24;
 
-      // ─── HEADER ──────────────────────────────────────
+      // Línea separadora bajo el header (se dibuja antes que el logo)
+      const headerBottom = marginY + 16;
+      doc.strokeColor(accentColor)
+        .lineWidth(0.5)
+        .moveTo(marginX, headerBottom)
+        .lineTo(cardX + cardW - 12, headerBottom)
+        .stroke();
+
+      // ─── HEADER: logo (encima de la linea) + nombre ───
       const logoUrl = setting?.logoUrl || null;
       const logoSize = 28;
       const logoX = cardX + cardW - 12 - logoSize;
@@ -616,14 +629,6 @@ export class SociosService {
           align: 'left',
           lineBreak: false,
         });
-
-      // Línea separadora bajo el header
-      const headerBottom = marginY + 16;
-      doc.strokeColor(accentColor)
-        .lineWidth(0.5)
-        .moveTo(marginX, headerBottom)
-        .lineTo(cardX + cardW - 12, headerBottom)
-        .stroke();
 
       // ─── BODY ────────────────────────────────────────
       const bodyY = headerBottom + 10;
