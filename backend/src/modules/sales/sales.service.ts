@@ -8,7 +8,6 @@ import { MercadoPagoInstoreService } from './services/mercadopago-instore.servic
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 import {
   mapMpPaymentToPaymentStatus,
-  mapSaleStatus,
 } from './webhooks/mercadopago-webhook.utils';
 
 @Injectable()
@@ -294,20 +293,11 @@ export class SalesService {
             );
           },
         );
-        const mappedSaleStatus = mapSaleStatus(mappedPaymentStatus);
         if (mpStatus || mpStatusDetail || paymentId) {
           updatedSale = await this.prisma.sale.update({
             where: { id: finalSale.id },
             data: {
               paymentStatus: mappedPaymentStatus,
-              status:
-                mappedSaleStatus && finalSale.status !== SaleStatus.APPROVED
-                  ? mappedSaleStatus
-                  : finalSale.status,
-              statusUpdatedAt:
-                mappedSaleStatus && finalSale.status !== SaleStatus.APPROVED
-                  ? new Date()
-                  : finalSale.statusUpdatedAt,
               paidAt:
                 mappedPaymentStatus === PaymentStatus.APPROVED
                   ? finalSale.paidAt ?? new Date()

@@ -20,5 +20,6 @@ import { SalesGateway } from './websockets/sales.gateway';
     MercadoPagoWebhookProcessorService,
     SalesGateway,
   ],
+  exports: [SalesService],
 })
 export class SalesModule {}

@@ -2,6 +2,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from './mercadopago-query.service';
 import { MercadoPagoWebhookProcessorService } from './mercadopago-webhook-processor.service';
 import { SalesGateway } from '../websockets/sales.gateway';
+import { SalesService } from '../sales.service';
 
 describe('MercadoPagoWebhookProcessorService', () => {
   it('marca la venta como pagada cuando el pago es aprobado', async () => {
@@ -48,7 +49,11 @@ describe('MercadoPagoWebhookProcessorService', () => {
       notifyPaymentStatusChanged: jest.fn(),
     } as unknown as SalesGateway;
 
-    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway);
+    const salesService = {
+      decrementStockForSale: jest.fn().mockResolvedValue(undefined),
+    } as unknown as SalesService;
+
+    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway, salesService);
 
     await processor.processWebhook({
       body: { type: 'payment' },
@@ -104,11 +109,15 @@ describe('MercadoPagoWebhookProcessorService', () => {
       getPayment: jest.fn(),
     } as unknown as MercadoPagoQueryService;
 
-    const salesGateway = {
+    const salesGateway2 = {
       notifyPaymentStatusChanged: jest.fn(),
     } as unknown as SalesGateway;
 
-    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway);
+    const salesService2 = {
+      decrementStockForSale: jest.fn().mockResolvedValue(undefined),
+    } as unknown as SalesService;
+
+    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway2, salesService2);
 
     await processor.processWebhook({
       body: { type: 'merchant_order', resource: 'https://api.mercadopago.com/merchant_orders/mo-1' },

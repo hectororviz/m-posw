@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
+import { SalesService } from '../sales/sales.service';
 import type { PollTransferResponse } from './dto/transfer.dto';
 
 interface MPPayment {
@@ -32,6 +33,7 @@ export class PaymentsService {
   constructor(
     private prisma: PrismaService,
     private mpConfig: MercadoPagoConfigService,
+    private salesService: SalesService,
   ) {}
 
   async pollTransfer(montoEsperado: number, userId: string): Promise<PollTransferResponse> {
@@ -246,6 +248,10 @@ export class PaymentsService {
 
       return sale;
     });
+
+    this.logger.log(`Venta transferencia creada saleId=${result.id}, decrementando stock...`);
+    await this.salesService.decrementStockForSale(result.id);
+    this.logger.log(`Stock decrementado para venta transferencia saleId=${result.id}`);
 
     return {
       success: true,

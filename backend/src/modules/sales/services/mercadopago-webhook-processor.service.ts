@@ -3,6 +3,7 @@ import { PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from './mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
+import { SalesService } from '../sales.service';
 import {
   extractExternalReference,
   extractMerchantOrderId,
@@ -30,6 +31,7 @@ export class MercadoPagoWebhookProcessorService {
     private prisma: PrismaService,
     private mpQueryService: MercadoPagoQueryService,
     private salesGateway: SalesGateway,
+    private salesService: SalesService,
   ) {}
 
   async processWebhook(payload: WebhookPayload) {
@@ -226,7 +228,7 @@ export class MercadoPagoWebhookProcessorService {
 
     // Decrementar stock si la venta acaba de ser aprobada
     if (wasNotApproved && resolvedSaleStatus === SaleStatus.APPROVED) {
-      await this.decrementStockForSale(sale.id);
+      await this.salesService.decrementStockForSale(sale.id);
     }
 
     this.salesGateway.notifyPaymentStatusChanged({
@@ -567,17 +569,4 @@ export class MercadoPagoWebhookProcessorService {
     return [];
   }
 
-  private async decrementStockForSale(saleId: string) {
-    const saleItems = await this.prisma.saleItem.findMany({
-      where: { saleId },
-      select: { productId: true, quantity: true },
-    });
-
-    for (const item of saleItems) {
-      await this.prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      });
-    }
-  }
 }
