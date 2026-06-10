@@ -37,19 +37,17 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
   const [categorias, setCategorias] = useState<any[]>([]);
 
-  const fetchBeneficios = async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const params = filterTipo ? `?socioTipoId=${filterTipo}` : '';
-      const res = await apiClient.get<Beneficio[]>(`/socios/beneficios${params}`);
-      setBeneficios(res.data);
-    } catch (_) {}
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchBeneficios(); }, []);  // eslint-disable-line
+    const params = filterTipo ? `?socioTipoId=${filterTipo}` : '';
+    apiClient.get<Beneficio[]>(`/socios/beneficios${params}`)
+      .then((res) => setBeneficios(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [filterTipo, refresh]);
 
   const fetchCategorias = async () => {
     try {
@@ -111,7 +109,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
       }
       setModalOpen(false);
       resetForm();
-      await fetchBeneficios();
+      setRefresh((r) => r + 1);
     } catch (err) {
       setError(normalizeApiError(err));
     } finally {
@@ -123,7 +121,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
     try {
       await apiClient.delete(`/socios/beneficios/${id}`);
       pushToast('Beneficio eliminado', 'success');
-      await fetchBeneficios();
+      setRefresh((r) => r + 1);
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
     }
@@ -133,7 +131,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
     try {
       await apiClient.put(`/socios/beneficios/${b.id}`, { activo: !b.activo });
       pushToast(b.activo ? 'Beneficio desactivado' : 'Beneficio activado', 'success');
-      await fetchBeneficios();
+      setRefresh((r) => r + 1);
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
     }
@@ -151,7 +149,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
           className="stock-search-input"
           style={{ flex: '0 0 auto', maxWidth: '220px' }}
           value={filterTipo}
-          onChange={(e) => { setFilterTipo(e.target.value); setTimeout(fetchBeneficios, 0); }}
+          onChange={(e) => setFilterTipo(e.target.value)}
         >
           <option value="">Todos los tipos</option>
           {tipos.map((t) => (
