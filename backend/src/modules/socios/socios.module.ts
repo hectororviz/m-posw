@@ -11,10 +11,10 @@ import { SociosBeneficiosService } from './socios-beneficios.service';
 @Module({
   imports: [ScheduleModule.forRoot()],
   controllers: [
-    SociosController,
-    SociosQrController,
     SociosBeneficiosController,
     SociosCanjesController,
+    SociosQrController,
+    SociosController,
   ],
   providers: [SociosService, SociosQrService, SociosBeneficiosService, PrismaService],
   exports: [SociosService, SociosBeneficiosService],
