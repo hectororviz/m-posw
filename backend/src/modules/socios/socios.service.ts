@@ -104,17 +104,47 @@ export class SociosService {
         socioTipo: { select: { id: true, nombre: true, montoMensual: true, activo: true } },
         cuotas: {
           where: { estado: { in: ['PENDIENTE', 'PARCIAL'] } },
-          select: { montoOriginal: true, montoPagado: true },
+          select: { montoOriginal: true, montoPagado: true, mes: true, anio: true },
         },
       },
       orderBy: { nroSocio: 'asc' },
     });
 
+    const ahora = new Date();
+    const anioActual = ahora.getUTCFullYear();
+    const mesActual = ahora.getUTCMonth() + 1;
+
     const result = socios.map((s) => {
-      const deudaTotal = s.cuotas.reduce(
+      let deudaTotal = s.cuotas.reduce(
         (sum, c) => sum + (Number(c.montoOriginal) - Number(c.montoPagado)),
         0,
       );
+
+      if (
+        s.estado === 'ACTIVO' &&
+        s.socioTipo.activo &&
+        Number(s.socioTipo.montoMensual) > 0
+      ) {
+        const cuotasExistentes = new Set(
+          s.cuotas.map((c) => `${c.anio}-${c.mes}`),
+        );
+        const fechaAlta = new Date(s.fechaAlta);
+
+        for (let mes = 1; mes <= 12; mes++) {
+          const key = `${anioActual}-${mes}`;
+          if (cuotasExistentes.has(key)) continue;
+
+          const dia10 = new Date(Date.UTC(anioActual, mes - 1, 10, 12, 0, 0));
+
+          if (
+            fechaAlta.getTime() <= dia10.getTime() &&
+            ahora.getTime() >= dia10.getTime()
+          ) {
+            deudaTotal += Number(s.socioTipo.montoMensual);
+          }
+        }
+      }
+
       return {
         id: s.id,
         nroSocio: s.nroSocio,
