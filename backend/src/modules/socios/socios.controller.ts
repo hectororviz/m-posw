@@ -21,6 +21,7 @@ import { CreateSocioDto } from './dto/create-socio.dto';
 import { UpdateSocioDto } from './dto/update-socio.dto';
 import { CreateSocioPagoDto } from './dto/create-socio-pago.dto';
 import { GenerarCuotasDto } from './dto/generar-cuotas.dto';
+import { BulkCarnetsDto } from './dto/bulk-carnets.dto';
 import { SociosService } from './socios.service';
 import type { Response } from 'express';
 
@@ -125,6 +126,20 @@ export class SociosController {
   }
 
   // ─── Carnet ──────────────────────────────────────────────
+
+  @Post('carnets')
+  async getCarnets(
+    @Body() dto: BulkCarnetsDto,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.sociosService.generateCarnetsPdf(dto.ids);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
 
   @Get(':id/carnet')
   async getCarnet(

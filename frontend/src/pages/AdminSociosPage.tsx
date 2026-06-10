@@ -62,6 +62,7 @@ export const AdminSociosPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   // ─── Modal state ──────────────────────────────────────
   const [modalMode, setModalMode] = useState<ModalMode>(null);
@@ -410,6 +411,46 @@ export const AdminSociosPage: React.FC = () => {
     }
   };
 
+  // ─── Seleccion multiple ─────────────────────────────
+  const toggleSelectSocio = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length && filtered.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map((s) => s.id)));
+    }
+  };
+
+  const handleBulkCarnet = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+      const token = localStorage.getItem('authToken');
+      const resp = await fetch(`${baseUrl}/socios/carnets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ids: [...selectedIds] }),
+      });
+      if (!resp.ok) throw new Error('Error al generar los carnets');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setSelectedIds(new Set());
+    } catch (err) {
+      pushToast('Error al generar los carnets', 'error');
+    }
+  };
+
   // ─── Render ───────────────────────────────────────────
   return (
     <div>
@@ -492,6 +533,9 @@ export const AdminSociosPage: React.FC = () => {
         <div className="sales-table-wrapper">
           <div className="sales-table">
             <div className="sales-table-head">
+              <span style={{ flex: '0 0 36px', display: 'flex', alignItems: 'center' }}>
+                <input type="checkbox" checked={selectedIds.size === filtered.length && filtered.length > 0} onChange={toggleSelectAll} />
+              </span>
               <span className="col-date" style={{ flex: '0 0 70px' }}>Nº</span>
               <span className="col-user" style={{ flex: 1 }}>Apellido y Nombre</span>
               <span className="col-method" style={{ flex: '0 0 100px' }}>Tipo</span>
@@ -501,6 +545,9 @@ export const AdminSociosPage: React.FC = () => {
             </div>
             {filtered.map((s: Socio) => (
               <div key={s.id} className="sales-table-row">
+                <span style={{ flex: '0 0 36px', display: 'flex', alignItems: 'center' }}>
+                  <input type="checkbox" checked={selectedIds.has(s.id)} onChange={() => toggleSelectSocio(s.id)} />
+                </span>
                 <span className="col-date" style={{ flex: '0 0 70px', fontWeight: 500 }}>#{s.nroSocio}</span>
                 <span className="col-user" style={{ flex: 1, fontWeight: 500 }}>
                   {s.apellido}, {s.nombre}
@@ -528,6 +575,18 @@ export const AdminSociosPage: React.FC = () => {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {filtered.length > 0 && selectedIds.size > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-action-count">{selectedIds.size} seleccionado{selectedIds.size > 1 ? 's' : ''}</span>
+          <button type="button" className="btn-primary" onClick={handleBulkCarnet}>
+            Generar carnets
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setSelectedIds(new Set())}>
+            Cancelar
+          </button>
         </div>
       )}
 

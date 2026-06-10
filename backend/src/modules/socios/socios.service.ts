@@ -563,6 +563,133 @@ export class SociosService {
 
   // ─── Carnet PDF ──────────────────────────────────────────
 
+  // CR80: 85.6mm x 54mm = 242.65pt x 153.07pt
+  private static readonly CARD_W = 242.65;
+  private static readonly CARD_H = 153.07;
+
+  private drawCard(
+    doc: PDFKit.PDFDocument,
+    cardX: number,
+    cardY: number,
+    socio: { apellido: string; nombre: string; nroSocio: number; fechaAlta: Date; dni: string; uuid: string; socioTipo: { nombre: string } },
+    displayName: string,
+    accentColor: string,
+    logoUrl: string | null | undefined,
+    qrBuffer: Buffer,
+  ) {
+    const { CARD_W: cardW, CARD_H: cardH } = SociosService;
+
+    // Fondo blanco del recuadro
+    doc.roundedRect(cardX, cardY, cardW, cardH, 6).fill('#ffffff');
+
+    // Franja vertical de acento recortada al borde redondeado
+    const stripeW = 8;
+    doc.save();
+    doc.roundedRect(cardX, cardY, cardW, cardH, 6).clip();
+    doc.rect(cardX, cardY, stripeW, cardH).fill(accentColor);
+    doc.restore();
+
+    // Borde del recuadro (encima de la franja)
+    doc.roundedRect(cardX, cardY, cardW, cardH, 6).stroke('#cccccc');
+
+    // Margen interno del recuadro
+    const marginX = cardX + stripeW + 12;
+    const marginY = cardY + 10;
+    const contentW = cardW - stripeW - 24;
+
+    const logoSize = 42;
+
+    // Línea separadora bajo el header (se dibuja antes que el logo)
+    const headerBottom = marginY + 20;
+    doc.strokeColor(accentColor)
+      .lineWidth(0.5)
+      .moveTo(marginX, headerBottom)
+      .lineTo(cardX + cardW - 12, headerBottom)
+      .stroke();
+
+    // ─── HEADER: logo (encima de la linea) + nombre ───
+    const logoX = cardX + cardW - 12 - logoSize;
+    const logoY = marginY;
+
+    if (logoUrl) {
+      const logoPath = logoUrl.startsWith('/')
+        ? path.join('/data/uploads', logoUrl.replace('/uploads/', ''))
+        : logoUrl;
+
+      if (logoPath.startsWith('/data/uploads') && fs.existsSync(logoPath)) {
+        try {
+          doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
+        } catch (_) {
+          // Ignore logo errors
+        }
+      }
+    }
+
+    doc.fill(accentColor)
+      .fontSize(14)
+      .font('Helvetica-Bold')
+      .text(displayName.toUpperCase(), marginX, marginY, {
+        width: cardW - stripeW - 24 - logoSize - 8,
+        align: 'left',
+        lineBreak: false,
+      });
+
+    // ─── BODY ────────────────────────────────────────
+    const bodyY = headerBottom + 10;
+
+    const nombreCompleto = `${socio.apellido}, ${socio.nombre}`;
+
+    doc.fill('#111111')
+      .fontSize(12)
+      .font('Helvetica-Bold')
+      .text(nombreCompleto, marginX, bodyY, {
+        width: contentW,
+        align: 'left',
+      });
+
+    doc.fill('#333333')
+      .fontSize(10)
+      .font('Helvetica')
+      .text(`Socio Nº ${String(socio.nroSocio).padStart(6, '0')}`, marginX, bodyY + 18, {
+        width: contentW,
+        align: 'left',
+      });
+
+    const fechaAlta = new Date(socio.fechaAlta);
+    const fechaAltaStr = `${String(fechaAlta.getUTCDate()).padStart(2, '0')}/${String(fechaAlta.getUTCMonth() + 1).padStart(2, '0')}/${fechaAlta.getUTCFullYear()}`;
+    const dniFormateado = socio.dni.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+    const infoY = bodyY + 38;
+    const lineH = 14;
+
+    doc.fill('#555555').fontSize(7).font('Helvetica');
+    doc.text(`Tipo: ${socio.socioTipo.nombre}`, marginX, infoY);
+    doc.text(`DNI: ${dniFormateado}`, marginX, infoY + lineH);
+    doc.text(`Socio desde: ${fechaAltaStr}`, marginX, infoY + lineH * 2);
+
+    // ─── FOOTER ──────────────────────────────────────
+    const footerY = cardY + cardH - 14;
+    doc.strokeColor('#dddddd')
+      .lineWidth(0.3)
+      .moveTo(marginX, footerY - 4)
+      .lineTo(cardX + cardW - 12, footerY - 4)
+      .stroke();
+
+    doc.fill('#aaaaaa')
+      .fontSize(5.5)
+      .font('Helvetica')
+      .text(displayName, marginX, footerY, {
+        width: contentW,
+        align: 'center',
+      });
+
+    // QR code en la esquina inferior derecha
+    const qrSize = 60;
+    const qrX = cardX + cardW - qrSize - 8;
+    const qrY = cardY + cardH - qrSize - 8;
+    doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
+  }
+
   async generateCarnetPdf(socioId: number): Promise<{ buffer: Buffer; filename: string }> {
     const socio = await this.prisma.socio.findUnique({
       where: { id: socioId },
@@ -578,18 +705,6 @@ export class SociosService {
 
     const displayName = setting?.clubName?.trim() || setting?.storeName || 'Club';
     const accentColor = setting?.accentColor || '#1e3a5f';
-
-    const fechaAlta = new Date(socio.fechaAlta);
-    const diaAlta = String(fechaAlta.getUTCDate()).padStart(2, '0');
-    const mesAlta = String(fechaAlta.getUTCMonth() + 1).padStart(2, '0');
-    const anioAlta = fechaAlta.getUTCFullYear();
-    const fechaAltaStr = `${diaAlta}/${mesAlta}/${anioAlta}`;
-
-    const dniFormateado = socio.dni.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-    // CR80: 85.6mm x 54mm = 242.65pt x 153.07pt
-    const cardW = 242.65;
-    const cardH = 153.07;
     const filename = `credencial-socio-${socio.nroSocio}.pdf`;
 
     const qrBuffer = await QRCode.toBuffer(socio.uuid, {
@@ -597,6 +712,8 @@ export class SociosService {
       width: 120,
       margin: 1,
     });
+
+    const { CARD_W: cardW, CARD_H: cardH } = SociosService;
 
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
@@ -615,112 +732,87 @@ export class SociosService {
       const cardX = (pageW - cardW) / 2;
       const cardY = 40;
 
-      // Fondo blanco del recuadro
-      doc.roundedRect(cardX, cardY, cardW, cardH, 6).fill('#ffffff');
+      this.drawCard(doc, cardX, cardY, socio, displayName, accentColor, setting?.logoUrl, qrBuffer);
 
-      // Franja vertical de acento recortada al borde redondeado
-      const stripeW = 8;
-      doc.save();
-      doc.roundedRect(cardX, cardY, cardW, cardH, 6).clip();
-      doc.rect(cardX, cardY, stripeW, cardH).fill(accentColor);
-      doc.restore();
+      doc.end();
+    });
+  }
 
-      // Borde del recuadro (encima de la franja)
-      doc.roundedRect(cardX, cardY, cardW, cardH, 6).stroke('#cccccc');
+  async generateCarnetsPdf(ids: number[]): Promise<{ buffer: Buffer; filename: string }> {
+    if (!ids || ids.length === 0) throw new BadRequestException('Se requiere al menos un ID de socio');
 
-      // Margen interno del recuadro
-      const marginX = cardX + stripeW + 12;
-      const marginY = cardY + 10;
-      const contentW = cardW - stripeW - 24;
+    const socios = await this.prisma.socio.findMany({
+      where: { id: { in: ids } },
+      include: { socioTipo: true },
+      orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }],
+    });
 
-      const logoSize = 42;
+    if (socios.length === 0) throw new NotFoundException('No se encontraron socios con los IDs proporcionados');
 
-      // Línea separadora bajo el header (se dibuja antes que el logo)
-      const headerBottom = marginY + 20;
-      doc.strokeColor(accentColor)
-        .lineWidth(0.5)
-        .moveTo(marginX, headerBottom)
-        .lineTo(cardX + cardW - 12, headerBottom)
-        .stroke();
+    const setting = await this.prisma.setting.findUnique({
+      where: { id: '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca' },
+      select: { logoUrl: true, storeName: true, clubName: true, accentColor: true },
+    });
 
-      // ─── HEADER: logo (encima de la linea) + nombre ───
-      const logoUrl = setting?.logoUrl || null;
-      const logoX = cardX + cardW - 12 - logoSize;
-      const logoY = marginY;
+    const displayName = setting?.clubName?.trim() || setting?.storeName || 'Club';
+    const accentColor = setting?.accentColor || '#1e3a5f';
+    const logoUrl = setting?.logoUrl || null;
 
-      if (logoUrl) {
-        const logoPath = logoUrl.startsWith('/')
-          ? path.join('/data/uploads', logoUrl.replace('/uploads/', ''))
-          : logoUrl;
+    // Pre-generar todos los QR buffers
+    const qrMap = new Map<number, Buffer>();
+    for (const socio of socios) {
+      const qrBuffer = await QRCode.toBuffer(socio.uuid, {
+        type: 'png',
+        width: 120,
+        margin: 1,
+      });
+      qrMap.set(socio.id, qrBuffer);
+    }
 
-        if (logoPath.startsWith('/data/uploads') && fs.existsSync(logoPath)) {
-          try {
-            doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
-          } catch (_) {
-            // Ignore logo errors
-          }
+    const { CARD_W: cardW, CARD_H: cardH } = SociosService;
+
+    // Grid: 2 columnas x 4 filas en A4 portrait (595.28 x 841.89 pt)
+    const COLS = 2;
+    const ROWS = 4;
+    const CARDS_PER_PAGE = COLS * ROWS; // 8
+    const pageW = 595.28;
+    const colGap = 38;
+    const rowGap = 46;
+    const leftMargin = (pageW - COLS * cardW - colGap) / 2; // ~36
+    const topMargin = 42;
+
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const doc = new PDFDocument({
+        size: 'A4',
+        layout: 'portrait',
+        margin: 0,
+      });
+
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve({
+        buffer: Buffer.concat(chunks),
+        filename: `credenciales-${socios.length}-socios.pdf`,
+      }));
+      doc.on('error', reject);
+
+      for (let i = 0; i < socios.length; i++) {
+        const pageIndex = Math.floor(i / CARDS_PER_PAGE);
+        const slotInPage = i % CARDS_PER_PAGE;
+        const col = slotInPage % COLS;
+        const row = Math.floor(slotInPage / COLS);
+
+        const cardX = leftMargin + col * (cardW + colGap);
+        const cardY = topMargin + row * (cardH + rowGap);
+
+        if (slotInPage === 0 && i > 0) {
+          doc.addPage();
         }
+
+        const socio = socios[i];
+        const qrBuffer = qrMap.get(socio.id)!;
+        this.drawCard(doc, cardX, cardY, socio, displayName, accentColor, logoUrl, qrBuffer);
       }
-
-      doc.fill(accentColor)
-        .fontSize(14)
-        .font('Helvetica-Bold')
-        .text(displayName.toUpperCase(), marginX, marginY, {
-          width: cardW - stripeW - 24 - logoSize - 8,
-          align: 'left',
-          lineBreak: false,
-        });
-
-      // ─── BODY ────────────────────────────────────────
-      const bodyY = headerBottom + 10;
-
-      const nombreCompleto = `${socio.apellido}, ${socio.nombre}`;
-
-      doc.fill('#111111')
-        .fontSize(12)
-        .font('Helvetica-Bold')
-        .text(nombreCompleto, marginX, bodyY, {
-          width: contentW,
-          align: 'left',
-        });
-
-      doc.fill('#333333')
-        .fontSize(10)
-        .font('Helvetica')
-        .text(`Socio Nº ${String(socio.nroSocio).padStart(6, '0')}`, marginX, bodyY + 18, {
-          width: contentW,
-          align: 'left',
-        });
-
-      const infoY = bodyY + 38;
-      const lineH = 14;
-
-      doc.fill('#555555').fontSize(7).font('Helvetica');
-      doc.text(`Tipo: ${socio.socioTipo.nombre}`, marginX, infoY);
-      doc.text(`DNI: ${dniFormateado}`, marginX, infoY + lineH);
-      doc.text(`Socio desde: ${fechaAltaStr}`, marginX, infoY + lineH * 2);
-
-      // ─── FOOTER ──────────────────────────────────────
-      const footerY = cardY + cardH - 14;
-      doc.strokeColor('#dddddd')
-        .lineWidth(0.3)
-        .moveTo(marginX, footerY - 4)
-        .lineTo(cardX + cardW - 12, footerY - 4)
-        .stroke();
-
-      doc.fill('#aaaaaa')
-        .fontSize(5.5)
-        .font('Helvetica')
-        .text(displayName, marginX, footerY, {
-          width: contentW,
-          align: 'center',
-        });
-
-      // QR code en la esquina inferior derecha
-      const qrSize = 60;
-      const qrX = cardX + cardW - qrSize - 8;
-      const qrY = cardY + cardH - qrSize - 8;
-      doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
 
       doc.end();
     });
