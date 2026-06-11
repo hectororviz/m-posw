@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedor, useAcreedorDeuda } from '../api/queries';
+import { useAcreedor, useAcreedorDeuda, useTreasuryAccounts } from '../api/queries';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
@@ -19,6 +19,8 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const acreedorId = id ? Number(id) : undefined;
   const { data: acreedor } = useAcreedor(acreedorId);
   const { data: deuda, isLoading: deudaLoading } = useAcreedorDeuda(acreedorId);
+  const { data: treasuryAccounts = [] } = useTreasuryAccounts();
+  const autoTreasuryId = treasuryAccounts.length === 1 ? treasuryAccounts[0].id : '';
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const navigate = useNavigate();
@@ -28,6 +30,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
     medioPago: 'efectivo' as 'efectivo' | 'transferencia',
     fecha: new Date().toISOString().slice(0, 10),
     notas: '',
+    treasuryAccountId: autoTreasuryId,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +41,10 @@ export const AdminAcreedorDetailPage: React.FC = () => {
       setError('El monto debe ser mayor a 0');
       return;
     }
+    if (!pagoForm.treasuryAccountId) {
+      setError('Selecciona dónde ingresó el dinero');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -46,6 +53,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         medioPago: pagoForm.medioPago,
         fecha: pagoForm.fecha,
         notas: pagoForm.notas || undefined,
+        treasuryAccountId: pagoForm.treasuryAccountId,
       });
       await queryClient.invalidateQueries({ queryKey: ['acreedor-deuda', acreedorId] });
       await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
@@ -57,6 +65,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         medioPago: 'efectivo',
         fecha: new Date().toISOString().slice(0, 10),
         notas: '',
+        treasuryAccountId: autoTreasuryId,
       });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -127,7 +136,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
       )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-        <button type="button" className="btn-primary" onClick={() => { setError(null); setPagoModal(true); }}>
+        <button type="button" className="btn-primary" onClick={() => { setError(null); setPagoForm(prev => ({ ...prev, treasuryAccountId: autoTreasuryId })); setPagoModal(true); }}>
           + Registrar pago
         </button>
       </div>
@@ -234,6 +243,18 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                   value={pagoForm.fecha}
                   onChange={(e) => setPagoForm({ ...pagoForm, fecha: e.target.value })}
                 />
+              </div>
+              <div className="settings-field">
+                <label>¿Dónde ingresó el dinero? *</label>
+                <select
+                  value={pagoForm.treasuryAccountId}
+                  onChange={(e) => setPagoForm({ ...pagoForm, treasuryAccountId: e.target.value })}
+                >
+                  <option value="">Seleccionar cuenta...</option>
+                  {treasuryAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="settings-field">
                 <label>Notas</label>

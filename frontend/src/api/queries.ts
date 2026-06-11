@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasurySummary, TrialBalanceData, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -226,6 +226,15 @@ export const useImputableExpenseAccounts = () =>
     queryKey: ['treasury-expense-imputable'],
     queryFn: async () => {
       const response = await apiClient.get<LedgerAccount[]>('/treasury/accounts/expense-imputable');
+      return response.data;
+    },
+  });
+
+export const useTreasuryAccounts = () =>
+  useQuery({
+    queryKey: ['treasury-accounts'],
+    queryFn: async () => {
+      const response = await apiClient.get<TreasuryAccount[]>('/accounting/accounts/treasury');
       return response.data;
     },
   });

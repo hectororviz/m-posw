@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -119,10 +120,11 @@ export class SociosController {
 
   @Post('cuotas/:cuotaId/pagar')
   pagarCuota(
+    @Req() req: { user: { sub: string } },
     @Param('cuotaId', ParseIntPipe) cuotaId: number,
     @Body() dto: CreateSocioPagoDto,
   ) {
-    return this.sociosService.pagarCuota(cuotaId, dto);
+    return this.sociosService.pagarCuota(req.user.sub, cuotaId, dto);
   }
 
   // ─── Carnet ──────────────────────────────────────────────

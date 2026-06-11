@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
+import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { SalesService } from '../sales/sales.service';
 import type { PollTransferResponse } from './dto/transfer.dto';
 
@@ -34,6 +35,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private mpConfig: MercadoPagoConfigService,
     private salesService: SalesService,
+    private journalEntriesService: JournalEntriesService,
   ) {}
 
   async pollTransfer(montoEsperado: number, userId: string): Promise<PollTransferResponse> {
@@ -206,7 +208,6 @@ export class PaymentsService {
 
     // Create the sale and movimiento in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create sale
       const sale = await tx.sale.create({
         data: {
           userId,
@@ -225,7 +226,6 @@ export class PaymentsService {
         include: { items: true },
       });
 
-      // Create or update movimientoMP
       await tx.movimientoMP.upsert({
         where: { paymentId },
         create: {
@@ -233,7 +233,7 @@ export class PaymentsService {
           paymentId,
           monto: roundedReceived,
           montoEsperado: roundedTotal,
-          pagador: null, // We could fetch this from MP if needed
+          pagador: null,
           tipo: 'cvu',
           fecha: new Date(),
           notificado: true,
@@ -245,6 +245,31 @@ export class PaymentsService {
           procesado: true,
         },
       });
+
+      const pma = await tx.paymentMethodAccount.findUnique({
+        where: { paymentMethod: 'TRANSFER' },
+      });
+      const ingresosAccount = await tx.ledgerAccount.findUnique({
+        where: { code: '4.1.01' },
+      });
+
+      if (pma && ingresosAccount) {
+        const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+          date: new Date(),
+          description: `Venta POS - TRANSFER - Venta #${sale.id}`,
+          lines: [
+            { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
+            { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
+          ],
+          sourceType: 'VENTA_POS',
+          sourceId: sale.orderNumber,
+        });
+
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: { journalEntryId: entry.id },
+        });
+      }
 
       return sale;
     });

@@ -178,6 +178,8 @@ model Sale {
   mercadoPagoPayments MercadoPagoPayment[]
   movimientosMP MovimientoMP[]
   fiadoVenta       FiadoVenta?
+  journalEntryId   String?        @unique @db.Uuid
+  journalEntry     JournalEntry?  @relation("JournalEntrySale", fields: [journalEntryId], references: [id])
 }
 
 model SaleItem {
@@ -387,6 +389,9 @@ model LedgerAccount {
   children       LedgerAccount[]   @relation("LedgerAccountHierarchy")
 
   lines          JournalEntryLine[]
+  paymentMethodAccounts PaymentMethodAccount[] @relation("PaymentMethodAccountLedger")
+  pagoAcreedores  PagoAcreedor[]   @relation("PagoAcreedorTreasuryAccount")
+  socioPagos      SocioPago[]      @relation("SocioPagoTreasuryAccount")
 
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -404,6 +409,8 @@ model JournalEntry {
   date            DateTime
   description     String
   notes           String?
+  sourceType      String?   // 'VENTA_POS' | 'FIADO_VENTA' | 'PAGO_ACREEDOR' | 'SOCIO_PAGO'
+  sourceId        Int?
   status          JournalEntryStatus @default(DRAFT)
 
   createdById     String             @db.Uuid
@@ -418,6 +425,10 @@ model JournalEntry {
   reversalEntry   JournalEntry?      @relation("JournalEntryReversal")
 
   lines           JournalEntryLine[]
+  sourceSales             Sale[]           @relation("JournalEntrySale")
+  sourceFiadoVentas       FiadoVenta[]     @relation("JournalEntryFiadoVenta")
+  sourcePagoAcreedores    PagoAcreedor[]   @relation("JournalEntryPagoAcreedor")
+  sourceSocioPagos        SocioPago[]      @relation("JournalEntrySocioPago")
 
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
@@ -446,6 +457,13 @@ model JournalEntryLine {
   @@index([accountId])
 }
 
+model PaymentMethodAccount {
+  id               Int            @id @default(autoincrement())
+  paymentMethod    PaymentMethod  @unique
+  ledgerAccountId  String         @db.Uuid
+  ledgerAccount    LedgerAccount  @relation("PaymentMethodAccountLedger", fields: [ledgerAccountId], references: [id])
+}
+
 model Acreedor {
   id          Int           @id @default(autoincrement())
   nombre      String
@@ -465,6 +483,8 @@ model FiadoVenta {
   createdAt  DateTime @default(now())
   venta      Sale     @relation(fields: [ventaId], references: [id])
   acreedor   Acreedor @relation(fields: [acreedorId], references: [id])
+  journalEntryId   String?        @unique @db.Uuid
+  journalEntry     JournalEntry?  @relation("JournalEntryFiadoVenta", fields: [journalEntryId], references: [id])
 
   @@index([acreedorId])
   @@index([ventaId])
@@ -478,7 +498,11 @@ model PagoAcreedor {
   fecha      DateTime
   notas      String?
   createdAt  DateTime @default(now())
-  acreedor   Acreedor @relation(fields: [acreedorId], references: [id])
+  acreedor        Acreedor        @relation(fields: [acreedorId], references: [id])
+  journalEntryId   String?         @unique @db.Uuid
+  journalEntry     JournalEntry?   @relation("JournalEntryPagoAcreedor", fields: [journalEntryId], references: [id])
+  treasuryAccountId String?        @db.Uuid
+  treasuryAccount  LedgerAccount?  @relation("PagoAcreedorTreasuryAccount", fields: [treasuryAccountId], references: [id])
 
   @@index([acreedorId])
 }
@@ -575,13 +599,17 @@ model SocioCuota {
 }
 
 model SocioPago {
-  id           Int       @id @default(autoincrement())
-  socioCuotaId Int
-  socioCuota   SocioCuota @relation(fields: [socioCuotaId], references: [id])
-  monto        Decimal   @db.Decimal(10, 2)
-  fecha        DateTime
-  observacion  String?
-  createdAt    DateTime  @default(now())
+  id                Int             @id @default(autoincrement())
+  socioCuotaId      Int
+  socioCuota        SocioCuota      @relation(fields: [socioCuotaId], references: [id])
+  monto             Decimal         @db.Decimal(10, 2)
+  fecha             DateTime
+  observacion       String?
+  journalEntryId    String?         @unique @db.Uuid
+  journalEntry      JournalEntry?   @relation("JournalEntrySocioPago", fields: [journalEntryId], references: [id])
+  treasuryAccountId String?         @db.Uuid
+  treasuryAccount   LedgerAccount?  @relation("SocioPagoTreasuryAccount", fields: [treasuryAccountId], references: [id])
+  createdAt         DateTime        @default(now())
 
   @@index([socioCuotaId])
 }

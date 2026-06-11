@@ -15,6 +15,15 @@ import {
   VoidJournalEntryDto,
 } from './dto/journal-entry.dto';
 
+export interface AutomatedEntryParams {
+  date?: Date;
+  description: string;
+  lines: { accountId: string; debit: number; credit: number; description?: string }[];
+  sourceType: string;
+  sourceId: number;
+  status?: 'DRAFT' | 'POSTED';
+}
+
 @Injectable()
 export class JournalEntriesService {
   constructor(private prisma: PrismaService) {}
@@ -286,6 +295,46 @@ export class JournalEntriesService {
       });
 
       return reversal;
+    });
+  }
+
+  async createAutomatedEntry(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    params: AutomatedEntryParams,
+  ) {
+    this.validateLines(params.lines);
+
+    const date = params.date || new Date();
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+
+    const seq = await this.getNextSequence(tx, year);
+    const entryNumber = this.formatEntryNumber(seq, month, year);
+    const status = params.status || 'POSTED';
+
+    return tx.journalEntry.create({
+      data: {
+        entryNumber,
+        sequenceNumber: seq,
+        fiscalYear: year,
+        month,
+        date,
+        description: params.description,
+        status,
+        postedAt: status === 'POSTED' ? new Date() : null,
+        sourceType: params.sourceType,
+        sourceId: params.sourceId,
+        createdById: userId,
+        lines: {
+          create: params.lines.map((l) => ({
+            accountId: l.accountId,
+            debit: l.debit,
+            credit: l.credit,
+            description: l.description,
+          })),
+        },
+      },
     });
   }
 

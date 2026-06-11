@@ -19,5 +19,6 @@ import { TreasuryReportsService } from './reports.service';
     JournalEntriesService,
     TreasuryReportsService,
   ],
+  exports: [LedgerAccountsService, JournalEntriesService],
 })
 export class TreasuryModule {}

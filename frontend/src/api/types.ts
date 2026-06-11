@@ -271,6 +271,12 @@ export interface LedgerAccount {
   _count?: { lines: number };
 }
 
+export interface TreasuryAccount {
+  id: string;
+  code: string;
+  name: string;
+}
+
 export interface JournalEntryLine {
   id: string;
   entryId: string;

@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { AccountingService } from './accounting.service';
+import { LedgerAccountsService } from '../treasury/ledger-accounts.service';
 import { AssignCategoryDto } from './dto/assign-category.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateMovementDto } from './dto/create-movement.dto';
@@ -28,7 +29,17 @@ import { UpdateMovementDto } from './dto/update-movement.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AccountingController {
-  constructor(private readonly accountingService: AccountingService) {}
+  constructor(
+    private readonly accountingService: AccountingService,
+    private readonly ledgerAccountsService: LedgerAccountsService,
+  ) {}
+
+  // ─── Treasury Accounts ─────────────────────────────────────────
+
+  @Get('accounts/treasury')
+  getTreasuryAccounts() {
+    return this.ledgerAccountsService.getTreasuryAccounts();
+  }
 
   // ─── Categories ───────────────────────────────────────────────
 

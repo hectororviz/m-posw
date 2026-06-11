@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma.service';
+import { TreasuryModule } from '../treasury/treasury.module';
 import { SociosController } from './socios.controller';
 import { SociosService } from './socios.service';
 import { SociosQrController } from './socios-qr.controller';
@@ -9,7 +10,7 @@ import { SociosBeneficiosController, SociosCanjesController } from './socios-ben
 import { SociosBeneficiosService } from './socios-beneficios.service';
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  imports: [ScheduleModule.forRoot(), TreasuryModule],
   controllers: [
     SociosBeneficiosController,
     SociosCanjesController,

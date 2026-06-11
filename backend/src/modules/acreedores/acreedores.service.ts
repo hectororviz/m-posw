@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -26,7 +27,10 @@ interface FifoResult {
 
 @Injectable()
 export class AcreedoresService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalEntriesService: JournalEntriesService,
+  ) {}
 
   private calculateFifo(fiadoVentas: FiadoVentaRaw[], pagos: PagoRaw[]): FifoResult {
     const sortedVentas = [...fiadoVentas].sort(
@@ -189,23 +193,63 @@ export class AcreedoresService {
     };
   }
 
-  async addPago(acreedorId: number, dto: CreatePagoDto) {
-    await this.findOne(acreedorId);
+  async addPago(userId: string, acreedorId: number, dto: CreatePagoDto) {
+    const acreedor = await this.findOne(acreedorId);
 
     if (dto.monto <= 0) {
       throw new BadRequestException('El monto debe ser mayor a 0');
     }
 
+    const treasuryAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { id: dto.treasuryAccountId },
+    });
+    if (!treasuryAccount) {
+      throw new BadRequestException('Cuenta de tesorería no encontrada');
+    }
+
+    const deudoresFiadosAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { code: '1.2.03' },
+    });
+    if (!deudoresFiadosAccount) {
+      throw new BadRequestException('Cuenta contable 1.2.03 no encontrada');
+    }
+
+    const deuda = await this.getDeuda(acreedorId);
+    const esTotal = deuda.saldoPendiente <= dto.monto + 0.001;
+    const tipoPago = esTotal ? 'Total' : 'Parcial';
+
     const [year, month, day] = dto.fecha.split('-').map(Number);
 
-    return this.prisma.pagoAcreedor.create({
-      data: {
-        acreedorId,
-        monto: dto.monto,
-        medioPago: dto.medioPago,
-        fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
-        notas: dto.notas,
-      },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const pago = await tx.pagoAcreedor.create({
+        data: {
+          acreedorId,
+          monto: dto.monto,
+          medioPago: dto.medioPago,
+          fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+          notas: dto.notas,
+        },
+      });
+
+      const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+        date: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+        description: `Pago acreedor - ${acreedor.nombre} (acreedor #${acreedor.id}) - ${tipoPago} $${dto.monto.toFixed(2)}`,
+        lines: [
+          { accountId: dto.treasuryAccountId, debit: dto.monto, credit: 0 },
+          { accountId: deudoresFiadosAccount.id, debit: 0, credit: dto.monto },
+        ],
+        sourceType: 'PAGO_ACREEDOR',
+        sourceId: pago.id,
+      });
+
+      await tx.pagoAcreedor.update({
+        where: { id: pago.id },
+        data: { journalEntryId: entry.id, treasuryAccountId: dto.treasuryAccountId },
+      });
+
+      return pago;
     });
+
+    return result;
   }
 }

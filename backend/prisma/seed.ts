@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PaymentMethod, PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -38,6 +38,7 @@ async function main() {
   }
 
   await seedLedgerAccounts();
+  await seedPaymentMethodAccounts();
 }
 
 async function seedLedgerAccounts() {
@@ -50,6 +51,7 @@ async function seedLedgerAccounts() {
     { code: '1.2',    name: 'Créditos',                  type: 'ASSET' as const,     acceptsEntries: false },
     { code: '1.2.01', name: 'Créditos a cobrar',         type: 'ASSET' as const,     acceptsEntries: true },
     { code: '1.2.02', name: 'Anticipos entregados',      type: 'ASSET' as const,     acceptsEntries: true },
+    { code: '1.2.03', name: 'Deudores por ventas fiadas', type: 'ASSET' as const,    acceptsEntries: true },
     { code: '2',      name: 'Pasivo',                    type: 'LIABILITY' as const, acceptsEntries: false },
     { code: '2.1',    name: 'Deudas',                    type: 'LIABILITY' as const, acceptsEntries: false },
     { code: '2.1.01', name: 'Proveedores a pagar',       type: 'LIABILITY' as const, acceptsEntries: true },
@@ -117,6 +119,36 @@ async function seedLedgerAccounts() {
   }
 
   console.log('Plan de cuentas contable sembrado correctamente.');
+}
+
+async function seedPaymentMethodAccounts() {
+  const accounts = await prisma.ledgerAccount.findMany({
+    where: { code: { in: ['1.1.01', '1.1.02', '1.2.03'] } },
+  });
+  const byCode: Record<string, string> = {};
+  for (const a of accounts) byCode[a.code] = a.id;
+
+  const mappings: { paymentMethod: PaymentMethod; ledgerAccountCode: string }[] = [
+    { paymentMethod: 'CASH', ledgerAccountCode: '1.1.01' },
+    { paymentMethod: 'MP_QR', ledgerAccountCode: '1.1.02' },
+    { paymentMethod: 'TRANSFER', ledgerAccountCode: '1.1.02' },
+    { paymentMethod: 'FIADO', ledgerAccountCode: '1.2.03' },
+  ];
+
+  for (const m of mappings) {
+    const ledgerAccountId = byCode[m.ledgerAccountCode];
+    if (!ledgerAccountId) {
+      console.warn(`Cuenta ${m.ledgerAccountCode} no encontrada para PaymentMethodAccount ${m.paymentMethod}`);
+      continue;
+    }
+    await prisma.paymentMethodAccount.upsert({
+      where: { paymentMethod: m.paymentMethod },
+      update: { ledgerAccountId },
+      create: { paymentMethod: m.paymentMethod, ledgerAccountId },
+    });
+  }
+
+  console.log('PaymentMethodAccount sembrado correctamente.');
 }
 
 main()

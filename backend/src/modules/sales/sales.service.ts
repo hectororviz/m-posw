@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { MovementType, PaymentMethod, PaymentStatus, Prisma, ProductType, SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
+import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
@@ -20,6 +21,7 @@ export class SalesService {
     private config: ConfigService,
     private mpService: MercadoPagoInstoreService,
     private mpQueryService: MercadoPagoQueryService,
+    private journalEntriesService: JournalEntriesService,
   ) {}
 
   async createCashSale(userId: string, dto: CreateCashSaleDto) {
@@ -32,31 +34,57 @@ export class SalesService {
     }
     const changeAmount = this.roundToCurrency(cashReceived - roundedTotal);
 
+    const pma = await this.prisma.paymentMethodAccount.findUnique({
+      where: { paymentMethod: 'CASH' },
+    });
+    if (!pma) throw new BadRequestException('No hay cuenta contable configurada para CASH');
+
+    const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { code: '4.1.01' },
+    });
+    if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+
     try {
-      const sale = await this.prisma.sale.create({
-        data: {
-          userId,
-          total: roundedTotal,
-          status: SaleStatus.APPROVED,
-          paymentStatus: PaymentStatus.APPROVED,
-          paymentMethod: PaymentMethod.CASH,
-          cashReceived,
-          changeAmount,
-          statusUpdatedAt: new Date(),
-          paidAt: new Date(),
-          items: {
-            create: items,
+      const result = await this.prisma.$transaction(async (tx) => {
+        const sale = await tx.sale.create({
+          data: {
+            userId,
+            total: roundedTotal,
+            status: SaleStatus.APPROVED,
+            paymentStatus: PaymentStatus.APPROVED,
+            paymentMethod: PaymentMethod.CASH,
+            cashReceived,
+            changeAmount,
+            statusUpdatedAt: new Date(),
+            paidAt: new Date(),
+            items: { create: items },
           },
-        },
-        include: { items: { include: { product: { include: { category: true } } } } },
+        });
+
+        const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+          date: new Date(),
+          description: `Venta POS - CASH - Venta #${sale.id}`,
+          lines: [
+            { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
+            { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
+          ],
+          sourceType: 'VENTA_POS',
+          sourceId: sale.orderNumber,
+        });
+
+        await tx.sale.update({
+          where: { id: sale.id },
+          data: { journalEntryId: entry.id },
+        });
+
+        return sale;
       });
 
-      // Decrementar stock por cada producto vendido
-      this.logger.log(`Venta en efectivo creada saleId=${sale.id}, decrementando stock...`);
-      await this.decrementStockForSale(sale.id);
-      this.logger.log(`Stock decrementado para saleId=${sale.id}`);
+      this.logger.log(`Venta en efectivo creada saleId=${result.id}, decrementando stock...`);
+      await this.decrementStockForSale(result.id);
+      this.logger.log(`Stock decrementado para saleId=${result.id}`);
 
-      return sale;
+      return result;
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta en efectivo');
     }
@@ -67,23 +95,55 @@ export class SalesService {
     const roundedTotal = this.roundToCurrency(total);
     this.assertTotal(dto.total, roundedTotal);
 
+    const pma = await this.prisma.paymentMethodAccount.findUnique({
+      where: { paymentMethod: 'MP_QR' },
+    });
+    if (!pma) throw new BadRequestException('No hay cuenta contable configurada para MP_QR');
+
+    const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { code: '4.1.01' },
+    });
+    if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+
     let sale;
+    let journalEntry;
     try {
-      sale = await this.prisma.sale.create({
-        data: {
-          userId,
-          total: roundedTotal,
-          status: SaleStatus.PENDING,
-          paymentStatus: PaymentStatus.PENDING,
-          paymentMethod: PaymentMethod.MP_QR,
-          statusUpdatedAt: new Date(),
-          paymentStartedAt: new Date(),
-          items: {
-            create: items,
+      const result = await this.prisma.$transaction(async (tx) => {
+        const s = await tx.sale.create({
+          data: {
+            userId,
+            total: roundedTotal,
+            status: SaleStatus.PENDING,
+            paymentStatus: PaymentStatus.PENDING,
+            paymentMethod: PaymentMethod.MP_QR,
+            statusUpdatedAt: new Date(),
+            paymentStartedAt: new Date(),
+            items: { create: items },
           },
-        },
-        include: { items: { include: { product: { include: { category: true } } } }, user: true },
+        });
+
+        const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+          date: new Date(),
+          description: `Venta POS - MP_QR - Venta #${s.id}`,
+          lines: [
+            { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
+            { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
+          ],
+          sourceType: 'VENTA_POS',
+          sourceId: s.orderNumber,
+          status: 'DRAFT',
+        });
+
+        await tx.sale.update({
+          where: { id: s.id },
+          data: { journalEntryId: entry.id },
+        });
+
+        return { sale: s, entry };
       });
+
+      sale = result.sale;
+      journalEntry = result.entry;
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta con QR');
     }
@@ -134,38 +194,65 @@ export class SalesService {
       throw new NotFoundException('Acreedor no encontrado o inactivo');
     }
 
+    const deudoresFiadosAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { code: '1.2.03' },
+    });
+    if (!deudoresFiadosAccount) throw new BadRequestException('Cuenta contable 1.2.03 no encontrada');
+
+    const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { code: '4.1.01' },
+    });
+    if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+
     try {
-      const sale = await this.prisma.sale.create({
-        data: {
-          userId,
-          total: roundedTotal,
-          status: SaleStatus.APPROVED,
-          paymentStatus: PaymentStatus.APPROVED,
-          paymentMethod: PaymentMethod.FIADO,
-          cashReceived: 0,
-          changeAmount: 0,
-          statusUpdatedAt: new Date(),
-          paidAt: new Date(),
-          items: {
-            create: items,
+      const result = await this.prisma.$transaction(async (tx) => {
+        const sale = await tx.sale.create({
+          data: {
+            userId,
+            total: roundedTotal,
+            status: SaleStatus.APPROVED,
+            paymentStatus: PaymentStatus.APPROVED,
+            paymentMethod: PaymentMethod.FIADO,
+            cashReceived: 0,
+            changeAmount: 0,
+            statusUpdatedAt: new Date(),
+            paidAt: new Date(),
+            items: { create: items },
           },
-        },
-        include: { items: { include: { product: { include: { category: true } } } } },
+        });
+
+        const fiadoVenta = await tx.fiadoVenta.create({
+          data: {
+            ventaId: sale.id,
+            acreedorId: dto.acreedorId,
+            monto: roundedTotal,
+          },
+        });
+
+        const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+          date: new Date(),
+          description: `Venta fiada - ${acreedor.nombre} (acreedor #${acreedor.id}) - ${items.length} items`,
+          lines: [
+            { accountId: deudoresFiadosAccount.id, debit: roundedTotal, credit: 0 },
+            { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
+          ],
+          sourceType: 'FIADO_VENTA',
+          sourceId: fiadoVenta.id,
+        });
+
+        await tx.fiadoVenta.update({
+          where: { id: fiadoVenta.id },
+          data: { journalEntryId: entry.id },
+        });
+
+        return sale;
       });
 
-      await this.prisma.fiadoVenta.create({
-        data: {
-          ventaId: sale.id,
-          acreedorId: dto.acreedorId,
-          monto: roundedTotal,
-        },
-      });
+      this.logger.log(`Venta fiado creada saleId=${result.id}, acreedorId=${dto.acreedorId}, decrementando stock...`);
+      await this.decrementStockForSale(result.id);
+      this.logger.log(`Stock decrementado para saleId=${result.id}`);
 
-      this.logger.log(`Venta fiado creada saleId=${sale.id}, acreedorId=${dto.acreedorId}, decrementando stock...`);
-      await this.decrementStockForSale(sale.id);
-      this.logger.log(`Stock decrementado para saleId=${sale.id}`);
-
-      return sale;
+      return result;
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta fiado');
     }
@@ -346,17 +433,26 @@ export class SalesService {
     
     this.logger.log(`Completando venta ${saleId}, estado actual: ${sale.status}`);
     
-    const updatedSale = await this.prisma.sale.update({
-      where: { id: saleId },
-      data: {
-        status: SaleStatus.APPROVED,
-        statusUpdatedAt: new Date(),
-        paidAt: sale.paidAt ?? new Date(),
-      },
-      include: { items: { include: { product: { include: { category: true } } } } },
+    const updatedSale = await this.prisma.$transaction(async (tx) => {
+      const s = await tx.sale.update({
+        where: { id: saleId },
+        data: {
+          status: SaleStatus.APPROVED,
+          statusUpdatedAt: new Date(),
+          paidAt: sale.paidAt ?? new Date(),
+        },
+      });
+
+      if (s.journalEntryId) {
+        await tx.journalEntry.update({
+          where: { id: s.journalEntryId },
+          data: { status: 'POSTED', postedAt: new Date() },
+        });
+      }
+
+      return s;
     });
 
-    // Decrementar stock por cada producto vendido
     this.logger.log(`Venta ${saleId} completada, decrementando stock...`);
     await this.decrementStockForSale(saleId);
     this.logger.log(`Stock decrementado para venta ${saleId}`);

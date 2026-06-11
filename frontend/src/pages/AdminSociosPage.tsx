@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas } from '../api/queries';
+import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas, useTreasuryAccounts } from '../api/queries';
 import type { Socio, SocioCuotaItem } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -52,6 +52,7 @@ const emptyPagoForm = {
   monto: '',
   fecha: new Date().toISOString().slice(0, 10),
   observacion: '',
+  treasuryAccountId: '',
 };
 
 export const AdminSociosPage: React.FC = () => {
@@ -59,6 +60,8 @@ export const AdminSociosPage: React.FC = () => {
   const { data: socios = [], isLoading } = useSocios(filters);
   const { data: resumen } = useSociosTesoreriaResumen();
   const { data: tipos = [] } = useSociosTipos();
+  const { data: treasuryAccounts = [] } = useTreasuryAccounts();
+  const autoTreasuryId = treasuryAccounts.length === 1 ? treasuryAccounts[0].id : '';
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [search, setSearch] = useState('');
@@ -96,6 +99,7 @@ export const AdminSociosPage: React.FC = () => {
   const [pagoMasivoError, setPagoMasivoError] = useState<string | null>(null);
   const [pagoMasivoSaving, setPagoMasivoSaving] = useState(false);
   const [pagoMasivoInputMode, setPagoMasivoInputMode] = useState<'total' | 'check'>('check');
+  const [pagoMasivoTreasuryId, setPagoMasivoTreasuryId] = useState(autoTreasuryId);
   const [pagoMasivoPartialMonth, setPagoMasivoPartialMonth] = useState<{
     cuotaId: number;
     mes: number;
@@ -133,6 +137,7 @@ export const AdminSociosPage: React.FC = () => {
     setPagoMasivoSaving(false);
     setPagoMasivoInputMode('check');
     setPagoMasivoPartialMonth(null);
+    setPagoMasivoTreasuryId(autoTreasuryId);
   };
 
   // ─── Create ───────────────────────────────────────────
@@ -220,6 +225,7 @@ export const AdminSociosPage: React.FC = () => {
       monto: String(pendiente),
       fecha: new Date().toISOString().slice(0, 10),
       observacion: '',
+      treasuryAccountId: autoTreasuryId,
     });
     setError(null);
     setPagoModal(true);
@@ -231,6 +237,10 @@ export const AdminSociosPage: React.FC = () => {
       setError('El monto debe ser mayor a 0');
       return;
     }
+    if (!pagoForm.treasuryAccountId) {
+      setError('Selecciona dónde ingresó el dinero');
+      return;
+    }
     if (!pagoCuotaId) return;
     setSaving(true);
     setError(null);
@@ -239,6 +249,7 @@ export const AdminSociosPage: React.FC = () => {
         monto,
         fecha: pagoForm.fecha,
         observacion: pagoForm.observacion || undefined,
+        treasuryAccountId: pagoForm.treasuryAccountId,
       });
       await queryClient.invalidateQueries({ queryKey: ['socio-cuotas', selectedId] });
       await queryClient.invalidateQueries({ queryKey: ['socios'] });
@@ -361,6 +372,11 @@ export const AdminSociosPage: React.FC = () => {
     const selected = cuotasAdeudadas.filter((c) => pagoMasivoChecked[c.id]);
     if (selected.length === 0) return;
 
+    if (!pagoMasivoTreasuryId) {
+      setPagoMasivoError('Selecciona dónde ingresó el dinero');
+      return;
+    }
+
     setPagoMasivoSaving(true);
     setPagoMasivoError(null);
 
@@ -377,6 +393,7 @@ export const AdminSociosPage: React.FC = () => {
         await apiClient.post(`/socios/cuotas/${c.id}/pagar`, {
           monto,
           fecha: pagoMasivoFecha,
+          treasuryAccountId: pagoMasivoTreasuryId,
         });
       } catch (err) {
         setPagoMasivoError(
@@ -817,6 +834,18 @@ export const AdminSociosPage: React.FC = () => {
                 <input type="date" value={pagoForm.fecha} onChange={(e) => setPagoForm({ ...pagoForm, fecha: e.target.value })} />
               </div>
               <div className="settings-field">
+                <label>¿Dónde ingresó el dinero? *</label>
+                <select
+                  value={pagoForm.treasuryAccountId}
+                  onChange={(e) => setPagoForm({ ...pagoForm, treasuryAccountId: e.target.value })}
+                >
+                  <option value="">Seleccionar cuenta...</option>
+                  {treasuryAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="settings-field">
                 <label>Observacion</label>
                 <textarea rows={2} value={pagoForm.observacion} onChange={(e) => setPagoForm({ ...pagoForm, observacion: e.target.value })} placeholder="Notas adicionales" />
               </div>
@@ -918,6 +947,19 @@ export const AdminSociosPage: React.FC = () => {
                         value={pagoMasivoFecha}
                         onChange={(e) => setPagoMasivoFecha(e.target.value)}
                       />
+                    </div>
+
+                    <div className="settings-field">
+                      <label>¿Dónde ingresó el dinero? *</label>
+                      <select
+                        value={pagoMasivoTreasuryId}
+                        onChange={(e) => setPagoMasivoTreasuryId(e.target.value)}
+                      >
+                        <option value="">Seleccionar cuenta...</option>
+                        {treasuryAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                        ))}
+                      </select>
                     </div>
                   </>
                 )}

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { Roles } from '../common/roles.decorator';
@@ -54,9 +54,10 @@ export class AcreedoresController {
 
   @Post(':id/pagos')
   addPago(
+    @Req() req: { user: { sub: string } },
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreatePagoDto,
   ) {
-    return this.acreedoresService.addPago(id, dto);
+    return this.acreedoresService.addPago(req.user.sub, id, dto);
   }
 }

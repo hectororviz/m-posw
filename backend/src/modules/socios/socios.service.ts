@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../common/prisma.service';
+import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { CreateSocioTipoDto } from './dto/create-socio-tipo.dto';
 import { UpdateSocioTipoDto } from './dto/update-socio-tipo.dto';
 import { CreateSocioDto } from './dto/create-socio.dto';
@@ -26,7 +27,10 @@ const MONTH_NAMES = [
 export class SociosService {
   private readonly logger = new Logger(SociosService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private journalEntriesService: JournalEntriesService,
+  ) {}
 
   // ─── Tipos ───────────────────────────────────────────────
 
@@ -377,6 +381,7 @@ export class SociosService {
   }
 
   async pagarCuota(
+    userId: string,
     cuotaId: number,
     dto: CreateSocioPagoDto,
   ) {
@@ -386,6 +391,7 @@ export class SociosService {
 
     const cuota = await this.prisma.socioCuota.findUnique({
       where: { id: cuotaId },
+      include: { socio: true },
     });
 
     if (!cuota) {
@@ -404,6 +410,20 @@ export class SociosService {
       );
     }
 
+    const treasuryAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { id: dto.treasuryAccountId },
+    });
+    if (!treasuryAccount) {
+      throw new BadRequestException('Cuenta de tesorería no encontrada');
+    }
+
+    const cuotasAccount = await this.prisma.ledgerAccount.findUnique({
+      where: { code: '4.1.03' },
+    });
+    if (!cuotasAccount) {
+      throw new BadRequestException('Cuenta contable 4.1.03 no encontrada');
+    }
+
     const nuevoMontoPagado = Number(cuota.montoPagado) + dto.monto;
 
     let nuevoEstado: 'PENDIENTE' | 'PARCIAL' | 'PAGADO' = 'PENDIENTE';
@@ -416,25 +436,48 @@ export class SociosService {
 
     const [year, month, day] = dto.fecha.split('-').map(Number);
 
-    const [cuotaActualizada, pago] = await this.prisma.$transaction([
-      this.prisma.socioCuota.update({
+    const result = await this.prisma.$transaction(async (tx) => {
+      const cuotaActualizada = await tx.socioCuota.update({
         where: { id: cuotaId },
         data: {
           montoPagado: nuevoMontoPagado,
           estado: nuevoEstado,
         },
-      }),
-      this.prisma.socioPago.create({
+      });
+
+      const pago = await tx.socioPago.create({
         data: {
           socioCuotaId: cuotaId,
           monto: dto.monto,
           fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
           observacion: dto.observacion,
         },
-      }),
-    ]);
+      });
 
-    return { cuota: cuotaActualizada, pago };
+      const socioName = cuota.socio
+        ? `${cuota.socio.nombre} ${cuota.socio.apellido}`
+        : `socio #${cuota.socioId}`;
+
+      const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+        date: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+        description: `Pago cuota - ${socioName} - ${cuota.mes}/${cuota.anio}`,
+        lines: [
+          { accountId: dto.treasuryAccountId, debit: dto.monto, credit: 0 },
+          { accountId: cuotasAccount.id, debit: 0, credit: dto.monto },
+        ],
+        sourceType: 'SOCIO_PAGO',
+        sourceId: pago.id,
+      });
+
+      await tx.socioPago.update({
+        where: { id: pago.id },
+        data: { journalEntryId: entry.id, treasuryAccountId: dto.treasuryAccountId },
+      });
+
+      return { cuota: cuotaActualizada, pago };
+    });
+
+    return result;
   }
 
   // ─── Reporte Matriz ──────────────────────────────────────
