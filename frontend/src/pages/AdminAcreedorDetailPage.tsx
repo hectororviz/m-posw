@@ -27,7 +27,6 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const [pagoModal, setPagoModal] = useState(false);
   const [pagoForm, setPagoForm] = useState({
     monto: '',
-    medioPago: 'efectivo' as 'efectivo' | 'transferencia',
     fecha: new Date().toISOString().slice(0, 10),
     notas: '',
     treasuryAccountId: autoTreasuryId,
@@ -50,7 +49,6 @@ export const AdminAcreedorDetailPage: React.FC = () => {
     try {
       await apiClient.post(`/acreedores/${acreedorId}/pagos`, {
         monto,
-        medioPago: pagoForm.medioPago,
         fecha: pagoForm.fecha,
         notas: pagoForm.notas || undefined,
         treasuryAccountId: pagoForm.treasuryAccountId,
@@ -62,7 +60,6 @@ export const AdminAcreedorDetailPage: React.FC = () => {
       setPagoModal(false);
       setPagoForm({
         monto: '',
-        medioPago: 'efectivo',
         fecha: new Date().toISOString().slice(0, 10),
         notas: '',
         treasuryAccountId: autoTreasuryId,
@@ -225,16 +222,6 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                   onChange={(e) => setPagoForm({ ...pagoForm, monto: e.target.value })}
                   placeholder="0.00"
                 />
-              </div>
-              <div className="settings-field">
-                <label>Medio de pago *</label>
-                <select
-                  value={pagoForm.medioPago}
-                  onChange={(e) => setPagoForm({ ...pagoForm, medioPago: e.target.value as 'efectivo' | 'transferencia' })}
-                >
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                </select>
               </div>
               <div className="settings-field">
                 <label>Fecha *</label>

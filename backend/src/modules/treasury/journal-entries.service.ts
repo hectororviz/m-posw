@@ -58,7 +58,7 @@ export class JournalEntriesService {
         createdBy: { select: { id: true, name: true } },
         lines: { include: { account: true } },
       },
-      orderBy: { date: 'desc' },
+      orderBy: { entryNumber: 'desc' },
     });
   }
 

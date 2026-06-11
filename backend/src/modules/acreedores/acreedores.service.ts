@@ -225,7 +225,7 @@ export class AcreedoresService {
         data: {
           acreedorId,
           monto: dto.monto,
-          medioPago: dto.medioPago,
+          medioPago: dto.medioPago || '',
           fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
           notas: dto.notas,
         },

@@ -5,9 +5,10 @@ export class CreatePagoDto {
   @Min(0.01)
   monto: number;
 
+  @IsOptional()
   @IsString()
   @IsIn(['efectivo', 'transferencia'])
-  medioPago: string;
+  medioPago?: string;
 
   @IsDateString()
   fecha: string;
