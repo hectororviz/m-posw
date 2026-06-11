@@ -63,6 +63,18 @@ export class UpdateSettingDto {
   enableAcreedoresModule?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  enableAutoJournalPos?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enableAutoJournalAcreedores?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enableAutoJournalSocios?: boolean;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];
