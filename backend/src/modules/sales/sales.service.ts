@@ -34,17 +34,41 @@ export class SalesService {
     }
     const changeAmount = this.roundToCurrency(cashReceived - roundedTotal);
 
-    const pma = await this.prisma.paymentMethodAccount.findUnique({
-      where: { paymentMethod: 'CASH' },
-    });
-    if (!pma) throw new BadRequestException('No hay cuenta contable configurada para CASH');
-
-    const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { code: '4.1.01' },
-    });
-    if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+    const setting = await this.prisma.setting.findFirst();
 
     try {
+      if (!setting?.enableAutoJournalPos) {
+        const sale = await this.prisma.sale.create({
+          data: {
+            userId,
+            total: roundedTotal,
+            status: SaleStatus.APPROVED,
+            paymentStatus: PaymentStatus.APPROVED,
+            paymentMethod: PaymentMethod.CASH,
+            cashReceived,
+            changeAmount,
+            statusUpdatedAt: new Date(),
+            paidAt: new Date(),
+            items: { create: items },
+          },
+          include: { items: { include: { product: { include: { category: true } } } } },
+        });
+        this.logger.log(`Venta en efectivo creada saleId=${sale.id}, decrementando stock...`);
+        await this.decrementStockForSale(sale.id);
+        this.logger.log(`Stock decrementado para saleId=${sale.id}`);
+        return sale;
+      }
+
+      const pma = await this.prisma.paymentMethodAccount.findUnique({
+        where: { paymentMethod: 'CASH' },
+      });
+      if (!pma) throw new BadRequestException('No hay cuenta contable configurada para CASH');
+
+      const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
+        where: { code: '4.1.01' },
+      });
+      if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+
       const result = await this.prisma.$transaction(async (tx) => {
         const sale = await tx.sale.create({
           data: {
@@ -96,21 +120,12 @@ export class SalesService {
     const roundedTotal = this.roundToCurrency(total);
     this.assertTotal(dto.total, roundedTotal);
 
-    const pma = await this.prisma.paymentMethodAccount.findUnique({
-      where: { paymentMethod: 'MP_QR' },
-    });
-    if (!pma) throw new BadRequestException('No hay cuenta contable configurada para MP_QR');
-
-    const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { code: '4.1.01' },
-    });
-    if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+    const setting = await this.prisma.setting.findFirst();
 
     let sale;
-    let journalEntry;
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
-        const s = await tx.sale.create({
+      if (!setting?.enableAutoJournalPos) {
+        const s = await this.prisma.sale.create({
           data: {
             userId,
             total: roundedTotal,
@@ -122,29 +137,53 @@ export class SalesService {
             items: { create: items },
           },
         });
-
-        const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
-          date: new Date(),
-          description: `Venta POS - MP_QR - Venta #${s.id}`,
-          lines: [
-            { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
-            { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
-          ],
-          sourceType: 'VENTA_POS',
-          sourceId: s.orderNumber,
-          status: 'DRAFT',
+        sale = s;
+      } else {
+        const pma = await this.prisma.paymentMethodAccount.findUnique({
+          where: { paymentMethod: 'MP_QR' },
         });
+        if (!pma) throw new BadRequestException('No hay cuenta contable configurada para MP_QR');
 
-        await tx.sale.update({
-          where: { id: s.id },
-          data: { journalEntryId: entry.id },
+        const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
+          where: { code: '4.1.01' },
         });
+        if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
 
-        return { sale: s, entry };
-      });
+        const result = await this.prisma.$transaction(async (tx) => {
+          const s = await tx.sale.create({
+            data: {
+              userId,
+              total: roundedTotal,
+              status: SaleStatus.PENDING,
+              paymentStatus: PaymentStatus.PENDING,
+              paymentMethod: PaymentMethod.MP_QR,
+              statusUpdatedAt: new Date(),
+              paymentStartedAt: new Date(),
+              items: { create: items },
+            },
+          });
 
-      sale = result.sale;
-      journalEntry = result.entry;
+          const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+            date: new Date(),
+            description: `Venta POS - MP_QR - Venta #${s.id}`,
+            lines: [
+              { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
+              { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
+            ],
+            sourceType: 'VENTA_POS',
+            sourceId: s.orderNumber,
+            status: 'DRAFT',
+          });
+
+          await tx.sale.update({
+            where: { id: s.id },
+            data: { journalEntryId: entry.id },
+          });
+
+          return s;
+        });
+        sale = result;
+      }
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta con QR');
     }
@@ -195,17 +234,51 @@ export class SalesService {
       throw new NotFoundException('Acreedor no encontrado o inactivo');
     }
 
-    const deudoresFiadosAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { code: '1.2.03' },
-    });
-    if (!deudoresFiadosAccount) throw new BadRequestException('Cuenta contable 1.2.03 no encontrada');
-
-    const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { code: '4.1.01' },
-    });
-    if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+    const setting = await this.prisma.setting.findFirst();
 
     try {
+      if (!setting?.enableAutoJournalPos) {
+        const sale = await this.prisma.sale.create({
+          data: {
+            userId,
+            total: roundedTotal,
+            status: SaleStatus.APPROVED,
+            paymentStatus: PaymentStatus.APPROVED,
+            paymentMethod: PaymentMethod.FIADO,
+            cashReceived: 0,
+            changeAmount: 0,
+            statusUpdatedAt: new Date(),
+            paidAt: new Date(),
+            items: { create: items },
+          },
+          include: { items: { include: { product: { include: { category: true } } } } },
+        });
+
+        await this.prisma.fiadoVenta.create({
+          data: {
+            ventaId: sale.id,
+            acreedorId: dto.acreedorId,
+            monto: roundedTotal,
+          },
+        });
+
+        this.logger.log(`Venta fiado creada saleId=${sale.id}, acreedorId=${dto.acreedorId}, decrementando stock...`);
+        await this.decrementStockForSale(sale.id);
+        this.logger.log(`Stock decrementado para saleId=${sale.id}`);
+
+        return sale;
+      }
+
+      const deudoresFiadosAccount = await this.prisma.ledgerAccount.findUnique({
+        where: { code: '1.2.03' },
+      });
+      if (!deudoresFiadosAccount) throw new BadRequestException('Cuenta contable 1.2.03 no encontrada');
+
+      const ingresosAccount = await this.prisma.ledgerAccount.findUnique({
+        where: { code: '4.1.01' },
+      });
+      if (!ingresosAccount) throw new BadRequestException('Cuenta contable 4.1.01 no encontrada');
+
       const result = await this.prisma.$transaction(async (tx) => {
         const sale = await tx.sale.create({
           data: {

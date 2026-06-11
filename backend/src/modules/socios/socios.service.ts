@@ -410,6 +410,43 @@ export class SociosService {
       );
     }
 
+    const setting = await this.prisma.setting.findFirst();
+
+    if (!setting?.enableAutoJournalSocios) {
+      const treasuryAccount = this.prisma.ledgerAccount.findUnique({
+        where: { id: dto.treasuryAccountId },
+      });
+
+      const nuevoMontoPagado = Number(cuota.montoPagado) + dto.monto;
+
+      let nuevoEstado: 'PENDIENTE' | 'PARCIAL' | 'PAGADO' = 'PENDIENTE';
+      if (nuevoMontoPagado >= Number(cuota.montoOriginal) - 0.001) {
+        nuevoEstado = 'PAGADO';
+      } else if (nuevoMontoPagado > 0) {
+        nuevoEstado = 'PARCIAL';
+      }
+
+      const [year, month, day] = dto.fecha.split('-').map(Number);
+
+      const [cuotaActualizada, pago] = await this.prisma.$transaction([
+        this.prisma.socioCuota.update({
+          where: { id: cuotaId },
+          data: { montoPagado: nuevoMontoPagado, estado: nuevoEstado },
+        }),
+        this.prisma.socioPago.create({
+          data: {
+            socioCuotaId: cuotaId,
+            monto: dto.monto,
+            fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+            observacion: dto.observacion,
+            treasuryAccountId: dto.treasuryAccountId,
+          },
+        }),
+      ]);
+
+      return { cuota: cuotaActualizada, pago };
+    }
+
     const treasuryAccount = await this.prisma.ledgerAccount.findUnique({
       where: { id: dto.treasuryAccountId },
     });

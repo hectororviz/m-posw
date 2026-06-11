@@ -145,6 +145,9 @@ export interface Setting {
   enableSociosModule?: boolean | null;
   enableTreasuryModule?: boolean | null;
   enableAcreedoresModule?: boolean | null;
+  enableAutoJournalPos?: boolean | null;
+  enableAutoJournalAcreedores?: boolean | null;
+  enableAutoJournalSocios?: boolean | null;
   movementInReasons?: string[];
   movementOutReasons?: string[];
   mpLinked?: boolean | null;

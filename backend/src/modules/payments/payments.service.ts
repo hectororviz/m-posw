@@ -246,29 +246,33 @@ export class PaymentsService {
         },
       });
 
-      const pma = await tx.paymentMethodAccount.findUnique({
-        where: { paymentMethod: 'TRANSFER' },
-      });
-      const ingresosAccount = await tx.ledgerAccount.findUnique({
-        where: { code: '4.1.01' },
-      });
+      const setting = await tx.setting.findFirst();
 
-      if (pma && ingresosAccount) {
-        const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
-          date: new Date(),
-          description: `Venta POS - TRANSFER - Venta #${sale.id}`,
-          lines: [
-            { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
-            { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
-          ],
-          sourceType: 'VENTA_POS',
-          sourceId: sale.orderNumber,
+      if (setting?.enableAutoJournalPos) {
+        const pma = await tx.paymentMethodAccount.findUnique({
+          where: { paymentMethod: 'TRANSFER' },
+        });
+        const ingresosAccount = await tx.ledgerAccount.findUnique({
+          where: { code: '4.1.01' },
         });
 
-        await tx.sale.update({
-          where: { id: sale.id },
-          data: { journalEntryId: entry.id },
-        });
+        if (pma && ingresosAccount) {
+          const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+            date: new Date(),
+            description: `Venta POS - TRANSFER - Venta #${sale.id}`,
+            lines: [
+              { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
+              { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
+            ],
+            sourceType: 'VENTA_POS',
+            sourceId: sale.orderNumber,
+          });
+
+          await tx.sale.update({
+            where: { id: sale.id },
+            data: { journalEntryId: entry.id },
+          });
+        }
       }
 
       return sale;

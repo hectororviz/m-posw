@@ -200,6 +200,22 @@ export class AcreedoresService {
       throw new BadRequestException('El monto debe ser mayor a 0');
     }
 
+    const [year, month, day] = dto.fecha.split('-').map(Number);
+    const setting = await this.prisma.setting.findFirst();
+
+    if (!setting?.enableAutoJournalAcreedores) {
+      return this.prisma.pagoAcreedor.create({
+        data: {
+          acreedorId,
+          monto: dto.monto,
+          medioPago: dto.medioPago || '',
+          fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+          notas: dto.notas,
+          treasuryAccountId: dto.treasuryAccountId,
+        },
+      });
+    }
+
     const treasuryAccount = await this.prisma.ledgerAccount.findUnique({
       where: { id: dto.treasuryAccountId },
     });
@@ -217,8 +233,6 @@ export class AcreedoresService {
     const deuda = await this.getDeuda(acreedorId);
     const esTotal = deuda.saldoPendiente <= dto.monto + 0.001;
     const tipoPago = esTotal ? 'Total' : 'Parcial';
-
-    const [year, month, day] = dto.fecha.split('-').map(Number);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const pago = await tx.pagoAcreedor.create({
