@@ -59,6 +59,7 @@ export class SalesService {
             paidAt: new Date(),
             items: { create: items },
           },
+          include: { items: { include: { product: { include: { category: true } } } } },
         });
 
         const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
@@ -219,6 +220,7 @@ export class SalesService {
             paidAt: new Date(),
             items: { create: items },
           },
+          include: { items: { include: { product: { include: { category: true } } } } },
         });
 
         const fiadoVenta = await tx.fiadoVenta.create({
