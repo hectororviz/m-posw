@@ -562,3 +562,14 @@ export interface SaleVoucher {
   plan?: InternetPlan | null;
   createdAt: string;
 }
+
+export interface VoucherListItem {
+  id: string;
+  saleOrderNumber: number;
+  planName: string;
+  planDuration: number;
+  active: boolean;
+  createdAt: string;
+  saleCreatedAt: string;
+  salePaidAt: string | null;
+}

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 
@@ -456,6 +456,17 @@ export const useInternetPlans = () =>
     queryKey: ['internet-plans'],
     queryFn: async () => {
       const response = await apiClient.get<InternetPlan[]>('/internet/plans');
+      return response.data;
+    },
+  });
+
+export const useInternetVouchers = (saleId?: string) =>
+  useQuery({
+    queryKey: ['internet-vouchers', saleId],
+    queryFn: async () => {
+      const response = await apiClient.get<VoucherListItem[]>('/internet/vouchers/list', {
+        params: saleId ? { saleId } : undefined,
+      });
       return response.data;
     },
   });

@@ -1,12 +1,43 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
+import { Roles } from '../common/roles.decorator';
+import { RolesGuard } from '../common/roles.guard';
+import { PrismaService } from '../common/prisma.service';
 import { GenerateVoucherDto } from './dto/generate-voucher.dto';
 import { InternetVouchersService } from './internet-vouchers.service';
 
 @Controller('internet/vouchers')
 @UseGuards(JwtAuthGuard)
 export class InternetVouchersController {
-  constructor(private readonly vouchersService: InternetVouchersService) {}
+  constructor(
+    private readonly vouchersService: InternetVouchersService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Get('list')
+  async listVouchers(@Query('saleId') saleId?: string) {
+    const vouchers = await this.prisma.saleVoucher.findMany({
+      where: saleId ? { saleId } : undefined,
+      include: {
+        plan: true,
+        sale: { select: { orderNumber: true, createdAt: true, paidAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    return vouchers.map((v) => ({
+      id: v.id,
+      saleOrderNumber: v.sale.orderNumber,
+      planName: v.plan.name,
+      planDuration: v.plan.duration,
+      active: v.active,
+      createdAt: v.createdAt,
+      saleCreatedAt: v.sale.createdAt,
+      salePaidAt: v.sale.paidAt,
+    }));
+  }
 
   @Post('generate')
   generate(@Body() dto: GenerateVoucherDto) {

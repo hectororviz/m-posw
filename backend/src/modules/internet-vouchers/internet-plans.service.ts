@@ -40,7 +40,7 @@ export class InternetPlansService {
           type: 'SIMPLE',
           active: true,
           categoryId: category.id,
-          iconName: INTERNET_CATEGORY_ICON,
+          iconName: formatDurationShort(dto.duration),
           colorHex: INTERNET_CATEGORY_COLOR,
         },
       });
@@ -76,6 +76,7 @@ export class InternetPlansService {
         if (dto.name !== undefined) productUpdate.name = dto.name;
         if (dto.price !== undefined) productUpdate.price = dto.price;
         if (dto.active !== undefined) productUpdate.active = dto.active;
+        if (dto.duration !== undefined) productUpdate.iconName = formatDurationShort(dto.duration);
         if (Object.keys(productUpdate).length > 0) {
           await tx.product.update({
             where: { id: existing.productId },
@@ -183,4 +184,10 @@ export class InternetPlansService {
       },
     });
   }
+}
+
+function formatDurationShort(seconds: number): string {
+  if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400}d`;
+  if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600}h`;
+  return `${Math.round(seconds / 60)}m`;
 }

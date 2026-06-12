@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useInternetPlans } from '../api/queries';
+import { useInternetPlans, useInternetVouchers } from '../api/queries';
 import type { InternetPlan } from '../api/types';
+
+type TabId = 'vouchers' | 'planes';
 
 const DURATION_OPTIONS = [
   { label: '1 hora', value: 3600 },
@@ -49,9 +51,20 @@ const formatDuration = (seconds: number) => {
   return `${seconds}s`;
 };
 
+const formatDateTime = (iso: string) => {
+  const d = new Date(iso);
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const hours = d.getHours().toString().padStart(2, '0');
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  return `${day}/${month} ${hours}:${minutes}`;
+};
+
 export const AdminInternetPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const { data: plans, isLoading } = useInternetPlans();
+  const { data: plans, isLoading: plansLoading } = useInternetPlans();
+  const { data: vouchers, isLoading: vouchersLoading } = useInternetVouchers();
+  const [activeTab, setActiveTab] = useState<TabId>('vouchers');
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<InternetPlan | null>(null);
   const [form, setForm] = useState<PlanForm>(EMPTY_FORM);
@@ -86,25 +99,12 @@ export const AdminInternetPage: React.FC = () => {
 
   const handleSave = async () => {
     setError(null);
-    if (!form.name.trim()) {
-      setError('El nombre es obligatorio');
-      return;
-    }
+    if (!form.name.trim()) { setError('El nombre es obligatorio'); return; }
     const priceNum = Number(form.price);
-    if (!priceNum || priceNum <= 0) {
-      setError('El precio debe ser mayor a 0');
-      return;
-    }
+    if (!priceNum || priceNum <= 0) { setError('El precio debe ser mayor a 0'); return; }
     setSaving(true);
     try {
-      const payload = {
-        name: form.name.trim(),
-        duration: form.duration,
-        price: priceNum,
-        downloadBandwidth: form.downloadBandwidth,
-        uploadBandwidth: form.uploadBandwidth,
-        idleTimeout: form.idleTimeout,
-      };
+      const payload = { name: form.name.trim(), duration: form.duration, price: priceNum, downloadBandwidth: form.downloadBandwidth, uploadBandwidth: form.uploadBandwidth, idleTimeout: form.idleTimeout };
       if (editingPlan) {
         await apiClient.patch(`/internet/plans/${editingPlan.id}`, payload);
       } else {
@@ -114,11 +114,7 @@ export const AdminInternetPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['internet-plans'] });
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
-    } catch (err) {
-      setError(normalizeApiError(err));
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(normalizeApiError(err)); } finally { setSaving(false); }
   };
 
   const handleDelete = async (plan: InternetPlan) => {
@@ -129,11 +125,7 @@ export const AdminInternetPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['internet-plans'] });
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
-    } catch (err) {
-      setError(normalizeApiError(err));
-    } finally {
-      setDeletingId(null);
-    }
+    } catch (err) { setError(normalizeApiError(err)); } finally { setDeletingId(null); }
   };
 
   const getPriceDisplay = (price: number | string) => {
@@ -141,155 +133,160 @@ export const AdminInternetPage: React.FC = () => {
     return `$${num.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
-  if (isLoading) {
-    return (
-      <div>
-        <div className="page-header">
-          <h2 className="page-header-title">Planes de Internet</h2>
-          <p className="page-header-subtitle">Gestiona los vouchers WiFi que se venden en el POS.</p>
-        </div>
-        <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>Cargando...</p>
-        </div>
-      </div>
-    );
-  }
+  const TABS: { id: TabId; label: string }[] = [
+    { id: 'vouchers', label: 'Vouchers' },
+    { id: 'planes', label: 'Planes' },
+  ];
 
   return (
     <div>
       <div className="page-header">
         <div>
-          <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Planes de Internet</h2>
-          <p className="page-header-subtitle">Gestiona los vouchers WiFi que se venden en el POS. Cada plan crea automaticamente un producto en la categoria Internet.</p>
+          <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Internet</h2>
+          <p className="page-header-subtitle">Gestiona los vouchers WiFi y planes de internet.</p>
         </div>
+      </div>
+
+      <div className="settings-tabs">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {error && <p className="error-text">{error}</p>}
 
-      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo plan" title="Nuevo plan">+</button>
-
-      {showModal && (
-        <div className="modal-backdrop" onClick={closeModal} role="presentation">
-          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{editingPlan ? 'Editar plan' : 'Nuevo plan'}</h3>
-              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
+      {/* TAB: Vouchers */}
+      {activeTab === 'vouchers' && (
+        <>
+          {vouchersLoading ? (
+            <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+              <p style={{ color: 'var(--color-text-faint)', margin: 0 }}>Cargando...</p>
             </div>
-            <div className="modal-body">
-              <div className="settings-field">
-                <label htmlFor="plan-name">Nombre</label>
-                <input id="plan-name" type="text" placeholder="Internet 24 horas" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-
-              <div className="settings-field">
-                <label htmlFor="plan-duration">Duracion</label>
-                <select
-                  id="plan-duration"
-                  value={form.customDuration ? -1 : form.duration}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (val === -1) {
-                      setForm({ ...form, customDuration: true, duration: 0 });
-                    } else {
-                      setForm({ ...form, customDuration: false, duration: val });
-                    }
-                  }}
-                >
-                  {DURATION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                  <option value={-1}>Personalizado...</option>
-                </select>
-                {form.customDuration && (
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Duracion en segundos"
-                    value={form.duration || ''}
-                    onChange={(e) => setForm({ ...form, duration: Number(e.target.value) || 0 })}
-                    style={{ marginTop: '0.5rem' }}
-                  />
-                )}
-              </div>
-
-              <div className="settings-field">
-                <label htmlFor="plan-down">Velocidad de descarga</label>
-                <select id="plan-down" value={form.downloadBandwidth} onChange={(e) => setForm({ ...form, downloadBandwidth: e.target.value })}>
-                  {BW_OPTIONS.map((bw) => (
-                    <option key={bw} value={bw}>{bw}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="settings-field">
-                <label htmlFor="plan-up">Velocidad de subida</label>
-                <select id="plan-up" value={form.uploadBandwidth} onChange={(e) => setForm({ ...form, uploadBandwidth: e.target.value })}>
-                  {BW_OPTIONS.map((bw) => (
-                    <option key={bw} value={bw}>{bw}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="settings-field">
-                <label htmlFor="plan-price">Precio</label>
-                <div className="price-input-wrapper">
-                  <span className="price-input-symbol">$</span>
-                  <input id="plan-price" type="number" min="0" step="1" placeholder="2000" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          ) : !vouchers || vouchers.length === 0 ? (
+            <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+              <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>No hay vouchers vendidos todavia.</p>
+              <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>Cuando se venda un plan de internet, los vouchers apareceran aca.</p>
+            </div>
+          ) : (
+            <div className="product-list-v2">
+              {vouchers.map((v) => (
+                <div key={v.id} className={`product-list-row ${!v.active ? 'is-inactive' : ''}`}>
+                  <div className="product-list-thumb">
+                    <span className="product-list-thumb-icon">📶</span>
+                  </div>
+                  <div className="product-list-details">
+                    <span className="product-list-row-name">{v.planName}</span>
+                    <span className="product-list-row-cat">Venta #{v.saleOrderNumber} · {formatDateTime(v.saleCreatedAt)}</span>
+                  </div>
+                  <span className="product-list-row-stock" style={{ fontSize: '0.8rem', color: 'var(--color-text-faint)', minWidth: '60px' }}>
+                    {v.active ? 'Activo' : 'Usado'}
+                  </span>
+                  {v.salePaidAt && (
+                    <span className="product-list-row-stock" style={{ fontSize: '0.8rem', color: 'var(--color-text-faint)', minWidth: '60px' }}>
+                      Pagado: {formatDateTime(v.salePaidAt)}
+                    </span>
+                  )}
                 </div>
-              </div>
-
-              <div className="settings-field" style={{ marginBottom: 0 }}>
-                <label htmlFor="plan-idle">Timeout de inactividad (segundos)</label>
-                <input id="plan-idle" type="number" min="0" step="1" value={form.idleTimeout} onChange={(e) => setForm({ ...form, idleTimeout: Number(e.target.value) || 0 })} />
-              </div>
+              ))}
             </div>
-            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
-              <button type="button" className="btn-primary" disabled={saving} onClick={handleSave}>{editingPlan ? 'Guardar cambios' : 'Crear plan'}</button>
-            </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
-      {!plans || plans.length === 0 ? (
-        <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>
-            No hay planes de internet configurados.
-          </p>
-          <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
-            Crea uno para que aparezca como producto en la categoria Internet del POS.
-          </p>
-        </div>
-      ) : (
-        <div className="product-grid-v2">
-          {plans.map((plan) => (
-            <div key={plan.id} className={`product-card-v2 ${!plan.active ? 'is-inactive' : ''}`}>
-              <div className="product-card-v2-media product-card-v2-media--category" style={{ background: 'var(--color-surface-raised)' }}>
-                <span className="product-card-v2-icon">📶</span>
-              </div>
-              <div className="product-card-v2-info">
-                <span className="product-card-v2-name">{plan.name}</span>
-              </div>
-              <div className="product-card-v2-meta">
-                <span className="product-card-v2-price">{getPriceDisplay(plan.price)}</span>
-                <span className="product-card-v2-badge">{formatDuration(plan.duration)} &middot; {plan.downloadBandwidth} / {plan.uploadBandwidth}</span>
-              </div>
-              <div className="product-card-v2-actions">
-                <button type="button" className="btn-ghost" onClick={() => openEdit(plan)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${plan.name}`}>✎</button>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  disabled={deletingId === plan.id}
-                  onClick={() => handleDelete(plan)}
-                  style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }}
-                  aria-label={`Eliminar ${plan.name}`}
-                >
-                  {deletingId === plan.id ? '...' : '✕'}
-                </button>
+      {/* TAB: Planes */}
+      {activeTab === 'planes' && (
+        <>
+          <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo plan" title="Nuevo plan">+</button>
+
+          {showModal && (
+            <div className="modal-backdrop" onClick={closeModal} role="presentation">
+              <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>{editingPlan ? 'Editar plan' : 'Nuevo plan'}</h3>
+                  <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
+                </div>
+                <div className="modal-body">
+                  <div className="settings-field">
+                    <label htmlFor="plan-name">Nombre</label>
+                    <input id="plan-name" type="text" placeholder="Internet 24 horas" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </div>
+                  <div className="settings-field">
+                    <label htmlFor="plan-duration">Duracion</label>
+                    <select id="plan-duration" value={form.customDuration ? -1 : form.duration} onChange={(e) => { const v = Number(e.target.value); if (v === -1) setForm({ ...form, customDuration: true, duration: 0 }); else setForm({ ...form, customDuration: false, duration: v }); }}>
+                      {DURATION_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                      <option value={-1}>Personalizado...</option>
+                    </select>
+                    {form.customDuration && <input type="number" min="1" placeholder="Duracion en segundos" value={form.duration || ''} onChange={(e) => setForm({ ...form, duration: Number(e.target.value) || 0 })} style={{ marginTop: '0.5rem' }} />}
+                  </div>
+                  <div className="settings-field">
+                    <label htmlFor="plan-down">Velocidad de descarga</label>
+                    <select id="plan-down" value={form.downloadBandwidth} onChange={(e) => setForm({ ...form, downloadBandwidth: e.target.value })}>
+                      {BW_OPTIONS.map((bw) => (<option key={bw} value={bw}>{bw}</option>))}
+                    </select>
+                  </div>
+                  <div className="settings-field">
+                    <label htmlFor="plan-up">Velocidad de subida</label>
+                    <select id="plan-up" value={form.uploadBandwidth} onChange={(e) => setForm({ ...form, uploadBandwidth: e.target.value })}>
+                      {BW_OPTIONS.map((bw) => (<option key={bw} value={bw}>{bw}</option>))}
+                    </select>
+                  </div>
+                  <div className="settings-field">
+                    <label htmlFor="plan-price">Precio</label>
+                    <div className="price-input-wrapper">
+                      <span className="price-input-symbol">$</span>
+                      <input id="plan-price" type="number" min="0" step="1" placeholder="2000" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="settings-field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="plan-idle">Timeout de inactividad (segundos)</label>
+                    <input id="plan-idle" type="number" min="0" step="1" value={form.idleTimeout} onChange={(e) => setForm({ ...form, idleTimeout: Number(e.target.value) || 0 })} />
+                  </div>
+                </div>
+                <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
+                  <button type="button" className="btn-primary" disabled={saving} onClick={handleSave}>{editingPlan ? 'Guardar cambios' : 'Crear plan'}</button>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+
+          {plansLoading ? (
+            <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+              <p style={{ color: 'var(--color-text-faint)', margin: 0 }}>Cargando...</p>
+            </div>
+          ) : !plans || plans.length === 0 ? (
+            <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+              <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>No hay planes configurados.</p>
+              <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>Crea uno para que aparezca como producto en la categoria Internet del POS.</p>
+            </div>
+          ) : (
+            <div className="product-grid-v2">
+              {plans.map((plan) => (
+                <div key={plan.id} className={`product-card-v2 ${!plan.active ? 'is-inactive' : ''}`}>
+                  <div className="product-card-v2-media product-card-v2-media--category" style={{ background: 'var(--color-surface-raised)' }}>
+                    <span className="product-card-v2-icon">📶</span>
+                  </div>
+                  <div className="product-card-v2-info">
+                    <span className="product-card-v2-name">{plan.name}</span>
+                    <span className="product-card-v2-price">{getPriceDisplay(plan.price)}</span>
+                    <span className="product-card-v2-badge" style={{ marginTop: '0.25rem' }}>{formatDuration(plan.duration)} · {plan.downloadBandwidth}/{plan.uploadBandwidth}</span>
+                  </div>
+                  <div className="product-card-v2-actions">
+                    <button type="button" className="btn-ghost" onClick={() => openEdit(plan)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${plan.name}`}>✎</button>
+                    <button type="button" className="btn-ghost" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : '✕'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
