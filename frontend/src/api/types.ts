@@ -145,6 +145,7 @@ export interface Setting {
   enableSociosModule?: boolean | null;
   enableTreasuryModule?: boolean | null;
   enableAcreedoresModule?: boolean | null;
+  enableInternetModule?: boolean | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -533,4 +534,30 @@ export interface StatsSummary {
   byProduct: { name: string; quantity: number }[];
   byPaymentMethod: { method: string; total: number }[];
   byDay: { date: string; total: number }[];
+}
+
+export interface InternetPlan {
+  id: string;
+  name: string;
+  duration: number;
+  idleTimeout: number;
+  downloadBandwidth: string;
+  uploadBandwidth: string;
+  price: number;
+  active: boolean;
+  position: number;
+  productId?: string | null;
+  product?: Product | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleVoucher {
+  id: string;
+  saleId: string;
+  planId: string;
+  pin: string;
+  active: boolean;
+  plan?: InternetPlan;
+  createdAt: string;
 }

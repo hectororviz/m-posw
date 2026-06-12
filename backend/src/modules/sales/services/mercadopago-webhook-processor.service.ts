@@ -4,6 +4,7 @@ import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from './mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
 import { SalesService } from '../sales.service';
+import { InternetVouchersService } from '../../internet-vouchers/internet-vouchers.service';
 import {
   extractExternalReference,
   extractMerchantOrderId,
@@ -32,6 +33,7 @@ export class MercadoPagoWebhookProcessorService {
     private mpQueryService: MercadoPagoQueryService,
     private salesGateway: SalesGateway,
     private salesService: SalesService,
+    private internetVouchers: InternetVouchersService,
   ) {}
 
   async processWebhook(payload: WebhookPayload) {
@@ -229,6 +231,9 @@ export class MercadoPagoWebhookProcessorService {
     // Decrementar stock si la venta acaba de ser aprobada
     if (wasNotApproved && resolvedSaleStatus === SaleStatus.APPROVED) {
       await this.salesService.decrementStockForSale(sale.id);
+      this.internetVouchers.generateVouchersForSale(sale.id).catch(err =>
+        this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`),
+      );
     }
 
     this.salesGateway.notifyPaymentStatusChanged({

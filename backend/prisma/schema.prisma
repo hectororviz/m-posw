@@ -180,6 +180,7 @@ model Sale {
   fiadoVenta       FiadoVenta?
   journalEntryId   String?        @unique @db.Uuid
   journalEntry     JournalEntry?  @relation("JournalEntrySale", fields: [journalEntryId], references: [id])
+  vouchers         SaleVoucher[]
 }
 
 model SaleItem {
@@ -244,6 +245,7 @@ model Setting {
   enableSociosModule Boolean @default(true)
   enableTreasuryModule Boolean @default(true)
   enableAcreedoresModule Boolean @default(true)
+  enableInternetModule        Boolean @default(false)
   enableAutoJournalPos        Boolean @default(true)
   enableAutoJournalAcreedores Boolean @default(true)
   enableAutoJournalSocios     Boolean @default(true)
@@ -519,6 +521,38 @@ model MpCityMapping {
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@map("mp_city_mappings")
+}
+
+// ─── Internet Vouchers ───────────────────────────────────
+
+model InternetPlan {
+  id                String        @id @default(uuid()) @db.Uuid
+  name              String
+  duration          Int
+  idleTimeout       Int           @default(1800)
+  downloadBandwidth String        @default("10M")
+  uploadBandwidth   String        @default("2M")
+  price             Decimal       @db.Decimal(10, 2)
+  active            Boolean       @default(true)
+  position          Int           @default(0)
+  productId         String?       @unique @db.Uuid
+  product           Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+  categoryId        String?       @db.Uuid
+  vouchers          SaleVoucher[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model SaleVoucher {
+  id        String       @id @default(uuid()) @db.Uuid
+  saleId    String       @db.Uuid
+  sale      Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  planId    String       @db.Uuid
+  plan      InternetPlan @relation(fields: [planId], references: [id])
+  pin        String
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 }
 
 // ─── Socios ──────────────────────────────────────────────

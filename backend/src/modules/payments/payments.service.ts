@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
 import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { SalesService } from '../sales/sales.service';
+import { InternetVouchersService } from '../internet-vouchers/internet-vouchers.service';
 import type { PollTransferResponse } from './dto/transfer.dto';
 
 interface MPPayment {
@@ -36,6 +37,7 @@ export class PaymentsService {
     private mpConfig: MercadoPagoConfigService,
     private salesService: SalesService,
     private journalEntriesService: JournalEntriesService,
+    private internetVouchers: InternetVouchersService,
   ) {}
 
   async pollTransfer(montoEsperado: number, userId: string): Promise<PollTransferResponse> {
@@ -281,6 +283,8 @@ export class PaymentsService {
     this.logger.log(`Venta transferencia creada saleId=${result.id}, decrementando stock...`);
     await this.salesService.decrementStockForSale(result.id);
     this.logger.log(`Stock decrementado para venta transferencia saleId=${result.id}`);
+
+    this.internetVouchers.generateVouchersForSale(result.id).catch(err => this.logger.error(`Error generando vouchers para sale ${result.id}: ${err}`));
 
     return {
       success: true,

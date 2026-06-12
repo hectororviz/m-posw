@@ -298,6 +298,7 @@ Solapa "Módulos" en Configuración (entre Usuarios y Sistema) para habilitar/de
 | `enableSociosModule` | true | Oculta "Socios" del menú y el botón QR del POS |
 | `enableTreasuryModule` | true | Oculta "Tesorería" del menú |
 | `enableAcreedoresModule` | true | Oculta "Acreedores" del menú, el toggle Fiado en Ventas y el botón Fiado del checkout |
+| `enableInternetModule` | false | Activa el módulo de Vouchers WiFi. Agrega "Internet" al menú, la categoría en el POS, y genera vouchers al vender planes de internet |
 
 Los toggles se persisten en la tabla `Setting` y se aplican en tiempo real sin recargar.
 
@@ -307,6 +308,53 @@ Los toggles se persisten en la tabla `Setting` y se aplican en tiempo real sin r
 - **Toggle "Fiado"** en AdminSettingsPage → pestaña Ventas → Medios de pago (visible solo si `enableAcreedoresModule === true`).
 - Por defecto desactivado (`enableFiadoPayment: false`).
 - Sin acreedores activos, el select del POS muestra "No hay acreedores activos".
+
+## Internet Vouchers / Módulo WiFi
+
+Módulo para venta de vouchers de acceso a internet WiFi respaldados por RADIUS. Se integra con la API de `api-radius` (proyecto `~/internet-sale`).
+
+### Estructura
+```
+backend/src/modules/internet-vouchers/
+├── internet-vouchers.module.ts
+├── internet-plans.controller.ts       # CRUD de planes (ADMIN)
+├── internet-plans.service.ts          # Lógica: plan ↔ producto sync automático
+├── internet-vouchers.controller.ts    # Generación/consulta/anulación de vouchers
+├── internet-vouchers.service.ts       # Cliente HTTP → api-radius:3001
+└── dto/
+    ├── create-plan.dto.ts
+    ├── update-plan.dto.ts
+    └── generate-voucher.dto.ts
+```
+
+### Modelos
+- **InternetPlan**: define un plan (nombre, duración, ancho de banda, precio). Al crearse, genera automáticamente un `Product` asociado bajo la categoría "Internet".
+- **SaleVoucher**: registra cada voucher generado para una venta (PIN, plan, activo). Se crean al confirmar el pago.
+
+### Flujo
+1. Admin activa el módulo en Configuración → Módulos → "Vouchers WiFi"
+2. Admin crea planes en Internet → cada plan crea automáticamente un producto en la categoría "Internet" (stock=0, ilimitado)
+3. En el POS, la categoría "Internet" aparece con los productos de cada plan
+4. Al vender un plan de internet, el backend llama a `api-radius:3001/api/vouchers/generate` con los parámetros inline
+5. El voucher se genera solo al confirmar el pago (CASH/FIADO: inmediato, MP_QR: vía webhook, TRANSFER: al confirmar)
+6. Los PINs se guardan en `SaleVoucher` y se incluyen en el ticket
+7. Si se anula la venta, los vouchers se desactivan automáticamente
+
+### Configuración
+- `VOUCHER_API_URL`: URL base de api-radius (default: `http://api-radius:3001/api`)
+- `Setting.enableInternetModule`: toggle del módulo (default: false)
+
+### Frontend
+```
+frontend/src/pages/
+└── AdminInternetPage.tsx     # CRUD de planes con modal para duración, ancho de banda, precio
+```
+
+### Relación con internet-sale
+- api-radius es un stack Docker separado (`~/internet-sale`)
+- Ambos comparten la red `soler_default` para que el backend de m-posw pueda llamar a `api-radius:3001`
+- Los planes se definen en m-posw (fuente de verdad); api-radius acepta parámetros inline vía el endpoint `POST /vouchers/generate`
+- `plans.json` en internet-sale es legacy/fallback
 
 ## Theme / Dark Mode
 
@@ -361,6 +409,7 @@ m-posw/
 │   │       ├── categories/        # Categorías de productos
 │   │       ├── common/            # Prisma, MP config, guards, uploads
 │   │       ├── icons/             # Listado de iconos
+│   │       ├── internet-vouchers/  # Vouchers WiFi (integración api-radius)
 │   │       ├── mercadopago-oauth/ # OAuth 2.0 Mercado Pago
 │   │       ├── payments/          # Transferencias (polling MP)
 │   │       ├── products/          # Productos + recetas

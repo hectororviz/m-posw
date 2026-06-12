@@ -53,6 +53,7 @@ export const AdminSettingsPage: React.FC = () => {
     enableSociosModule: true,
     enableTreasuryModule: true,
     enableAcreedoresModule: true,
+    enableInternetModule: false,
     enableAutoJournalPos: true,
     enableAutoJournalAcreedores: true,
     enableAutoJournalSocios: true,
@@ -214,6 +215,7 @@ export const AdminSettingsPage: React.FC = () => {
         enableSociosModule: settings.enableSociosModule ?? true,
         enableTreasuryModule: settings.enableTreasuryModule ?? true,
         enableAcreedoresModule: settings.enableAcreedoresModule ?? true,
+        enableInternetModule: settings.enableInternetModule ?? false,
         enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
         enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
         enableAutoJournalSocios: settings.enableAutoJournalSocios ?? true,
@@ -1035,6 +1037,19 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Modulo de Acreedores</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu, la opcion Fiado del checkout y el toggle de Fiado en Ventas</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableInternetModule}
+                  onChange={(e) => setForm({ ...form, enableInternetModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Internet / Vouchers WiFi</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Agrega la categoria "Internet" en el POS y permite vender vouchers de acceso WiFi</small>
                 </span>
               </label>
             </div>

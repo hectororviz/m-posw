@@ -7,6 +7,7 @@ import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
+import { InternetVouchersService } from '../internet-vouchers/internet-vouchers.service';
 import {
   mapMpPaymentToPaymentStatus,
 } from './webhooks/mercadopago-webhook.utils';
@@ -22,6 +23,7 @@ export class SalesService {
     private mpService: MercadoPagoInstoreService,
     private mpQueryService: MercadoPagoQueryService,
     private journalEntriesService: JournalEntriesService,
+    private internetVouchers: InternetVouchersService,
   ) {}
 
   async createCashSale(userId: string, dto: CreateCashSaleDto) {
@@ -56,6 +58,7 @@ export class SalesService {
         this.logger.log(`Venta en efectivo creada saleId=${sale.id}, decrementando stock...`);
         await this.decrementStockForSale(sale.id);
         this.logger.log(`Stock decrementado para saleId=${sale.id}`);
+        this.internetVouchers.generateVouchersForSale(sale.id).catch(err => this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`));
         return sale;
       }
 
@@ -108,6 +111,8 @@ export class SalesService {
       this.logger.log(`Venta en efectivo creada saleId=${result.id}, decrementando stock...`);
       await this.decrementStockForSale(result.id);
       this.logger.log(`Stock decrementado para saleId=${result.id}`);
+
+      this.internetVouchers.generateVouchersForSale(result.id).catch(err => this.logger.error(`Error generando vouchers para sale ${result.id}: ${err}`));
 
       return result;
     } catch (error) {
@@ -266,6 +271,8 @@ export class SalesService {
         await this.decrementStockForSale(sale.id);
         this.logger.log(`Stock decrementado para saleId=${sale.id}`);
 
+        this.internetVouchers.generateVouchersForSale(sale.id).catch(err => this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`));
+
         return sale;
       }
 
@@ -326,6 +333,8 @@ export class SalesService {
       this.logger.log(`Venta fiado creada saleId=${result.id}, acreedorId=${dto.acreedorId}, decrementando stock...`);
       await this.decrementStockForSale(result.id);
       this.logger.log(`Stock decrementado para saleId=${result.id}`);
+
+      this.internetVouchers.generateVouchersForSale(result.id).catch(err => this.logger.error(`Error generando vouchers para sale ${result.id}: ${err}`));
 
       return result;
     } catch (error) {
@@ -531,6 +540,8 @@ export class SalesService {
     this.logger.log(`Venta ${saleId} completada, decrementando stock...`);
     await this.decrementStockForSale(saleId);
     this.logger.log(`Stock decrementado para venta ${saleId}`);
+
+    this.internetVouchers.generateVouchersForSale(saleId).catch(err => this.logger.error(`Error generando vouchers para sale ${saleId}: ${err}`));
 
     return updatedSale;
   }

@@ -26,6 +26,7 @@ const navItems = [
   { to: '/admin/stock',      emoji: '📐', label: 'Stock' },
   { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores',    moduleKey: 'enableAcreedoresModule' as const },
   { to: '/admin/socios',     emoji: '🪪', label: 'Socios',        moduleKey: 'enableSociosModule' as const },
+  { to: '/admin/internet',   emoji: '📶', label: 'Internet',      moduleKey: 'enableInternetModule' as const },
   { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion' },
 ];
 
@@ -117,7 +118,7 @@ export const AdminLayout: React.FC = () => {
           {navItems
             .filter((item) => {
               if (!item.moduleKey) return true;
-              const key = item.moduleKey as 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule';
+              const key = item.moduleKey as 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule';
               return settings?.[key] ?? true;
             })
             .map(({ to, emoji, label }) => (

@@ -42,6 +42,7 @@ type TicketPayload = {
   thanks?: string;
   footer?: string;
   title?: string;
+  vouchers?: { pin: string; plan_name: string; valid_hours: number }[];
 };
 
 declare global {
@@ -249,6 +250,20 @@ export const PrintTicketPage: React.FC = () => {
         </>
       )}
       {ticket.thanks && <p className="ticket-thanks">{ticket.thanks}</p>}
+      {ticket.vouchers && ticket.vouchers.length > 0 && (
+        <>
+          <div className="ticket-divider" />
+          <div className="ticket-voucher-section">
+            {ticket.vouchers.map((v, i) => (
+              <div key={i} className="ticket-voucher">
+                <span className="ticket-voucher-title">INTERNET WIFI</span>
+                <span className="ticket-voucher-pin">{v.pin}</span>
+                <span className="ticket-voucher-plan">{v.plan_name} &middot; {v.valid_hours}h</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
       {ticket.footer && <p className="ticket-footer">{ticket.footer}</p>}
       <button type="button" className="primary-button no-print" onClick={() => window.print()}>
         Imprimir

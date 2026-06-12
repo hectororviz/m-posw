@@ -17,6 +17,7 @@ import { SalesModule } from './sales/sales.module';
 import { SettingsModule } from './settings/settings.module';
 import { StatsModule } from './stats/stats.module';
 import { StockModule } from './stock/stock.module';
+import { InternetVouchersModule } from './internet-vouchers/internet-vouchers.module';
 import { SociosModule } from './socios/socios.module';
 import { TreasuryModule } from './treasury/treasury.module';
 import { UsersModule } from './users/users.module';
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module';
     CategoriesModule,
     CashMovementsModule,
     IconsModule,
+    InternetVouchersModule,
     MercadoPagoOauthModule,
     PaymentsModule,
     ProductsModule,

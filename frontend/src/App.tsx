@@ -11,6 +11,7 @@ import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminStockPage } from './pages/AdminStockPage';
 import { AdminAcreedoresPage } from './pages/AdminAcreedoresPage';
 import { AdminAcreedorDetailPage } from './pages/AdminAcreedorDetailPage';
+import { AdminInternetPage } from './pages/AdminInternetPage';
 import { AdminSociosLayout } from './pages/AdminSociosLayout';
 import { AdminSociosTiposPage } from './pages/AdminSociosTiposPage';
 import { AdminSociosPage } from './pages/AdminSociosPage';
@@ -110,6 +111,7 @@ export const App: React.FC = () => {
         <Route path="stock" element={<AdminStockPage />} />
         <Route path="acreedores" element={<AdminAcreedoresPage />} />
         <Route path="acreedores/:id" element={<AdminAcreedorDetailPage />} />
+        <Route path="internet" element={<AdminInternetPage />} />
         <Route path="socios" element={<AdminSociosLayout />}>
           <Route index element={<AdminSociosPage />} />
           <Route path="matriz" element={<AdminSociosMatrizPage />} />

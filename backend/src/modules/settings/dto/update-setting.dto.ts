@@ -64,6 +64,10 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsBoolean()
+  enableInternetModule?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   enableAutoJournalPos?: boolean;
 
   @IsOptional()

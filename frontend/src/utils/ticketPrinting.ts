@@ -26,6 +26,7 @@ export type TicketPayload = {
   thanks?: string;
   footer?: string;
   title?: string;
+  vouchers?: { pin: string; plan_name: string; valid_hours: number }[];
 };
 
 type PrintTicketInput = {
