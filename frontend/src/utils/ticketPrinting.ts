@@ -36,6 +36,7 @@ type PrintTicketInput = {
   total: number;
   items: TicketItemPayload[];
   saleId?: string;
+  vouchers?: { pin: string; plan_name: string; valid_hours: number }[];
   onPopupBlocked?: () => void;
   onAlreadyPrinted?: () => void;
   onError?: (message: string) => void;
@@ -68,6 +69,7 @@ export const maybePrintTicket = async ({
   total,
   items,
   saleId,
+  vouchers,
   onAlreadyPrinted,
   onError,
 }: PrintTicketInput) => {
@@ -113,6 +115,7 @@ export const maybePrintTicket = async ({
     total: Number(total),
     thanks: 'Gracias por tu compra',
     footer: 'Ticket no fiscal',
+    vouchers: vouchers && vouchers.length > 0 ? vouchers : undefined,
   });
 
   const ticketParam = encodeURIComponent(encodeBase64(JSON.stringify(payload)));

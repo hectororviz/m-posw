@@ -58,7 +58,16 @@ export class SalesService {
         this.logger.log(`Venta en efectivo creada saleId=${sale.id}, decrementando stock...`);
         await this.decrementStockForSale(sale.id);
         this.logger.log(`Stock decrementado para saleId=${sale.id}`);
-        this.internetVouchers.generateVouchersForSale(sale.id).catch(err => this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`));
+        const vouchers = await this.internetVouchers.generateVouchersForSale(sale.id);
+        if (vouchers.length > 0) {
+          return this.prisma.sale.findUnique({
+            where: { id: sale.id },
+            include: {
+              items: { include: { product: { include: { category: true } } } },
+              vouchers: { include: { plan: true } },
+            },
+          });
+        }
         return sale;
       }
 
@@ -112,7 +121,16 @@ export class SalesService {
       await this.decrementStockForSale(result.id);
       this.logger.log(`Stock decrementado para saleId=${result.id}`);
 
-      this.internetVouchers.generateVouchersForSale(result.id).catch(err => this.logger.error(`Error generando vouchers para sale ${result.id}: ${err}`));
+      const vouchers = await this.internetVouchers.generateVouchersForSale(result.id);
+      if (vouchers.length > 0) {
+        return this.prisma.sale.findUnique({
+          where: { id: result.id },
+          include: {
+            items: { include: { product: { include: { category: true } } } },
+            vouchers: { include: { plan: true } },
+          },
+        });
+      }
 
       return result;
     } catch (error) {
@@ -271,7 +289,16 @@ export class SalesService {
         await this.decrementStockForSale(sale.id);
         this.logger.log(`Stock decrementado para saleId=${sale.id}`);
 
-        this.internetVouchers.generateVouchersForSale(sale.id).catch(err => this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`));
+        const vouchers = await this.internetVouchers.generateVouchersForSale(sale.id);
+        if (vouchers.length > 0) {
+          return this.prisma.sale.findUnique({
+            where: { id: sale.id },
+            include: {
+              items: { include: { product: { include: { category: true } } } },
+              vouchers: { include: { plan: true } },
+            },
+          });
+        }
 
         return sale;
       }
@@ -334,7 +361,16 @@ export class SalesService {
       await this.decrementStockForSale(result.id);
       this.logger.log(`Stock decrementado para saleId=${result.id}`);
 
-      this.internetVouchers.generateVouchersForSale(result.id).catch(err => this.logger.error(`Error generando vouchers para sale ${result.id}: ${err}`));
+      const vouchers = await this.internetVouchers.generateVouchersForSale(result.id);
+      if (vouchers.length > 0) {
+        return this.prisma.sale.findUnique({
+          where: { id: result.id },
+          include: {
+            items: { include: { product: { include: { category: true } } } },
+            vouchers: { include: { plan: true } },
+          },
+        });
+      }
 
       return result;
     } catch (error) {
@@ -350,6 +386,7 @@ export class SalesService {
       include: {
         user: { select: { id: true, name: true } },
         items: { include: { product: { include: { category: true } } } },
+        vouchers: { include: { plan: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -404,6 +441,7 @@ export class SalesService {
       include: {
         user: { select: { id: true, name: true } },
         items: { include: { product: { include: { category: true } } } },
+        vouchers: { include: { plan: true } },
       },
     });
     if (!sale) {

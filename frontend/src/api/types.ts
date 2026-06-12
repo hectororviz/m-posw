@@ -117,6 +117,7 @@ export interface Sale {
   ticketPrintedAt?: string | null;
   items: SaleItem[];
   user?: SaleUser;
+  vouchers?: SaleVoucher[];
 }
 
 
@@ -558,6 +559,6 @@ export interface SaleVoucher {
   planId: string;
   pin: string;
   active: boolean;
-  plan?: InternetPlan;
+  plan?: InternetPlan | null;
   createdAt: string;
 }

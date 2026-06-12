@@ -284,7 +284,10 @@ export class PaymentsService {
     await this.salesService.decrementStockForSale(result.id);
     this.logger.log(`Stock decrementado para venta transferencia saleId=${result.id}`);
 
-    this.internetVouchers.generateVouchersForSale(result.id).catch(err => this.logger.error(`Error generando vouchers para sale ${result.id}: ${err}`));
+    const vouchers = await this.internetVouchers.generateVouchersForSale(result.id);
+    if (vouchers.length > 0) {
+      this.logger.log(`${vouchers.length} voucher(s) generado(s) para venta transferencia saleId=${result.id}`);
+    }
 
     return {
       success: true,

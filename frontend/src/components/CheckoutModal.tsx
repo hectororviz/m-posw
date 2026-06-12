@@ -381,6 +381,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
               orderNumber: item.orderNumber,
               categoryTicket: item.product.category?.ticket,
             })),
+            vouchers: sale.vouchers?.map((v) => ({ pin: v.pin, plan_name: v.plan?.name || 'Internet', valid_hours: v.plan ? Math.round(v.plan.duration / 3600) : 24 })),
             onPopupBlocked: () =>
               pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
             onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
@@ -579,6 +580,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             orderNumber: item.orderNumber,
             categoryTicket: item.product.category?.ticket,
           })),
+          vouchers: sale.vouchers?.map((v) => ({ pin: v.pin, plan_name: v.plan?.name || 'Internet', valid_hours: v.plan ? Math.round(v.plan.duration / 3600) : 24 })),
           onPopupBlocked: () =>
             pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
           onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
@@ -642,6 +644,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         dateTimeISO: sale.paidAt ?? sale.createdAt,
         total: sale.total,
         items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber, categoryTicket: item.product.category?.ticket })),
+        vouchers: sale.vouchers?.map((v) => ({ pin: v.pin, plan_name: v.plan?.name || 'Internet', valid_hours: v.plan ? Math.round(v.plan.duration / 3600) : 24 })),
         onPopupBlocked: () =>
           pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
         onError: (message) => pushToast(message, 'error'),
@@ -713,6 +716,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         dateTimeISO: sale.paidAt ?? sale.createdAt,
         total: sale.total,
         items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber, categoryTicket: item.product.category?.ticket })),
+        vouchers: sale.vouchers?.map((v) => ({ pin: v.pin, plan_name: v.plan?.name || 'Internet', valid_hours: v.plan ? Math.round(v.plan.duration / 3600) : 24 })),
         onPopupBlocked: () =>
           pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
         onError: (message) => pushToast(message, 'error'),
