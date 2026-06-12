@@ -34,7 +34,6 @@ export class InternetVouchersService {
 
     this.logger.log(`Generando voucher para plan ${plan.name} (sale ${saleId})`);
 
-    const url = new URL(`${this.apiUrl}/vouchers/generate`);
     const body = JSON.stringify({
       plan_name: plan.name,
       duration: plan.duration,
@@ -44,7 +43,7 @@ export class InternetVouchersService {
       sale_id: saleId,
     });
 
-    const data = await this.httpPost(url, body);
+    const data = await this.httpPost(`${this.apiUrl}/vouchers/generate`, body);
 
     const voucher = await this.prisma.saleVoucher.create({
       data: {
@@ -113,7 +112,6 @@ export class InternetVouchersService {
 
       for (let i = 0; i < item.quantity; i++) {
         try {
-          const url = new URL(`${this.apiUrl}/vouchers/generate`);
           const body = JSON.stringify({
             plan_name: plan.name,
             duration: plan.duration,
@@ -122,7 +120,7 @@ export class InternetVouchersService {
             idle_timeout: plan.idleTimeout,
             sale_id: saleId,
           });
-          const data = await this.httpPost(url, body);
+          const data = await this.httpPost(`${this.apiUrl}/vouchers/generate`, body);
 
           const voucher = await tx.saleVoucher.create({
             data: {
@@ -159,9 +157,8 @@ export class InternetVouchersService {
 
   async deactivateBySale(saleId: string) {
     try {
-      const url = new URL(`${this.apiUrl}/vouchers/deactivate-by-sale`);
       const body = JSON.stringify({ sale_id: saleId });
-      const data = await this.httpPost(url, body);
+      const data = await this.httpPost(`${this.apiUrl}/vouchers/deactivate-by-sale`, body);
 
       await this.prisma.saleVoucher.updateMany({
         where: { saleId, active: true },
@@ -185,13 +182,16 @@ export class InternetVouchersService {
     }
   }
 
-  private httpPost(url: URL, body: string): Promise<GenerateResponse> {
+  private httpPost(fullUrl: string, body: string): Promise<GenerateResponse> {
+    const parsed = new URL(fullUrl);
     return new Promise((resolve, reject) => {
       const req = http.request(
         {
-          hostname: url.hostname,
-          port: url.port || 80,
-          path: url.pathname,
+          protocol: parsed.protocol,
+          host: parsed.host,
+          hostname: parsed.hostname,
+          port: parsed.port || 80,
+          path: parsed.pathname,
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
