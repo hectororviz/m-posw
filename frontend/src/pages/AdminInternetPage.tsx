@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useInternetPlans } from '../api/queries';
 import type { InternetPlan } from '../api/types';
-import { useToast } from '../components/ToastProvider';
 
 const DURATION_OPTIONS = [
   { label: '1 hora', value: 3600 },
@@ -21,71 +20,100 @@ const BW_OPTIONS = ['1M', '2M', '3M', '5M', '10M', '20M', '50M', '100M'];
 
 const defaultDuration = DURATION_OPTIONS[4].value;
 
-const emptyForm = {
+interface PlanForm {
+  name: string;
+  duration: number;
+  price: string;
+  downloadBandwidth: string;
+  uploadBandwidth: string;
+  idleTimeout: number;
+  customDuration: boolean;
+}
+
+const EMPTY_FORM: PlanForm = {
   name: '',
   duration: defaultDuration,
-  price: 0,
+  price: '',
   downloadBandwidth: '10M',
   uploadBandwidth: '2M',
   idleTimeout: 1800,
+  customDuration: false,
 };
 
-type FormState = typeof emptyForm;
+const isPreset = (seconds: number) => DURATION_OPTIONS.some((o) => o.value === seconds);
+
+const formatDuration = (seconds: number) => {
+  if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400} d`;
+  if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600} h`;
+  if (seconds >= 60) return `${Math.round(seconds / 60)} min`;
+  return `${seconds}s`;
+};
 
 export const AdminInternetPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: plans, isLoading } = useInternetPlans();
-  const { pushToast } = useToast();
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingPlan, setEditingPlan] = useState<InternetPlan | null>(null);
+  const [form, setForm] = useState<PlanForm>(EMPTY_FORM);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const openCreate = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setError(null);
-    setModalOpen(true);
+    setEditingPlan(null);
+    setForm(EMPTY_FORM);
+    setShowModal(true);
   };
 
   const openEdit = (plan: InternetPlan) => {
-    setEditingId(plan.id);
+    setEditingPlan(plan);
     setForm({
       name: plan.name,
       duration: plan.duration,
-      price: Number(plan.price),
+      price: String(plan.price),
       downloadBandwidth: plan.downloadBandwidth,
       uploadBandwidth: plan.uploadBandwidth,
       idleTimeout: plan.idleTimeout,
+      customDuration: !isPreset(plan.duration),
     });
-    setError(null);
-    setModalOpen(true);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingPlan(null);
   };
 
   const handleSave = async () => {
+    setError(null);
     if (!form.name.trim()) {
       setError('El nombre es obligatorio');
       return;
     }
-    if (form.price <= 0) {
+    const priceNum = Number(form.price);
+    if (!priceNum || priceNum <= 0) {
       setError('El precio debe ser mayor a 0');
       return;
     }
     setSaving(true);
-    setError(null);
     try {
-      if (editingId) {
-        await apiClient.patch(`/internet/plans/${editingId}`, form);
-        pushToast('Plan actualizado', 'success');
+      const payload = {
+        name: form.name.trim(),
+        duration: form.duration,
+        price: priceNum,
+        downloadBandwidth: form.downloadBandwidth,
+        uploadBandwidth: form.uploadBandwidth,
+        idleTimeout: form.idleTimeout,
+      };
+      if (editingPlan) {
+        await apiClient.patch(`/internet/plans/${editingPlan.id}`, payload);
       } else {
-        await apiClient.post('/internet/plans', form);
-        pushToast('Plan creado', 'success');
+        await apiClient.post('/internet/plans', payload);
       }
+      closeModal();
       await queryClient.invalidateQueries({ queryKey: ['internet-plans'] });
-      setModalOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
     } catch (err) {
       setError(normalizeApiError(err));
     } finally {
@@ -94,190 +122,175 @@ export const AdminInternetPage: React.FC = () => {
   };
 
   const handleDelete = async (plan: InternetPlan) => {
-    if (!confirm(`¿Eliminar el plan "${plan.name}"? Esto tambien eliminara el producto asociado.`)) return;
-    setDeleting(plan.id);
+    setError(null);
+    setDeletingId(plan.id);
     try {
       await apiClient.delete(`/internet/plans/${plan.id}`);
       await queryClient.invalidateQueries({ queryKey: ['internet-plans'] });
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
-      pushToast('Plan eliminado', 'success');
     } catch (err) {
-      pushToast(normalizeApiError(err), 'error');
+      setError(normalizeApiError(err));
     } finally {
-      setDeleting(null);
+      setDeletingId(null);
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400} d`;
-    if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600} h`;
-    if (seconds >= 60) return `${Math.round(seconds / 60)} min`;
-    return `${seconds}s`;
+  const getPriceDisplay = (price: number | string) => {
+    const num = typeof price === 'string' ? Number(price) : price;
+    return `$${num.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
-  const nonCustom = DURATION_OPTIONS.map((o) => o.value);
-
-  if (isLoading) return <div className="loading-indicator">Cargando...</div>;
+  if (isLoading) {
+    return (
+      <div>
+        <div className="page-header">
+          <h2 className="page-header-title">Planes de Internet</h2>
+          <p className="page-header-subtitle">Gestiona los vouchers WiFi que se venden en el POS.</p>
+        </div>
+        <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Planes de Internet</h2>
-          <button type="button" className="btn-primary" onClick={openCreate}>
-            + Agregar plan
-          </button>
+    <div>
+      <div className="page-header">
+        <div>
+          <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Planes de Internet</h2>
+          <p className="page-header-subtitle">Gestiona los vouchers WiFi que se venden en el POS. Cada plan crea automaticamente un producto en la categoria Internet.</p>
         </div>
+      </div>
 
-        {(!plans || plans.length === 0) && (
-          <p className="empty-state">
-            No hay planes configurados. Crea uno para que aparezca como producto en el POS.
-          </p>
-        )}
+      {error && <p className="error-text">{error}</p>}
 
-        {plans && plans.length > 0 && (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Duracion</th>
-                <th>Descarga</th>
-                <th>Subida</th>
-                <th>Precio</th>
-                <th>Activo</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {plans.map((plan) => (
-                <tr key={plan.id}>
-                  <td>{plan.name}</td>
-                  <td>{formatDuration(plan.duration)}</td>
-                  <td>{plan.downloadBandwidth}</td>
-                  <td>{plan.uploadBandwidth}</td>
-                  <td>${Number(plan.price).toFixed(0)}</td>
-                  <td>{plan.active ? 'Si' : 'No'}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button type="button" className="btn-small" onClick={() => openEdit(plan)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-small btn-danger"
-                        disabled={deleting === plan.id}
-                        onClick={() => handleDelete(plan)}
-                      >
-                        {deleting === plan.id ? '...' : 'Eliminar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo plan" title="Nuevo plan">+</button>
 
-        {modalOpen && (
-          <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-              <h3>{editingId ? 'Editar plan' : 'Nuevo plan'}</h3>
-
-              {error && <p className="form-error">{error}</p>}
-
-              <div className="form-group">
-                <label>Nombre</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="Internet 24 horas"
-                />
+      {showModal && (
+        <div className="modal-backdrop" onClick={closeModal} role="presentation">
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{editingPlan ? 'Editar plan' : 'Nuevo plan'}</h3>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-field">
+                <label htmlFor="plan-name">Nombre</label>
+                <input id="plan-name" type="text" placeholder="Internet 24 horas" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
 
-              <div className="form-group">
-                <label>Duracion</label>
+              <div className="settings-field">
+                <label htmlFor="plan-duration">Duracion</label>
                 <select
-                  value={form.duration}
-                  onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })}
+                  id="plan-duration"
+                  value={form.customDuration ? -1 : form.duration}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val === -1) {
+                      setForm({ ...form, customDuration: true, duration: 0 });
+                    } else {
+                      setForm({ ...form, customDuration: false, duration: val });
+                    }
+                  }}
                 >
                   {DURATION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
-                  <option value="-1" disabled>
-                    ──────
-                  </option>
-                  {!nonCustom.includes(form.duration) && (
-                    <option value={form.duration}>{formatDuration(form.duration)} (personalizado)</option>
-                  )}
+                  <option value={-1}>Personalizado...</option>
                 </select>
-                <div style={{ marginTop: '0.5rem' }}>
+                {form.customDuration && (
                   <input
                     type="number"
                     min="1"
-                    placeholder="Duracion personalizada en segundos"
-                    value={nonCustom.includes(form.duration) ? '' : form.duration}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (v > 0) setForm({ ...form, duration: v });
-                    }}
-                    style={{ width: '100%' }}
+                    placeholder="Duracion en segundos"
+                    value={form.duration || ''}
+                    onChange={(e) => setForm({ ...form, duration: Number(e.target.value) || 0 })}
+                    style={{ marginTop: '0.5rem' }}
                   />
-                  <small style={{ color: 'var(--color-text-faint)' }}>
-                    Para duraciones no listadas, ingresa los segundos manualmente (ej: 10800 = 3 horas)
-                  </small>
+                )}
+              </div>
+
+              <div className="settings-field">
+                <label htmlFor="plan-down">Velocidad de descarga</label>
+                <select id="plan-down" value={form.downloadBandwidth} onChange={(e) => setForm({ ...form, downloadBandwidth: e.target.value })}>
+                  {BW_OPTIONS.map((bw) => (
+                    <option key={bw} value={bw}>{bw}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="settings-field">
+                <label htmlFor="plan-up">Velocidad de subida</label>
+                <select id="plan-up" value={form.uploadBandwidth} onChange={(e) => setForm({ ...form, uploadBandwidth: e.target.value })}>
+                  {BW_OPTIONS.map((bw) => (
+                    <option key={bw} value={bw}>{bw}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="settings-field">
+                <label htmlFor="plan-price">Precio</label>
+                <div className="price-input-wrapper">
+                  <span className="price-input-symbol">$</span>
+                  <input id="plan-price" type="number" min="0" step="1" placeholder="2000" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>Descarga</label>
-                  <select
-                    value={form.downloadBandwidth}
-                    onChange={(e) => setForm({ ...form, downloadBandwidth: e.target.value })}
-                  >
-                    {BW_OPTIONS.map((bw) => (
-                      <option key={bw} value={bw}>{bw}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group" style={{ flex: 1 }}>
-                  <label>Subida</label>
-                  <select
-                    value={form.uploadBandwidth}
-                    onChange={(e) => setForm({ ...form, uploadBandwidth: e.target.value })}
-                  >
-                    {BW_OPTIONS.map((bw) => (
-                      <option key={bw} value={bw}>{bw}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="settings-field" style={{ marginBottom: 0 }}>
+                <label htmlFor="plan-idle">Timeout de inactividad (segundos)</label>
+                <input id="plan-idle" type="number" min="0" step="1" value={form.idleTimeout} onChange={(e) => setForm({ ...form, idleTimeout: Number(e.target.value) || 0 })} />
               </div>
+            </div>
+            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn-ghost" onClick={closeModal}>Cancelar</button>
+              <button type="button" className="btn-primary" disabled={saving} onClick={handleSave}>{editingPlan ? 'Guardar cambios' : 'Crear plan'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="form-group">
-                <label>Precio (ARS)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-                />
+      {!plans || plans.length === 0 ? (
+        <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>
+            No hay planes de internet configurados.
+          </p>
+          <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
+            Crea uno para que aparezca como producto en la categoria Internet del POS.
+          </p>
+        </div>
+      ) : (
+        <div className="product-grid-v2">
+          {plans.map((plan) => (
+            <div key={plan.id} className={`product-card-v2 ${!plan.active ? 'is-inactive' : ''}`}>
+              <div className="product-card-v2-media product-card-v2-media--category" style={{ background: 'var(--color-surface-raised)' }}>
+                <span className="product-card-v2-icon">📶</span>
               </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="button" className="btn-primary" disabled={saving} onClick={handleSave}>
-                  {saving ? 'Guardando...' : 'Guardar'}
+              <div className="product-card-v2-info">
+                <span className="product-card-v2-name">{plan.name}</span>
+              </div>
+              <div className="product-card-v2-meta">
+                <span className="product-card-v2-price">{getPriceDisplay(plan.price)}</span>
+                <span className="product-card-v2-badge">{formatDuration(plan.duration)} &middot; {plan.downloadBandwidth} / {plan.uploadBandwidth}</span>
+              </div>
+              <div className="product-card-v2-actions">
+                <button type="button" className="btn-ghost" onClick={() => openEdit(plan)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${plan.name}`}>✎</button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={deletingId === plan.id}
+                  onClick={() => handleDelete(plan)}
+                  style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }}
+                  aria-label={`Eliminar ${plan.name}`}
+                >
+                  {deletingId === plan.id ? '...' : '✕'}
                 </button>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
