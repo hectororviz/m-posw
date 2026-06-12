@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useInternetPlans, useInternetVouchers, useInternetStats } from '../api/queries';
 import type { InternetPlan } from '../api/types';
+import { useToast } from '../components/ToastProvider';
 
 type TabId = 'vouchers' | 'planes';
 
@@ -72,6 +73,8 @@ export const AdminInternetPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const { pushToast } = useToast();
 
   const openCreate = () => {
     setEditingPlan(null);
@@ -96,6 +99,21 @@ export const AdminInternetPage: React.FC = () => {
   const closeModal = () => {
     setShowModal(false);
     setEditingPlan(null);
+  };
+
+  const handleDeactivate = async (voucherId: string) => {
+    if (!confirm('¿Anular este voucher? El PIN dejara de funcionar.')) return;
+    setDeactivatingId(voucherId);
+    try {
+      await apiClient.delete(`/internet/vouchers/id/${voucherId}`);
+      await queryClient.invalidateQueries({ queryKey: ['internet-vouchers'] });
+      await queryClient.invalidateQueries({ queryKey: ['internet-stats'] });
+      pushToast('Voucher anulado', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setDeactivatingId(null);
+    }
   };
 
   const handleSave = async () => {
@@ -197,6 +215,7 @@ export const AdminInternetPage: React.FC = () => {
                   <span className="col-type">Venta</span>
                   <span className="col-user">Plan</span>
                   <span className="col-method">Estado</span>
+                  <span className="col-action"></span>
                 </div>
                 {vouchers.map((v) => (
                   <div key={v.id} className="sales-table-row">
@@ -208,6 +227,19 @@ export const AdminInternetPage: React.FC = () => {
                         <span className="badge badge-success">Activo</span>
                       ) : (
                         <span className="badge badge-neutral">Usado</span>
+                      )}
+                    </span>
+                    <span className="col-action">
+                      {v.active && (
+                        <button
+                          type="button"
+                          className="btn-ghost btn-sm"
+                          style={{ color: 'var(--color-danger-text)' }}
+                          disabled={deactivatingId === v.id}
+                          onClick={() => handleDeactivate(v.id)}
+                        >
+                          {deactivatingId === v.id ? '...' : 'Anular'}
+                        </button>
                       )}
                     </span>
                   </div>

@@ -69,6 +69,13 @@ export class InternetVouchersController {
     return this.vouchersService.getVoucher(pin);
   }
 
+  @Delete('id/:id')
+  async deactivateById(@Param('id') id: string) {
+    const voucher = await this.prisma.saleVoucher.findUnique({ where: { id } });
+    if (!voucher) return { error: 'Voucher no encontrado' };
+    return this.vouchersService.deactivateVoucher(voucher.pin);
+  }
+
   @Delete(':pin')
   deactivate(@Param('pin') pin: string) {
     return this.vouchersService.deactivateVoucher(pin);
