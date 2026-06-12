@@ -101,7 +101,7 @@ export const AdminInternetPage: React.FC = () => {
     setError(null);
     if (!form.name.trim()) { setError('El nombre es obligatorio'); return; }
     const priceNum = Number(form.price);
-    if (!priceNum || priceNum <= 0) { setError('El precio debe ser mayor a 0'); return; }
+    if (isNaN(priceNum) || priceNum < 0) { setError('El precio no puede ser negativo'); return; }
     setSaving(true);
     try {
       const payload = { name: form.name.trim(), duration: form.duration, price: priceNum, downloadBandwidth: form.downloadBandwidth, uploadBandwidth: form.uploadBandwidth, idleTimeout: form.idleTimeout };
@@ -147,18 +147,18 @@ export const AdminInternetPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="settings-tabs" style={{ marginBottom: '1.25rem' }}>
+      <nav className="treasury-subnav" style={{ marginBottom: '1.25rem' }}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
+            className={`treasury-subnav-link ${activeTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
           </button>
         ))}
-      </div>
+      </nav>
 
       {error && <p className="error-text">{error}</p>}
 
