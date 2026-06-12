@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../common/jwt-auth.guard';
+import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { GenerateVoucherDto } from './dto/generate-voucher.dto';
 import { InternetVouchersService } from './internet-vouchers.service';
 
