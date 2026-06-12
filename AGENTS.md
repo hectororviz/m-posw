@@ -319,8 +319,8 @@ backend/src/modules/internet-vouchers/
 ├── internet-vouchers.module.ts
 ├── internet-plans.controller.ts       # CRUD de planes (ADMIN)
 ├── internet-plans.service.ts          # Lógica: plan ↔ producto sync automático
-├── internet-vouchers.controller.ts    # Generación/consulta/anulación de vouchers
-├── internet-vouchers.service.ts       # Cliente HTTP → api-radius:3001
+├── internet-vouchers.controller.ts    # Generación/consulta/anulación de vouchers + listado
+├── internet-vouchers.service.ts       # Cliente HTTP → api-radius:3001 (usa http module nativo)
 └── dto/
     ├── create-plan.dto.ts
     ├── update-plan.dto.ts
@@ -328,33 +328,55 @@ backend/src/modules/internet-vouchers/
 ```
 
 ### Modelos
-- **InternetPlan**: define un plan (nombre, duración, ancho de banda, precio). Al crearse, genera automáticamente un `Product` asociado bajo la categoría "Internet".
+- **InternetPlan**: define un plan (nombre, duración, ancho de banda, precio). Al crearse, genera automáticamente un `Product` asociado bajo la categoría "Internet". El producto usa como icono la duración formateada ("1d", "24h", "30d").
 - **SaleVoucher**: registra cada voucher generado para una venta (PIN, plan, activo). Se crean al confirmar el pago.
 
 ### Flujo
 1. Admin activa el módulo en Configuración → Módulos → "Vouchers WiFi"
-2. Admin crea planes en Internet → cada plan crea automáticamente un producto en la categoría "Internet" (stock=0, ilimitado)
-3. En el POS, la categoría "Internet" aparece con los productos de cada plan
-4. Al vender un plan de internet, el backend llama a `api-radius:3001/api/vouchers/generate` con los parámetros inline
-5. El voucher se genera solo al confirmar el pago (CASH/FIADO: inmediato, MP_QR: vía webhook, TRANSFER: al confirmar)
-6. Los PINs se guardan en `SaleVoucher` y se incluyen en el ticket
-7. Si se anula la venta, los vouchers se desactivan automáticamente
+2. Admin crea planes en Internet → cada plan crea automáticamente un producto en la categoría "Internet" (stock=0, ilimitado, icono=duración)
+3. En el POS, la categoría "Internet" aparece con los productos ordenados por duración (1h → 3h → 24h → ...)
+4. Al vender un plan, el backend llama a `api-radius:3001/api/vouchers/generate` con parámetros inline vía `http.request` (NO usa `fetch` — bug de undici en Docker DNS)
+5. El voucher se genera al confirmar el pago (CASH/FIADO: inmediato, MP_QR: vía webhook, TRANSFER: al confirmar)
+6. Los PINs se guardan en `SaleVoucher` y se incluyen en el ticket impreso (sección "Internet WiFi" con PIN en grande)
+7. Si se anula la venta, los vouchers se desactivan automáticamente vía `POST /vouchers/deactivate-by-sale`
+
+### Página de Internet (Admin)
+Dos tabs con estilo `treasury-subnav-link` (naranja):
+
+| Tab | Contenido |
+|-----|-----------|
+| **Vouchers** (default) | Tabla de vouchers vendidos: fecha, venta #, plan, estado (badge Activo/Usado). Sin mostrar el PIN. |
+| **Planes** | Tabla de planes configurados: nombre, duración, ancho de banda, precio, activo. FAB "+" para crear. Modal con selects de duración, bandwidth y precio (permite $0). |
+
+### Comportamiento del módulo
+- **Activado**: categoría "Internet" visible en POS y admin, productos ordenados por duración, sidebar muestra "Internet"
+- **Desactivado**: categoría "Internet" oculta del POS (`active=false`) y filtrada del admin, sidebar oculta "Internet", no se generan vouchers
+- La sincronización categoría ↔ módulo se hace en `SettingsService.update()` y `CategoriesService.listAll()`
 
 ### Configuración
 - `VOUCHER_API_URL`: URL base de api-radius (default: `http://api-radius:3001/api`)
 - `Setting.enableInternetModule`: toggle del módulo (default: false)
-
-### Frontend
-```
-frontend/src/pages/
-└── AdminInternetPage.tsx     # CRUD de planes con modal para duración, ancho de banda, precio
-```
+- El precio 0 está permitido en los planes (para planes gratuitos)
 
 ### Relación con internet-sale
-- api-radius es un stack Docker separado (`~/internet-sale`)
+- api-radius es un stack Docker separado (`~/internet-sale`) con 4 servicios: postgres-radius, api-radius, freeradius, portal
 - Ambos comparten la red `soler_default` para que el backend de m-posw pueda llamar a `api-radius:3001`
 - Los planes se definen en m-posw (fuente de verdad); api-radius acepta parámetros inline vía el endpoint `POST /vouchers/generate`
 - `plans.json` en internet-sale es legacy/fallback
+- **IMPORTANTE**: El código usa `http.request` de Node.js (no `fetch`) porque `undici` (el motor de `fetch` en Node 20) falla al resolver DNS de Docker internamente
+- **IMPORTANTE**: La columna `sale_id` en `radius.vouchers` debe ser `VARCHAR(50)` (no `INTEGER`) porque m-posw usa UUIDs
+
+### Endpoints del módulo
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/internet/plans` | Listar planes (ADMIN) |
+| `POST` | `/internet/plans` | Crear plan → auto-crea Product |
+| `PATCH` | `/internet/plans/:id` | Editar plan → actualiza Product |
+| `DELETE` | `/internet/plans/:id` | Eliminar plan → elimina Product |
+| `GET` | `/internet/vouchers/list` | Listar vouchers vendidos (sin PIN) |
+| `POST` | `/internet/vouchers/generate` | Generar voucher individual |
+| `GET` | `/internet/vouchers/:pin` | Consultar voucher |
+| `DELETE` | `/internet/vouchers/:pin` | Anular voucher |
 
 ## Theme / Dark Mode
 
