@@ -14,7 +14,7 @@ interface GenerateResponse {
 @Injectable()
 export class InternetVouchersService {
   private readonly logger = new Logger(InternetVouchersService.name);
-  private readonly apiUrl: string;
+  readonly apiUrl: string;
 
   constructor(
     private prisma: PrismaService,
@@ -180,6 +180,10 @@ export class InternetVouchersService {
     } catch {
       return null;
     }
+  }
+
+  async httpGet(urlStr: string): Promise<string> {
+    return this.httpRequest(urlStr, 'GET');
   }
 
   private httpPost(fullUrl: string, body: string): Promise<GenerateResponse> {

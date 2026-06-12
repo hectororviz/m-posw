@@ -470,3 +470,12 @@ export const useInternetVouchers = (saleId?: string) =>
       return response.data;
     },
   });
+
+export const useInternetStats = () =>
+  useQuery({
+    queryKey: ['internet-stats'],
+    queryFn: async () => {
+      const response = await apiClient.get<VoucherStats>('/internet/vouchers/stats');
+      return response.data;
+    },
+  });

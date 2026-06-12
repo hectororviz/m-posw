@@ -15,6 +15,16 @@ export class InternetVouchersController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Get('stats')
+  async getStats() {
+    try {
+      const data = await this.vouchersService.httpGet(`${this.vouchersService.apiUrl}/stats`);
+      return JSON.parse(data);
+    } catch {
+      return { active_vouchers: 0, generated_today: 0, used_today: 0, total_vouchers: 0 };
+    }
+  }
+
   @Get('list')
   async listVouchers(@Query('saleId') saleId?: string) {
     const vouchers = await this.prisma.saleVoucher.findMany({

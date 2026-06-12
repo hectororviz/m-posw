@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useInternetPlans, useInternetVouchers } from '../api/queries';
+import { useInternetPlans, useInternetVouchers, useInternetStats } from '../api/queries';
 import type { InternetPlan } from '../api/types';
 
 type TabId = 'vouchers' | 'planes';
@@ -64,6 +64,7 @@ export const AdminInternetPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: plans, isLoading: plansLoading } = useInternetPlans();
   const { data: vouchers, isLoading: vouchersLoading } = useInternetVouchers();
+  const { data: stats } = useInternetStats();
   const [activeTab, setActiveTab] = useState<TabId>('vouchers');
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<InternetPlan | null>(null);
@@ -165,6 +166,23 @@ export const AdminInternetPage: React.FC = () => {
       {/* TAB: Vouchers */}
       {activeTab === 'vouchers' && (
         <>
+          {stats && (
+            <div className="sales-kpis">
+              <div className="sales-kpi-card">
+                <span className="sales-kpi-label">Vouchers activos</span>
+                <span className="sales-kpi-value">{stats.active_vouchers}</span>
+              </div>
+              <div className="sales-kpi-card">
+                <span className="sales-kpi-label">Generados hoy</span>
+                <span className="sales-kpi-value">{stats.generated_today}</span>
+              </div>
+              <div className="sales-kpi-card">
+                <span className="sales-kpi-label">Usados hoy</span>
+                <span className="sales-kpi-value">{stats.used_today}</span>
+              </div>
+            </div>
+          )}
+
           {vouchersLoading ? (
             <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
               <div className="spinner" aria-hidden="true" />

@@ -258,7 +258,12 @@ export const AdminSalesPage: React.FC = () => {
     const sale = sales.find((s) => s.id === saleId);
     if (!sale) return;
     try { await apiClient.post(`/sales/${saleId}/ticket-printed`); } catch (err) { pushToast(normalizeApiError(err), 'error'); }
-    const payload: TicketPayload = { clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: sale.createdAt, itemsStyle: 'sale', items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber })), total: sale.total, thanks: 'Gracias por tu compra', footer: 'Ticket no fiscal' };
+    const payload: TicketPayload = {
+      clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: sale.createdAt, itemsStyle: 'sale',
+      items: sale.items.map((item) => ({ qty: item.quantity, name: item.product.name, category: item.product.category?.name, orderNumber: item.orderNumber })),
+      total: sale.total, thanks: 'Gracias por tu compra', footer: 'Ticket no fiscal',
+      vouchers: sale.vouchers?.map((v) => ({ pin: v.pin, plan_name: v.plan?.name || 'Internet', valid_hours: v.plan ? Math.round(v.plan.duration / 3600) : 24 })),
+    };
     pushToast('Enviando ticket a impresion.', 'success');
     window.location.href = `/printticket?data=${encodeURIComponent(encodeBase64(JSON.stringify(payload)))}`;
   };
@@ -358,6 +363,18 @@ export const AdminSalesPage: React.FC = () => {
                   <div key={item.id} className="sales-detail-product">{item.quantity} x {item.product.name} <span>{formatCurrency(item.subtotal)}</span></div>
                 ))}
               </div>
+              {selectedSale.vouchers && selectedSale.vouchers.length > 0 && (
+                <>
+                  <div className="ticket-divider" />
+                  <div className="sales-detail-row"><span>Vouchers WiFi</span></div>
+                  {selectedSale.vouchers.map((v) => (
+                    <div key={v.id} className="sales-detail-row" style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.1rem', letterSpacing: '2px' }}>
+                      <span>{v.plan?.name}</span>
+                      <span>{v.pin}</span>
+                    </div>
+                  ))}
+                </>
+              )}
               <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setSelectedSaleId(null)}>Cerrar</button>
                 <button type="button" className="btn-secondary" onClick={() => handleReprintTicket(selectedSale.id)}>Reimprimir ticket</button>
