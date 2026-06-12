@@ -176,10 +176,6 @@ export const AdminInternetPage: React.FC = () => {
                 <span className="sales-kpi-label">Generados hoy</span>
                 <span className="sales-kpi-value">{stats.generated_today}</span>
               </div>
-              <div className="sales-kpi-card">
-                <span className="sales-kpi-label">Usados hoy</span>
-                <span className="sales-kpi-value">{stats.used_today}</span>
-              </div>
             </div>
           )}
 

@@ -577,6 +577,5 @@ export interface VoucherListItem {
 export interface VoucherStats {
   active_vouchers: number;
   generated_today: number;
-  used_today: number;
   total_vouchers: number;
 }

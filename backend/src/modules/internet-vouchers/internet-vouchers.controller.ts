@@ -17,12 +17,22 @@ export class InternetVouchersController {
 
   @Get('stats')
   async getStats() {
-    try {
-      const data = await this.vouchersService.httpGet(`${this.vouchersService.apiUrl}/stats`);
-      return JSON.parse(data);
-    } catch {
-      return { active_vouchers: 0, generated_today: 0, used_today: 0, total_vouchers: 0 };
-    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [active, todayCount, total] = await Promise.all([
+      this.prisma.saleVoucher.count({ where: { active: true } }),
+      this.prisma.saleVoucher.count({ where: { createdAt: { gte: today, lt: tomorrow } } }),
+      this.prisma.saleVoucher.count(),
+    ]);
+
+    return {
+      active_vouchers: active,
+      generated_today: todayCount,
+      total_vouchers: total,
+    };
   }
 
   @Get('list')
