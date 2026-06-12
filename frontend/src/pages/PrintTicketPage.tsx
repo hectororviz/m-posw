@@ -256,9 +256,8 @@ export const PrintTicketPage: React.FC = () => {
           <div className="ticket-voucher-section">
             {ticket.vouchers.map((v, i) => (
               <div key={i} className="ticket-voucher">
-                <span className="ticket-voucher-title">INTERNET WIFI</span>
+                <span className="ticket-voucher-title">Internet WiFi</span>
                 <span className="ticket-voucher-pin">{v.pin}</span>
-                <span className="ticket-voucher-plan">{v.plan_name} &middot; {v.valid_hours}h</span>
               </div>
             ))}
           </div>
