@@ -59,6 +59,9 @@ export class CategoriesService {
   }
 
   async listProducts(categoryId: string, includeInactive = false) {
+    const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    const isInternetCategory = category?.name === 'Internet';
+
     const products = await this.prisma.product.findMany({
       where: {
         categoryId,
@@ -71,12 +74,23 @@ export class CategoriesService {
             rawMaterial: true,
           },
         },
+        ...(isInternetCategory ? { internetPlan: true } : {}),
       },
       orderBy: { name: 'asc' },
     });
 
+    let sorted = products;
+
+    if (isInternetCategory) {
+      sorted = [...products].sort((a, b) => {
+        const durA = a.internetPlan?.duration ?? 0;
+        const durB = b.internetPlan?.duration ?? 0;
+        return durA - durB;
+      });
+    }
+
     // Calcular stock para productos compuestos basado en sus recetas
-    return products.map(product => {
+    return sorted.map(product => {
       if (product.type === ProductType.COMPOSITE && product.recipeAsComposite.length > 0) {
         // Calcular cuántas unidades se pueden hacer con el stock actual de materias primas
         const possibleUnits = product.recipeAsComposite.map(ingredient => {
