@@ -20,10 +20,16 @@ export class CategoriesService {
     });
   }
 
-  listAll() {
-    return this.prisma.category.findMany({
+  async listAll() {
+    const setting = await this.prisma.setting.findFirst();
+    const categories = await this.prisma.category.findMany({
       orderBy: { createdAt: 'desc' },
     });
+
+    if (!setting?.enableInternetModule) {
+      return categories.filter((c) => c.name !== 'Internet');
+    }
+    return categories;
   }
 
   create(dto: CreateCategoryDto) {

@@ -62,7 +62,7 @@ export class SettingsService {
   }
 
   async update(dto: UpdateSettingDto) {
-    return this.prisma.setting.upsert({
+    const result = await this.prisma.setting.upsert({
       where: { id: DEFAULT_SETTING_ID },
       create: {
         id: DEFAULT_SETTING_ID,
@@ -114,5 +114,14 @@ export class SettingsService {
         ...(dto.movementOutReasons !== undefined ? { movementOutReasons: dto.movementOutReasons } : {}),
       },
     });
+
+    if (dto.enableInternetModule !== undefined) {
+      await this.prisma.category.updateMany({
+        where: { name: 'Internet' },
+        data: { active: dto.enableInternetModule },
+      });
+    }
+
+    return result;
   }
 }
