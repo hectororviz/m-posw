@@ -147,7 +147,7 @@ export const AdminInternetPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="settings-tabs">
+      <div className="settings-tabs" style={{ marginBottom: '1.25rem' }}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -167,7 +167,8 @@ export const AdminInternetPage: React.FC = () => {
         <>
           {vouchersLoading ? (
             <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-              <p style={{ color: 'var(--color-text-faint)', margin: 0 }}>Cargando...</p>
+              <div className="spinner" aria-hidden="true" />
+              <p style={{ color: 'var(--color-text-faint)', margin: '0.75rem 0 0', fontSize: '0.95rem' }}>Cargando...</p>
             </div>
           ) : !vouchers || vouchers.length === 0 ? (
             <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
@@ -175,26 +176,29 @@ export const AdminInternetPage: React.FC = () => {
               <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>Cuando se venda un plan de internet, los vouchers apareceran aca.</p>
             </div>
           ) : (
-            <div className="product-list-v2">
-              {vouchers.map((v) => (
-                <div key={v.id} className={`product-list-row ${!v.active ? 'is-inactive' : ''}`}>
-                  <div className="product-list-thumb">
-                    <span className="product-list-thumb-icon">📶</span>
-                  </div>
-                  <div className="product-list-details">
-                    <span className="product-list-row-name">{v.planName}</span>
-                    <span className="product-list-row-cat">Venta #{v.saleOrderNumber} · {formatDateTime(v.saleCreatedAt)}</span>
-                  </div>
-                  <span className="product-list-row-stock" style={{ fontSize: '0.8rem', color: 'var(--color-text-faint)', minWidth: '60px' }}>
-                    {v.active ? 'Activo' : 'Usado'}
-                  </span>
-                  {v.salePaidAt && (
-                    <span className="product-list-row-stock" style={{ fontSize: '0.8rem', color: 'var(--color-text-faint)', minWidth: '60px' }}>
-                      Pagado: {formatDateTime(v.salePaidAt)}
-                    </span>
-                  )}
+            <div className="sales-table-wrapper">
+              <div className="sales-table">
+                <div className="sales-table-head">
+                  <span className="col-date">Fecha</span>
+                  <span className="col-type">Venta</span>
+                  <span className="col-user">Plan</span>
+                  <span className="col-method">Estado</span>
                 </div>
-              ))}
+                {vouchers.map((v) => (
+                  <div key={v.id} className="sales-table-row">
+                    <span className="col-date">{formatDateTime(v.saleCreatedAt)}</span>
+                    <span className="col-type">#{v.saleOrderNumber}</span>
+                    <span className="col-user">{v.planName}</span>
+                    <span className="col-method">
+                      {v.active ? (
+                        <span className="badge badge-success">Activo</span>
+                      ) : (
+                        <span className="badge badge-neutral">Usado</span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>
@@ -259,7 +263,8 @@ export const AdminInternetPage: React.FC = () => {
 
           {plansLoading ? (
             <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-              <p style={{ color: 'var(--color-text-faint)', margin: 0 }}>Cargando...</p>
+              <div className="spinner" aria-hidden="true" />
+              <p style={{ color: 'var(--color-text-faint)', margin: '0.75rem 0 0', fontSize: '0.95rem' }}>Cargando...</p>
             </div>
           ) : !plans || plans.length === 0 ? (
             <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
@@ -267,23 +272,36 @@ export const AdminInternetPage: React.FC = () => {
               <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>Crea uno para que aparezca como producto en la categoria Internet del POS.</p>
             </div>
           ) : (
-            <div className="product-grid-v2">
-              {plans.map((plan) => (
-                <div key={plan.id} className={`product-card-v2 ${!plan.active ? 'is-inactive' : ''}`}>
-                  <div className="product-card-v2-media product-card-v2-media--category" style={{ background: 'var(--color-surface-raised)' }}>
-                    <span className="product-card-v2-icon">📶</span>
-                  </div>
-                  <div className="product-card-v2-info">
-                    <span className="product-card-v2-name">{plan.name}</span>
-                    <span className="product-card-v2-price">{getPriceDisplay(plan.price)}</span>
-                    <span className="product-card-v2-badge" style={{ marginTop: '0.25rem' }}>{formatDuration(plan.duration)} · {plan.downloadBandwidth}/{plan.uploadBandwidth}</span>
-                  </div>
-                  <div className="product-card-v2-actions">
-                    <button type="button" className="btn-ghost" onClick={() => openEdit(plan)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${plan.name}`}>✎</button>
-                    <button type="button" className="btn-ghost" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : '✕'}</button>
-                  </div>
+            <div className="sales-table-wrapper">
+              <div className="sales-table">
+                <div className="sales-table-head">
+                  <span className="col-date">Nombre</span>
+                  <span className="col-user">Duracion</span>
+                  <span className="col-total" style={{ flex: '0 0 180px' }}>Ancho de banda</span>
+                  <span className="col-total" style={{ flex: '0 0 110px' }}>Precio</span>
+                  <span className="col-method" style={{ flex: '0 0 70px' }}>Activo</span>
+                  <span className="col-action" style={{ flex: '0 0 80px' }}></span>
                 </div>
-              ))}
+                {plans.map((plan) => (
+                  <div key={plan.id} className={`sales-table-row ${!plan.active ? 'row-inactive' : ''}`}>
+                    <span className="col-date" style={{ fontWeight: 500 }}>{plan.name}</span>
+                    <span className="col-user">{formatDuration(plan.duration)}</span>
+                    <span className="col-total" style={{ flex: '0 0 180px', color: 'var(--color-text-faint)' }}>{plan.downloadBandwidth} / {plan.uploadBandwidth}</span>
+                    <span className="col-total" style={{ flex: '0 0 110px', fontWeight: 600 }}>{getPriceDisplay(plan.price)}</span>
+                    <span className="col-method" style={{ flex: '0 0 70px' }}>
+                      {plan.active ? (
+                        <span className="badge badge-success">Si</span>
+                      ) : (
+                        <span className="badge badge-neutral">No</span>
+                      )}
+                    </span>
+                    <span className="col-action" style={{ flex: '0 0 80px', display: 'flex', gap: '0.25rem' }}>
+                      <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(plan)} aria-label={`Editar ${plan.name}`}>✎</button>
+                      <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : '✕'}</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>
