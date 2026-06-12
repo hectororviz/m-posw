@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/prisma.service';
+import * as http from 'http';
 
 interface GenerateResponse {
   pin: string;
@@ -33,44 +34,72 @@ export class InternetVouchersService {
 
     this.logger.log(`Generando voucher para plan ${plan.name} (sale ${saleId})`);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const url = new URL(`${this.apiUrl}/vouchers/generate`);
+    const body = JSON.stringify({
+      plan_name: plan.name,
+      duration: plan.duration,
+      download: plan.downloadBandwidth,
+      upload: plan.uploadBandwidth,
+      idle_timeout: plan.idleTimeout,
+      sale_id: saleId,
+    });
 
-    try {
-      const response = await fetch(`${this.apiUrl}/vouchers/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          plan_name: plan.name,
-          duration: plan.duration,
-          download: plan.downloadBandwidth,
-          upload: plan.uploadBandwidth,
-          idle_timeout: plan.idleTimeout,
-          sale_id: saleId,
-        }),
-        signal: controller.signal,
-      });
+    const data = await this.httpPost(url, body);
+    this.logger.log(`Voucher response: ${JSON.stringify(data)}`);
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(`api-radius error ${response.status}: ${err.error || 'unknown'}`);
-      }
+    const voucher = await this.prisma.saleVoucher.create({
+      data: {
+        saleId,
+        planId: plan.id,
+        pin: data.pin,
+      },
+    });
 
-      const data: GenerateResponse = await response.json();
+    this.logger.log(`Voucher generado: ${data.pin} | plan: ${plan.name}`);
+    return voucher;
+  }
 
-      const voucher = await this.prisma.saleVoucher.create({
-        data: {
-          saleId,
-          planId: plan.id,
-          pin: data.pin,
+  private httpPost(url: URL, body: string): Promise<GenerateResponse> {
+    return new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: url.hostname,
+          port: url.port || 80,
+          path: url.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+          },
+          timeout: 10000,
         },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              if (res.statusCode && res.statusCode >= 400) {
+                reject(new Error(`api-radius error ${res.statusCode}: ${parsed.error || 'unknown'}`));
+              } else {
+                resolve(parsed);
+              }
+            } catch (err) {
+              reject(new Error(`api-radius invalid response: ${data.substring(0, 200)}`));
+            }
+          });
+        },
+      );
+
+      req.on('error', (err) => reject(new Error(`api-radius request failed: ${err.message}`)));
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('api-radius request timeout'));
       });
 
-      this.logger.log(`Voucher generado: ${data.pin} | plan: ${plan.name}`);
-      return voucher;
-    } finally {
-      clearTimeout(timeout);
-    }
+      req.write(body);
+      req.end();
+    });
   }
 
   async generateVouchersForSale(saleId: string) {
@@ -127,33 +156,31 @@ export class InternetVouchersService {
       if (!plan) continue;
 
       for (let i = 0; i < item.quantity; i++) {
-        const controllers: AbortController[] = [];
-        const timeouts: ReturnType<typeof setTimeout>[] = [];
-
         try {
-          const ac = new AbortController();
-          controllers.push(ac);
-          const t = setTimeout(() => ac.abort(), 10000);
-          timeouts.push(t);
-
-          const response = await fetch(`${this.apiUrl}/vouchers/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              plan_name: plan.name,
-              duration: plan.duration,
-              download: plan.downloadBandwidth,
-              upload: plan.uploadBandwidth,
-              idle_timeout: plan.idleTimeout,
-              sale_id: saleId,
-            }),
-            signal: ac.signal,
+          const body = JSON.stringify({
+            plan_name: plan.name,
+            duration: plan.duration,
+            download: plan.downloadBandwidth,
+            upload: plan.uploadBandwidth,
+            idle_timeout: plan.idleTimeout,
+            sale_id: saleId,
           });
+          const url = new URL(`${this.apiUrl}/vouchers/generate`);
+          const data = await this.httpPost(url, body);
 
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(`api-radius error ${response.status}: ${err.error || 'unknown'}`);
-          }
+          const voucher = await tx.saleVoucher.create({
+            data: {
+              saleId,
+              planId: plan.id,
+              pin: data.pin,
+            },
+          });
+          vouchers.push(voucher);
+          this.logger.log(`Voucher generado (tx): ${data.pin} | plan: ${plan.name}`);
+        } catch (err) {
+          this.logger.error(`Error generando voucher para plan ${plan.id} (tx): ${err}`);
+        }
+      }
 
           const data: GenerateResponse = await response.json();
 
@@ -169,8 +196,6 @@ export class InternetVouchersService {
           this.logger.log(`Voucher generado (tx): ${data.pin} | plan: ${plan.name}`);
         } catch (err) {
           this.logger.error(`Error generando voucher para plan ${plan.id} (tx): ${err}`);
-        } finally {
-          for (const t of timeouts) clearTimeout(t);
         }
       }
     }
@@ -180,20 +205,11 @@ export class InternetVouchersService {
 
   async deactivateVoucher(pin: string) {
     try {
-      const response = await fetch(`${this.apiUrl}/vouchers/${pin}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(`api-radius error ${response.status}: ${err.error || 'unknown'}`);
-      }
-
+      await this.httpRequest(`${this.apiUrl}/vouchers/${pin}`, 'DELETE');
       await this.prisma.saleVoucher.updateMany({
         where: { pin },
         data: { active: false },
       });
-
       this.logger.log(`Voucher desactivado: ${pin}`);
       return { success: true };
     } catch (err) {
@@ -204,13 +220,9 @@ export class InternetVouchersService {
 
   async deactivateBySale(saleId: string) {
     try {
-      const response = await fetch(`${this.apiUrl}/vouchers/deactivate-by-sale`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sale_id: saleId }),
-      });
-
-      const data = await response.json().catch(() => ({}));
+      const url = new URL(`${this.apiUrl}/vouchers/deactivate-by-sale`);
+      const body = JSON.stringify({ sale_id: saleId });
+      const data = await this.httpPost(url, body);
 
       await this.prisma.saleVoucher.updateMany({
         where: { saleId, active: true },
@@ -227,11 +239,45 @@ export class InternetVouchersService {
 
   async getVoucher(pin: string) {
     try {
-      const response = await fetch(`${this.apiUrl}/vouchers/${pin}`);
-      if (!response.ok) return null;
-      return response.json();
+      const data = await this.httpRequest(`${this.apiUrl}/vouchers/${pin}`, 'GET');
+      return JSON.parse(data);
     } catch {
       return null;
     }
+  }
+
+  private httpRequest(urlStr: string, method: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const url = new URL(urlStr);
+      const req = http.request(
+        {
+          hostname: url.hostname,
+          port: url.port || 80,
+          path: url.pathname,
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+          res.on('end', () => {
+            if (res.statusCode && res.statusCode >= 400) {
+              reject(new Error(`api-radius error ${res.statusCode}`));
+            } else {
+              resolve(data);
+            }
+          });
+        },
+      );
+
+      req.on('error', (err) => reject(new Error(`api-radius request failed: ${err.message}`)));
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('api-radius request timeout'));
+      });
+
+      req.end();
+    });
   }
 }
