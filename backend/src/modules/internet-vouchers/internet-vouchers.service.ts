@@ -45,7 +45,6 @@ export class InternetVouchersService {
     });
 
     const data = await this.httpPost(url, body);
-    this.logger.log(`Voucher response: ${JSON.stringify(data)}`);
 
     const voucher = await this.prisma.saleVoucher.create({
       data: {
@@ -57,49 +56,6 @@ export class InternetVouchersService {
 
     this.logger.log(`Voucher generado: ${data.pin} | plan: ${plan.name}`);
     return voucher;
-  }
-
-  private httpPost(url: URL, body: string): Promise<GenerateResponse> {
-    return new Promise((resolve, reject) => {
-      const req = http.request(
-        {
-          hostname: url.hostname,
-          port: url.port || 80,
-          path: url.pathname,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(body),
-          },
-          timeout: 10000,
-        },
-        (res) => {
-          let data = '';
-          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
-          res.on('end', () => {
-            try {
-              const parsed = JSON.parse(data);
-              if (res.statusCode && res.statusCode >= 400) {
-                reject(new Error(`api-radius error ${res.statusCode}: ${parsed.error || 'unknown'}`));
-              } else {
-                resolve(parsed);
-              }
-            } catch (err) {
-              reject(new Error(`api-radius invalid response: ${data.substring(0, 200)}`));
-            }
-          });
-        },
-      );
-
-      req.on('error', (err) => reject(new Error(`api-radius request failed: ${err.message}`)));
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('api-radius request timeout'));
-      });
-
-      req.write(body);
-      req.end();
-    });
   }
 
   async generateVouchersForSale(saleId: string) {
@@ -157,6 +113,7 @@ export class InternetVouchersService {
 
       for (let i = 0; i < item.quantity; i++) {
         try {
+          const url = new URL(`${this.apiUrl}/vouchers/generate`);
           const body = JSON.stringify({
             plan_name: plan.name,
             duration: plan.duration,
@@ -165,7 +122,6 @@ export class InternetVouchersService {
             idle_timeout: plan.idleTimeout,
             sale_id: saleId,
           });
-          const url = new URL(`${this.apiUrl}/vouchers/generate`);
           const data = await this.httpPost(url, body);
 
           const voucher = await tx.saleVoucher.create({
@@ -175,23 +131,6 @@ export class InternetVouchersService {
               pin: data.pin,
             },
           });
-          vouchers.push(voucher);
-          this.logger.log(`Voucher generado (tx): ${data.pin} | plan: ${plan.name}`);
-        } catch (err) {
-          this.logger.error(`Error generando voucher para plan ${plan.id} (tx): ${err}`);
-        }
-      }
-
-          const data: GenerateResponse = await response.json();
-
-          const voucher = await tx.saleVoucher.create({
-            data: {
-              saleId,
-              planId: plan.id,
-              pin: data.pin,
-            },
-          });
-
           vouchers.push(voucher);
           this.logger.log(`Voucher generado (tx): ${data.pin} | plan: ${plan.name}`);
         } catch (err) {
@@ -244,6 +183,49 @@ export class InternetVouchersService {
     } catch {
       return null;
     }
+  }
+
+  private httpPost(url: URL, body: string): Promise<GenerateResponse> {
+    return new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          hostname: url.hostname,
+          port: url.port || 80,
+          path: url.pathname,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body),
+          },
+          timeout: 10000,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+          res.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              if (res.statusCode && res.statusCode >= 400) {
+                reject(new Error(`api-radius error ${res.statusCode}: ${parsed.error || 'unknown'}`));
+              } else {
+                resolve(parsed);
+              }
+            } catch {
+              reject(new Error(`api-radius invalid response: ${data.substring(0, 200)}`));
+            }
+          });
+        },
+      );
+
+      req.on('error', (err) => reject(new Error(`api-radius request failed: ${err.message}`)));
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('api-radius request timeout'));
+      });
+
+      req.write(body);
+      req.end();
+    });
   }
 
   private httpRequest(urlStr: string, method: string): Promise<string> {
