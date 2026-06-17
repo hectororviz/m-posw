@@ -17,109 +17,88 @@ const ALL_MODULES: { key: ModuleKey; label: string }[] = [
 
 const accessOptions: { value: ModuleAccess; label: string }[] = [
   { value: 'HIDDEN', label: 'Oculto' },
-  { value: 'READ', label: 'Solo lectura' },
-  { value: 'FULL', label: 'Control total' },
+  { value: 'READ', label: 'Lectura' },
+  { value: 'FULL', label: 'Total' },
 ];
+
+const emptyForm = { username: '', password: '' };
+const defaultPermissions = (): ModulePermission[] =>
+  ALL_MODULES.filter((m) => m.key === 'POS').map((m) => ({ module: m.key, access: 'HIDDEN' as ModuleAccess }));
 
 export const AdminUsersPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: users } = useUsers();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState({
-    username: '',
-    password: '',
-    homeModule: '' as string,
-  });
-  const [newPermissions, setNewPermissions] = useState<ModulePermission[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<{
-    username: string;
-    password: string;
-    homeModule: string;
-  }>({ username: '', password: '', homeModule: '' });
-  const [editPermissions, setEditPermissions] = useState<ModulePermission[]>([]);
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [form, setForm] = useState(emptyForm);
+  const [permissions, setPermissions] = useState<ModulePermission[]>(defaultPermissions);
+  const [homeModule, setHomeModule] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const filteredUsers = useMemo(
-    () => (users ?? []).filter((u) => u.role !== 'ADMIN'),
-    [users],
-  );
+  const rendered = useMemo(() => users ?? [], [users]);
 
-  const toggleNewPerm = (module: ModuleKey, access: ModuleAccess) => {
+  const getPermAccess = (module: ModuleKey): ModuleAccess =>
+    permissions.find((p) => p.module === module)?.access ?? 'HIDDEN';
+
+  const setPermAccess = (module: ModuleKey, access: ModuleAccess) => {
     if (module === 'POS' && access === 'READ') return;
-    setNewPermissions((prev) => {
+    setPermissions((prev) => {
       const rest = prev.filter((p) => p.module !== module);
       if (access === 'HIDDEN') return rest;
       return [...rest, { module, access }];
     });
   };
 
-  const toggleEditPerm = (module: ModuleKey, access: ModuleAccess) => {
-    if (module === 'POS' && access === 'READ') return;
-    setEditPermissions((prev) => {
-      const rest = prev.filter((p) => p.module !== module);
-      if (access === 'HIDDEN') return rest;
-      return [...rest, { module, access }];
-    });
+  const openCreate = () => {
+    setModalMode('create');
+    setEditingUser(null);
+    setForm(emptyForm);
+    setPermissions(defaultPermissions());
+    setHomeModule('');
+    setError(null);
+    setSuccess(null);
   };
 
-  const getPermAccess = (perms: ModulePermission[], module: ModuleKey): ModuleAccess =>
-    perms.find((p) => p.module === module)?.access ?? 'HIDDEN';
+  const openEdit = (user: User) => {
+    setModalMode('edit');
+    setEditingUser(user);
+    setForm({ username: user.username, password: '' });
+    setPermissions(user.permissions ?? defaultPermissions());
+    setHomeModule(user.homeModule ?? '');
+    setError(null);
+    setSuccess(null);
+  };
 
-  const handleCreate = async () => {
+  const closeModal = () => {
+    setModalMode(null);
+    setEditingUser(null);
+  };
+
+  const handleSave = async () => {
     setError(null);
     setSuccess(null);
     try {
-      await apiClient.post('/users', {
-        username: newUser.username,
-        password: newUser.password,
-        homeModule: newUser.homeModule || undefined,
-        permissions: newPermissions,
-      });
-      setNewUser({ username: '', password: '', homeModule: '' });
-      setNewPermissions([]);
-      setSuccess('Usuario creado exitosamente');
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
-    } catch (err) {
-      setError(normalizeApiError(err));
-    }
-  };
-
-  const startEdit = (user: User) => {
-    setEditingId(user.id);
-    setEditForm({
-      username: user.username,
-      password: '',
-      homeModule: user.homeModule ?? '',
-    });
-    setEditPermissions(user.permissions ?? []);
-    setError(null);
-    setSuccess(null);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({ username: '', password: '', homeModule: '' });
-    setEditPermissions([]);
-  };
-
-  const handleUpdate = async () => {
-    if (!editingId) return;
-    setError(null);
-    setSuccess(null);
-    try {
-      const payload: Record<string, unknown> = {
-        username: editForm.username,
-        homeModule: editForm.homeModule || undefined,
-        permissions: editPermissions,
-      };
-      if (editForm.password) {
-        payload.password = editForm.password;
+      if (modalMode === 'create') {
+        await apiClient.post('/users', {
+          username: form.username,
+          password: form.password,
+          homeModule: homeModule || undefined,
+          permissions,
+        });
+        setSuccess('Usuario creado exitosamente');
+      } else if (editingUser) {
+        const payload: Record<string, unknown> = {
+          username: form.username,
+          homeModule: homeModule || undefined,
+          permissions,
+        };
+        if (form.password) payload.password = form.password;
+        await apiClient.patch(`/users/${editingUser.id}`, payload);
+        setSuccess('Usuario actualizado exitosamente');
       }
-      await apiClient.patch(`/users/${editingId}`, payload);
-      setEditingId(null);
-      setSuccess('Usuario actualizado exitosamente');
+      closeModal();
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -141,13 +120,10 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
-  const availableHomeModules = [
-    { value: '', label: 'Home genérico' },
-    ...ALL_MODULES.filter((m) => (editingId ? getPermAccess(editPermissions, m.key) : true)).map((m) => ({
-      value: m.key,
-      label: m.label,
-    })),
-  ];
+  const getHomeLabel = (key?: string | null) => {
+    if (!key) return 'Genérico';
+    return ALL_MODULES.find((m) => m.key === key)?.label ?? key;
+  };
 
   return (
     <section className="card admin-users-page">
@@ -156,134 +132,162 @@ export const AdminUsersPage: React.FC = () => {
       {error && <p className="error-text">{error}</p>}
       {success && <p className="success-text">{success}</p>}
 
-      <div className="section-title">Nuevo usuario</div>
-      <div className="user-create-form">
-        <div className="user-create-row">
-          <input
-            type="text"
-            placeholder="Nombre de usuario"
-            value={newUser.username}
-            onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-          />
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={newUser.password}
-            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-          />
-          <select
-            value={newUser.homeModule}
-            onChange={(e) => setNewUser({ ...newUser, homeModule: e.target.value })}
-          >
-            <option value="">Home genérico</option>
-            {ALL_MODULES.map((m) => (
-              <option key={m.key} value={m.key}>{m.label}</option>
-            ))}
-          </select>
-          <button type="button" className="btn-primary" onClick={handleCreate} disabled={!newUser.username || !newUser.password}>
-            Crear
-          </button>
-        </div>
-        <div className="user-perms-grid">
-          {ALL_MODULES.map((mod) => {
-            const current = getPermAccess(newPermissions, mod.key);
-            const opts = mod.key === 'POS'
-              ? accessOptions.filter((o) => o.value !== 'READ')
-              : accessOptions;
-            return (
-              <div key={mod.key} className="user-perm-item">
-                <span className="user-perm-label">{mod.label}</span>
-                <select
-                  className="user-perm-select"
-                  value={current}
-                  onChange={(e) => toggleNewPerm(mod.key, e.target.value as ModuleAccess)}
-                >
-                  {opts.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="section-title">Usuarios registrados</div>
-      {filteredUsers.length === 0 && (
+      {rendered.length === 0 ? (
         <p className="text-muted">No hay usuarios registrados.</p>
+      ) : (
+        <table className="users-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Rol</th>
+              <th>Home</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rendered.map((user) => (
+              <tr key={user.id}>
+                <td>{user.username}</td>
+                <td>
+                  <span className={`badge ${user.role === 'ADMIN' ? 'badge-info' : 'badge-neutral'}`}>
+                    {user.role === 'ADMIN' ? 'Admin' : 'Caja'}
+                  </span>
+                </td>
+                <td>{getHomeLabel(user.homeModule)}</td>
+                <td className="users-table-actions">
+                  {user.role !== 'ADMIN' && (
+                    <>
+                      <button type="button" className="btn-ghost" onClick={() => openEdit(user)} title="Editar">✎</button>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => handleDelete(user)}
+                        disabled={deletingId === user.id}
+                        style={{ color: 'var(--color-danger-text)' }}
+                        title="Eliminar"
+                      >
+                        {deletingId === user.id ? '...' : '✕'}
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
-      {filteredUsers.map((user) =>
-        editingId === user.id ? (
-          <div key={user.id} className="user-edit-card">
-            <div className="user-edit-row">
-              <input
-                type="text"
-                value={editForm.username}
-                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                placeholder="Nombre de usuario"
-              />
-              <input
-                type="password"
-                value={editForm.password}
-                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                placeholder="Nueva clave (dejar vacío para no cambiar)"
-              />
-              <select
-                value={editForm.homeModule}
-                onChange={(e) => setEditForm({ ...editForm, homeModule: e.target.value })}
-              >
-                {availableHomeModules.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              <button type="button" className="btn-primary" onClick={handleUpdate}>Guardar</button>
-              <button type="button" className="btn-ghost" onClick={cancelEdit}>Cancelar</button>
+
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo usuario" title="Nuevo usuario">
+        +
+      </button>
+
+      {modalMode && (
+        <div className="modal-backdrop" onClick={closeModal}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{modalMode === 'create' ? 'Nuevo usuario' : 'Editar usuario'}</h3>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
             </div>
-            <div className="user-perms-grid">
-              {ALL_MODULES.map((mod) => {
-                const current = getPermAccess(editPermissions, mod.key);
-                const opts = mod.key === 'POS'
-                  ? accessOptions.filter((o) => o.value !== 'READ')
-                  : accessOptions;
-                return (
-                  <div key={mod.key} className="user-perm-item">
-                    <span className="user-perm-label">{mod.label}</span>
-                    <select
-                      className="user-perm-select"
-                      value={current}
-                      onChange={(e) => toggleEditPerm(mod.key, e.target.value as ModuleAccess)}
-                    >
-                      {opts.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
+            <div className="modal-body">
+              <div className="user-modal-fields">
+                <div className="settings-field">
+                  <label htmlFor="user-username">Usuario</label>
+                  <input
+                    id="user-username"
+                    type="text"
+                    value={form.username}
+                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                    placeholder="Nombre de usuario"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="user-password">
+                    {modalMode === 'create' ? 'Contraseña' : 'Nueva clave (dejar vacío para no cambiar)'}
+                  </label>
+                  <input
+                    id="user-password"
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder={modalMode === 'create' ? 'Contraseña' : 'Opcional'}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="user-home">Home</label>
+                  <select
+                    id="user-home"
+                    value={homeModule}
+                    onChange={(e) => setHomeModule(e.target.value)}
+                  >
+                    <option value="">Home genérico</option>
+                    {ALL_MODULES.map((m) => (
+                      <option key={m.key} value={m.key}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="user-modal-perms">
+                <h4 style={{ margin: '0 0 0.75rem' }}>Permisos</h4>
+                <table className="perms-table">
+                  <thead>
+                    <tr>
+                      <th>Módulo</th>
+                      {accessOptions.map((o) => (
+                        <th key={o.value} className="perms-col-header">{o.label}</th>
                       ))}
-                    </select>
-                  </div>
-                );
-              })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ALL_MODULES.map((mod) => {
+                      const cur = getPermAccess(mod.key);
+                      const isPos = mod.key === 'POS';
+                      return (
+                        <tr key={mod.key}>
+                          <td className="perms-module-label">{mod.label}</td>
+                          {accessOptions.map((o) => {
+                            const disabled = isPos && o.value === 'READ';
+                            return (
+                              <td key={o.value} className="perms-radio-cell">
+                                <label className={`radio-btn ${disabled ? 'radio-btn--disabled' : ''}`}>
+                                  <input
+                                    type="radio"
+                                    name={`perm-${mod.key}`}
+                                    value={o.value}
+                                    checked={cur === o.value}
+                                    onChange={() => setPermAccess(mod.key, o.value)}
+                                    disabled={disabled}
+                                  />
+                                  <span className="radio-btn-circle" />
+                                </label>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={closeModal}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleSave}
+                  disabled={!form.username || (modalMode === 'create' && !form.password)}
+                >
+                  {modalMode === 'create' ? 'Crear' : 'Guardar'}
+                </button>
+              </div>
             </div>
           </div>
-        ) : (
-          <div key={user.id} className="user-list-item">
-            <div className="user-list-info">
-              <span className="user-list-username">{user.username}</span>
-              <span className="user-list-home">
-                Home: {user.homeModule ? ALL_MODULES.find((m) => m.key === user.homeModule)?.label ?? user.homeModule : 'Genérico'}
-              </span>
-            </div>
-            <div className="user-list-actions">
-              <button type="button" className="btn-ghost" onClick={() => startEdit(user)}>✎</button>
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => handleDelete(user)}
-                disabled={deletingId === user.id}
-                style={{ color: 'var(--color-danger-text)' }}
-              >
-                {deletingId === user.id ? '...' : '✕'}
-              </button>
-            </div>
-          </div>
-        ),
+        </div>
       )}
     </section>
   );

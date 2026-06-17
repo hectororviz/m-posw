@@ -6347,3 +6347,150 @@ button {
     max-width: 750px;
   }
 }
+
+/* ─── Users Table ─────────────────────────────────────────── */
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.5rem;
+}
+
+.users-table th,
+.users-table td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.users-table th {
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.users-table tbody tr:hover {
+  background: var(--color-hover);
+}
+
+.users-table-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* ─── User Modal Fields ───────────────────────────────────── */
+.user-modal {
+  width: min(560px, 95%);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.user-modal-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.user-modal-fields .settings-field {
+  flex: 1 1 200px;
+}
+
+.user-modal-fields .settings-field label {
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+  color: var(--color-text-muted);
+}
+
+.user-modal-fields input,
+.user-modal-fields select {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  background: var(--color-surface);
+}
+
+/* ─── Permissions Table (Radio Buttons) ───────────────────── */
+.user-modal-perms {
+  overflow-x: auto;
+}
+
+.perms-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.perms-table th,
+.perms-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.perms-table th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.perms-col-header {
+  min-width: 70px;
+}
+
+.perms-module-label {
+  text-align: left !important;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.perms-radio-cell {
+  vertical-align: middle;
+}
+
+.radio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.radio-btn input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.radio-btn-circle {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border-strong);
+  transition: all 0.15s ease;
+}
+
+.radio-btn input[type="radio"]:checked + .radio-btn-circle {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  box-shadow: inset 0 0 0 3px var(--color-surface);
+}
+
+.radio-btn:hover .radio-btn-circle {
+  border-color: var(--color-accent);
+}
+
+.radio-btn--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.radio-btn--disabled .radio-btn-circle {
+  border-color: var(--color-border);
+}
