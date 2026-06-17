@@ -2,201 +2,289 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useUsers } from '../api/queries';
-import type { Role, User } from '../api/types';
+import type { ModuleAccess, ModuleKey, ModulePermission, User } from '../api/types';
 
-const roleOptions: Role[] = ['ADMIN', 'USER'];
+const ALL_MODULES: { key: ModuleKey; label: string }[] = [
+  { key: 'POS', label: 'POS' },
+  { key: 'SOCIOS', label: 'Socios' },
+  { key: 'TESORERIA', label: 'Tesorería' },
+  { key: 'ACREEDORES', label: 'Acreedores' },
+  { key: 'INTERNET', label: 'Internet' },
+  { key: 'STOCK', label: 'Stock' },
+  { key: 'REPORTES', label: 'Reportes' },
+  { key: 'CONFIGURACION', label: 'Configuración' },
+];
+
+const accessOptions: { value: ModuleAccess; label: string }[] = [
+  { value: 'HIDDEN', label: 'Oculto' },
+  { value: 'READ', label: 'Solo lectura' },
+  { value: 'FULL', label: 'Control total' },
+];
 
 export const AdminUsersPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: users } = useUsers();
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [newUser, setNewUser] = useState({
-    name: '',
-    email: '',
+    username: '',
     password: '',
-    role: 'USER' as Role,
-    externalPosId: '',
-    externalStoreId: '',
+    homeModule: '' as string,
   });
-  const [edits, setEdits] = useState<Record<string, Partial<User> & { password?: string }>>({});
+  const [newPermissions, setNewPermissions] = useState<ModulePermission[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{
+    username: string;
+    password: string;
+    homeModule: string;
+  }>({ username: '', password: '', homeModule: '' });
+  const [editPermissions, setEditPermissions] = useState<ModulePermission[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const filteredUsers = useMemo(
+    () => (users ?? []).filter((u) => u.role !== 'ADMIN'),
+    [users],
+  );
+
+  const toggleNewPerm = (module: ModuleKey, access: ModuleAccess) => {
+    if (module === 'POS' && access === 'READ') return;
+    setNewPermissions((prev) => {
+      const rest = prev.filter((p) => p.module !== module);
+      if (access === 'HIDDEN') return rest;
+      return [...rest, { module, access }];
+    });
+  };
+
+  const toggleEditPerm = (module: ModuleKey, access: ModuleAccess) => {
+    if (module === 'POS' && access === 'READ') return;
+    setEditPermissions((prev) => {
+      const rest = prev.filter((p) => p.module !== module);
+      if (access === 'HIDDEN') return rest;
+      return [...rest, { module, access }];
+    });
+  };
+
+  const getPermAccess = (perms: ModulePermission[], module: ModuleKey): ModuleAccess =>
+    perms.find((p) => p.module === module)?.access ?? 'HIDDEN';
 
   const handleCreate = async () => {
     setError(null);
+    setSuccess(null);
     try {
       await apiClient.post('/users', {
-        name: newUser.name,
-        email: newUser.email || undefined,
+        username: newUser.username,
         password: newUser.password,
-        role: newUser.role,
-        externalPosId: newUser.externalPosId || undefined,
-        externalStoreId: newUser.externalStoreId || undefined,
+        homeModule: newUser.homeModule || undefined,
+        permissions: newPermissions,
       });
-      setNewUser({ name: '', email: '', password: '', role: 'USER', externalPosId: '', externalStoreId: '' });
+      setNewUser({ username: '', password: '', homeModule: '' });
+      setNewPermissions([]);
+      setSuccess('Usuario creado exitosamente');
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch (err) {
       setError(normalizeApiError(err));
     }
   };
 
-  const handleUpdate = async (userId: string) => {
+  const startEdit = (user: User) => {
+    setEditingId(user.id);
+    setEditForm({
+      username: user.username,
+      password: '',
+      homeModule: user.homeModule ?? '',
+    });
+    setEditPermissions(user.permissions ?? []);
     setError(null);
+    setSuccess(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({ username: '', password: '', homeModule: '' });
+    setEditPermissions([]);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingId) return;
+    setError(null);
+    setSuccess(null);
     try {
-      await apiClient.patch(`/users/${userId}`, edits[userId]);
-      setEdits((prev) => ({ ...prev, [userId]: {} }));
+      const payload: Record<string, unknown> = {
+        username: editForm.username,
+        homeModule: editForm.homeModule || undefined,
+        permissions: editPermissions,
+      };
+      if (editForm.password) {
+        payload.password = editForm.password;
+      }
+      await apiClient.patch(`/users/${editingId}`, payload);
+      setEditingId(null);
+      setSuccess('Usuario actualizado exitosamente');
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch (err) {
       setError(normalizeApiError(err));
     }
   };
 
-  const rendered = useMemo(() => users ?? [], [users]);
+  const handleDelete = async (user: User) => {
+    setError(null);
+    setSuccess(null);
+    setDeletingId(user.id);
+    try {
+      await apiClient.delete(`/users/${user.id}`);
+      setSuccess(`Usuario "${user.username}" eliminado`);
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+    } catch (err) {
+      setError(normalizeApiError(err));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const availableHomeModules = [
+    { value: '', label: 'Home genérico' },
+    ...ALL_MODULES.filter((m) => (editingId ? getPermAccess(editPermissions, m.key) : true)).map((m) => ({
+      value: m.key,
+      label: m.label,
+    })),
+  ];
 
   return (
-    <section className="card admin-products">
+    <section className="card admin-users-page">
       <h2>Usuarios</h2>
-      <div className="product-form-row">
-        <input
-          type="text"
-          placeholder="Nombre"
-          value={newUser.name}
-          onChange={(event) => setNewUser({ ...newUser, name: event.target.value })}
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={newUser.email}
-          onChange={(event) => setNewUser({ ...newUser, email: event.target.value })}
-        />
-        <input
-          type="password"
-          placeholder="Contraseña"
-          value={newUser.password}
-          inputMode="numeric"
-          pattern="[0-9]*"
-          onChange={(event) =>
-            setNewUser({ ...newUser, password: event.target.value.replace(/\D/g, '') })
-          }
-        />
-        <select
-          value={newUser.role}
-          onChange={(event) => setNewUser({ ...newUser, role: event.target.value as Role })}
-        >
-          {roleOptions.map((role) => (
-            <option key={role} value={role}>
-              {role}
-            </option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="externalPosId"
-          value={newUser.externalPosId}
-          onChange={(event) => setNewUser({ ...newUser, externalPosId: event.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="externalStoreId"
-          value={newUser.externalStoreId}
-          onChange={(event) => setNewUser({ ...newUser, externalStoreId: event.target.value })}
-        />
-        <button type="button" className="icon-button primary-button" onClick={handleCreate} aria-label="Crear usuario" title="Crear usuario">
-          <span aria-hidden="true">+</span>
-        </button>
-      </div>
+
       {error && <p className="error-text">{error}</p>}
-      <div className="product-table">
-        <div className="product-table-header product-table-header--7">
-          <span>Nombre</span>
-          <span>Rol</span>
-          <span>Activo</span>
-          <span>Clave</span>
-          <span>externalPosId</span>
-          <span>externalStoreId</span>
-          <span>Acción</span>
+      {success && <p className="success-text">{success}</p>}
+
+      <div className="section-title">Nuevo usuario</div>
+      <div className="user-create-form">
+        <div className="user-create-row">
+          <input
+            type="text"
+            placeholder="Nombre de usuario"
+            value={newUser.username}
+            onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+          />
+          <input
+            type="password"
+            placeholder="Contraseña"
+            value={newUser.password}
+            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+          />
+          <select
+            value={newUser.homeModule}
+            onChange={(e) => setNewUser({ ...newUser, homeModule: e.target.value })}
+          >
+            <option value="">Home genérico</option>
+            {ALL_MODULES.map((m) => (
+              <option key={m.key} value={m.key}>{m.label}</option>
+            ))}
+          </select>
+          <button type="button" className="btn-primary" onClick={handleCreate} disabled={!newUser.username || !newUser.password}>
+            Crear
+          </button>
         </div>
-        {rendered.map((user) => {
-          const draft = edits[user.id] ?? {};
-          return (
-            <div key={user.id} className="product-table-row product-table-row--7">
+        <div className="user-perms-grid">
+          {ALL_MODULES.map((mod) => {
+            const current = getPermAccess(newPermissions, mod.key);
+            const opts = mod.key === 'POS'
+              ? accessOptions.filter((o) => o.value !== 'READ')
+              : accessOptions;
+            return (
+              <div key={mod.key} className="user-perm-item">
+                <span className="user-perm-label">{mod.label}</span>
+                <select
+                  className="user-perm-select"
+                  value={current}
+                  onChange={(e) => toggleNewPerm(mod.key, e.target.value as ModuleAccess)}
+                >
+                  {opts.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="section-title">Usuarios registrados</div>
+      {filteredUsers.length === 0 && (
+        <p className="text-muted">No hay usuarios registrados.</p>
+      )}
+      {filteredUsers.map((user) =>
+        editingId === user.id ? (
+          <div key={user.id} className="user-edit-card">
+            <div className="user-edit-row">
               <input
                 type="text"
-                value={draft.name ?? user.name}
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [user.id]: { ...draft, name: event.target.value },
-                  }))
-                }
+                value={editForm.username}
+                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                placeholder="Nombre de usuario"
               />
-              <select
-                value={draft.role ?? user.role}
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [user.id]: { ...draft, role: event.target.value as Role },
-                  }))
-                }
-              >
-                {roleOptions.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
-              <label className="switch switch-sm">
-                <input
-                  type="checkbox"
-                  checked={draft.active ?? user.active ?? true}
-                  onChange={(event) =>
-                    setEdits((prev) => ({
-                      ...prev,
-                      [user.id]: { ...draft, active: event.target.checked },
-                    }))
-                  }
-                />
-              </label>
               <input
                 type="password"
-                placeholder="Nueva clave"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                onChange={(event) => {
-                  const numericPassword = event.target.value.replace(/\D/g, '');
-                  setEdits((prev) => ({
-                    ...prev,
-                    [user.id]: { ...draft, password: numericPassword },
-                  }));
-                }}
+                value={editForm.password}
+                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                placeholder="Nueva clave (dejar vacío para no cambiar)"
               />
-              <input
-                type="text"
-                value={draft.externalPosId ?? user.externalPosId ?? ''}
-                placeholder="externalPosId"
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [user.id]: { ...draft, externalPosId: event.target.value },
-                  }))
-                }
-              />
-              <input
-                type="text"
-                value={draft.externalStoreId ?? user.externalStoreId ?? ''}
-                placeholder="externalStoreId"
-                onChange={(event) =>
-                  setEdits((prev) => ({
-                    ...prev,
-                    [user.id]: { ...draft, externalStoreId: event.target.value },
-                  }))
-                }
-              />
-              <button type="button" className="secondary-button" onClick={() => handleUpdate(user.id)}>
-                Guardar
+              <select
+                value={editForm.homeModule}
+                onChange={(e) => setEditForm({ ...editForm, homeModule: e.target.value })}
+              >
+                {availableHomeModules.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+              <button type="button" className="btn-primary" onClick={handleUpdate}>Guardar</button>
+              <button type="button" className="btn-ghost" onClick={cancelEdit}>Cancelar</button>
+            </div>
+            <div className="user-perms-grid">
+              {ALL_MODULES.map((mod) => {
+                const current = getPermAccess(editPermissions, mod.key);
+                const opts = mod.key === 'POS'
+                  ? accessOptions.filter((o) => o.value !== 'READ')
+                  : accessOptions;
+                return (
+                  <div key={mod.key} className="user-perm-item">
+                    <span className="user-perm-label">{mod.label}</span>
+                    <select
+                      className="user-perm-select"
+                      value={current}
+                      onChange={(e) => toggleEditPerm(mod.key, e.target.value as ModuleAccess)}
+                    >
+                      {opts.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div key={user.id} className="user-list-item">
+            <div className="user-list-info">
+              <span className="user-list-username">{user.username}</span>
+              <span className="user-list-home">
+                Home: {user.homeModule ? ALL_MODULES.find((m) => m.key === user.homeModule)?.label ?? user.homeModule : 'Genérico'}
+              </span>
+            </div>
+            <div className="user-list-actions">
+              <button type="button" className="btn-ghost" onClick={() => startEdit(user)}>✎</button>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => handleDelete(user)}
+                disabled={deletingId === user.id}
+                style={{ color: 'var(--color-danger-text)' }}
+              >
+                {deletingId === user.id ? '...' : '✕'}
               </button>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        ),
+      )}
     </section>
   );
 };

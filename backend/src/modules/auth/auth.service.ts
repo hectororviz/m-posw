@@ -2,54 +2,52 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma.service';
+import { UserPermissionsService } from '../users/user-permissions.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService, private jwtService: JwtService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+    private userPermissionsService: UserPermissionsService,
+  ) {}
 
-  async validateUser(identifier: { email?: string; name?: string }, credential: string) {
-    if (!identifier.email && !identifier.name) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-    const user = identifier.email
-      ? await this.prisma.user.findUnique({ where: { email: identifier.email } })
-      : await this.prisma.user.findUnique({ where: { name: identifier.name! } });
+  async login(dto: { username: string; password: string }) {
+    const user = await this.prisma.user.findUnique({ where: { username: dto.username } });
     if (!user || !user.active) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    const valid = await bcrypt.compare(credential, user.password);
+    const valid = await bcrypt.compare(dto.password, user.password);
     if (!valid) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
-    return user;
-  }
 
-  async login(dto: { email?: string; name?: string; password?: string; pin?: string }) {
-    const credential = dto.pin ?? dto.password;
-    if (!credential) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-    const user = await this.validateUser({ email: dto.email, name: dto.name }, credential);
     const session = await this.prisma.$transaction(async (tx) => {
       await tx.session.updateMany({
         where: { userId: user.id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
       return tx.session.create({
-        data: {
-          userId: user.id,
-        },
+        data: { userId: user.id },
       });
     });
-    const payload = { sub: user.id, role: user.role, name: user.name, sessionId: session.id };
+
+    const payload = { sub: user.id, role: user.role, username: user.username, sessionId: session.id };
+
+    const permissions = user.role === 'ADMIN'
+      ? []
+      : await this.userPermissionsService.getPermissions(user.id);
+
     return {
       accessToken: await this.jwtService.signAsync(payload),
       user: {
         id: user.id,
-        name: user.name,
+        username: user.username,
         email: user.email,
         role: user.role,
       },
+      homeModule: user.homeModule ?? null,
+      permissions,
     };
   }
 

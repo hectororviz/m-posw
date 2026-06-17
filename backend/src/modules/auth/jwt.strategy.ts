@@ -14,7 +14,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; name: string; role: string; sessionId?: string }) {
+  async validate(payload: { sub: string; username: string; role: string; sessionId?: string }) {
     if (!payload.sessionId) {
       throw new UnauthorizedException('Sesión inválida');
     }
@@ -24,11 +24,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!session) {
       throw new UnauthorizedException('Sesión inválida');
     }
-    // sub is the canonical userId; sessionId is only for session validation and must not be used for ownership checks.
     return {
       id: payload.sub,
       sub: payload.sub,
-      name: payload.name,
+      username: payload.username,
       role: payload.role,
       sessionId: payload.sessionId,
     };

@@ -277,7 +277,7 @@ export class TreasuryReportsService {
 
     const lastEntries = await this.prisma.journalEntry.findMany({
       where: { status: { in: ['POSTED', 'VOIDED'] } },
-      include: { createdBy: { select: { id: true, name: true } } },
+      include: { createdBy: { select: { id: true, username: true } } },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });

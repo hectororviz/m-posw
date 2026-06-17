@@ -181,7 +181,7 @@ export class AccountingService {
     return this.prisma.manualMovement.findMany({
       where,
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, username: true } },
         manualMovementCategory: {
           include: { category: true },
         },

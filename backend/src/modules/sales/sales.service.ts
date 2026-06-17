@@ -384,7 +384,7 @@ export class SalesService {
     return this.prisma.sale.findMany({
       where: createdAtFilter ? { createdAt: { gte: createdAtFilter } } : undefined,
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, username: true } },
         items: { include: { product: { include: { category: true } } } },
         vouchers: { include: { plan: true } },
       },
@@ -439,7 +439,7 @@ export class SalesService {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, username: true } },
         items: { include: { product: { include: { category: true } } } },
         vouchers: { include: { plan: true } },
       },
@@ -680,7 +680,7 @@ export class SalesService {
         expiredAt: new Date(),
       },
       include: {
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, username: true } },
         items: { include: { product: { include: { category: true } } } },
       },
     });

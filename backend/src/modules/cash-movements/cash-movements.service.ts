@@ -19,7 +19,7 @@ export class CashMovementsService {
         amount: Math.round(dto.amount * 100) / 100,
         reason: fullReason,
       },
-      include: { createdBy: { select: { id: true, name: true } } },
+      include: { createdBy: { select: { id: true, username: true } } },
     });
   }
 
@@ -28,7 +28,7 @@ export class CashMovementsService {
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 200),
       skip: Math.max(offset, 0),
-      include: { createdBy: { select: { id: true, name: true } } },
+      include: { createdBy: { select: { id: true, username: true } } },
     });
   }
 }

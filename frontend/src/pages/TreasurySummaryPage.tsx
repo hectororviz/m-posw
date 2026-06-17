@@ -107,7 +107,7 @@ export const TreasurySummaryPage: React.FC = () => {
                       <span>{formatDate(e.date)}</span>
                       <span className="truncate">{e.description}</span>
                       <span><span className={statusBadge(e.status)}>{e.status === 'DRAFT' ? 'Borrador' : e.status === 'POSTED' ? 'Confirmado' : 'Anulado'}</span></span>
-                      <span>{e.createdBy?.name || '-'}</span>
+                      <span>{e.createdBy?.username || '-'}</span>
                     </div>
                   ))}
                 </div>

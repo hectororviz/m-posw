@@ -44,8 +44,7 @@ Ver `.env.example` para el listado completo. Las críticas:
 |----------|-----------|
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | Firma de tokens JWT |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` / `ADMIN_PIN` | Admin inicial (PIN tiene prioridad si ambos están) |
-| `CAJA01_PASSWORD` | Password de la caja inicial (role USER) |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Credenciales del admin inicial (seed) |
 | `CORS_ORIGIN` | Origen permitido para CORS |
 | `VITE_API_BASE_URL` | `/api` (con proxy) o URL completa del backend |
 | `MP_ACCESS_TOKEN` / `MP_COLLECTOR_ID` | Mercado Pago (opcionales si usás OAuth) |
@@ -55,6 +54,58 @@ Ver `.env.example` para el listado completo. Las críticas:
 | `MP_CLIENT_ID` / `MP_CLIENT_SECRET` | Credenciales para OAuth Mercado Pago |
 | `MP_OAUTH_REDIRECT_URI` | URI de callback para OAuth |
 | `MP_INTEGRATOR_ID` | Integrator ID opcional (header X-Integrator-Id) |
+
+## Authentication & Permissions
+
+### Login
+
+Login unificado por `username` + `password`. El endpoint `POST /auth/login` devuelve:
+- `accessToken`: JWT (payload: `userId`, `role`, `username`)
+- `user`: datos del usuario
+- `homeModule`: módulo al que redirige post-login (null = `/home`)
+- `permissions`: lista de `{ module, access }` para el usuario (vacío para ADMIN)
+
+### Roles
+
+- **ADMIN**: acceso FULL implícito a todos los módulos. No tiene registros en `UserModulePermission`.
+- **USER**: acceso configurable por módulo vía `UserModulePermission`.
+
+### Módulos y niveles de acceso
+
+| Módulo | ModuleKey | Niveles |
+|--------|-----------|---------|
+| POS | `POS` | HIDDEN, FULL (no acepta READ) |
+| Socios | `SOCIOS` | HIDDEN, READ, FULL |
+| Tesorería | `TESORERIA` | HIDDEN, READ, FULL |
+| Acreedores | `ACREEDORES` | HIDDEN, READ, FULL |
+| Internet | `INTERNET` | HIDDEN, READ, FULL |
+| Stock | `STOCK` | HIDDEN, READ, FULL |
+| Reportes | `REPORTES` | HIDDEN, READ, FULL |
+| Configuración | `CONFIGURACION` | HIDDEN, READ, FULL |
+
+- **HIDDEN**: no aparece en sidebar, no accesible vía URL
+- **READ**: visible, datos cargados, sin botones de crear/editar/eliminar
+- **FULL**: acceso completo
+
+### Permisos en el frontend
+
+- Hook `useModuleAccess(moduleKey)` → `'HIDDEN' | 'READ' | 'FULL'`
+- Componente `ModuleRoute` protege rutas; redirige a `/home` si módulo oculto
+- Sidebar se construye dinámicamente según permisos
+- Home page (`/home`) muestra grilla de módulos accesibles
+
+### Guard de backend
+
+- `ModuleAccessGuard` + decorador `@RequireModule(ModuleKey, MinAccess)`
+- El ADMIN bypasea cualquier verificación
+
+### Gestión de usuarios
+
+- `GET /users` — lista con permisos y homeModule
+- `POST /users` — crear con `{ username, password, homeModule?, permissions[] }`
+- `PATCH /users/:id` — editar usuario y permisos
+- `DELETE /users/:id` — no permite eliminar al admin
+- Solo ADMIN puede gestionar usuarios. Los permisos del admin no se modifican.
 
 ## Developer Commands
 

@@ -85,9 +85,9 @@ export const AdminSalesPage: React.FC = () => {
 
   const filteredEntries = useMemo(() => {
     const all: SalesTableEntry[] = [
-      ...sales.map((s) => ({ kind: 'SALE' as const, id: `sale-${s.id}`, createdAt: s.createdAt, total: s.total, userName: s.user?.name ?? 'Sin usuario', paymentLabel: getPaymentMethodLabel(s.paymentMethod), saleId: s.id })),
+      ...sales.map((s) => ({ kind: 'SALE' as const, id: `sale-${s.id}`, createdAt: s.createdAt, total: s.total, userName: s.user?.username ?? 'Sin usuario', paymentLabel: getPaymentMethodLabel(s.paymentMethod), saleId: s.id })),
       ...movements.map((m) => ({ kind: 'MOVEMENT' as const, id: `movement-${m.id}`, createdAt: m.createdAt, total: m.type === 'SALIDA' ? m.amount * -1 : m.amount, userName: 'Mov. manual', paymentLabel: m.type, reason: m.reason })),
-      ...cashCloses.map((c) => ({ kind: 'CASH_CLOSE' as const, id: `close-${c.id}`, createdAt: c.closedAt, total: c.salesTotal, userName: c.closedBy?.name ?? 'Sistema', paymentLabel: 'CIERRE', cashCloseId: c.id, note: c.note })),
+      ...cashCloses.map((c) => ({ kind: 'CASH_CLOSE' as const, id: `close-${c.id}`, createdAt: c.closedAt, total: c.salesTotal, userName: c.closedBy?.username ?? 'Sistema', paymentLabel: 'CIERRE', cashCloseId: c.id, note: c.note })),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return all.filter((entry) => {
@@ -391,7 +391,7 @@ export const AdminSalesPage: React.FC = () => {
             <div className="modal-body">
               <div className="sales-detail-row"><span>Fecha</span><span>{formatDate(selectedCashClose.closedAt)} {formatTime(selectedCashClose.closedAt)}</span></div>
               <div className="sales-detail-row"><span>Periodo</span><span>{formatDate(selectedCashClose.from)} - {formatDate(selectedCashClose.to)}</span></div>
-              <div className="sales-detail-row"><span>Cerrado por</span><span>{selectedCashClose.closedBy?.name ?? 'Sistema'}</span></div>
+              <div className="sales-detail-row"><span>Cerrado por</span><span>{selectedCashClose.closedBy?.username ?? 'Sistema'}</span></div>
               <div className="ticket-divider" />
               <div className="sales-detail-row"><span>Ventas</span><strong>{formatCurrency(selectedCashClose.salesTotal)}</strong></div>
               <div className="sales-detail-row"><span>Efectivo</span><span>{formatCurrency(selectedCashClose.salesCashTotal)}</span></div>

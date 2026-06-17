@@ -227,7 +227,7 @@ export const TreasuryJournalEntriesPage: React.FC = () => {
                 <span><span className={statusBadge(e.status)}>{statusLabel(e.status)}</span></span>
                 <span>{formatCurrency(totalDebit(e))}</span>
                 <span>{formatCurrency(totalCredit(e))}</span>
-                <span>{e.createdBy?.name || '-'}</span>
+                <span>{e.createdBy?.username || '-'}</span>
                 <span className="action-buttons">
                   <button className="btn-ghost btn-sm" onClick={() => openModal('detail', e.id)}>Ver</button>
                   {e.status === 'DRAFT' && (
@@ -842,7 +842,7 @@ const DetailModal: React.FC<{ entry: JournalEntry; onClose: () => void }> = ({ e
             </div>
             <div className="detail-row">
               <span className="detail-label">Creado por:</span>
-              <span>{entry.createdBy?.name || '-'}</span>
+              <span>{entry.createdBy?.username || '-'}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Descripción:</span>

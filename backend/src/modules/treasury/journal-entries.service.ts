@@ -55,7 +55,7 @@ export class JournalEntriesService {
     return this.prisma.journalEntry.findMany({
       where,
       include: {
-        createdBy: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, username: true } },
         lines: { include: { account: true } },
       },
       orderBy: { entryNumber: 'desc' },
@@ -66,7 +66,7 @@ export class JournalEntriesService {
     const entry = await this.prisma.journalEntry.findUnique({
       where: { id },
       include: {
-        createdBy: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, username: true } },
         lines: {
           include: { account: true },
           orderBy: { createdAt: 'asc' },
@@ -119,7 +119,7 @@ export class JournalEntriesService {
           },
         },
         include: {
-          createdBy: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, username: true } },
           lines: { include: { account: true } },
         },
       });
@@ -196,7 +196,7 @@ export class JournalEntriesService {
         where: { id },
         data,
         include: {
-          createdBy: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, username: true } },
           lines: { include: { account: true } },
         },
       });
@@ -232,7 +232,7 @@ export class JournalEntriesService {
       where: { id },
       data: { status: 'POSTED', postedAt: new Date() },
       include: {
-        createdBy: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, username: true } },
         lines: { include: { account: true } },
       },
     });

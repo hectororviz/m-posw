@@ -2,19 +2,40 @@ export type Role = 'ADMIN' | 'USER';
 
 export type ProductType = 'SIMPLE' | 'RAW_MATERIAL' | 'COMPOSITE';
 
+export type ModuleKey =
+  | 'POS'
+  | 'SOCIOS'
+  | 'TESORERIA'
+  | 'ACREEDORES'
+  | 'INTERNET'
+  | 'STOCK'
+  | 'REPORTES'
+  | 'CONFIGURACION';
+
+export type ModuleAccess = 'HIDDEN' | 'READ' | 'FULL';
+
+export interface ModulePermission {
+  module: ModuleKey;
+  access: ModuleAccess;
+}
+
 export interface AuthResponse {
   accessToken: string;
   user: User;
+  homeModule: string | null;
+  permissions: ModulePermission[];
 }
 
 export interface User {
   id: string;
-  name: string;
+  username: string;
   email?: string | null;
   role: Role;
   active?: boolean;
+  homeModule?: string | null;
   externalPosId?: string | null;
   externalStoreId?: string | null;
+  permissions?: ModulePermission[];
 }
 
 export interface Category {
@@ -100,7 +121,7 @@ export interface SaleItem {
 
 export interface SaleUser {
   id: string;
-  name: string;
+  username: string;
   email?: string | null;
 }
 
@@ -208,7 +229,7 @@ export interface CashClose {
   closedByUserId: string;
   closedBy?: {
     id: string;
-    name: string;
+    username: string;
     role: string;
   };
   salesCashTotal: number;
@@ -253,7 +274,7 @@ export interface ManualMovementWithCategory {
   amount: number;
   reason: string;
   userId: string;
-  user?: { id: string; name: string };
+  user?: { id: string; username: string };
   manualMovementCategory?: {
     id: string;
     categoryId: string;
@@ -303,7 +324,7 @@ export interface JournalEntry {
   notes?: string | null;
   status: JournalEntryStatus;
   createdById: string;
-  createdBy?: { id: string; name: string };
+  createdBy?: { id: string; username: string };
   postedAt?: string | null;
   voidedAt?: string | null;
   voidReason?: string | null;

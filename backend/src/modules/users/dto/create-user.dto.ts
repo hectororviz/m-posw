@@ -1,27 +1,30 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { Role } from '@prisma/client';
+import { IsArray, IsEnum, IsOptional, IsString, MinLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ModuleKey, ModuleAccess } from '@prisma/client';
+
+class PermissionInput {
+  @IsEnum(ModuleKey)
+  module: ModuleKey;
+
+  @IsEnum(ModuleAccess)
+  access: ModuleAccess;
+}
 
 export class CreateUserDto {
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
   @IsString()
-  name: string;
+  username: string;
 
   @IsString()
   @MinLength(6)
   password: string;
 
-  @IsEnum(Role)
-  @IsOptional()
-  role?: Role;
-
   @IsOptional()
   @IsString()
-  externalPosId?: string;
+  homeModule?: string;
 
   @IsOptional()
-  @IsString()
-  externalStoreId?: string;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PermissionInput)
+  permissions?: PermissionInput[];
 }

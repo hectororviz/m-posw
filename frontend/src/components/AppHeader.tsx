@@ -66,8 +66,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           </div>
         </div>
         <div className="header-user">
-          <span className="user-name" title={user?.name ?? 'Usuario'}>
-            {user?.name ?? 'Usuario'}
+          <span className="user-name" title={user?.username ?? 'Usuario'}>
+            {user?.username ?? 'Usuario'}
           </span>
           <button type="button" onClick={toggleTheme} className="ghost-button header-toggle-button theme-toggle" aria-label="Cambiar tema" title={resolved === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
             <span aria-hidden="true">{resolved === 'dark' ? '☀️' : '🌙'}</span>

@@ -1,14 +1,19 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { Role } from '@prisma/client';
+import { IsArray, IsBoolean, IsEnum, IsOptional, IsString, MinLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ModuleKey, ModuleAccess } from '@prisma/client';
+
+class PermissionInput {
+  @IsEnum(ModuleKey)
+  module: ModuleKey;
+
+  @IsEnum(ModuleAccess)
+  access: ModuleAccess;
+}
 
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
-  name?: string;
-
-  @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
+  username?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -18,6 +23,16 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(6)
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  homeModule?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PermissionInput)
+  permissions?: PermissionInput[];
 
   @IsOptional()
   @IsString()

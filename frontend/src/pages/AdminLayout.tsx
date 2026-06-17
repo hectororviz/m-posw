@@ -3,6 +3,8 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
+import { useModuleAccess } from '../hooks/useModuleAccess';
+import { useAuth } from '../context/AuthContext';
 
 const COLLAPSE_BREAKPOINT = 1200;
 const STORAGE_KEY = 'admin-sidebar-collapsed';
@@ -17,26 +19,39 @@ const getInitials = (name?: string | null) => {
 
 const navIcon = (emoji: string) => <span className="nav-icon" aria-hidden="true">{emoji}</span>;
 
-const navItems = [
-  { to: '/admin/sales',      emoji: '📋', label: 'Ventas' },
-  { to: '/admin/stats',      emoji: '📊', label: 'Estadisticas' },
-  { to: '/admin/tesoreria',  emoji: '📒', label: 'Tesorería',     moduleKey: 'enableTreasuryModule' as const },
-  { to: '/admin/categories', emoji: '🗂️', label: 'Categorias' },
-  { to: '/admin/products',   emoji: '📦', label: 'Productos' },
-  { to: '/admin/stock',      emoji: '📐', label: 'Stock' },
-  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores',    moduleKey: 'enableAcreedoresModule' as const },
-  { to: '/admin/socios',     emoji: '🪪', label: 'Socios',        moduleKey: 'enableSociosModule' as const },
-  { to: '/admin/internet',   emoji: '📶', label: 'Internet',      moduleKey: 'enableInternetModule' as const },
-  { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion' },
+interface NavItem {
+  to: string;
+  emoji: string;
+  label: string;
+  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule';
+  permissionModule?: string;
+}
+
+const navItems: NavItem[] = [
+  { to: '/admin/sales',      emoji: '📋', label: 'Ventas',          permissionModule: 'REPORTES' },
+  { to: '/admin/stats',      emoji: '📊', label: 'Estadisticas',     permissionModule: 'REPORTES' },
+  { to: '/admin/tesoreria',  emoji: '📒', label: 'Tesorería',       moduleKey: 'enableTreasuryModule', permissionModule: 'TESORERIA' },
+  { to: '/admin/categories', emoji: '🗂️', label: 'Categorias',       permissionModule: 'CONFIGURACION' },
+  { to: '/admin/products',   emoji: '📦', label: 'Productos',        permissionModule: 'CONFIGURACION' },
+  { to: '/admin/stock',      emoji: '📐', label: 'Stock',            permissionModule: 'STOCK' },
+  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores',      moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
+  { to: '/admin/socios',     emoji: '🪪', label: 'Socios',          moduleKey: 'enableSociosModule', permissionModule: 'SOCIOS' },
+  { to: '/admin/internet',   emoji: '📶', label: 'Internet',        moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
+  { to: '/admin/users',      emoji: '👤', label: 'Usuarios',        permissionModule: 'CONFIGURACION' },
+  { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion',    permissionModule: 'CONFIGURACION' },
 ];
 
 export const AdminLayout: React.FC = () => {
   const { data: settings } = useSettings();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const storeName = settings?.storeName ?? 'm-POSw';
   const logoUrl = buildImageUrl(settings?.logoUrl);
   const [logoError, setLogoError] = useState(false);
   const initials = getInitials(storeName);
   const showLogo = Boolean(logoUrl) && !logoError;
+
+  const moduleAccess = useModuleAccess;
 
   const prevWidthRef = useRef<number>(
     typeof window !== 'undefined' ? window.innerWidth : COLLAPSE_BREAKPOINT + 1
@@ -84,6 +99,19 @@ export const AdminLayout: React.FC = () => {
     });
   }, []);
 
+  const filteredNavItems = navItems.filter((item) => {
+    if (item.moduleKey) {
+      const key = item.moduleKey;
+      const settingVal = settings?.[key];
+      if (settingVal === false) return false;
+    }
+    if (!isAdmin && item.permissionModule) {
+      const access = moduleAccess(item.permissionModule as any);
+      if (access === 'HIDDEN') return false;
+    }
+    return true;
+  });
+
   return (
     <AppLayout title="">
       <div className="admin-layout">
@@ -115,13 +143,7 @@ export const AdminLayout: React.FC = () => {
             </button>
           </div>
 
-          {navItems
-            .filter((item) => {
-              if (!item.moduleKey) return true;
-              const key = item.moduleKey as 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule';
-              return settings?.[key] ?? true;
-            })
-            .map(({ to, emoji, label }) => (
+          {filteredNavItems.map(({ to, emoji, label }) => (
             <NavLink
               key={to}
               to={to}

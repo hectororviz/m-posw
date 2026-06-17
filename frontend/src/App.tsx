@@ -9,6 +9,7 @@ import { AdminSalesPage } from './pages/AdminSalesPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 import { AdminStatsPage } from './pages/AdminStatsPage';
 import { AdminStockPage } from './pages/AdminStockPage';
+import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminAcreedoresPage } from './pages/AdminAcreedoresPage';
 import { AdminAcreedorDetailPage } from './pages/AdminAcreedorDetailPage';
 import { AdminInternetPage } from './pages/AdminInternetPage';
@@ -28,6 +29,7 @@ import { OAuthReturnPage } from './pages/OAuthReturnPage';
 import { PrintTicketPage } from './pages/PrintTicketPage';
 import { SalesPage } from './pages/SalesPage';
 import { useAuth } from './context/AuthContext';
+import type { ModuleKey } from './api/types';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { token } = useAuth();
@@ -37,10 +39,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  if (user?.role !== 'ADMIN') {
-    return <Navigate to="/" replace />;
+const ModuleRoute: React.FC<{ module: ModuleKey; children: React.ReactNode }> = ({ module, children }) => {
+  const { token, user, permissions } = useAuth();
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user?.role === 'ADMIN') {
+    return <>{children}</>;
+  }
+  const perm = permissions.find((p) => p.module === module);
+  if (!perm || perm.access === 'HIDDEN') {
+    return <Navigate to="/home" replace />;
   }
   return <>{children}</>;
 };
@@ -53,7 +62,7 @@ export const App: React.FC = () => {
       <Route path="/print/ticket" element={<PrintTicketPage />} />
       <Route path="/printticket" element={<PrintTicketPage />} />
       <Route
-        path="/"
+        path="/home"
         element={
           <ProtectedRoute>
             <HomePage />
@@ -61,10 +70,22 @@ export const App: React.FC = () => {
         }
       />
       <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <ModuleRoute module="POS">
+              <HomePage />
+            </ModuleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/category/:id"
         element={
           <ProtectedRoute>
-            <CategoryPage />
+            <ModuleRoute module="POS">
+              <CategoryPage />
+            </ModuleRoute>
           </ProtectedRoute>
         }
       />
@@ -96,35 +117,81 @@ export const App: React.FC = () => {
         path="/admin"
         element={
           <ProtectedRoute>
-            <AdminRoute>
-              <AdminLayout />
-            </AdminRoute>
+            <AdminLayout />
           </ProtectedRoute>
         }
       >
         <Route index element={<Navigate to="/admin/sales" replace />} />
-        <Route path="categories" element={<AdminCategoriesPage />} />
-        <Route path="products" element={<AdminProductsPage />} />
-        <Route path="sales" element={<AdminSalesPage />} />
-        <Route path="stats" element={<AdminStatsPage />} />
-        <Route path="settings" element={<AdminSettingsPage />} />
-        <Route path="stock" element={<AdminStockPage />} />
-        <Route path="acreedores" element={<AdminAcreedoresPage />} />
-        <Route path="acreedores/:id" element={<AdminAcreedorDetailPage />} />
-        <Route path="internet" element={<AdminInternetPage />} />
-        <Route path="socios" element={<AdminSociosLayout />}>
+        <Route path="categories" element={
+          <ModuleRoute module="CONFIGURACION">
+            <AdminCategoriesPage />
+          </ModuleRoute>
+        } />
+        <Route path="products" element={
+          <ModuleRoute module="CONFIGURACION">
+            <AdminProductsPage />
+          </ModuleRoute>
+        } />
+        <Route path="sales" element={
+          <ModuleRoute module="REPORTES">
+            <AdminSalesPage />
+          </ModuleRoute>
+        } />
+        <Route path="stats" element={
+          <ModuleRoute module="REPORTES">
+            <AdminStatsPage />
+          </ModuleRoute>
+        } />
+        <Route path="settings" element={
+          <ModuleRoute module="CONFIGURACION">
+            <AdminSettingsPage />
+          </ModuleRoute>
+        } />
+        <Route path="users" element={
+          <ModuleRoute module="CONFIGURACION">
+            <AdminUsersPage />
+          </ModuleRoute>
+        } />
+        <Route path="stock" element={
+          <ModuleRoute module="STOCK">
+            <AdminStockPage />
+          </ModuleRoute>
+        } />
+        <Route path="acreedores" element={
+          <ModuleRoute module="ACREEDORES">
+            <AdminAcreedoresPage />
+          </ModuleRoute>
+        } />
+        <Route path="acreedores/:id" element={
+          <ModuleRoute module="ACREEDORES">
+            <AdminAcreedorDetailPage />
+          </ModuleRoute>
+        } />
+        <Route path="internet" element={
+          <ModuleRoute module="INTERNET">
+            <AdminInternetPage />
+          </ModuleRoute>
+        } />
+        <Route path="socios" element={
+          <ModuleRoute module="SOCIOS">
+            <AdminSociosLayout />
+          </ModuleRoute>
+        }>
           <Route index element={<AdminSociosPage />} />
           <Route path="matriz" element={<AdminSociosMatrizPage />} />
           <Route path="configuracion" element={<AdminSociosTiposPage />} />
           <Route path="beneficios" element={<AdminSociosBeneficiosPage />} />
         </Route>
-        <Route path="users" element={<Navigate to="/admin/settings" replace />} />
         <Route path="contabilidad" element={<Navigate to="/admin/tesoreria" replace />} />
         <Route path="contabilidad/movimientos" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
         <Route path="contabilidad/jornadas" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
         <Route path="contabilidad/categorias" element={<Navigate to="/admin/tesoreria/cuentas" replace />} />
         <Route path="contabilidad/exportar" element={<Navigate to="/admin/tesoreria/reportes" replace />} />
-        <Route path="tesoreria" element={<TreasuryLayout />}>
+        <Route path="tesoreria" element={
+          <ModuleRoute module="TESORERIA">
+            <TreasuryLayout />
+          </ModuleRoute>
+        }>
           <Route index element={<TreasurySummaryPage />} />
           <Route path="movimientos" element={<TreasuryJournalEntriesPage />} />
           <Route path="cuentas" element={<TreasuryLedgerAccountsPage />} />
