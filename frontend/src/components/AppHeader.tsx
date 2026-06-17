@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
@@ -25,7 +25,7 @@ const getInitials = (name?: string | null) => {
 };
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, permissions } = useAuth();
   const { resolved, toggle: toggleTheme } = useTheme();
   const location = useLocation();
   const storeName = settings?.storeName ?? 'm-POSw';
@@ -35,10 +35,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
   const initials = getInitials(storeName);
   const showLogo = Boolean(logoUrl) && !logoError;
   const isPosScreen = location.pathname === '/pos' || location.pathname.startsWith('/category/');
+  const isHomeScreen = location.pathname === '/home';
   const isAdminScreen = location.pathname.startsWith('/admin');
   const isSalesScreen = location.pathname === '/sales';
-  const showConfigToggle = user?.role === 'ADMIN' && (isPosScreen || isAdminScreen);
-  const showSalesButton = user?.role !== 'ADMIN';
+  const isAdmin = user?.role === 'ADMIN';
+  const hasAdminAccess = useMemo(() => {
+    if (isAdmin) return true;
+    return permissions.some((p) => p.access !== 'HIDDEN' && p.module !== 'POS');
+  }, [isAdmin, permissions]);
 
   useEffect(() => {
     setLogoError(false);
@@ -72,22 +76,28 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           <button type="button" onClick={toggleTheme} className="ghost-button header-toggle-button theme-toggle" aria-label="Cambiar tema" title={resolved === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
             <span aria-hidden="true">{resolved === 'dark' ? '☀️' : '🌙'}</span>
           </button>
-          {showSalesButton && (
+          {!isAdmin && hasAdminAccess && (
+            <NavLink
+              to={isAdminScreen || isHomeScreen ? '/pos' : '/home'}
+              className="ghost-button sales-toggle-button"
+            >
+              {isAdminScreen || isHomeScreen ? 'POS' : 'Admin'}
+            </NavLink>
+          )}
+          {!isAdmin && !hasAdminAccess && (
             <NavLink
               to={isSalesScreen ? '/pos' : '/sales'}
               className="ghost-button sales-toggle-button"
-              aria-label={isSalesScreen ? 'Volver al POS' : 'Movimientos'}
             >
               {isSalesScreen ? 'POS' : 'Movimientos'}
             </NavLink>
           )}
-          {showConfigToggle && (
+          {isAdmin && (
             <NavLink
-              to={isPosScreen ? '/admin/settings' : '/pos'}
+              to={isPosScreen || isHomeScreen ? '/admin/settings' : '/pos'}
               className="ghost-button header-toggle-button"
-              aria-label={isPosScreen ? 'Configuración' : 'Volver a POS'}
             >
-              <span aria-hidden="true">{isPosScreen ? '⚙️' : '$'}</span>
+              <span aria-hidden="true">{isPosScreen || isHomeScreen ? '⚙️' : '$'}</span>
             </NavLink>
           )}
           <button type="button" onClick={logout} className="ghost-button logout-button" aria-label="Salir">
