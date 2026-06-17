@@ -1,55 +1,114 @@
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import type { ModuleKey } from '../api/types';
+import { useMemo } from 'react';
+import { buildImageUrl } from '../api/client';
+import {
+  useSocios,
+  useAcreedores,
+  useSettings,
+  useCategories,
+  useAdminProducts,
+  useInternetStats,
+} from '../api/queries';
 
-const MODULES: {
-  key: ModuleKey;
-  label: string;
+const getInitials = (name?: string | null) => {
+  if (!name) return 'MP';
+  const words = name.trim().split(' ').filter(Boolean);
+  if (words.length === 0) return 'MP';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+};
+
+interface MetricCard {
   icon: string;
-  route: string;
-  description: string;
-}[] = [
-  { key: 'POS', label: 'POS', icon: '🛒', route: '/pos', description: 'Punto de venta' },
-  { key: 'VENTAS', label: 'Ventas', icon: '📋', route: '/admin/sales', description: 'Historial de ventas' },
-  { key: 'SOCIOS', label: 'Socios', icon: '🪪', route: '/admin/socios', description: 'Padrón de socios y cuotas' },
-  { key: 'TESORERIA', label: 'Tesorería', icon: '📒', route: '/admin/tesoreria', description: 'Contabilidad y libro diario' },
-  { key: 'ACREEDORES', label: 'Acreedores', icon: '👥', route: '/admin/acreedores', description: 'Fiado y cuentas corrientes' },
-  { key: 'PRODUCTOS', label: 'Productos', icon: '📦', route: '/admin/products', description: 'Productos, categorías y stock' },
-  { key: 'INTERNET', label: 'Internet', icon: '📶', route: '/admin/internet', description: 'Vouchers WiFi' },
-  { key: 'REPORTES', label: 'Reportes', icon: '📊', route: '/admin/stats', description: 'Estadísticas y reportes' },
-  { key: 'CONFIGURACION', label: 'Configuración', icon: '⚙️', route: '/admin/settings', description: 'Ajustes del sistema' },
-];
+  value: number | string;
+  label: string;
+  key: string;
+}
 
 export const HomePage: React.FC = () => {
-  const navigate = useNavigate();
-  const { permissions, user } = useAuth();
+  const { data: settings } = useSettings();
+  const { data: socios } = useSocios();
+  const { data: acreedores } = useAcreedores();
+  const { data: categories } = useCategories();
+  const { data: products } = useAdminProducts();
+  const { data: internetStats } = useInternetStats();
 
-  const isAdmin = user?.role === 'ADMIN';
-  const hasAccess = (key: ModuleKey): boolean => {
-    if (isAdmin) return true;
-    return permissions.some((p) => p.module === key && p.access !== 'HIDDEN');
-  };
+  const clubName = settings?.clubName || settings?.storeName || 'm-POSw';
+  const logoUrl = buildImageUrl(settings?.logoUrl);
+  const initials = getInitials(clubName);
 
-  const visibleModules = MODULES.filter((m) => hasAccess(m.key));
+  const metrics = useMemo<MetricCard[]>(() => {
+    const cards: MetricCard[] = [];
+
+    if (socios) {
+      const activos = socios.filter((s) => s.estado === 'ACTIVO').length;
+      cards.push({
+        icon: '🪪',
+        value: activos,
+        label: 'Socios activos',
+        key: 'socios',
+      });
+    }
+
+    if (acreedores) {
+      const activos = acreedores.filter((a) => a.activo).length;
+      if (activos > 0 || settings?.enableAcreedoresModule) {
+        cards.push({
+          icon: '👥',
+          value: activos,
+          label: 'Acreedores activos',
+          key: 'acreedores',
+        });
+      }
+    }
+
+    if (products) {
+      cards.push({
+        icon: '📦',
+        value: products.length,
+        label: 'Productos',
+        key: 'productos',
+      });
+    }
+
+    if (categories) {
+      cards.push({
+        icon: '🗂️',
+        value: categories.length,
+        label: 'Categorías',
+        key: 'categorias',
+      });
+    }
+
+    if (internetStats && settings?.enableInternetModule) {
+      cards.push({
+        icon: '📶',
+        value: internetStats.active_vouchers,
+        label: 'Vouchers activos',
+        key: 'internet',
+      });
+    }
+
+    return cards;
+  }, [socios, acreedores, categories, products, internetStats, settings]);
 
   return (
     <div className="home-page">
-      <div className="home-header">
-        <h1>Bienvenido, {user?.username ?? 'Usuario'}</h1>
-        <p>Seleccioná un módulo para comenzar</p>
+      <div className="home-brand">
+        {logoUrl ? (
+          <img src={logoUrl} alt={clubName} className="home-logo" />
+        ) : (
+          <div className="home-logo-placeholder">{initials}</div>
+        )}
+        <h1 className="home-club-name">{clubName}</h1>
       </div>
+
       <div className="home-grid">
-        {visibleModules.map((mod) => (
-          <button
-            key={mod.key}
-            type="button"
-            className="home-card"
-            onClick={() => navigate(mod.route)}
-          >
-            <span className="home-card-icon">{mod.icon}</span>
-            <span className="home-card-label">{mod.label}</span>
-            <span className="home-card-desc">{mod.description}</span>
-          </button>
+        {metrics.map((card) => (
+          <div key={card.key} className="home-card">
+            <span className="home-card-icon">{card.icon}</span>
+            <span className="home-card-value">{card.value}</span>
+            <span className="home-card-label">{card.label}</span>
+          </div>
         ))}
       </div>
     </div>

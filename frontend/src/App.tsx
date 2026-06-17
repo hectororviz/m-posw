@@ -64,11 +64,7 @@ export const App: React.FC = () => {
       <Route path="/printticket" element={<PrintTicketPage />} />
       <Route
         path="/home"
-        element={
-          <ProtectedRoute>
-            <HomePage />
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/admin/home" replace />}
       />
       <Route
         path="/pos"
@@ -80,7 +76,7 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      <Route path="/" element={<Navigate to="/home" replace />} />
+      <Route path="/" element={<Navigate to="/admin/home" replace />} />
       <Route
         path="/category/:id"
         element={
@@ -121,7 +117,8 @@ export const App: React.FC = () => {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/admin/sales" replace />} />
+        <Route index element={<Navigate to="/admin/home" replace />} />
+        <Route path="home" element={<HomePage />} />
         <Route path="categories" element={
           <ModuleRoute module="PRODUCTOS">
             <AdminCategoriesPage />

@@ -28,6 +28,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+  { to: '/admin/home',      emoji: '🏠', label: 'Home',                            permissionModule: 'CONFIGURACION' },
   { to: '/pos',              emoji: '🛒', label: 'POS',                 permissionModule: 'POS' },
   { to: '/admin/sales',      emoji: '📋', label: 'Ventas',              permissionModule: 'VENTAS' },
   { to: '/admin/stats',      emoji: '📊', label: 'Estadisticas',         permissionModule: 'REPORTES' },

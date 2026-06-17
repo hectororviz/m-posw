@@ -43,9 +43,9 @@ export const LoginPage: React.FC = () => {
         }
       }
       if (response.data.user.role === 'ADMIN') {
-        navigate('/admin/sales', { replace: true });
+        navigate('/admin/home', { replace: true });
       } else {
-        navigate('/home', { replace: true });
+        navigate('/admin/home', { replace: true });
       }
     } catch (err) {
       setError(normalizeApiError(err));
