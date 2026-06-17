@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { PosPage } from './pages/PosPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { AdminLayout } from './pages/AdminLayout';
 import { AdminCategoriesPage } from './pages/AdminCategoriesPage';
@@ -70,22 +71,21 @@ export const App: React.FC = () => {
         }
       />
       <Route
-        path="/"
+        path="/pos"
         element={
           <ProtectedRoute>
             <ModuleRoute module="POS">
-              <HomePage />
+              <PosPage />
             </ModuleRoute>
           </ProtectedRoute>
         }
       />
+      <Route path="/" element={<Navigate to="/home" replace />} />
       <Route
         path="/category/:id"
         element={
           <ProtectedRoute>
-            <ModuleRoute module="POS">
-              <CategoryPage />
-            </ModuleRoute>
+            <CategoryPage />
           </ProtectedRoute>
         }
       />
@@ -123,17 +123,17 @@ export const App: React.FC = () => {
       >
         <Route index element={<Navigate to="/admin/sales" replace />} />
         <Route path="categories" element={
-          <ModuleRoute module="CONFIGURACION">
+          <ModuleRoute module="PRODUCTOS">
             <AdminCategoriesPage />
           </ModuleRoute>
         } />
         <Route path="products" element={
-          <ModuleRoute module="CONFIGURACION">
+          <ModuleRoute module="PRODUCTOS">
             <AdminProductsPage />
           </ModuleRoute>
         } />
         <Route path="sales" element={
-          <ModuleRoute module="REPORTES">
+          <ModuleRoute module="VENTAS">
             <AdminSalesPage />
           </ModuleRoute>
         } />
@@ -153,7 +153,7 @@ export const App: React.FC = () => {
           </ModuleRoute>
         } />
         <Route path="stock" element={
-          <ModuleRoute module="STOCK">
+          <ModuleRoute module="PRODUCTOS">
             <AdminStockPage />
           </ModuleRoute>
         } />
@@ -198,7 +198,7 @@ export const App: React.FC = () => {
           <Route path="reportes" element={<TreasuryReportsPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   );
 };

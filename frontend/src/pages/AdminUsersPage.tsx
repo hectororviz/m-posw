@@ -6,11 +6,12 @@ import type { ModuleAccess, ModuleKey, ModulePermission, User } from '../api/typ
 
 const ALL_MODULES: { key: ModuleKey; label: string }[] = [
   { key: 'POS', label: 'POS' },
+  { key: 'VENTAS', label: 'Ventas' },
   { key: 'SOCIOS', label: 'Socios' },
   { key: 'TESORERIA', label: 'Tesorería' },
   { key: 'ACREEDORES', label: 'Acreedores' },
+  { key: 'PRODUCTOS', label: 'Productos' },
   { key: 'INTERNET', label: 'Internet' },
-  { key: 'STOCK', label: 'Stock' },
   { key: 'REPORTES', label: 'Reportes' },
   { key: 'CONFIGURACION', label: 'Configuración' },
 ];

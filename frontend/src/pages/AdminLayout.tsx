@@ -28,17 +28,18 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/admin/sales',      emoji: '📋', label: 'Ventas',          permissionModule: 'REPORTES' },
-  { to: '/admin/stats',      emoji: '📊', label: 'Estadisticas',     permissionModule: 'REPORTES' },
-  { to: '/admin/tesoreria',  emoji: '📒', label: 'Tesorería',       moduleKey: 'enableTreasuryModule', permissionModule: 'TESORERIA' },
-  { to: '/admin/categories', emoji: '🗂️', label: 'Categorias',       permissionModule: 'CONFIGURACION' },
-  { to: '/admin/products',   emoji: '📦', label: 'Productos',        permissionModule: 'CONFIGURACION' },
-  { to: '/admin/stock',      emoji: '📐', label: 'Stock',            permissionModule: 'STOCK' },
-  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores',      moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
-  { to: '/admin/socios',     emoji: '🪪', label: 'Socios',          moduleKey: 'enableSociosModule', permissionModule: 'SOCIOS' },
-  { to: '/admin/internet',   emoji: '📶', label: 'Internet',        moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
-  { to: '/admin/users',      emoji: '👤', label: 'Usuarios',        permissionModule: 'CONFIGURACION' },
-  { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion',    permissionModule: 'CONFIGURACION' },
+  { to: '/pos',              emoji: '🛒', label: 'POS',                 permissionModule: 'POS' },
+  { to: '/admin/sales',      emoji: '📋', label: 'Ventas',              permissionModule: 'VENTAS' },
+  { to: '/admin/stats',      emoji: '📊', label: 'Estadisticas',         permissionModule: 'REPORTES' },
+  { to: '/admin/tesoreria',  emoji: '📒', label: 'Tesorería',           moduleKey: 'enableTreasuryModule', permissionModule: 'TESORERIA' },
+  { to: '/admin/categories', emoji: '🗂️', label: 'Categorias',           permissionModule: 'PRODUCTOS' },
+  { to: '/admin/products',   emoji: '📦', label: 'Productos',            permissionModule: 'PRODUCTOS' },
+  { to: '/admin/stock',      emoji: '📐', label: 'Stock',                permissionModule: 'PRODUCTOS' },
+  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores',          moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
+  { to: '/admin/socios',     emoji: '🪪', label: 'Socios',              moduleKey: 'enableSociosModule', permissionModule: 'SOCIOS' },
+  { to: '/admin/internet',   emoji: '📶', label: 'Internet',            moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
+  { to: '/admin/users',      emoji: '👤', label: 'Usuarios',            permissionModule: 'CONFIGURACION' },
+  { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion',        permissionModule: 'CONFIGURACION' },
 ];
 
 export const AdminLayout: React.FC = () => {

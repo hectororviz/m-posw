@@ -112,12 +112,13 @@ export const LoginPage: React.FC = () => {
 
 function getModuleRoute(moduleKey: string): string | null {
   const map: Record<string, string> = {
-    POS: '/',
+    POS: '/pos',
+    VENTAS: '/admin/sales',
     SOCIOS: '/admin/socios',
     TESORERIA: '/admin/tesoreria',
     ACREEDORES: '/admin/acreedores',
+    PRODUCTOS: '/admin/products',
     INTERNET: '/admin/internet',
-    STOCK: '/admin/stock',
     REPORTES: '/admin/stats',
     CONFIGURACION: '/admin/settings',
   };

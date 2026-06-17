@@ -9,12 +9,13 @@ const MODULES: {
   route: string;
   description: string;
 }[] = [
-  { key: 'POS', label: 'POS', icon: '🛒', route: '/', description: 'Punto de venta' },
+  { key: 'POS', label: 'POS', icon: '🛒', route: '/pos', description: 'Punto de venta' },
+  { key: 'VENTAS', label: 'Ventas', icon: '📋', route: '/admin/sales', description: 'Historial de ventas' },
   { key: 'SOCIOS', label: 'Socios', icon: '🪪', route: '/admin/socios', description: 'Padrón de socios y cuotas' },
   { key: 'TESORERIA', label: 'Tesorería', icon: '📒', route: '/admin/tesoreria', description: 'Contabilidad y libro diario' },
   { key: 'ACREEDORES', label: 'Acreedores', icon: '👥', route: '/admin/acreedores', description: 'Fiado y cuentas corrientes' },
+  { key: 'PRODUCTOS', label: 'Productos', icon: '📦', route: '/admin/products', description: 'Productos, categorías y stock' },
   { key: 'INTERNET', label: 'Internet', icon: '📶', route: '/admin/internet', description: 'Vouchers WiFi' },
-  { key: 'STOCK', label: 'Stock', icon: '📐', route: '/admin/stock', description: 'Control de inventario' },
   { key: 'REPORTES', label: 'Reportes', icon: '📊', route: '/admin/stats', description: 'Estadísticas y reportes' },
   { key: 'CONFIGURACION', label: 'Configuración', icon: '⚙️', route: '/admin/settings', description: 'Ajustes del sistema' },
 ];

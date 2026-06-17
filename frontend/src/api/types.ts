@@ -4,11 +4,12 @@ export type ProductType = 'SIMPLE' | 'RAW_MATERIAL' | 'COMPOSITE';
 
 export type ModuleKey =
   | 'POS'
+  | 'VENTAS'
   | 'SOCIOS'
   | 'TESORERIA'
   | 'ACREEDORES'
+  | 'PRODUCTOS'
   | 'INTERNET'
-  | 'STOCK'
   | 'REPORTES'
   | 'CONFIGURACION';
 

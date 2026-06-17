@@ -34,7 +34,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
   const showSkeleton = isLoading && !settings;
   const initials = getInitials(storeName);
   const showLogo = Boolean(logoUrl) && !logoError;
-  const isPosScreen = location.pathname === '/' || location.pathname.startsWith('/category/');
+  const isPosScreen = location.pathname === '/pos' || location.pathname.startsWith('/category/');
   const isAdminScreen = location.pathname.startsWith('/admin');
   const isSalesScreen = location.pathname === '/sales';
   const showConfigToggle = user?.role === 'ADMIN' && (isPosScreen || isAdminScreen);
@@ -74,7 +74,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           </button>
           {showSalesButton && (
             <NavLink
-              to={isSalesScreen ? '/' : '/sales'}
+              to={isSalesScreen ? '/pos' : '/sales'}
               className="ghost-button sales-toggle-button"
               aria-label={isSalesScreen ? 'Volver al POS' : 'Movimientos'}
             >
@@ -83,7 +83,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           )}
           {showConfigToggle && (
             <NavLink
-              to={isPosScreen ? '/admin/settings' : '/'}
+              to={isPosScreen ? '/admin/settings' : '/pos'}
               className="ghost-button header-toggle-button"
               aria-label={isPosScreen ? 'Configuración' : 'Volver a POS'}
             >
