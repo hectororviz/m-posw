@@ -21,6 +21,7 @@ import { InternetVouchersModule } from './internet-vouchers/internet-vouchers.mo
 import { SociosModule } from './socios/socios.module';
 import { TreasuryModule } from './treasury/treasury.module';
 import { UsersModule } from './users/users.module';
+import { HomeModule } from './home/home.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { UsersModule } from './users/users.module';
     SettingsModule,
     SociosModule,
     StockModule,
+    HomeModule,
   ],
   providers: [
     {
