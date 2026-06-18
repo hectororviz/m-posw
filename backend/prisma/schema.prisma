@@ -270,6 +270,7 @@ model Setting {
   enableAutoJournalPos        Boolean @default(true)
   enableAutoJournalAcreedores Boolean @default(true)
   enableAutoJournalSocios     Boolean @default(true)
+  enableLigasModule           Boolean @default(false)
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -286,6 +287,17 @@ model Setting {
   mpLinked        Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model LigasConfig {
+  id        String   @id @default(uuid()) @db.Uuid
+  leagueId  String
+  leagueName String
+  teamId    String
+  teamName  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ProductOrderCounter {

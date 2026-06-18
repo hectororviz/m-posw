@@ -22,6 +22,7 @@ import { SociosModule } from './socios/socios.module';
 import { TreasuryModule } from './treasury/treasury.module';
 import { UsersModule } from './users/users.module';
 import { HomeModule } from './home/home.module';
+import { LigasModule } from './ligas/ligas.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { HomeModule } from './home/home.module';
     CashMovementsModule,
     IconsModule,
     InternetVouchersModule,
+    LigasModule,
     MercadoPagoOauthModule,
     PaymentsModule,
     ProductsModule,

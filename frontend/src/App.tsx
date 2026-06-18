@@ -29,6 +29,9 @@ import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { OAuthReturnPage } from './pages/OAuthReturnPage';
 import { PrintTicketPage } from './pages/PrintTicketPage';
 import { SalesPage } from './pages/SalesPage';
+import { LigasLayout } from './pages/LigasLayout';
+import { LigasStandingsPage } from './pages/LigasStandingsPage';
+import { LigasConfigPage } from './pages/LigasConfigPage';
 import { useAuth } from './context/AuthContext';
 import type { ModuleKey } from './api/types';
 
@@ -169,6 +172,15 @@ export const App: React.FC = () => {
             <AdminInternetPage />
           </ModuleRoute>
         } />
+        <Route path="ligas" element={
+          <ModuleRoute module="LIGAS">
+            <LigasLayout />
+          </ModuleRoute>
+        }>
+          <Route index element={<Navigate to="/admin/ligas/configuracion" replace />} />
+          <Route path=":configId" element={<LigasStandingsPage />} />
+          <Route path="configuracion" element={<LigasConfigPage />} />
+        </Route>
         <Route path="socios" element={
           <ModuleRoute module="SOCIOS">
             <AdminSociosLayout />

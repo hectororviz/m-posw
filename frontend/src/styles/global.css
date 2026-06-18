@@ -4830,6 +4830,27 @@ button {
 .sales-table-head .col-method { flex: 0 0 80px; text-align: center; }
 .sales-table-head .col-action { flex: 0 0 60px; text-align: right; }
 
+/* Ligas standings columns */
+.sales-table-row .col-num { flex: 0 0 44px; text-align: center; color: var(--color-text-muted); }
+.sales-table-head .col-num { flex: 0 0 44px; text-align: center; }
+.sales-table-row .col-team { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sales-table-head .col-team { flex: 1; }
+.sales-table-row .col-product { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sales-table-head .col-product { flex: 1; }
+.sales-table-row .col-category { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sales-table-head .col-category { flex: 1; }
+
+.ligas-row-highlight {
+  background: var(--color-primary-bg) !important;
+  font-weight: 500;
+}
+.ligas-row-highlight:hover {
+  background: var(--color-primary-bg) !important;
+}
+.ligas-star {
+  font-size: 0.8rem;
+}
+
 .sales-table-reason {
   font-size: 0.8rem;
   color: var(--color-text-faint);

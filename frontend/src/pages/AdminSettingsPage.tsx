@@ -53,6 +53,7 @@ export const AdminSettingsPage: React.FC = () => {
     enableTreasuryModule: true,
     enableAcreedoresModule: true,
     enableInternetModule: false,
+    enableLigasModule: false,
     enableAutoJournalPos: true,
     enableAutoJournalAcreedores: true,
     enableAutoJournalSocios: true,
@@ -147,6 +148,7 @@ export const AdminSettingsPage: React.FC = () => {
         enableTreasuryModule: settings.enableTreasuryModule ?? true,
         enableAcreedoresModule: settings.enableAcreedoresModule ?? true,
         enableInternetModule: settings.enableInternetModule ?? false,
+        enableLigasModule: settings.enableLigasModule ?? false,
         enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
         enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
         enableAutoJournalSocios: settings.enableAutoJournalSocios ?? true,
@@ -491,8 +493,21 @@ export const AdminSettingsPage: React.FC = () => {
                   />
                   <span className="toggle-switch-track" />
                   Teclado embebido
-                </label>
-              </div>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableLigasModule}
+                  onChange={(e) => setForm({ ...form, enableLigasModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Ligas Deportivas</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Muestra tablas de posiciones y partidos de ligas de futbol</small>
+                </span>
+              </label>
+            </div>
             </div>
 
             <div className="settings-section">

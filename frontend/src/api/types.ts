@@ -10,6 +10,7 @@ export type ModuleKey =
   | 'ACREEDORES'
   | 'PRODUCTOS'
   | 'INTERNET'
+  | 'LIGAS'
   | 'REPORTES'
   | 'CONFIGURACION';
 
@@ -169,6 +170,7 @@ export interface Setting {
   enableTreasuryModule?: boolean | null;
   enableAcreedoresModule?: boolean | null;
   enableInternetModule?: boolean | null;
+  enableLigasModule?: boolean | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -178,6 +180,61 @@ export interface Setting {
   mpTokenExpiresAt?: string | null;
   mpPosId?: string | null;
   mpQrData?: string | null;
+}
+
+export interface Liga {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export interface LigaCategoria {
+  id: string;
+  name: string;
+  league_id: string;
+}
+
+export interface LigaEquipo {
+  id: string;
+  name: string;
+  short_name: string;
+  logo_url: string | null;
+  city: string;
+}
+
+export interface LigaPosicion {
+  position: number;
+  teamId: string;
+  teamName: string;
+  teamShortName: string;
+  pj: number;
+  pg: number;
+  pe: number;
+  pp: number;
+  gf: number;
+  gc: number;
+  dg: number;
+  pts: number;
+}
+
+export interface LigaProximoPartido {
+  id: string;
+  matchday: number | null;
+  match_date: string | null;
+  categoryName: string;
+  opponentName: string;
+  isLocal: boolean;
+}
+
+export interface LigasConfig {
+  id: string;
+  leagueId: string;
+  leagueName: string;
+  teamId: string;
+  teamName: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MpOauthStatus {

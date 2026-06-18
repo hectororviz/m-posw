@@ -1,0 +1,255 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../common/prisma.service';
+import type { CreateLigaConfigDto } from './dto/create-liga-config.dto';
+
+interface SupabaseLeague {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+interface SupabaseCategory {
+  id: string;
+  name: string;
+  league_id: string;
+}
+
+interface SupabaseTeam {
+  id: string;
+  name: string;
+  short_name: string;
+  logo_url: string | null;
+  city: string;
+}
+
+interface SupabaseMatch {
+  id: string;
+  league_id: string;
+  category_id: string;
+  local_team_id: string;
+  away_team_id: string;
+  matchday: number | null;
+  match_date: string | null;
+  status: string;
+  local_goals: number | null;
+  away_goals: number | null;
+}
+
+export interface StandingRow {
+  position: number;
+  teamId: string;
+  teamName: string;
+  teamShortName: string;
+  pj: number;
+  pg: number;
+  pe: number;
+  pp: number;
+  gf: number;
+  gc: number;
+  dg: number;
+  pts: number;
+}
+
+export interface NextMatch {
+  id: string;
+  matchday: number | null;
+  match_date: string | null;
+  categoryName: string;
+  opponentName: string;
+  isLocal: boolean;
+}
+
+@Injectable()
+export class LigasService {
+  private readonly logger = new Logger(LigasService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {}
+
+  private getSupabaseUrl() {
+    return this.config.get<string>('SUPABASE_URL');
+  }
+
+  private getSupabaseKey() {
+    return this.config.get<string>('SUPABASE_ANON_KEY');
+  }
+
+  private async supabaseGet<T>(path: string): Promise<T> {
+    const url = `${this.getSupabaseUrl()}/rest/v1${path}`;
+    const headers: Record<string, string> = {
+      apikey: this.getSupabaseKey(),
+      Authorization: `Bearer ${this.getSupabaseKey()}`,
+    };
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Supabase ${res.status}: ${body}`);
+    }
+    return res.json() as Promise<T>;
+  }
+
+  async getLeagues(): Promise<SupabaseLeague[]> {
+    return this.supabaseGet<SupabaseLeague[]>('/leagues?active=eq.true&order=created_at.asc');
+  }
+
+  async getCategories(leagueId: string): Promise<SupabaseCategory[]> {
+    return this.supabaseGet<SupabaseCategory[]>(
+      `/categories?league_id=eq.${leagueId}&order=name.asc`,
+    );
+  }
+
+  async getTeams(leagueId: string): Promise<SupabaseTeam[]> {
+    return this.supabaseGet<SupabaseTeam[]>(
+      `/teams?select=id,name,short_name,logo_url,city&order=name.asc`,
+    );
+  }
+
+  async getMatchesByLeague(leagueId: string): Promise<SupabaseMatch[]> {
+    return this.supabaseGet<SupabaseMatch[]>(
+      `/matches?league_id=eq.${leagueId}&order=matchday.asc&limit=10000`,
+    );
+  }
+
+  async getStandings(
+    leagueId: string,
+    categoryId?: string,
+  ): Promise<StandingRow[]> {
+    let path = `/matches?league_id=eq.${leagueId}`;
+    if (categoryId) {
+      path += `&category_id=eq.${categoryId}`;
+    }
+    path += '&order=matchday.asc&limit=10000';
+
+    const matches = await this.supabaseGet<SupabaseMatch[]>(path);
+
+    const teams = await this.getTeams(leagueId);
+    const teamMap = new Map<string, SupabaseTeam>();
+    for (const t of teams) {
+      teamMap.set(t.id, t);
+    }
+
+    const finishedMatches = matches.filter((m) => m.status === 'finalizado');
+
+    // Collect all team IDs that appear in finished matches
+    const teamIds = new Set<string>();
+    for (const m of finishedMatches) {
+      if (m.local_team_id) teamIds.add(m.local_team_id);
+      if (m.away_team_id) teamIds.add(m.away_team_id);
+    }
+
+    const stats = new Map<
+      string,
+      { pj: number; pg: number; pe: number; pp: number; gf: number; gc: number }
+    >();
+
+    for (const id of teamIds) {
+      stats.set(id, { pj: 0, pg: 0, pe: 0, pp: 0, gf: 0, gc: 0 });
+    }
+
+    for (const m of finishedMatches) {
+      if (m.local_goals == null || m.away_goals == null) continue;
+      if (!m.local_team_id || !m.away_team_id) continue;
+
+      const localStats = stats.get(m.local_team_id);
+      const awayStats = stats.get(m.away_team_id);
+      if (!localStats || !awayStats) continue;
+
+      localStats.pj++;
+      awayStats.pj++;
+      localStats.gf += m.local_goals;
+      localStats.gc += m.away_goals;
+      awayStats.gf += m.away_goals;
+      awayStats.gc += m.local_goals;
+
+      if (m.local_goals > m.away_goals) {
+        localStats.pg++;
+        awayStats.pp++;
+      } else if (m.local_goals < m.away_goals) {
+        awayStats.pg++;
+        localStats.pp++;
+      } else {
+        localStats.pe++;
+        awayStats.pe++;
+      }
+    }
+
+    const rows: StandingRow[] = [];
+    for (const [teamId, s] of stats) {
+      const team = teamMap.get(teamId);
+      if (!team) continue;
+      rows.push({
+        position: 0,
+        teamId,
+        teamName: team.name,
+        teamShortName: team.short_name,
+        pj: s.pj,
+        pg: s.pg,
+        pe: s.pe,
+        pp: s.pp,
+        gf: s.gf,
+        gc: s.gc,
+        dg: s.gf - s.gc,
+        pts: s.pg * 3 + s.pe,
+      });
+    }
+
+    // Sort by points desc, goal difference desc, goals for desc
+    rows.sort((a, b) => b.pts - a.pts || b.dg - a.dg || b.gf - a.gf);
+
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].position = i + 1;
+    }
+
+    return rows;
+  }
+
+  async getNextMatches(
+    teamId: string,
+    leagueId: string,
+  ): Promise<NextMatch[]> {
+    const [matches, categories] = await Promise.all([
+      this.supabaseGet<SupabaseMatch[]>(
+        `/matches?league_id=eq.${leagueId}&or=(local_team_id.eq.${teamId},away_team_id.eq.${teamId})&status=eq.pendiente&order=matchday.asc&limit=20`,
+      ),
+      this.getCategories(leagueId),
+    ]);
+
+    const teams = await this.getTeams(leagueId);
+    const teamMap = new Map<string, SupabaseTeam>();
+    for (const t of teams) teamMap.set(t.id, t);
+
+    const catMap = new Map<string, string>();
+    for (const c of categories) catMap.set(c.id, c.name);
+
+    return matches.map((m) => {
+      const isLocal = m.local_team_id === teamId;
+      const opponentId = isLocal ? m.away_team_id : m.local_team_id;
+      const opponent = opponentId ? teamMap.get(opponentId) : null;
+      return {
+        id: m.id,
+        matchday: m.matchday,
+        match_date: m.match_date,
+        categoryName: catMap.get(m.category_id) ?? '?',
+        opponentName: opponent?.name ?? '?',
+        isLocal,
+      };
+    });
+  }
+
+  async getConfigs() {
+    return this.prisma.ligasConfig.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async createConfig(dto: CreateLigaConfigDto) {
+    return this.prisma.ligasConfig.create({ data: dto });
+  }
+
+  async deleteConfig(id: string) {
+    return this.prisma.ligasConfig.delete({ where: { id } });
+  }
+}

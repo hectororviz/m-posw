@@ -79,6 +79,10 @@ export class UpdateSettingDto {
   enableAutoJournalSocios?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  enableLigasModule?: boolean;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];
