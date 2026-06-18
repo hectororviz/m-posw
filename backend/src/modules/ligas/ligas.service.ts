@@ -102,9 +102,30 @@ export class LigasService {
   }
 
   async getTeams(leagueId: string): Promise<SupabaseTeam[]> {
-    return this.supabaseGet<SupabaseTeam[]>(
-      `/teams?select=id,name,short_name,logo_url,city&order=name.asc`,
+    const matches = await this.supabaseGet<SupabaseMatch[]>(
+      `/matches?league_id=eq.${leagueId}&select=local_team_id,away_team_id&limit=10000`,
     );
+    const teamIds = new Set<string>();
+    for (const m of matches) {
+      if (m.local_team_id) teamIds.add(m.local_team_id);
+      if (m.away_team_id) teamIds.add(m.away_team_id);
+    }
+    if (teamIds.size === 0) return [];
+    const ids = Array.from(teamIds);
+    // Supabase REST in filter: split into chunks of 50 to avoid URL length issues
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 50) {
+      chunks.push(ids.slice(i, i + 50));
+    }
+    const allTeams: SupabaseTeam[] = [];
+    for (const chunk of chunks) {
+      const filter = chunk.map((id) => `id.eq.${id}`).join(',');
+      const teams = await this.supabaseGet<SupabaseTeam[]>(
+        `/teams?select=id,name,short_name,logo_url,city&or=(${filter})&order=name.asc`,
+      );
+      allTeams.push(...teams);
+    }
+    return allTeams;
   }
 
   async getMatchesByLeague(leagueId: string): Promise<SupabaseMatch[]> {
@@ -210,12 +231,33 @@ export class LigasService {
     teamId: string,
     leagueId: string,
   ): Promise<NextMatch[]> {
-    const [matches, categories] = await Promise.all([
+    const todayIso = new Date().toISOString().slice(0, 10);
+    this.logger.log(
+      `getNextMatches teamId=${teamId} leagueId=${leagueId} today=${todayIso}`,
+    );
+
+    const [rawMatches, categories] = await Promise.all([
       this.supabaseGet<SupabaseMatch[]>(
-        `/matches?league_id=eq.${leagueId}&or=(local_team_id.eq.${teamId},away_team_id.eq.${teamId})&status=eq.pendiente&order=matchday.asc&limit=20`,
+        `/matches?league_id=eq.${leagueId}&or=(local_team_id.eq.${teamId},away_team_id.eq.${teamId})&status=eq.pendiente&order=match_date.asc.nullslast&limit=50`,
       ),
       this.getCategories(leagueId),
     ]);
+
+    this.logger.log(
+      `Supabase returned ${rawMatches.length} pending matches for team ${teamId} in league ${leagueId}`,
+    );
+
+    // filter out past matches (keep those without date)
+    const matches = rawMatches.filter((m) => {
+      if (!m.match_date) return true;
+      return m.match_date >= todayIso;
+    });
+
+    if (rawMatches.length !== matches.length) {
+      this.logger.log(
+        `Filtered out ${rawMatches.length - matches.length} past-dated matches`,
+      );
+    }
 
     const teams = await this.getTeams(leagueId);
     const teamMap = new Map<string, SupabaseTeam>();

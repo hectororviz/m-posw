@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import type { LigaProximoPartido } from '../api/types';
 import { useLigasCategories, useLigasConfigs, useLigasNextMatches, useLigasStandings } from '../api/queries';
 
 export const LigasStandingsPage: React.FC = () => {
@@ -95,42 +96,60 @@ export const LigasStandingsPage: React.FC = () => {
         <p className="text-muted">No hay partidos finalizados para mostrar la tabla</p>
       )}
 
-      {nextMatches && nextMatches.length > 0 && (
-        <div style={{ marginTop: '2rem' }}>
-          <h3 style={{ marginBottom: '0.75rem' }}>Próximos partidos de {config.teamName}</h3>
-          <div className="sales-table-wrapper">
-            <div className="sales-table">
-              <div className="sales-table-head">
-                <span className="col-date">Fecha</span>
-                <span className="col-product">Jornada</span>
-                <span className="col-product">Categoría</span>
-                <span className="col-category">Rival</span>
-                <span className="col-num">Localía</span>
-              </div>
-              {nextMatches.map((m) => (
-                <div key={m.id} className="sales-table-row">
-                  <span className="col-date">
-                    {m.match_date
-                      ? new Date(m.match_date + 'T00:00:00').toLocaleDateString(
-                          'es-AR',
-                          { day: '2-digit', month: '2-digit', year: 'numeric' },
-                        )
-                      : '—'}
-                  </span>
-                  <span className="col-product">
-                    {m.matchday != null ? `Jornada ${m.matchday}` : '—'}
-                  </span>
-                  <span className="col-product">{m.categoryName}</span>
-                  <span className="col-category">{m.opponentName}</span>
-                  <span className="col-num">
-                    {m.isLocal ? 'Local' : 'Visitante'}
-                  </span>
+      {nextMatches && nextMatches.length > 0 &&
+        (() => {
+          const formatDate = (d: string | null) =>
+            d
+              ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric',
+                })
+              : '—';
+
+          const groupKey = (m: LigaProximoPartido) =>
+            `${m.matchday ?? 'null'}|${m.match_date ?? 'null'}`;
+
+          return (
+            <div style={{ marginTop: '2rem' }}>
+              <h3 style={{ marginBottom: '0.75rem' }}>
+                Próximos partidos de {config.teamName}
+              </h3>
+              <div className="sales-table-wrapper">
+                <div className="sales-table">
+                  <div className="sales-table-head">
+                    <span className="col-date">Fecha</span>
+                    <span className="col-product">Jornada</span>
+                    <span className="col-category">Rival</span>
+                    <span className="col-num">Localía</span>
+                  </div>
+                  {nextMatches.map((m, i) => {
+                    const prev = i > 0 ? nextMatches[i - 1] : null;
+                    const sameGroup = prev && groupKey(m) === groupKey(prev);
+                    return (
+                      <div key={m.id} className="sales-table-row">
+                        <span className="col-date">
+                          {sameGroup ? '' : formatDate(m.match_date)}
+                        </span>
+                        <span className="col-product">
+                          {sameGroup
+                            ? ''
+                            : m.matchday != null
+                              ? `Jornada ${m.matchday}`
+                              : '—'}
+                        </span>
+                        <span className="col-category">{m.opponentName}</span>
+                        <span className="col-num">
+                          {m.isLocal ? 'Local' : 'Visitante'}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
     </div>
   );
 };
