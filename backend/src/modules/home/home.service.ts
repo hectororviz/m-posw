@@ -5,7 +5,9 @@ import { ModuleKey } from '@prisma/client';
 
 interface PosMetrics {
   ventasHoy: number;
+  ventasAyer: number;
   ventasSemana: number;
+  ventasSemanaPasada: number;
 }
 
 interface SociosMetrics {
@@ -103,24 +105,42 @@ export class HomeService {
   private async getPosMetrics(): Promise<PosMetrics | null> {
     const now = new Date();
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+    const yesterdayStart = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayEnd = new Date(today.getTime() - 1);
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgoStart = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgoEnd = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000 - 1);
 
-    const [ventasHoy, ventasSemana] = await Promise.all([
+    const [ventasHoy, ventasAyer, ventasSemana, ventasSemanaPasada] = await Promise.all([
       this.prisma.sale.aggregate({
         _sum: { total: true },
         where: { status: 'APPROVED', createdAt: { gte: today } },
       }),
       this.prisma.sale.aggregate({
         _sum: { total: true },
+        where: { status: 'APPROVED', createdAt: { gte: yesterdayStart, lt: today } },
+      }),
+      this.prisma.sale.aggregate({
+        _sum: { total: true },
         where: {
           status: 'APPROVED',
-          createdAt: { gte: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000) },
+          createdAt: { gte: weekAgo },
+        },
+      }),
+      this.prisma.sale.aggregate({
+        _sum: { total: true },
+        where: {
+          status: 'APPROVED',
+          createdAt: { gte: twoWeeksAgoStart, lt: weekAgo },
         },
       }),
     ]);
 
     return {
       ventasHoy: Number(ventasHoy._sum.total || 0),
+      ventasAyer: Number(ventasAyer._sum.total || 0),
       ventasSemana: Number(ventasSemana._sum.total || 0),
+      ventasSemanaPasada: Number(ventasSemanaPasada._sum.total || 0),
     };
   }
 

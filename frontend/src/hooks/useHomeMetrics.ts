@@ -4,7 +4,9 @@ import { apiClient } from '../api/client';
 export interface HomeMetrics {
   pos?: {
     ventasHoy: number;
+    ventasAyer: number;
     ventasSemana: number;
+    ventasSemanaPasada: number;
   };
   socios?: {
     activos: number;

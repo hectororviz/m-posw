@@ -6498,58 +6498,52 @@ button {
 /* ─── Home Page ───────────────────────────────────────────── */
 .home-page {
   padding: 2rem 1.5rem;
-  max-width: 900px;
+  max-width: 960px;
 }
 
-.home-brand {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--color-border);
+.home-welcome {
+  margin-bottom: 2.25rem;
 }
 
-.home-logo {
-  width: 64px;
-  height: 64px;
-  border-radius: 1rem;
-  object-fit: contain;
-  background: var(--color-surface);
-}
-
-.home-logo-placeholder {
-  width: 64px;
-  height: 64px;
-  border-radius: 1rem;
-  background: var(--color-accent);
-  color: var(--color-surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
+.home-welcome-title {
+  font-size: 1.65rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-.home-club-name {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
+  margin: 0 0 0.35rem;
   color: var(--color-text);
+  line-height: 1.3;
 }
 
+.home-welcome-date {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--color-text-muted);
+}
+
+/* ─── Grid Layouts ─────────────────────────────────────── */
 .home-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1rem;
+  margin-bottom: 1.25rem;
 }
 
+.home-grid--primary {
+  grid-template-columns: 1fr 1fr;
+}
+
+.home-grid--standard {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.home-grid--secondary {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* ─── Card Base ────────────────────────────────────────── */
 .home-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   padding: 1.25rem 1rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -6562,21 +6556,93 @@ button {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.home-card-icon {
-  font-size: 1.75rem;
-  line-height: 1;
+/* ─── Card Levels ──────────────────────────────────────── */
+.home-card--primary {
+  padding: 1.75rem 1.25rem;
 }
 
+.home-card--primary .home-card-value {
+  font-size: 2rem;
+}
+
+.home-card--secondary {
+  opacity: 0.72;
+  border-color: var(--color-border-faint, var(--color-border));
+}
+
+.home-card--secondary:hover {
+  opacity: 0.9;
+}
+
+/* ─── Card Icon ────────────────────────────────────────── */
+.home-card-icon {
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.home-card-icon--alert-danger {
+  color: var(--color-danger, #dc2626);
+}
+
+.home-card-icon--alert-warning {
+  color: var(--color-warning, #d97706);
+}
+
+/* ─── Card Value ───────────────────────────────────────── */
 .home-card-value {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-text);
   line-height: 1.1;
 }
 
+.home-card-value--alert-danger {
+  color: var(--color-danger, #dc2626);
+}
+
+.home-card-value--alert-warning {
+  color: var(--color-warning, #d97706);
+}
+
+/* ─── Trend Indicator ──────────────────────────────────── */
+.home-card-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.home-card-trend--up {
+  color: var(--color-success, #16a34a);
+}
+
+.home-card-trend--down {
+  color: var(--color-danger, #dc2626);
+}
+
+.home-card-trend--flat {
+  color: var(--color-text-muted);
+}
+
+/* ─── Card Label ───────────────────────────────────────── */
 .home-card-label {
   font-size: 0.8rem;
   color: var(--color-text-muted);
   text-align: center;
   line-height: 1.2;
+}
+
+/* ─── Responsive ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .home-grid--primary,
+  .home-grid--standard,
+  .home-grid--secondary {
+    grid-template-columns: 1fr;
+  }
+
+  .home-card--primary .home-card-value {
+    font-size: 1.75rem;
+  }
 }
