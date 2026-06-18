@@ -46,46 +46,42 @@ const ResultModal: React.FC<{
           </button>
         </div>
         <div className="ligas-modal-body">
-          {sorted.map((m) => {
-            const score =
-              m.localGoals != null && m.awayGoals != null
-                ? `${m.localGoals} - ${m.awayGoals}`
-                : null;
-            const badge = score
-              ? m.isWon
-                ? { letter: 'G', color: '#16a34a' }
-                : m.isDraw
-                  ? { letter: 'E', color: '#ca8a04' }
-                  : { letter: 'P', color: '#dc2626' }
-              : null;
-
-            return (
-              <div key={m.id} className="ligas-modal-result">
-                <span className="ligas-modal-cat">{m.categoryName}</span>
-                <span
-                  className="ligas-modal-score"
-                  style={badge ? { color: badge.color } : undefined}
+          <div className="sales-table">
+            <div className="sales-table-head" style={{ position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1 }}>
+              <span className="col-category">Categoría</span>
+              <span className="col-num">{group.opponentName}</span>
+              <span className="col-num">{teamName}</span>
+            </div>
+            {sorted.map((m) => {
+              const ourGoals = m.isLocal ? m.localGoals : m.awayGoals;
+              const theirGoals = m.isLocal ? m.awayGoals : m.localGoals;
+              const played = m.localGoals != null && m.awayGoals != null;
+              const bg = played
+                ? m.isWon
+                  ? 'rgba(22,163,74,0.12)'
+                  : m.isDraw
+                    ? 'rgba(202,138,4,0.12)'
+                    : 'rgba(220,38,38,0.12)'
+                : 'transparent';
+              return (
+                <div
+                  key={m.id}
+                  className="sales-table-row"
+                  style={{ background: bg }}
                 >
-                  {group.isLocal
-                    ? `${teamName} ${score || 'vs'} ${group.opponentName}`
-                    : `${group.opponentName} ${score || 'vs'} ${teamName}`}
-                  {badge && (
-                    <span
-                      style={{
-                        background: badge.color + '1a',
-                        padding: '1px 7px',
-                        borderRadius: 6,
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {badge.letter}
-                    </span>
-                  )}
-                </span>
-              </div>
-            );
-          })}
+                  <span className="col-category" style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+                    {m.categoryName}
+                  </span>
+                  <span className="col-num" style={{ fontWeight: 600 }}>
+                    {played ? theirGoals : '—'}
+                  </span>
+                  <span className="col-num" style={{ fontWeight: 700 }}>
+                    {played ? ourGoals : '—'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

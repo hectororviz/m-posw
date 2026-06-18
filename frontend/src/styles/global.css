@@ -4896,23 +4896,15 @@ button {
   color: var(--color-text-muted); padding: 4px; line-height: 1;
 }
 .ligas-modal-body {
-  padding: 0.75rem 1.25rem;
+  padding: 0.75rem 1rem;
   overflow-y: auto; flex: 1;
 }
-.ligas-modal-result {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--color-border-light, rgba(0,0,0,0.06));
-}
-.ligas-modal-result:last-child { border-bottom: none; }
-.ligas-modal-cat {
-  font-size: 0.85rem; color: var(--color-text-muted);
-  min-width: 70px;
-}
-.ligas-modal-score {
-  font-weight: 700; font-size: 0.95rem;
-  display: flex; align-items: center; gap: 8px;
-}
+.ligas-modal-body .sales-table { border-radius: 0; box-shadow: none; }
+.ligas-modal-body .sales-table-head { border-radius: 0; }
+.ligas-modal-body .col-category { flex: 1; }
+.ligas-modal-body .col-num { flex: 0 0 80px; }
+.ligas-modal-body .col-num:last-child { flex: 0 0 80px; font-weight: 700; }
+.ligas-modal-body .sales-table-row:last-child { border-bottom: none; }
 
 .sales-table-reason {
   font-size: 0.8rem;
