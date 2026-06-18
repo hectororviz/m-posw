@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { LigaProximoPartido } from '../api/types';
-import { useLigasCategories, useLigasConfigs, useLigasNextMatches, useLigasStandings } from '../api/queries';
+import type { LigaProximoPartido, LigaResultado } from '../api/types';
+import { useLigasCategories, useLigasConfigs, useLigasNextMatches, useLigasResults, useLigasStandings } from '../api/queries';
 
 export const LigasStandingsPage: React.FC = () => {
   const { configId } = useParams<{ configId: string }>();
@@ -18,6 +18,17 @@ export const LigasStandingsPage: React.FC = () => {
   const { data: categories } = useLigasCategories(config?.leagueId);
 
   const { data: nextMatches } = useLigasNextMatches(config?.teamId, config?.leagueId);
+
+  const { data: results } = useLigasResults(config?.teamId, config?.leagueId, categoryId || undefined);
+
+  const formatDate = (d: string | null) =>
+    d
+      ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+      : '—';
 
   if (!config) {
     return <p className="text-muted">Torneo no encontrado</p>;
@@ -96,17 +107,64 @@ export const LigasStandingsPage: React.FC = () => {
         <p className="text-muted">No hay partidos finalizados para mostrar la tabla</p>
       )}
 
+      {results && results.length > 0 && (
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ marginBottom: '0.75rem' }}>
+            Resultados de {config.teamName}
+          </h3>
+          <div className="sales-table-wrapper">
+            <div className="sales-table">
+              <div className="sales-table-head">
+                <span className="col-date">Fecha</span>
+                <span className="col-product">Jornada</span>
+                <span className="col-category">Local</span>
+                <span className="col-num">Resultado</span>
+                <span className="col-category">Visitante</span>
+              </div>
+              {results.map((r) => {
+                const resultBadge = r.localGoals != null && r.awayGoals != null
+                  ? { letter: r.isWon ? 'G' : r.isDraw ? 'E' : 'P', color: r.isWon ? '#16a34a' : r.isDraw ? '#ca8a04' : '#dc2626' }
+                  : null;
+                return (
+                  <div key={r.id} className="sales-table-row ligas-row-highlight">
+                    <span className="col-date">{formatDate(r.match_date)}</span>
+                    <span className="col-product">
+                      {r.matchday != null ? `Jornada ${r.matchday}` : '—'}
+                    </span>
+                    <span className="col-category">{r.localName}</span>
+                    <span className="col-num" style={{ fontWeight: 600 }}>
+                      {r.localGoals != null && r.awayGoals != null
+                        ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              background: resultBadge!.color + '1a',
+                              color: resultBadge!.color,
+                              padding: '1px 8px',
+                              borderRadius: 6,
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {r.localGoals} - {r.awayGoals}
+                            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>{resultBadge!.letter}</span>
+                          </span>
+                        )
+                        : '—'}
+                    </span>
+                    <span className="col-category">{r.awayName}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {(() => {
           if (!nextMatches || nextMatches.length === 0) return null;
-
-          const formatDate = (d: string | null) =>
-            d
-              ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                })
-              : '—';
 
           const groupKey = (m: LigaProximoPartido) =>
             `${m.matchday ?? 'null'}|${m.match_date ?? 'null'}`;

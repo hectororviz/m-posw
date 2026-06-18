@@ -52,6 +52,15 @@ export class LigasController {
     return this.ligasService.getNextMatches(id, leagueId);
   }
 
+  @Get('teams/:id/results')
+  getResults(
+    @Param('id') id: string,
+    @Query('leagueId') leagueId: string,
+    @Query('categoryId') categoryId?: string,
+  ) {
+    return this.ligasService.getResults(id, leagueId, categoryId);
+  }
+
   @Get('configs')
   getConfigs() {
     return this.ligasService.getConfigs();

@@ -227,6 +227,19 @@ export interface LigaProximoPartido {
   isPast: boolean;
 }
 
+export interface LigaResultado {
+  id: string;
+  matchday: number | null;
+  match_date: string | null;
+  categoryName: string;
+  localName: string;
+  localGoals: number | null;
+  awayGoals: number | null;
+  awayName: string;
+  isWon: boolean;
+  isDraw: boolean;
+}
+
 export interface LigasConfig {
   id: string;
   leagueId: string;

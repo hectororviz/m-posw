@@ -61,6 +61,19 @@ export interface NextMatch {
   isPast: boolean;
 }
 
+export interface MatchResult {
+  id: string;
+  matchday: number | null;
+  match_date: string | null;
+  categoryName: string;
+  localName: string;
+  localGoals: number | null;
+  awayGoals: number | null;
+  awayName: string;
+  isWon: boolean;
+  isDraw: boolean;
+}
+
 @Injectable()
 export class LigasService {
   private readonly logger = new Logger(LigasService.name);
@@ -287,6 +300,49 @@ export class LigasService {
     });
 
     return mapped;
+  }
+
+  async getResults(
+    teamId: string,
+    leagueId: string,
+    categoryId?: string,
+  ): Promise<MatchResult[]> {
+    let path = `/matches?league_id=eq.${leagueId}&or=(local_team_id.eq.${teamId},away_team_id.eq.${teamId})&status=neq.pendiente&order=match_date.desc&limit=100`;
+    if (categoryId) {
+      path += `&category_id=eq.${categoryId}`;
+    }
+
+    const [matches, categories] = await Promise.all([
+      this.supabaseGet<SupabaseMatch[]>(path),
+      this.getCategories(leagueId),
+    ]);
+
+    const teams = await this.getTeams(leagueId);
+    const teamMap = new Map<string, SupabaseTeam>();
+    for (const t of teams) teamMap.set(t.id, t);
+
+    const catMap = new Map<string, string>();
+    for (const c of categories) catMap.set(c.id, c.name);
+
+    return matches.map((m) => {
+      const localTeam = teamMap.get(m.local_team_id ?? '');
+      const awayTeam = teamMap.get(m.away_team_id ?? '');
+      const isLocal = m.local_team_id === teamId;
+      const ourGoals = isLocal ? m.local_goals : m.away_goals;
+      const theirGoals = isLocal ? m.away_goals : m.local_goals;
+      return {
+        id: m.id,
+        matchday: m.matchday,
+        match_date: m.match_date,
+        categoryName: catMap.get(m.category_id) ?? '?',
+        localName: localTeam?.name ?? '?',
+        localGoals: m.local_goals,
+        awayGoals: m.away_goals,
+        awayName: awayTeam?.name ?? '?',
+        isWon: ourGoals != null && theirGoals != null && ourGoals > theirGoals,
+        isDraw: ourGoals != null && theirGoals != null && ourGoals === theirGoals,
+      };
+    });
   }
 
   async getConfigs() {
