@@ -494,19 +494,6 @@ export const AdminSettingsPage: React.FC = () => {
                   <span className="toggle-switch-track" />
                   Teclado embebido
               </label>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={form.enableLigasModule}
-                  onChange={(e) => setForm({ ...form, enableLigasModule: e.target.checked })}
-                />
-                <span className="toggle-switch-track" />
-                <span>
-                  <strong>Modulo de Ligas Deportivas</strong>
-                  <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Muestra tablas de posiciones y partidos de ligas de futbol</small>
-                </span>
-              </label>
             </div>
             </div>
 
@@ -952,6 +939,19 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Modulo de Internet / Vouchers WiFi</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Agrega la categoria "Internet" en el POS y permite vender vouchers de acceso WiFi</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableLigasModule}
+                  onChange={(e) => setForm({ ...form, enableLigasModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Ligas Deportivas</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Muestra tablas de posiciones y partidos de ligas de futbol</small>
                 </span>
               </label>
             </div>

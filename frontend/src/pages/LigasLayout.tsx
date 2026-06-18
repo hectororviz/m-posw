@@ -1,4 +1,4 @@
-import { NavLink, Navigate, Outlet } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { useLigasConfigs } from '../api/queries';
 
@@ -15,14 +15,10 @@ export const LigasLayout: React.FC = () => {
     );
   }
 
-  if (!configs || configs.length === 0) {
-    return <Navigate to="/admin/ligas/configuracion" replace />;
-  }
-
   return (
     <div className="treasury-page">
       <nav className="treasury-subnav">
-        {configs.map((cfg) => (
+        {(configs ?? []).map((cfg) => (
           <NavLink
             key={cfg.id}
             to={`/admin/ligas/${cfg.id}`}
