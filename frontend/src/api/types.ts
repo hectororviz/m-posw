@@ -224,6 +224,7 @@ export interface LigaProximoPartido {
   categoryName: string;
   opponentName: string;
   isLocal: boolean;
+  isPast: boolean;
 }
 
 export interface LigasConfig {

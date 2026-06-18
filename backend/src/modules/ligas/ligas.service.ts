@@ -58,6 +58,7 @@ export interface NextMatch {
   categoryName: string;
   opponentName: string;
   isLocal: boolean;
+  isPast: boolean;
 }
 
 @Injectable()
@@ -238,7 +239,7 @@ export class LigasService {
 
     const [rawMatches, categories] = await Promise.all([
       this.supabaseGet<SupabaseMatch[]>(
-        `/matches?league_id=eq.${leagueId}&or=(local_team_id.eq.${teamId},away_team_id.eq.${teamId})&status=eq.pendiente&order=match_date.asc.nullslast&limit=50`,
+        `/matches?league_id=eq.${leagueId}&or=(local_team_id.eq.${teamId},away_team_id.eq.${teamId})&status=eq.pendiente&order=matchday.asc&limit=50`,
       ),
       this.getCategories(leagueId),
     ]);
@@ -247,18 +248,6 @@ export class LigasService {
       `Supabase returned ${rawMatches.length} pending matches for team ${teamId} in league ${leagueId}`,
     );
 
-    // filter out past matches (keep those without date)
-    const matches = rawMatches.filter((m) => {
-      if (!m.match_date) return true;
-      return m.match_date >= todayIso;
-    });
-
-    if (rawMatches.length !== matches.length) {
-      this.logger.log(
-        `Filtered out ${rawMatches.length - matches.length} past-dated matches`,
-      );
-    }
-
     const teams = await this.getTeams(leagueId);
     const teamMap = new Map<string, SupabaseTeam>();
     for (const t of teams) teamMap.set(t.id, t);
@@ -266,10 +255,11 @@ export class LigasService {
     const catMap = new Map<string, string>();
     for (const c of categories) catMap.set(c.id, c.name);
 
-    return matches.map((m) => {
+    const mapped: NextMatch[] = rawMatches.map((m) => {
       const isLocal = m.local_team_id === teamId;
       const opponentId = isLocal ? m.away_team_id : m.local_team_id;
       const opponent = opponentId ? teamMap.get(opponentId) : null;
+      const isPast = !!m.match_date && m.match_date < todayIso;
       return {
         id: m.id,
         matchday: m.matchday,
@@ -277,8 +267,26 @@ export class LigasService {
         categoryName: catMap.get(m.category_id) ?? '?',
         opponentName: opponent?.name ?? '?',
         isLocal,
+        isPast,
       };
     });
+
+    const pastCount = mapped.filter((m) => m.isPast).length;
+    const futureCount = mapped.length - pastCount;
+    this.logger.log(
+      `Next matches: ${futureCount} future/undated, ${pastCount} past-dated`,
+    );
+
+    // future/undated first (by match_date asc), then past (by match_date desc)
+    mapped.sort((a, b) => {
+      if (a.isPast !== b.isPast) return a.isPast ? 1 : -1;
+      const aDate = a.match_date ?? '9999';
+      const bDate = b.match_date ?? '9999';
+      if (a.isPast) return bDate.localeCompare(aDate); // past: most recent first
+      return aDate.localeCompare(bDate); // future: soonest first
+    });
+
+    return mapped;
   }
 
   async getConfigs() {

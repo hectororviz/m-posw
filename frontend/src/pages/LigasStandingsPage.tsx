@@ -96,8 +96,9 @@ export const LigasStandingsPage: React.FC = () => {
         <p className="text-muted">No hay partidos finalizados para mostrar la tabla</p>
       )}
 
-      {nextMatches && nextMatches.length > 0 &&
-        (() => {
+      {(() => {
+          if (!nextMatches || nextMatches.length === 0) return null;
+
           const formatDate = (d: string | null) =>
             d
               ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
@@ -110,11 +111,17 @@ export const LigasStandingsPage: React.FC = () => {
           const groupKey = (m: LigaProximoPartido) =>
             `${m.matchday ?? 'null'}|${m.match_date ?? 'null'}`;
 
-          return (
-            <div style={{ marginTop: '2rem' }}>
-              <h3 style={{ marginBottom: '0.75rem' }}>
-                Próximos partidos de {config.teamName}
-              </h3>
+          const upcoming = nextMatches.filter((m) => !m.isPast);
+          const past = nextMatches.filter((m) => m.isPast);
+
+          const renderTable = (matches: LigaProximoPartido[], title: string, subtitle?: string) => (
+            <div style={{ marginTop: '2rem' }} key={title}>
+              <h3 style={{ marginBottom: '0.25rem' }}>{title}</h3>
+              {subtitle && (
+                <p className="text-muted" style={{ marginBottom: '0.75rem', fontSize: '0.85rem' }}>
+                  {subtitle}
+                </p>
+              )}
               <div className="sales-table-wrapper">
                 <div className="sales-table">
                   <div className="sales-table-head">
@@ -123,8 +130,8 @@ export const LigasStandingsPage: React.FC = () => {
                     <span className="col-category">Rival</span>
                     <span className="col-num">Localía</span>
                   </div>
-                  {nextMatches.map((m, i) => {
-                    const prev = i > 0 ? nextMatches[i - 1] : null;
+                  {matches.map((m, i) => {
+                    const prev = i > 0 ? matches[i - 1] : null;
                     const sameGroup = prev && groupKey(m) === groupKey(prev);
                     return (
                       <div key={m.id} className="sales-table-row">
@@ -148,6 +155,27 @@ export const LigasStandingsPage: React.FC = () => {
                 </div>
               </div>
             </div>
+          );
+
+          return (
+            <>
+              {upcoming.length > 0
+                ? renderTable(upcoming, `Próximos partidos de ${config.teamName}`)
+                : null}
+              {past.length > 0
+                ? renderTable(
+                    past,
+                    `Partidos pendientes (fechas anteriores)`,
+                    'Estos partidos aún figuran como pendientes en el sistema; sus fechas ya pasaron pero el estado no se actualizó.',
+                  )
+                : null}
+              {upcoming.length === 0 && past.length === 0 && (
+                <div style={{ marginTop: '2rem' }}>
+                  <h3 style={{ marginBottom: '0.75rem' }}>Próximos partidos</h3>
+                  <p className="text-muted">No hay partidos pendientes para {config.teamName}</p>
+                </div>
+              )}
+            </>
           );
         })()}
     </div>
