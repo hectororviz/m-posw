@@ -1,7 +1,96 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { LigaMatchdayGroup } from '../api/types';
+import type { LigaMatchdayGroup, LigaMatchdayMatch } from '../api/types';
 import { useLigasAllMatches, useLigasCategories, useLigasConfigs, useLigasStandings } from '../api/queries';
+
+const sortCategories = (matches: LigaMatchdayMatch[]): LigaMatchdayMatch[] => {
+  const extractNum = (name: string): number => {
+    const m = name.match(/\d+/);
+    return m ? parseInt(m[0], 10) : 0;
+  };
+  return [...matches].sort((a, b) => {
+    const na = extractNum(a.categoryName);
+    const nb = extractNum(b.categoryName);
+    if (na !== nb) return nb - na;
+    return a.categoryName.localeCompare(b.categoryName);
+  });
+};
+
+const ResultModal: React.FC<{
+  group: LigaMatchdayGroup;
+  teamName: string;
+  onClose: () => void;
+}> = ({ group, teamName, onClose }) => {
+  const formatDate = (d: string | null) =>
+    d
+      ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+      : '';
+
+  const played = group.matches.filter((m) => m.status !== 'pendiente');
+  const sorted = sortCategories(played);
+
+  return (
+    <div className="ligas-modal-overlay" onClick={onClose}>
+      <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="ligas-modal-header">
+          <h3>
+            Jornada {group.matchday}
+            {group.match_date ? ` — ${formatDate(group.match_date)}` : ''}
+          </h3>
+          <button className="ligas-modal-close" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <div className="ligas-modal-body">
+          {sorted.map((m) => {
+            const score =
+              m.localGoals != null && m.awayGoals != null
+                ? `${m.localGoals} - ${m.awayGoals}`
+                : null;
+            const badge = score
+              ? m.isWon
+                ? { letter: 'G', color: '#16a34a' }
+                : m.isDraw
+                  ? { letter: 'E', color: '#ca8a04' }
+                  : { letter: 'P', color: '#dc2626' }
+              : null;
+
+            return (
+              <div key={m.id} className="ligas-modal-result">
+                <span className="ligas-modal-cat">{m.categoryName}</span>
+                <span
+                  className="ligas-modal-score"
+                  style={badge ? { color: badge.color } : undefined}
+                >
+                  {group.isLocal
+                    ? `${teamName} ${score || 'vs'} ${group.opponentName}`
+                    : `${group.opponentName} ${score || 'vs'} ${teamName}`}
+                  {badge && (
+                    <span
+                      style={{
+                        background: badge.color + '1a',
+                        padding: '1px 7px',
+                        borderRadius: 6,
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {badge.letter}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const LigasStandingsPage: React.FC = () => {
   const { configId } = useParams<{ configId: string }>();
@@ -19,7 +108,7 @@ export const LigasStandingsPage: React.FC = () => {
 
   const { data: matchdayGroups } = useLigasAllMatches(config?.teamId, config?.leagueId);
 
-  const [expandedJornada, setExpandedJornada] = useState<number | null>(null);
+  const [modalGroup, setModalGroup] = useState<LigaMatchdayGroup | null>(null);
 
   const formatDate = (d: string | null) =>
     d
@@ -34,12 +123,7 @@ export const LigasStandingsPage: React.FC = () => {
     return <p className="text-muted">Torneo no encontrado</p>;
   }
 
-  const toggleJornada = (matchday: number) => {
-    setExpandedJornada((prev) => (prev === matchday ? null : matchday));
-  };
-
-  const groupKey = (g: LigaMatchdayGroup) =>
-    `${g.match_date ?? 'null'}`;
+  const groupKey = (g: LigaMatchdayGroup) => g.match_date ?? 'null';
 
   return (
     <div>
@@ -120,7 +204,7 @@ export const LigasStandingsPage: React.FC = () => {
             Partidos de {config.teamName}
           </h3>
           <div className="sales-table-wrapper">
-            <div className="sales-table">
+            <div className="sales-table ligas-matchday-table">
               <div className="sales-table-head">
                 <span className="col-date">Fecha</span>
                 <span className="col-product">Jornada</span>
@@ -131,92 +215,27 @@ export const LigasStandingsPage: React.FC = () => {
                 const prev = i > 0 ? matchdayGroups[i - 1] : null;
                 const sameDate = prev && groupKey(g) === groupKey(prev);
                 const hasPlayed = g.matches.some((m) => m.status !== 'pendiente');
-                const isExpanded = expandedJornada === g.matchday;
 
                 return (
-                  <div key={g.matchday}>
-                    <div
-                      className={
-                        'sales-table-row ligas-row-highlight' +
-                        (hasPlayed ? ' ligas-row-clickable' : '')
-                      }
-                      onClick={hasPlayed ? () => toggleJornada(g.matchday) : undefined}
-                      style={hasPlayed ? { cursor: 'pointer' } : undefined}
-                    >
-                      <span className="col-date">
-                        {sameDate ? '' : formatDate(g.match_date)}
-                      </span>
-                      <span className="col-product">
-                        Jornada {g.matchday}
-                      </span>
-                      <span className="col-category">
-                        {g.opponentName}
-                        {hasPlayed && (
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: '0.65rem',
-                              color: isExpanded ? 'var(--primary)' : '#888',
-                              transition: 'transform 0.2s',
-                              display: 'inline-block',
-                              transform: isExpanded ? 'rotate(180deg)' : undefined,
-                            }}
-                          >
-                            ▼
-                          </span>
-                        )}
-                      </span>
-                      <span className="col-num">
-                        {g.isLocal ? 'Local' : 'Visitante'}
-                      </span>
-                    </div>
-                    {isExpanded && hasPlayed && (
-                      <div className="ligas-subrows">
-                        {g.matches
-                          .filter((m) => m.status !== 'pendiente')
-                          .map((m) => {
-                            const colors = m.isWon
-                              ? '#16a34a'
-                              : m.isDraw
-                                ? '#ca8a04'
-                                : '#dc2626';
-                            const letter = m.isWon ? 'G' : m.isDraw ? 'E' : 'P';
-                            return (
-                              <div key={m.id} className="sales-table-row">
-                                <span className="col-date" />
-                                <span className="col-product" style={{ fontSize: '0.85rem', color: '#888' }}>
-                                  {m.categoryName}
-                                </span>
-                                <span />
-                                <span className="col-num">
-                                  {m.localGoals != null && m.awayGoals != null ? (
-                                    <span
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: 6,
-                                        background: colors + '1a',
-                                        color: colors,
-                                        padding: '1px 8px',
-                                        borderRadius: 6,
-                                        fontSize: '0.85rem',
-                                        fontWeight: 700,
-                                      }}
-                                    >
-                                      {m.localGoals} - {m.awayGoals}
-                                      <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>
-                                        {letter}
-                                      </span>
-                                    </span>
-                                  ) : (
-                                    'Pendiente'
-                                  )}
-                                </span>
-                              </div>
-                            );
-                          })}
-                      </div>
-                    )}
+                  <div
+                    key={g.matchday}
+                    className={
+                      'sales-table-row ligas-row-highlight' +
+                      (hasPlayed ? ' ligas-row-clickable' : '')
+                    }
+                    onClick={hasPlayed ? () => setModalGroup(g) : undefined}
+                    style={hasPlayed ? { cursor: 'pointer' } : undefined}
+                  >
+                    <span className="col-date">
+                      {sameDate ? '' : formatDate(g.match_date)}
+                    </span>
+                    <span className="col-product">
+                      {g.matchday}
+                    </span>
+                    <span className="col-category">{g.opponentName}</span>
+                    <span className="col-num">
+                      {g.isLocal ? 'Local' : 'Visitante'}
+                    </span>
                   </div>
                 );
               })}
@@ -230,6 +249,14 @@ export const LigasStandingsPage: React.FC = () => {
           <h3 style={{ marginBottom: '0.75rem' }}>Partidos</h3>
           <p className="text-muted">No hay partidos registrados para {config.teamName}</p>
         </div>
+      )}
+
+      {modalGroup && (
+        <ResultModal
+          group={modalGroup}
+          teamName={config.teamName}
+          onClose={() => setModalGroup(null)}
+        />
       )}
     </div>
   );

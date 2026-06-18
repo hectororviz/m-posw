@@ -4861,6 +4861,59 @@ button {
   font-size: 0.8rem;
 }
 
+/* Ligas matchday table: centered columns with fixed widths */
+.ligas-matchday-table .col-date { flex: 0 0 100px; text-align: center; justify-content: center; }
+.ligas-matchday-table .col-date span { text-align: center; }
+.ligas-matchday-table .col-product { flex: 0 0 120px; text-align: center; justify-content: center; }
+.ligas-matchday-table .col-product span { text-align: center; }
+.ligas-matchday-table .col-category { flex: 1; text-align: center; justify-content: center; }
+.ligas-matchday-table .col-category span { text-align: center; }
+.ligas-matchday-table .col-num { flex: 0 0 90px; text-align: center; justify-content: center; }
+.ligas-matchday-table .col-num span { text-align: center; }
+
+/* Ligas modal overlay */
+.ligas-modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.ligas-modal {
+  background: var(--color-surface);
+  border-radius: 12px;
+  max-width: 480px; width: 90%;
+  max-height: 70vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.ligas-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.ligas-modal-header h3 { margin: 0; font-size: 1rem; }
+.ligas-modal-close {
+  background: none; border: none; font-size: 1.2rem; cursor: pointer;
+  color: var(--color-text-muted); padding: 4px; line-height: 1;
+}
+.ligas-modal-body {
+  padding: 0.75rem 1.25rem;
+  overflow-y: auto; flex: 1;
+}
+.ligas-modal-result {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border-light, rgba(0,0,0,0.06));
+}
+.ligas-modal-result:last-child { border-bottom: none; }
+.ligas-modal-cat {
+  font-size: 0.85rem; color: var(--color-text-muted);
+  min-width: 70px;
+}
+.ligas-modal-score {
+  font-weight: 700; font-size: 0.95rem;
+  display: flex; align-items: center; gap: 8px;
+}
+
 .sales-table-reason {
   font-size: 0.8rem;
   color: var(--color-text-faint);
