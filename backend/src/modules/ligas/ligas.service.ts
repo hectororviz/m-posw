@@ -74,6 +74,25 @@ export interface MatchResult {
   isDraw: boolean;
 }
 
+export interface MatchdayCategoryMatch {
+  id: string;
+  categoryName: string;
+  status: string;
+  localGoals: number | null;
+  awayGoals: number | null;
+  isLocal: boolean;
+  isWon: boolean;
+  isDraw: boolean;
+}
+
+export interface MatchdayGroup {
+  matchday: number;
+  match_date: string | null;
+  opponentName: string;
+  isLocal: boolean;
+  matches: MatchdayCategoryMatch[];
+}
+
 @Injectable()
 export class LigasService {
   private readonly logger = new Logger(LigasService.name);
@@ -343,6 +362,69 @@ export class LigasService {
         isDraw: ourGoals != null && theirGoals != null && ourGoals === theirGoals,
       };
     });
+  }
+
+  async getAllMatches(
+    teamId: string,
+    leagueId: string,
+  ): Promise<MatchdayGroup[]> {
+    const [matches, categories] = await Promise.all([
+      this.supabaseGet<SupabaseMatch[]>(
+        `/matches?league_id=eq.${leagueId}&or=(local_team_id.eq.${teamId},away_team_id.eq.${teamId})&order=matchday.asc&limit=200`,
+      ),
+      this.getCategories(leagueId),
+    ]);
+
+    const teams = await this.getTeams(leagueId);
+    const teamMap = new Map<string, SupabaseTeam>();
+    for (const t of teams) teamMap.set(t.id, t);
+
+    const catMap = new Map<string, string>();
+    for (const c of categories) catMap.set(c.id, c.name);
+
+    // Group by matchday
+    const grouped = new Map<number, SupabaseMatch[]>();
+    for (const m of matches) {
+      if (m.matchday == null) continue;
+      const arr = grouped.get(m.matchday);
+      if (arr) arr.push(m);
+      else grouped.set(m.matchday, [m]);
+    }
+
+    const result: MatchdayGroup[] = [];
+    for (const [matchday, dayMatches] of grouped) {
+      // Determine opponent and locality from the first match
+      const first = dayMatches[0];
+      const isLocal = first.local_team_id === teamId;
+      const opponentId = isLocal ? first.away_team_id : first.local_team_id;
+      const opponent = opponentId ? teamMap.get(opponentId) : null;
+
+      const categoryMatches: MatchdayCategoryMatch[] = dayMatches.map((m) => {
+        const catIsLocal = m.local_team_id === teamId;
+        const ourGoals = catIsLocal ? m.local_goals : m.away_goals;
+        const theirGoals = catIsLocal ? m.away_goals : m.local_goals;
+        return {
+          id: m.id,
+          categoryName: catMap.get(m.category_id) ?? '?',
+          status: m.status,
+          localGoals: m.local_goals,
+          awayGoals: m.away_goals,
+          isLocal: catIsLocal,
+          isWon: ourGoals != null && theirGoals != null && ourGoals > theirGoals,
+          isDraw: ourGoals != null && theirGoals != null && ourGoals === theirGoals,
+        };
+      });
+
+      result.push({
+        matchday,
+        match_date: first.match_date,
+        opponentName: opponent?.name ?? '?',
+        isLocal,
+        matches: categoryMatches,
+      });
+    }
+
+    return result;
   }
 
   async getConfigs() {

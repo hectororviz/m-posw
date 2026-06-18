@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -538,6 +538,19 @@ export const useLigasResults = (teamId?: string, leagueId?: string, categoryId?:
       if (categoryId) params.set('categoryId', categoryId);
       const response = await apiClient.get<LigaResultado[]>(
         `/ligas/teams/${teamId}/results?${params}`,
+      );
+      return response.data;
+    },
+    enabled: !!teamId && !!leagueId,
+    staleTime: fiveMinutes,
+  });
+
+export const useLigasAllMatches = (teamId?: string, leagueId?: string) =>
+  useQuery({
+    queryKey: ['ligas-all', teamId, leagueId],
+    queryFn: async () => {
+      const response = await apiClient.get<LigaMatchdayGroup[]>(
+        `/ligas/teams/${teamId}/all-matches?leagueId=${leagueId}`,
       );
       return response.data;
     },

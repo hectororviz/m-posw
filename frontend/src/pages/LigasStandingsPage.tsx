@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { LigaProximoPartido, LigaResultado } from '../api/types';
-import { useLigasCategories, useLigasConfigs, useLigasNextMatches, useLigasResults, useLigasStandings } from '../api/queries';
+import type { LigaMatchdayGroup } from '../api/types';
+import { useLigasAllMatches, useLigasCategories, useLigasConfigs, useLigasStandings } from '../api/queries';
 
 export const LigasStandingsPage: React.FC = () => {
   const { configId } = useParams<{ configId: string }>();
@@ -17,9 +17,9 @@ export const LigasStandingsPage: React.FC = () => {
 
   const { data: categories } = useLigasCategories(config?.leagueId);
 
-  const { data: nextMatches } = useLigasNextMatches(config?.teamId, config?.leagueId);
+  const { data: matchdayGroups } = useLigasAllMatches(config?.teamId, config?.leagueId);
 
-  const { data: results } = useLigasResults(config?.teamId, config?.leagueId, categoryId || undefined);
+  const [expandedJornada, setExpandedJornada] = useState<number | null>(null);
 
   const formatDate = (d: string | null) =>
     d
@@ -33,6 +33,13 @@ export const LigasStandingsPage: React.FC = () => {
   if (!config) {
     return <p className="text-muted">Torneo no encontrado</p>;
   }
+
+  const toggleJornada = (matchday: number) => {
+    setExpandedJornada((prev) => (prev === matchday ? null : matchday));
+  };
+
+  const groupKey = (g: LigaMatchdayGroup) =>
+    `${g.match_date ?? 'null'}`;
 
   return (
     <div>
@@ -107,54 +114,109 @@ export const LigasStandingsPage: React.FC = () => {
         <p className="text-muted">No hay partidos finalizados para mostrar la tabla</p>
       )}
 
-      {results && results.length > 0 && (
+      {matchdayGroups && matchdayGroups.length > 0 && (
         <div style={{ marginTop: '2rem' }}>
           <h3 style={{ marginBottom: '0.75rem' }}>
-            Resultados de {config.teamName}
+            Partidos de {config.teamName}
           </h3>
           <div className="sales-table-wrapper">
             <div className="sales-table">
               <div className="sales-table-head">
                 <span className="col-date">Fecha</span>
                 <span className="col-product">Jornada</span>
-                <span className="col-category">Local</span>
-                <span className="col-num">Resultado</span>
-                <span className="col-category">Visitante</span>
+                <span className="col-category">Rival</span>
+                <span className="col-num">Localía</span>
               </div>
-              {results.map((r) => {
-                const resultBadge = r.localGoals != null && r.awayGoals != null
-                  ? { letter: r.isWon ? 'G' : r.isDraw ? 'E' : 'P', color: r.isWon ? '#16a34a' : r.isDraw ? '#ca8a04' : '#dc2626' }
-                  : null;
+              {matchdayGroups.map((g, i) => {
+                const prev = i > 0 ? matchdayGroups[i - 1] : null;
+                const sameDate = prev && groupKey(g) === groupKey(prev);
+                const hasPlayed = g.matches.some((m) => m.status !== 'pendiente');
+                const isExpanded = expandedJornada === g.matchday;
+
                 return (
-                  <div key={r.id} className="sales-table-row ligas-row-highlight">
-                    <span className="col-date">{formatDate(r.match_date)}</span>
-                    <span className="col-product">
-                      {r.matchday != null ? `Jornada ${r.matchday}` : '—'}
-                    </span>
-                    <span className="col-category">{r.localName}</span>
-                    <span className="col-num" style={{ fontWeight: 600 }}>
-                      {r.localGoals != null && r.awayGoals != null
-                        ? (
+                  <div key={g.matchday}>
+                    <div
+                      className={
+                        'sales-table-row ligas-row-highlight' +
+                        (hasPlayed ? ' ligas-row-clickable' : '')
+                      }
+                      onClick={hasPlayed ? () => toggleJornada(g.matchday) : undefined}
+                      style={hasPlayed ? { cursor: 'pointer' } : undefined}
+                    >
+                      <span className="col-date">
+                        {sameDate ? '' : formatDate(g.match_date)}
+                      </span>
+                      <span className="col-product">
+                        Jornada {g.matchday}
+                      </span>
+                      <span className="col-category">
+                        {g.opponentName}
+                        {hasPlayed && (
                           <span
                             style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              background: resultBadge!.color + '1a',
-                              color: resultBadge!.color,
-                              padding: '1px 8px',
-                              borderRadius: 6,
-                              fontSize: '0.85rem',
-                              fontWeight: 700,
+                              marginLeft: 6,
+                              fontSize: '0.65rem',
+                              color: isExpanded ? 'var(--primary)' : '#888',
+                              transition: 'transform 0.2s',
+                              display: 'inline-block',
+                              transform: isExpanded ? 'rotate(180deg)' : undefined,
                             }}
                           >
-                            {r.localGoals} - {r.awayGoals}
-                            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>{resultBadge!.letter}</span>
+                            ▼
                           </span>
-                        )
-                        : '—'}
-                    </span>
-                    <span className="col-category">{r.awayName}</span>
+                        )}
+                      </span>
+                      <span className="col-num">
+                        {g.isLocal ? 'Local' : 'Visitante'}
+                      </span>
+                    </div>
+                    {isExpanded && hasPlayed && (
+                      <div className="ligas-subrows">
+                        {g.matches
+                          .filter((m) => m.status !== 'pendiente')
+                          .map((m) => {
+                            const colors = m.isWon
+                              ? '#16a34a'
+                              : m.isDraw
+                                ? '#ca8a04'
+                                : '#dc2626';
+                            const letter = m.isWon ? 'G' : m.isDraw ? 'E' : 'P';
+                            return (
+                              <div key={m.id} className="sales-table-row">
+                                <span className="col-date" />
+                                <span className="col-product" style={{ fontSize: '0.85rem', color: '#888' }}>
+                                  {m.categoryName}
+                                </span>
+                                <span />
+                                <span className="col-num">
+                                  {m.localGoals != null && m.awayGoals != null ? (
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        background: colors + '1a',
+                                        color: colors,
+                                        padding: '1px 8px',
+                                        borderRadius: 6,
+                                        fontSize: '0.85rem',
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {m.localGoals} - {m.awayGoals}
+                                      <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                                        {letter}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    'Pendiente'
+                                  )}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -163,79 +225,12 @@ export const LigasStandingsPage: React.FC = () => {
         </div>
       )}
 
-      {(() => {
-          if (!nextMatches || nextMatches.length === 0) return null;
-
-          const groupKey = (m: LigaProximoPartido) =>
-            `${m.matchday ?? 'null'}|${m.match_date ?? 'null'}`;
-
-          const upcoming = nextMatches.filter((m) => !m.isPast);
-          const past = nextMatches.filter((m) => m.isPast);
-
-          const renderTable = (matches: LigaProximoPartido[], title: string, subtitle?: string) => (
-            <div style={{ marginTop: '2rem' }} key={title}>
-              <h3 style={{ marginBottom: '0.25rem' }}>{title}</h3>
-              {subtitle && (
-                <p className="text-muted" style={{ marginBottom: '0.75rem', fontSize: '0.85rem' }}>
-                  {subtitle}
-                </p>
-              )}
-              <div className="sales-table-wrapper">
-                <div className="sales-table">
-                  <div className="sales-table-head">
-                    <span className="col-date">Fecha</span>
-                    <span className="col-product">Jornada</span>
-                    <span className="col-category">Rival</span>
-                    <span className="col-num">Localía</span>
-                  </div>
-                  {matches.map((m, i) => {
-                    const prev = i > 0 ? matches[i - 1] : null;
-                    const sameGroup = prev && groupKey(m) === groupKey(prev);
-                    return (
-                      <div key={m.id} className="sales-table-row">
-                        <span className="col-date">
-                          {sameGroup ? '' : formatDate(m.match_date)}
-                        </span>
-                        <span className="col-product">
-                          {sameGroup
-                            ? ''
-                            : m.matchday != null
-                              ? `Jornada ${m.matchday}`
-                              : '—'}
-                        </span>
-                        <span className="col-category">{m.opponentName}</span>
-                        <span className="col-num">
-                          {m.isLocal ? 'Local' : 'Visitante'}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          );
-
-          return (
-            <>
-              {upcoming.length > 0
-                ? renderTable(upcoming, `Próximos partidos de ${config.teamName}`)
-                : null}
-              {past.length > 0
-                ? renderTable(
-                    past,
-                    `Partidos pendientes (fechas anteriores)`,
-                    'Estos partidos aún figuran como pendientes en el sistema; sus fechas ya pasaron pero el estado no se actualizó.',
-                  )
-                : null}
-              {upcoming.length === 0 && past.length === 0 && (
-                <div style={{ marginTop: '2rem' }}>
-                  <h3 style={{ marginBottom: '0.75rem' }}>Próximos partidos</h3>
-                  <p className="text-muted">No hay partidos pendientes para {config.teamName}</p>
-                </div>
-              )}
-            </>
-          );
-        })()}
+      {matchdayGroups && matchdayGroups.length === 0 && (
+        <div style={{ marginTop: '2rem' }}>
+          <h3 style={{ marginBottom: '0.75rem' }}>Partidos</h3>
+          <p className="text-muted">No hay partidos registrados para {config.teamName}</p>
+        </div>
+      )}
     </div>
   );
 };

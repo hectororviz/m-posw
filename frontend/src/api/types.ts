@@ -240,6 +240,25 @@ export interface LigaResultado {
   isDraw: boolean;
 }
 
+export interface LigaMatchdayMatch {
+  id: string;
+  categoryName: string;
+  status: string;
+  localGoals: number | null;
+  awayGoals: number | null;
+  isLocal: boolean;
+  isWon: boolean;
+  isDraw: boolean;
+}
+
+export interface LigaMatchdayGroup {
+  matchday: number;
+  match_date: string | null;
+  opponentName: string;
+  isLocal: boolean;
+  matches: LigaMatchdayMatch[];
+}
+
 export interface LigasConfig {
   id: string;
   leagueId: string;
