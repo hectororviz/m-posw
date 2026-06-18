@@ -44,6 +44,13 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Escáner QR en el POS**: al escanear el QR de un socio se aplican automáticamente sus descuentos en la venta.
 - **KPIs**: deuda total, cantidad de socios activos, socios con deuda.
 
+### Ligas Deportivas
+- **Tablas de posiciones**: seguimiento de torneos de fútbol con filtro por categoría. PJ, PG, PE, PP, GF, GC, DG y puntos. Equipo seguido resaltado con ⭐.
+- **Próximos partidos**: agenda de partidos pendientes del equipo, con fecha, jornada, rival y localía. Agrupación visual por fecha/jornada (sin repetir columnas).
+- **Partidos pendientes anteriores**: detección de partidos no actualizados (fechas pasadas sin status finalizado), mostrados en sección separada con nota aclaratoria.
+- **Configuración por torneo**: asociar múltiples ligas y equipos a seguir. Cada torneo genera una pestaña de navegación independiente.
+- Los datos se obtienen de una base externa (Supabase) poblada por scraping automático.
+
 ### Personalización
 - Nombre del comercio/club, logo, favicon y color principal de la UI configurable desde el panel admin.
 - Encabezado del ticket personalizable.
@@ -65,6 +72,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | **Feria / puesto callejero** | App Android en celular con impresión Bluetooth. Sin necesidad de PC ni instalación compleja. |
 | **Comercio minorista** | Catálogo de productos con imágenes, múltiples métodos de cobro, cierre de caja diario, libro diario contable. Ventas fiadas con control de acreedores. |
 | **Evento con múltiples puestos** | Cada puesto es una caja independiente. Admin centralizado que ve reportes, estadísticas y tesorería de todas las cajas. |
+| **Club deportivo** | Tablas de posiciones y próximos partidos de ligas de fútbol. Seguimiento de uno o varios equipos por torneo. Datos actualizados vía scraping. |
 
 ## Ventajas
 
