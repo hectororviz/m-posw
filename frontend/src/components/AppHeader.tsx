@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { DollarSign, LogOut, Moon, Settings, Sun } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
 import { useAuth } from '../context/AuthContext';
@@ -74,7 +75,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
             {user?.username ?? 'Usuario'}
           </span>
           <button type="button" onClick={toggleTheme} className="ghost-button header-toggle-button theme-toggle" aria-label="Cambiar tema" title={resolved === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
-            <span aria-hidden="true">{resolved === 'dark' ? '☀️' : '🌙'}</span>
+            {resolved === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           {!isAdmin && hasAdminAccess && (
             <NavLink
@@ -97,13 +98,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
               to={isPosScreen || isHomeScreen ? '/admin/settings' : '/pos'}
               className="ghost-button header-toggle-button"
             >
-              <span aria-hidden="true">{isPosScreen || isHomeScreen ? '⚙️' : '$'}</span>
+              {isPosScreen || isHomeScreen ? <Settings size={18} /> : <DollarSign size={18} />}
             </NavLink>
           )}
           <button type="button" onClick={logout} className="ghost-button logout-button" aria-label="Salir">
-            <span className="logout-icon" aria-hidden="true">
-              ⎋
-            </span>
+            <LogOut size={18} className="logout-icon" />
             <span className="logout-text">Salir</span>
           </button>
         </div>

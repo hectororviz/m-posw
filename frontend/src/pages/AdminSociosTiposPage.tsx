@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSociosTipos } from '../api/queries';
 import type { SocioTipo } from '../api/types';
@@ -156,7 +157,7 @@ export const AdminSociosTiposPage: React.FC = () => {
         aria-label="Nuevo tipo"
         title="Nuevo tipo"
       >
-        +
+        <Plus size={24} />
       </button>
 
       {modalOpen && (
@@ -164,7 +165,7 @@ export const AdminSociosTiposPage: React.FC = () => {
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingId ? 'Editar tipo' : 'Nuevo tipo'}</h3>
-              <button className="icon-button" onClick={() => { setModalOpen(false); resetForm(); }}>✕</button>
+              <button className="icon-button" onClick={() => { setModalOpen(false); resetForm(); }}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <p className="error-text">{error}</p>}

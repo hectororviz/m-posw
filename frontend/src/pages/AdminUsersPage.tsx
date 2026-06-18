@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useUsers } from '../api/queries';
@@ -158,7 +159,7 @@ export const AdminUsersPage: React.FC = () => {
                 <td className="users-table-actions">
                   {user.role !== 'ADMIN' && (
                     <>
-                      <button type="button" className="btn-ghost" onClick={() => openEdit(user)} title="Editar">✎</button>
+                      <button type="button" className="btn-ghost" onClick={() => openEdit(user)} title="Editar">{<Pencil size={16} />}</button>
                       <button
                         type="button"
                         className="btn-ghost"
@@ -167,7 +168,7 @@ export const AdminUsersPage: React.FC = () => {
                         style={{ color: 'var(--color-danger-text)' }}
                         title="Eliminar"
                       >
-                        {deletingId === user.id ? '...' : '✕'}
+                        {deletingId === user.id ? '...' : '{<X size={16} />}'}
                       </button>
                     </>
                   )}
@@ -178,16 +179,14 @@ export const AdminUsersPage: React.FC = () => {
         </table>
       )}
 
-      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo usuario" title="Nuevo usuario">
-        +
-      </button>
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo usuario" title="Nuevo usuario"><Plus size={24} /></button>
 
       {modalMode && (
         <div className="modal-backdrop" onClick={closeModal}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{modalMode === 'create' ? 'Nuevo usuario' : 'Editar usuario'}</h3>
-              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               <div className="user-modal-fields">

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AlertTriangle, ArrowLeft, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
@@ -90,7 +91,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
               onClick={() => navigate('/admin/acreedores')}
               style={{ marginBottom: '0.5rem' }}
             >
-              ← Volver
+              <ArrowLeft size={16} /> Volver
             </button>
             <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>{acreedor.nombre}</h2>
             <p className="page-header-subtitle">
@@ -106,7 +107,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
 
       {deuda?.alertaDeuda && (
         <div className="alerta-deuda-banner">
-          ⚠ Deuda pendiente desde hace {deuda.diasSinPagar} dias.
+          <AlertTriangle size={16} className="alerta-deuda-icon" /> Deuda pendiente desde hace {deuda.diasSinPagar} dias.
           {deuda.deudaMasAntigua && (
             <> Ultima venta sin saldar: {formatDate(deuda.deudaMasAntigua)}.</>
           )}
@@ -208,7 +209,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Registrar pago</h3>
-              <button className="icon-button" onClick={() => setPagoModal(false)}>✕</button>
+              <button className="icon-button" onClick={() => setPagoModal(false)}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <p className="error-text">{error}</p>}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { X } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { normalizeApiError } from '../api/client';
 import { useLedgerAccounts } from '../api/queries';
@@ -118,7 +119,7 @@ export const TreasuryLedgerAccountsPage: React.FC = () => {
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Nueva cuenta</h3>
-              <button type="button" className="icon-button" onClick={() => setShowCreate(false)}>✕</button>
+              <button type="button" className="icon-button" onClick={() => setShowCreate(false)}>{<X size={16} />}</button>
             </div>
             <form onSubmit={handleCreate}>
               <div className="modal-body">

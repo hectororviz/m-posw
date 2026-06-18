@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Maximize2, Minimize2, Square } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, buildImageUrl } from '../api/client';
 import { useCategories, useProductsByCategory } from '../api/queries';
@@ -73,9 +74,9 @@ export const PosPage: React.FC = () => {
               </button>
             ))}
             <div className="pos-zoom-control">
-              <button type="button" className={`pos-zoom-btn ${cardSize === 'sm' ? 'active' : ''}`} onClick={() => handleCardSize('sm')}>⊡</button>
-              <button type="button" className={`pos-zoom-btn ${cardSize === 'md' ? 'active' : ''}`} onClick={() => handleCardSize('md')}>◫</button>
-              <button type="button" className={`pos-zoom-btn ${cardSize === 'lg' ? 'active' : ''}`} onClick={() => handleCardSize('lg')}>▣</button>
+              <button type="button" className={`pos-zoom-btn ${cardSize === 'sm' ? 'active' : ''}`} onClick={() => handleCardSize('sm')}><Minimize2 size={16} /></button>
+              <button type="button" className={`pos-zoom-btn ${cardSize === 'md' ? 'active' : ''}`} onClick={() => handleCardSize('md')}><Square size={16} /></button>
+              <button type="button" className={`pos-zoom-btn ${cardSize === 'lg' ? 'active' : ''}`} onClick={() => handleCardSize('lg')}><Maximize2 size={16} /></button>
             </div>
           </div>
 

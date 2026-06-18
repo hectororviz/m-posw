@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useInternetPlans, useInternetVouchers, useInternetStats } from '../api/queries';
@@ -253,14 +254,14 @@ export const AdminInternetPage: React.FC = () => {
       {/* TAB: Planes */}
       {activeTab === 'planes' && (
         <>
-          <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo plan" title="Nuevo plan">+</button>
+          <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo plan" title="Nuevo plan"><Plus size={24} /></button>
 
           {showModal && (
             <div className="modal-backdrop" onClick={closeModal} role="presentation">
               <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                   <h3>{editingPlan ? 'Editar plan' : 'Nuevo plan'}</h3>
-                  <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
+                  <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">{<X size={16} />}</button>
                 </div>
                 <div className="modal-body">
                   <div className="settings-field">
@@ -342,8 +343,8 @@ export const AdminInternetPage: React.FC = () => {
                       )}
                     </span>
                     <span className="col-action" style={{ flex: '0 0 80px', display: 'flex', gap: '0.25rem' }}>
-                      <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(plan)} aria-label={`Editar ${plan.name}`}>✎</button>
-                      <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : '✕'}</button>
+                      <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(plan)} aria-label={`Editar ${plan.name}`}>{<Pencil size={16} />}</button>
+                      <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : '{<X size={16} />}'}</button>
                     </span>
                   </div>
                 ))}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Plus, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSociosTipos } from '../api/queries';
 import { useToast } from '../components/ToastProvider';
@@ -228,14 +229,14 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
         </div>
       )}
 
-      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo beneficio">+</button>
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo beneficio"><Plus size={24} /></button>
 
       {modalOpen && (
         <div className="modal-backdrop" onClick={() => { setModalOpen(false); resetForm(); }}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingId ? 'Editar beneficio' : 'Nuevo beneficio'}</h3>
-              <button className="icon-button" onClick={() => { setModalOpen(false); resetForm(); }}>✕</button>
+              <button className="icon-button" onClick={() => { setModalOpen(false); resetForm(); }}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <p className="error-text" style={{ marginBottom: '0.75rem' }}>{error}</p>}

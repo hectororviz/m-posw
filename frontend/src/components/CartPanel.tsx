@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, ArrowRight, Minus, Plus, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings } from '../api/queries';
 import { useCart } from '../context/CartContext';
@@ -123,9 +124,9 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
       <aside className={`cart-panel ${isCollapsed ? 'is-collapsed' : ''}`}>
         <div className="cart-panel__header">
           {!isCollapsed && <h2>Carrito</h2>}
-          <button type="button" className="icon-button cart-collapse-button" onClick={toggleCollapsed} aria-label={isCollapsed ? 'Expandir' : 'Colapsar'}>
-            <span aria-hidden="true">{isCollapsed ? '←' : '→'}</span>
-          </button>
+            <button type="button" className="icon-button cart-collapse-button" onClick={toggleCollapsed} aria-label={isCollapsed ? 'Expandir' : 'Colapsar'}>
+              {isCollapsed ? <ArrowLeft size={18} /> : <ArrowRight size={18} />}
+            </button>
         </div>
         {!isCollapsed && (
           <>
@@ -140,9 +141,9 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
                         <span className="cart-item__unit">{formatAmount(item.product.price)}</span>
                       </div>
                       <div className="cart-item__stepper">
-                        <button type="button" className="cart-stepper-btn" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}>−</button>
+                        <button type="button" className="cart-stepper-btn" onClick={() => updateQuantity(item.product.id, item.quantity - 1)}><Minus size={14} /></button>
                         <span className="cart-stepper-value">{item.quantity}</span>
-                        <button type="button" className="cart-stepper-btn" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}>+</button>
+                        <button type="button" className="cart-stepper-btn" onClick={() => updateQuantity(item.product.id, item.quantity + 1)}><Plus size={14} /></button>
                         <button type="button" className="cart-item-remove" onClick={() => removeItem(item.product.id)} aria-label={`Quitar ${item.product.name}`}>×</button>
                       </div>
                     </li>
@@ -203,7 +204,7 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
       {isMovementOpen && (
         <div className="modal-backdrop" onClick={() => setIsMovementOpen(false)}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3>Nuevo movimiento</h3><button className="icon-button" onClick={() => setIsMovementOpen(false)}>✕</button></div>
+            <div className="modal-header"><h3>Nuevo movimiento</h3><button className="icon-button" onClick={() => setIsMovementOpen(false)}>{<X size={16} />}</button></div>
             <div className="modal-body">
               <div className="settings-field">
                 <label>Tipo</label>

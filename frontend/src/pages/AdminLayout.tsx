@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { BarChart2, Boxes, ChevronLeft, ChevronRight, House, Landmark, Package, Receipt, Settings, ShoppingCart, Tag, UserCog, UserMinus, Users, Wifi } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
@@ -17,30 +18,32 @@ const getInitials = (name?: string | null) => {
   return `${words[0][0]}${words[1][0]}`.toUpperCase();
 };
 
-const navIcon = (emoji: string) => <span className="nav-icon" aria-hidden="true">{emoji}</span>;
+const navIcon = (icon: ReactNode) => <span className="nav-icon" aria-hidden="true">{icon}</span>;
 
 interface NavItem {
   to: string;
-  emoji: string;
+  emoji: ReactNode;
   label: string;
   moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule';
   permissionModule?: string;
 }
 
+const iconSize = 18;
+
 const navItems: NavItem[] = [
-  { to: '/admin/home',      emoji: '🏠', label: 'Home',                            permissionModule: 'CONFIGURACION' },
-  { to: '/pos',              emoji: '🛒', label: 'POS',                 permissionModule: 'POS' },
-  { to: '/admin/sales',      emoji: '📋', label: 'Ventas',              permissionModule: 'VENTAS' },
-  { to: '/admin/stats',      emoji: '📊', label: 'Estadisticas',         permissionModule: 'REPORTES' },
-  { to: '/admin/tesoreria',  emoji: '📒', label: 'Tesorería',           moduleKey: 'enableTreasuryModule', permissionModule: 'TESORERIA' },
-  { to: '/admin/categories', emoji: '🗂️', label: 'Categorias',           permissionModule: 'PRODUCTOS' },
-  { to: '/admin/products',   emoji: '📦', label: 'Productos',            permissionModule: 'PRODUCTOS' },
-  { to: '/admin/stock',      emoji: '📐', label: 'Stock',                permissionModule: 'PRODUCTOS' },
-  { to: '/admin/acreedores', emoji: '👥', label: 'Acreedores',          moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
-  { to: '/admin/socios',     emoji: '🪪', label: 'Socios',              moduleKey: 'enableSociosModule', permissionModule: 'SOCIOS' },
-  { to: '/admin/internet',   emoji: '📶', label: 'Internet',            moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
-  { to: '/admin/users',      emoji: '👤', label: 'Usuarios',            permissionModule: 'CONFIGURACION' },
-  { to: '/admin/settings',   emoji: '⚙️', label: 'Configuracion',        permissionModule: 'CONFIGURACION' },
+  { to: '/admin/home',      emoji: <House size={iconSize} />, label: 'Home',                            permissionModule: 'CONFIGURACION' },
+  { to: '/pos',              emoji: <ShoppingCart size={iconSize} />, label: 'POS',                 permissionModule: 'POS' },
+  { to: '/admin/sales',      emoji: <Receipt size={iconSize} />, label: 'Ventas',              permissionModule: 'VENTAS' },
+  { to: '/admin/stats',      emoji: <BarChart2 size={iconSize} />, label: 'Estadisticas',         permissionModule: 'REPORTES' },
+  { to: '/admin/tesoreria',  emoji: <Landmark size={iconSize} />, label: 'Tesorería',           moduleKey: 'enableTreasuryModule', permissionModule: 'TESORERIA' },
+  { to: '/admin/categories', emoji: <Tag size={iconSize} />, label: 'Categorias',           permissionModule: 'PRODUCTOS' },
+  { to: '/admin/products',   emoji: <Package size={iconSize} />, label: 'Productos',            permissionModule: 'PRODUCTOS' },
+  { to: '/admin/stock',      emoji: <Boxes size={iconSize} />, label: 'Stock',                permissionModule: 'PRODUCTOS' },
+  { to: '/admin/acreedores', emoji: <UserMinus size={iconSize} />, label: 'Acreedores',          moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
+  { to: '/admin/socios',     emoji: <Users size={iconSize} />, label: 'Socios',              moduleKey: 'enableSociosModule', permissionModule: 'SOCIOS' },
+  { to: '/admin/internet',   emoji: <Wifi size={iconSize} />, label: 'Internet',            moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
+  { to: '/admin/users',      emoji: <UserCog size={iconSize} />, label: 'Usuarios',            permissionModule: 'CONFIGURACION' },
+  { to: '/admin/settings',   emoji: <Settings size={iconSize} />, label: 'Configuracion',        permissionModule: 'CONFIGURACION' },
 ];
 
 export const AdminLayout: React.FC = () => {
@@ -141,7 +144,7 @@ export const AdminLayout: React.FC = () => {
               aria-label={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
               title={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
             >
-              <span aria-hidden="true">{isCollapsed ? '▶' : '◀'}</span>
+              {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             </button>
           </div>
 

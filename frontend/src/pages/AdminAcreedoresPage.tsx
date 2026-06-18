@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedores, useAcreedoresResumen } from '../api/queries';
 import type { Acreedor } from '../api/types';
@@ -234,7 +235,7 @@ export const AdminAcreedoresPage: React.FC = () => {
         aria-label="Nuevo acreedor"
         title="Nuevo acreedor"
       >
-        +
+        <Plus size={24} />
       </button>
 
       {modalOpen && (
@@ -242,7 +243,7 @@ export const AdminAcreedoresPage: React.FC = () => {
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingId ? 'Editar acreedor' : 'Nuevo acreedor'}</h3>
-              <button className="icon-button" onClick={() => { setModalOpen(false); resetForm(); }}>✕</button>
+              <button className="icon-button" onClick={() => { setModalOpen(false); resetForm(); }}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <p className="error-text">{error}</p>}

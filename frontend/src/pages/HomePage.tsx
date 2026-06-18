@@ -1,3 +1,5 @@
+import { AlertCircle, CalendarDays, CalendarX, Clock, FolderOpen, Package, ShoppingCart, Ticket, UserMinus, Users } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { useHomeMetrics } from '../hooks/useHomeMetrics';
@@ -21,40 +23,42 @@ export const HomePage: React.FC = () => {
   const logoUrl = buildImageUrl(settings?.logoUrl);
   const initials = getInitials(clubName);
 
-  const cards: { icon: string; label: string; value: string; key: string }[] = [];
+  const cards: { icon: ReactNode; label: string; value: string; key: string }[] = [];
+
+  const cardIconSize = 24;
 
   if (metrics?.pos) {
     cards.push(
-      { icon: '🛒', label: 'Ventas hoy', value: `$${formatCurrency(metrics.pos.ventasHoy)}`, key: 'pos-hoy' },
-      { icon: '📅', label: 'Ventas 7 días', value: `$${formatCurrency(metrics.pos.ventasSemana)}`, key: 'pos-semana' },
+      { icon: <ShoppingCart size={cardIconSize} />, label: 'Ventas hoy', value: `$${formatCurrency(metrics.pos.ventasHoy)}`, key: 'pos-hoy' },
+      { icon: <CalendarDays size={cardIconSize} />, label: 'Ventas 7 días', value: `$${formatCurrency(metrics.pos.ventasSemana)}`, key: 'pos-semana' },
     );
   }
 
   if (metrics?.socios) {
     cards.push(
-      { icon: '🪪', label: 'Socios activos', value: String(metrics.socios.activos), key: 'socios' },
-      { icon: '📋', label: 'Cuotas vencidas', value: String(metrics.socios.cuotasVencidas), key: 'cuotas' },
+      { icon: <Users size={cardIconSize} />, label: 'Socios activos', value: String(metrics.socios.activos), key: 'socios' },
+      { icon: <CalendarX size={cardIconSize} />, label: 'Cuotas vencidas', value: String(metrics.socios.cuotasVencidas), key: 'cuotas' },
     );
   }
 
   if (metrics?.acreedores) {
     cards.push(
-      { icon: '👥', label: 'Acreedores con deuda', value: String(metrics.acreedores.activos), key: 'acreedores' },
-      { icon: '💰', label: 'Deuda total', value: `$${formatCurrency(metrics.acreedores.deudaTotal)}`, key: 'deuda' },
+      { icon: <UserMinus size={cardIconSize} />, label: 'Acreedores con deuda', value: String(metrics.acreedores.activos), key: 'acreedores' },
+      { icon: <Clock size={cardIconSize} />, label: 'Deuda total', value: `$${formatCurrency(metrics.acreedores.deudaTotal)}`, key: 'deuda' },
     );
   }
 
   if (metrics?.internet) {
     cards.push(
-      { icon: '📶', label: 'Vouchers activos', value: String(metrics.internet.vouchersActivos), key: 'vouchers' },
-      { icon: '⏳', label: 'Vencen hoy', value: String(metrics.internet.vouchersVencenHoy), key: 'vouchers-hoy' },
+      { icon: <Ticket size={cardIconSize} />, label: 'Vouchers activos', value: String(metrics.internet.vouchersActivos), key: 'vouchers' },
+      { icon: <AlertCircle size={cardIconSize} />, label: 'Vencen hoy', value: String(metrics.internet.vouchersVencenHoy), key: 'vouchers-hoy' },
     );
   }
 
   if (metrics?.stock) {
     cards.push(
-      { icon: '📦', label: 'Productos', value: String(metrics.stock.productos), key: 'productos' },
-      { icon: '🗂️', label: 'Categorías', value: String(metrics.stock.categorias), key: 'categorias' },
+      { icon: <Package size={cardIconSize} />, label: 'Productos', value: String(metrics.stock.productos), key: 'productos' },
+      { icon: <FolderOpen size={cardIconSize} />, label: 'Categorías', value: String(metrics.stock.categorias), key: 'categorias' },
     );
   }
 

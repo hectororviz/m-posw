@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { X } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { normalizeApiError } from '../api/client';
 import {
@@ -558,7 +559,7 @@ const NewEntryModal: React.FC<{
       >
         <div className="modal-header">
           <h3>Nuevo movimiento</h3>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Cerrar">✕</button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Cerrar">{<X size={16} />}</button>
         </div>
         <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {error && <div className="error-banner">{error}</div>}
@@ -828,7 +829,7 @@ const DetailModal: React.FC<{ entry: JournalEntry; onClose: () => void }> = ({ e
       <div className="modal user-modal" style={{ maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Asiento {entry.entryNumber}</h3>
-          <button type="button" className="icon-button" onClick={onClose}>✕</button>
+          <button type="button" className="icon-button" onClick={onClose}>{<X size={16} />}</button>
         </div>
         <div className="modal-body">
           <div className="entry-detail-info">
@@ -928,7 +929,7 @@ const VoidModal: React.FC<{
       <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Anular asiento</h3>
-          <button type="button" className="icon-button" onClick={onClose}>✕</button>
+          <button type="button" className="icon-button" onClick={onClose}>{<X size={16} />}</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">

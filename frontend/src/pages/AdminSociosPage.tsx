@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas, useTreasuryAccounts } from '../api/queries';
@@ -607,9 +608,7 @@ export const AdminSociosPage: React.FC = () => {
         </div>
       )}
 
-      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo socio" title="Nuevo socio">
-        +
-      </button>
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo socio" title="Nuevo socio"><Plus size={24} /></button>
 
       {/* ─── Modal: Create / Edit ─────────────────────── */}
       {(modalMode === 'create' || modalMode === 'edit') && (
@@ -617,7 +616,7 @@ export const AdminSociosPage: React.FC = () => {
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
             <div className="modal-header">
               <h3>{modalMode === 'edit' ? 'Editar socio' : 'Nuevo socio'}</h3>
-              <button className="icon-button" onClick={closeModal}>✕</button>
+              <button className="icon-button" onClick={closeModal}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <p className="error-text" style={{ marginBottom: '0.75rem' }}>{error}</p>}
@@ -721,7 +720,7 @@ export const AdminSociosPage: React.FC = () => {
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ width: '960px', maxWidth: '98vw', maxHeight: '92vh', overflow: 'auto' }}>
             <div className="modal-header">
               <h3>{viewedSocio ? `${viewedSocio.apellido}, ${viewedSocio.nombre}` : 'Cargando...'}</h3>
-              <button className="icon-button" onClick={closeModal}>✕</button>
+              <button className="icon-button" onClick={closeModal}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {!viewedSocio ? (
@@ -821,7 +820,7 @@ export const AdminSociosPage: React.FC = () => {
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Registrar pago</h3>
-              <button className="icon-button" onClick={() => setPagoModal(false)}>✕</button>
+              <button className="icon-button" onClick={() => setPagoModal(false)}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <p className="error-text">{error}</p>}
@@ -873,7 +872,7 @@ export const AdminSociosPage: React.FC = () => {
             <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', maxHeight: '90vh', overflow: 'auto' }}>
               <div className="modal-header">
                 <h3>Registrar pago{socio ? ` — ${socio.apellido}, ${socio.nombre} (Nº ${socio.nroSocio})` : ''}</h3>
-                <button className="icon-button" onClick={closeModal}>✕</button>
+                <button className="icon-button" onClick={closeModal}>{<X size={16} />}</button>
               </div>
               <div className="modal-body">
                 {pagoMasivoError && <p className="error-text" style={{ marginBottom: '0.75rem' }}>{pagoMasivoError}</p>}

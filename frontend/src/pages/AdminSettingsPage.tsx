@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { marked } from 'marked';
 import * as emoji from 'node-emoji';
 import { apiClient, normalizeApiError } from '../api/client';
+import { X } from 'lucide-react';
 import { useMpOauthStatus, useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
 import { useToast } from '../components/ToastProvider';
@@ -1044,7 +1045,7 @@ export const AdminSettingsPage: React.FC = () => {
                 onClick={() => setShowAboutModal(false)}
                 aria-label="Cerrar"
               >
-                ✕
+                {<X size={16} />}
               </button>
             </div>
             <div className="modal-body about-modal-body">
@@ -1066,7 +1067,7 @@ export const AdminSettingsPage: React.FC = () => {
                 onClick={() => setShowMovementReasonsModal(false)}
                 aria-label="Cerrar"
               >
-                ✕
+                {<X size={16} />}
               </button>
             </div>
             <div className="modal-body">

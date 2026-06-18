@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface CategoryHeaderProps {
@@ -10,7 +11,7 @@ export const CategoryHeader: React.FC<CategoryHeaderProps> = ({ title }) => {
   return (
     <div className="category-header">
       <button type="button" className="icon-button" onClick={() => navigate(-1)} aria-label="Volver">
-        <span aria-hidden="true">←</span>
+        <ArrowLeft size={20} />
       </button>
       <h2 title={title}>{title}</h2>
     </div>

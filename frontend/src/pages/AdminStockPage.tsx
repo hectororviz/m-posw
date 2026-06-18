@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Minus, Plus } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings, useStock } from '../api/queries';
@@ -242,7 +243,7 @@ export const AdminStockPage: React.FC = () => {
                           disabled={product.stock === 0 || isSaving}
                           aria-label={`Reducir stock de ${product.name}`}
                         >
-                          −
+                          <Minus size={16} />
                         </button>
                         <input
                           type="text"
@@ -257,7 +258,7 @@ export const AdminStockPage: React.FC = () => {
                           aria-label={`Stock de ${product.name}`}
                         />
                         {isSaving && <span className="stock-qty-spinner-overlay" />}
-                        {isSaved && product.id === product.id && !stockEdits[product.id] && <span className="stock-qty-check-overlay">✓</span>}
+                        {isSaved && product.id === product.id && !stockEdits[product.id] && <span className="stock-qty-check-overlay"><Check size={18} /></span>}
                         <button
                           type="button"
                           className="stock-qty-btn"
@@ -265,7 +266,7 @@ export const AdminStockPage: React.FC = () => {
                           disabled={isSaving}
                           aria-label={`Aumentar stock de ${product.name}`}
                         >
-                          +
+                          <Plus size={16} />
                         </button>
                       </div>
                     </div>

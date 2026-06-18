@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
+import { X } from 'lucide-react';
 import { apiClient, getUploadsBaseUrl, normalizeApiError } from '../api/client';
 import type { PaymentMethod, Sale, SaleStatus, PollTransferResponse, ConfirmTransferResponse } from '../api/types';
 import { useSettings } from '../api/queries';
@@ -857,7 +858,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             aria-label="Cerrar"
             disabled={Boolean(qrResult || transferResult)}
           >
-            ✕
+            {<X size={16} />}
           </button>
         </div>
         <div className="modal-body">

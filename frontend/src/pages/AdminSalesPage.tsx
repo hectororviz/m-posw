@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAdminSales, useCashCloses, useManualMovements, useSettings } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -353,7 +354,7 @@ export const AdminSalesPage: React.FC = () => {
       {selectedSale && (
         <div className="modal-backdrop" onClick={() => setSelectedSaleId(null)}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3>Detalle de venta</h3><button className="icon-button" onClick={() => setSelectedSaleId(null)}>✕</button></div>
+            <div className="modal-header"><h3>Detalle de venta</h3><button className="icon-button" onClick={() => setSelectedSaleId(null)}>{<X size={16} />}</button></div>
             <div className="modal-body">
               <div className="sales-detail-row"><span>Fecha</span><span>{formatDate(selectedSale.createdAt)} {formatTime(selectedSale.createdAt)}</span></div>
               <div className="sales-detail-row"><span>Total</span><strong>{formatCurrency(selectedSale.total)}</strong></div>
@@ -387,7 +388,7 @@ export const AdminSalesPage: React.FC = () => {
       {selectedCashClose && (
         <div className="modal-backdrop" onClick={() => setSelectedCashCloseId(null)}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3>Cierre de Caja</h3><button className="icon-button" onClick={() => setSelectedCashCloseId(null)}>✕</button></div>
+            <div className="modal-header"><h3>Cierre de Caja</h3><button className="icon-button" onClick={() => setSelectedCashCloseId(null)}>{<X size={16} />}</button></div>
             <div className="modal-body">
               <div className="sales-detail-row"><span>Fecha</span><span>{formatDate(selectedCashClose.closedAt)} {formatTime(selectedCashClose.closedAt)}</span></div>
               <div className="sales-detail-row"><span>Periodo</span><span>{formatDate(selectedCashClose.from)} - {formatDate(selectedCashClose.to)}</span></div>
@@ -413,7 +414,7 @@ export const AdminSalesPage: React.FC = () => {
       {isPrintOpen && (
         <div className="modal-backdrop" onClick={() => setIsPrintOpen(false)}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3>Imprimir detalle</h3><button className="icon-button" onClick={() => setIsPrintOpen(false)}>✕</button></div>
+            <div className="modal-header"><h3>Imprimir detalle</h3><button className="icon-button" onClick={() => setIsPrintOpen(false)}>{<X size={16} />}</button></div>
             <div className="modal-body">
               <div className="settings-field"><label>Desde</label><input type="datetime-local" value={printStart} onChange={(e) => setPrintStart(e.target.value)} /></div>
               <div className="settings-field"><label>Hasta</label><input type="datetime-local" value={printEnd} onChange={(e) => setPrintEnd(e.target.value)} /></div>
@@ -429,7 +430,7 @@ export const AdminSalesPage: React.FC = () => {
       {isMovementOpen && (
         <div className="modal-backdrop" onClick={() => setIsMovementOpen(false)}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3>Nuevo movimiento</h3><button className="icon-button" onClick={() => setIsMovementOpen(false)}>✕</button></div>
+            <div className="modal-header"><h3>Nuevo movimiento</h3><button className="icon-button" onClick={() => setIsMovementOpen(false)}>{<X size={16} />}</button></div>
             <div className="modal-body">
               <div className="settings-field">
                 <label>Tipo</label>
@@ -482,7 +483,7 @@ export const AdminSalesPage: React.FC = () => {
       {closePreview && (
         <div className="modal-backdrop" onClick={() => setClosePreview(null)}>
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3>Cierre parcial</h3><button className="icon-button" onClick={() => setClosePreview(null)}>✕</button></div>
+            <div className="modal-header"><h3>Cierre parcial</h3><button className="icon-button" onClick={() => setClosePreview(null)}>{<X size={16} />}</button></div>
             <div className="modal-body">
               <div className="sales-detail-row"><span>Periodo</span><span>{formatDate(closePreview.from)} {formatTime(closePreview.from)} - {formatDate(closePreview.to)} {formatTime(closePreview.to)}</span></div>
               <div className="sales-detail-row"><span>Ventas</span><strong>{formatCurrency(closePreview.summary.salesTotal)}</strong></div>

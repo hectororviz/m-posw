@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus, X } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAccountingCategories, useAccountingMovements } from '../api/queries';
 import type { AccountingMovement } from '../api/types';
@@ -223,14 +224,14 @@ export const AccountingMovementsPage: React.FC = () => {
         ))}
       </div>
 
-      <button className="fab-button" onClick={openCreate} title="Nuevo movimiento">+</button>
+      <button className="fab-button" onClick={openCreate} title="Nuevo movimiento"><Plus size={24} /></button>
 
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
             <div className="modal-header">
               <h2>{editingId ? 'Editar movimiento' : 'Nuevo movimiento'}</h2>
-              <button className="icon-button" onClick={() => setShowModal(false)}>✕</button>
+              <button className="icon-button" onClick={() => setShowModal(false)}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <div className="error-text">{error}</div>}

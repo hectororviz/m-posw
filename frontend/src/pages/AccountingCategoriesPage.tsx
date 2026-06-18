@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { X } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAccountingCategories } from '../api/queries';
 
@@ -174,7 +175,7 @@ export const AccountingCategoriesPage: React.FC = () => {
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
             <div className="modal-header">
               <h2>Nueva categoría ({showCreate.type === 'INCOME' ? 'Ingreso' : 'Egreso'})</h2>
-              <button className="icon-button" onClick={() => setShowCreate(null)}>✕</button>
+              <button className="icon-button" onClick={() => setShowCreate(null)}>{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               {error && <div className="error-text">{error}</div>}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import jsQR from 'jsqr';
 import { apiClient } from '../api/client';
 
@@ -134,7 +135,7 @@ export const SocioQrModal: React.FC<Props> = ({ onApplyDiscounts, onClose }) => 
         <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
           <div className="modal-header">
             <h3>Socio: {data.socio.nombre}</h3>
-            <button className="icon-button" onClick={onClose}>✕</button>
+            <button className="icon-button" onClick={onClose}>{<X size={16} />}</button>
           </div>
           <div className="modal-body">
             <div style={{ marginBottom: '1rem' }}>
@@ -191,7 +192,7 @@ export const SocioQrModal: React.FC<Props> = ({ onApplyDiscounts, onClose }) => 
       <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
         <div className="modal-header">
           <h3>{loading ? 'Consultando...' : 'Escanear QR'}</h3>
-          <button className="icon-button" onClick={() => { stopCamera(); onClose(); }}>✕</button>
+          <button className="icon-button" onClick={() => { stopCamera(); onClose(); }}>{<X size={16} />}</button>
         </div>
         <div className="modal-body" style={{ textAlign: 'center' }}>
           {cameraError ? (

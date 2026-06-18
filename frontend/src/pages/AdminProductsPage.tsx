@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { LayoutGrid, List, Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
 import { useAdminCategories, useAdminProducts, useRawMaterials } from '../api/queries';
@@ -198,8 +199,8 @@ export const AdminProductsPage: React.FC = () => {
             <p className="page-header-subtitle">Gestiona el catalogo de productos del sistema.</p>
           </div>
           <div className="product-view-toggle">
-            <button type="button" className={`product-view-btn ${viewMode === 'cards' ? 'active' : ''}`} onClick={() => setViewMode('cards')} aria-label="Vista cards">▦</button>
-            <button type="button" className={`product-view-btn ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')} aria-label="Vista lista">☰</button>
+            <button type="button" className={`product-view-btn ${viewMode === 'cards' ? 'active' : ''}`} onClick={() => setViewMode('cards')} aria-label="Vista cards"><LayoutGrid size={16} /></button>
+            <button type="button" className={`product-view-btn ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')} aria-label="Vista lista"><List size={16} /></button>
           </div>
         </div>
       </div>
@@ -233,22 +234,14 @@ export const AdminProductsPage: React.FC = () => {
         </div>
       </div>
 
-      <button
-        type="button"
-        className="fab-button-v2"
-        onClick={openCreate}
-        aria-label="Nuevo producto"
-        title="Nuevo producto"
-      >
-        +
-      </button>
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo producto" title="Nuevo producto"><Plus size={24} /></button>
 
       {showModal && (
         <div className="modal-backdrop" onClick={closeModal} role="presentation">
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h3>
-              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               <div className="settings-field">
@@ -305,7 +298,7 @@ export const AdminProductsPage: React.FC = () => {
                         ))}
                       </select>
                       <input type="number" step="0.0001" placeholder="Cant." value={ing.quantity} onChange={(e) => updateIngredient(index, 'quantity', e.target.value)} />
-                      <button type="button" className="btn-ghost" onClick={() => removeIngredient(index)} aria-label="Eliminar ingrediente" style={{ padding: '0.4rem 0.5rem', color: 'var(--color-danger-text)' }}>✕</button>
+                      <button type="button" className="btn-ghost" onClick={() => removeIngredient(index)} aria-label="Eliminar ingrediente" style={{ padding: '0.4rem 0.5rem', color: 'var(--color-danger-text)' }}>{<X size={16} />}</button>
                     </div>
                   ))}
                   <button type="button" className="btn-ghost" onClick={addIngredient} style={{ marginTop: '0.5rem' }}>+ Agregar ingrediente</button>
@@ -355,8 +348,8 @@ export const AdminProductsPage: React.FC = () => {
                     )}
                     <span className="product-list-row-stock">{product.stock}</span>
                     <div className="product-list-actions">
-                      <button type="button" className="btn-ghost" onClick={() => openEdit(product)} aria-label={`Editar ${product.name}`}>✎</button>
-                      <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} aria-label={`Eliminar ${product.name}`}>✕</button>
+                      <button type="button" className="btn-ghost" onClick={() => openEdit(product)} aria-label={`Editar ${product.name}`}>{<Pencil size={16} />}</button>
+                      <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} aria-label={`Eliminar ${product.name}`}>{<X size={16} />}</button>
                     </div>
                   </div>
                 );
@@ -392,8 +385,8 @@ export const AdminProductsPage: React.FC = () => {
                         <span className="product-card-v2-price">${formatCurrencyInput(product.price)}</span>
                       )}
                       <div className="product-card-v2-actions">
-                        <button type="button" className="btn-ghost" onClick={() => openEdit(product)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${product.name}`}>✎</button>
-                        <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${product.name}`}>✕</button>
+                        <button type="button" className="btn-ghost" onClick={() => openEdit(product)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${product.name}`}>{<Pencil size={16} />}</button>
+                        <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${product.name}`}>{<X size={16} />}</button>
                       </div>
                     </div>
                   );

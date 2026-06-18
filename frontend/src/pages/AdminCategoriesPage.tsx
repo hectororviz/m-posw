@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
 import { useAdminCategories } from '../api/queries';
@@ -107,14 +108,14 @@ export const AdminCategoriesPage: React.FC = () => {
 
       {error && <p className="error-text">{error}</p>}
 
-      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nueva categoria" title="Nueva categoria">+</button>
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nueva categoria" title="Nueva categoria"><Plus size={24} /></button>
 
       {showModal && (
         <div className="modal-backdrop" onClick={closeModal} role="presentation">
           <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingCategory ? 'Editar categoria' : 'Nueva categoria'}</h3>
-              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">✕</button>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cerrar">{<X size={16} />}</button>
             </div>
             <div className="modal-body">
               <div className="settings-field">
@@ -171,8 +172,8 @@ export const AdminCategoriesPage: React.FC = () => {
                 <span className="product-card-v2-name">{category.name}</span>
               </div>
               <div className="product-card-v2-actions">
-                <button type="button" className="btn-ghost" onClick={() => openEdit(category)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${category.name}`}>✎</button>
-                <button type="button" className="btn-ghost" onClick={() => handleDelete(category.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${category.name}`}>✕</button>
+                <button type="button" className="btn-ghost" onClick={() => openEdit(category)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${category.name}`}>{<Pencil size={16} />}</button>
+                <button type="button" className="btn-ghost" onClick={() => handleDelete(category.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${category.name}`}>{<X size={16} />}</button>
               </div>
             </div>
           );
