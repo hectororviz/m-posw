@@ -119,6 +119,7 @@ function getModuleRoute(moduleKey: string): string | null {
     ACREEDORES: '/admin/acreedores',
     PRODUCTOS: '/admin/products',
     INTERNET: '/admin/internet',
+    PLAYERS: '/admin/players',
     REPORTES: '/admin/stats',
     CONFIGURACION: '/admin/settings',
   };

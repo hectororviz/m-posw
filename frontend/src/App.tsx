@@ -32,6 +32,11 @@ import { SalesPage } from './pages/SalesPage';
 import { LigasLayout } from './pages/LigasLayout';
 import { LigasStandingsPage } from './pages/LigasStandingsPage';
 import { LigasConfigPage } from './pages/LigasConfigPage';
+import { PlayersLayout } from './pages/players/PlayersLayout';
+import { PlayersDashboardPage } from './pages/players';
+import { PlayersPage } from './pages/players/PlayersPage';
+import { PlayerCategoriesPage } from './pages/players/PlayerCategoriesPage';
+import { TournamentsPage } from './pages/players/TournamentsPage';
 import { useAuth } from './context/AuthContext';
 import type { ModuleKey } from './api/types';
 
@@ -180,6 +185,16 @@ export const App: React.FC = () => {
           <Route index element={<Navigate to="/admin/ligas/configuracion" replace />} />
           <Route path=":configId" element={<LigasStandingsPage />} />
           <Route path="configuracion" element={<LigasConfigPage />} />
+        </Route>
+        <Route path="players" element={
+          <ModuleRoute module="PLAYERS">
+            <PlayersLayout />
+          </ModuleRoute>
+        }>
+          <Route index element={<PlayersDashboardPage />} />
+          <Route path="jugadores" element={<PlayersPage />} />
+          <Route path="categorias" element={<PlayerCategoriesPage />} />
+          <Route path="torneos" element={<TournamentsPage />} />
         </Route>
         <Route path="socios" element={
           <ModuleRoute module="SOCIOS">

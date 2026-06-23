@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -591,3 +591,109 @@ export const useLigasDeleteConfig = () => {
     },
   });
 };
+
+// ─── Players / Jugadores ─────────────────────────────────
+
+export const usePlayers = (params?: {
+  search?: string;
+  sex?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ['players', params],
+    queryFn: async () => {
+      const response = await apiClient.get<PaginatedPlayers>('/players', { params });
+      return response.data;
+    },
+  });
+
+export const usePlayer = (id?: number) =>
+  useQuery({
+    queryKey: ['player', id],
+    queryFn: async () => {
+      const response = await apiClient.get<Player>(`/players/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const usePlayerCategories = () =>
+  useQuery({
+    queryKey: ['player-categories'],
+    queryFn: async () => {
+      const response = await apiClient.get<PlayerCategory[]>('/player-categories');
+      return response.data;
+    },
+  });
+
+export const usePlayerCategory = (id?: number) =>
+  useQuery({
+    queryKey: ['player-category', id],
+    queryFn: async () => {
+      const response = await apiClient.get<PlayerCategory>(`/player-categories/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useTournaments = (params?: {
+  year?: number;
+  allowedSex?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ['tournaments', params],
+    queryFn: async () => {
+      const response = await apiClient.get<PaginatedTournaments>('/tournaments', { params });
+      return response.data;
+    },
+  });
+
+export const useTournament = (id?: number) =>
+  useQuery({
+    queryKey: ['tournament', id],
+    queryFn: async () => {
+      const response = await apiClient.get<Tournament>(`/tournaments/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useTournamentPlayers = (tournamentId?: number, params?: {
+  search?: string;
+  categoryId?: number;
+}) =>
+  useQuery({
+    queryKey: ['tournament-players', tournamentId, params],
+    queryFn: async () => {
+      const response = await apiClient.get<FichadoPlayer[]>(
+        `/tournaments/${tournamentId}/players`,
+        { params },
+      );
+      return response.data;
+    },
+    enabled: Boolean(tournamentId),
+  });
+
+export const useEligiblePlayers = (tournamentId?: number) =>
+  useQuery({
+    queryKey: ['eligible-players', tournamentId],
+    queryFn: async () => {
+      const response = await apiClient.post<EligiblePlayer[]>(
+        `/tournaments/${tournamentId}/players/eligible`,
+      );
+      return response.data;
+    },
+    enabled: Boolean(tournamentId),
+  });
+
+export const usePlayersDashboard = () =>
+  useQuery({
+    queryKey: ['players-dashboard'],
+    queryFn: async () => {
+      const response = await apiClient.get<PlayersDashboard>('/players-stats/dashboard');
+      return response.data;
+    },
+  });

@@ -83,6 +83,10 @@ export class UpdateSettingDto {
   enableLigasModule?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  enablePlayersModule?: boolean;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];

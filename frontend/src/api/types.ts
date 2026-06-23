@@ -11,6 +11,7 @@ export type ModuleKey =
   | 'PRODUCTOS'
   | 'INTERNET'
   | 'LIGAS'
+  | 'PLAYERS'
   | 'REPORTES'
   | 'CONFIGURACION';
 
@@ -171,6 +172,7 @@ export interface Setting {
   enableAcreedoresModule?: boolean | null;
   enableInternetModule?: boolean | null;
   enableLigasModule?: boolean | null;
+  enablePlayersModule?: boolean | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -690,4 +692,108 @@ export interface VoucherStats {
   active_vouchers: number;
   generated_today: number;
   total_vouchers: number;
+}
+
+// ─── Players / Jugadores ─────────────────────────────────
+
+export type Sex = 'M' | 'F';
+export type AllowedSex = 'M' | 'F' | 'X';
+export type PlayerCategoryType = 'AGE' | 'BIRTH_YEAR';
+
+export interface Player {
+  id: number;
+  firstName: string;
+  lastName: string;
+  dni: string;
+  birthDate: string;
+  sex: Sex;
+  tournamentCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  tournaments?: PlayerTournamentBrief[];
+}
+
+export interface PlayerTournamentBrief {
+  id: number;
+  name: string;
+  year: number;
+  playerCategoryId?: number;
+  fichadoAt?: string;
+}
+
+export interface PaginatedPlayers {
+  data: Player[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface PlayerCategory {
+  id: number;
+  name: string;
+  restrictionType: PlayerCategoryType;
+  ageMin?: number | null;
+  ageMax?: number | null;
+  ageCutoffMonth?: number | null;
+  ageCutoffDay?: number | null;
+  birthYear?: number | null;
+  tournaments?: { id: number; name: string }[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Tournament {
+  id: number;
+  name: string;
+  year: number;
+  allowedSex: AllowedSex;
+  birthYearMin?: number | null;
+  birthYearMax?: number | null;
+  categories?: PlayerCategory[];
+  playerCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PaginatedTournaments {
+  data: Tournament[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface EligiblePlayer {
+  id: number;
+  firstName: string;
+  lastName: string;
+  dni: string;
+  birthDate: string;
+  sex: Sex;
+  assignedCategoryId: number | null;
+  alreadyFichado: boolean;
+  fichadoEnOtroTorneoMismoAnio: boolean;
+  otroTorneoNombre: string | null;
+}
+
+export interface FichadoPlayer {
+  id: number;
+  firstName: string;
+  lastName: string;
+  dni: string;
+  birthDate: string;
+  sex: Sex;
+  playerCategoryId: number;
+  fichadoAt: string;
+}
+
+export interface PlayersDashboard {
+  tournaments: {
+    id: number;
+    name: string;
+    year: number;
+    totalPlayers: number;
+    byCategory: { name: string; count: number }[];
+  }[];
+  totalPlayersRegistered: number;
+  totalWithoutTournament: number;
 }

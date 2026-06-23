@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart2, Boxes, ChevronLeft, ChevronRight, House, Landmark, Package, Receipt, Settings, ShoppingCart, Tag, Trophy, UserCog, UserMinus, Users, Wifi } from 'lucide-react';
+import { BarChart2, Boxes, ChevronLeft, ChevronRight, House, Landmark, Package, Receipt, Settings, ShoppingCart, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
@@ -24,7 +24,7 @@ interface NavItem {
   to: string;
   emoji: ReactNode;
   label: string;
-  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule';
+  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule';
   permissionModule?: string;
 }
 
@@ -41,6 +41,7 @@ const navItems: NavItem[] = [
   { to: '/admin/stock',      emoji: <Boxes size={iconSize} />, label: 'Stock',                permissionModule: 'PRODUCTOS' },
   { to: '/admin/acreedores', emoji: <UserMinus size={iconSize} />, label: 'Acreedores',          moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
   { to: '/admin/ligas',     emoji: <Trophy size={iconSize} />, label: 'Ligas',              moduleKey: 'enableLigasModule', permissionModule: 'LIGAS' },
+  { to: '/admin/players',   emoji: <UsersRound size={iconSize} />, label: 'Jugadores',          moduleKey: 'enablePlayersModule', permissionModule: 'PLAYERS' },
   { to: '/admin/socios',     emoji: <Users size={iconSize} />, label: 'Socios',              moduleKey: 'enableSociosModule', permissionModule: 'SOCIOS' },
   { to: '/admin/internet',   emoji: <Wifi size={iconSize} />, label: 'Internet',            moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
   { to: '/admin/users',      emoji: <UserCog size={iconSize} />, label: 'Usuarios',            permissionModule: 'CONFIGURACION' },

@@ -23,6 +23,10 @@ import { TreasuryModule } from './treasury/treasury.module';
 import { UsersModule } from './users/users.module';
 import { HomeModule } from './home/home.module';
 import { LigasModule } from './ligas/ligas.module';
+import { PlayersModule } from './players/players.module';
+import { PlayerCategoriesModule } from './player-categories/player-categories.module';
+import { TournamentsModule } from './tournaments/tournaments.module';
+import { PlayersStatsModule } from './players-stats/players-stats.module';
 
 @Module({
   imports: [
@@ -49,6 +53,10 @@ import { LigasModule } from './ligas/ligas.module';
     SociosModule,
     StockModule,
     HomeModule,
+    PlayersModule,
+    PlayerCategoriesModule,
+    TournamentsModule,
+    PlayersStatsModule,
   ],
   providers: [
     {

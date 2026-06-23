@@ -54,6 +54,7 @@ export const AdminSettingsPage: React.FC = () => {
     enableAcreedoresModule: true,
     enableInternetModule: false,
     enableLigasModule: false,
+    enablePlayersModule: false,
     enableAutoJournalPos: true,
     enableAutoJournalAcreedores: true,
     enableAutoJournalSocios: true,
@@ -149,6 +150,7 @@ export const AdminSettingsPage: React.FC = () => {
         enableAcreedoresModule: settings.enableAcreedoresModule ?? true,
         enableInternetModule: settings.enableInternetModule ?? false,
         enableLigasModule: settings.enableLigasModule ?? false,
+        enablePlayersModule: settings.enablePlayersModule ?? false,
         enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
         enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
         enableAutoJournalSocios: settings.enableAutoJournalSocios ?? true,
@@ -952,6 +954,19 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Modulo de Ligas Deportivas</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Muestra tablas de posiciones y partidos de ligas de futbol</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enablePlayersModule}
+                  onChange={(e) => setForm({ ...form, enablePlayersModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Jugadores</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Gestion de jugadores, categorias y torneos deportivos</small>
                 </span>
               </label>
             </div>

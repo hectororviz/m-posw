@@ -23,6 +23,7 @@ enum ModuleKey {
   INTERNET
   REPORTES
   CONFIGURACION
+  PLAYERS
 }
 
 enum ModuleAccess {
@@ -271,6 +272,7 @@ model Setting {
   enableAutoJournalAcreedores Boolean @default(true)
   enableAutoJournalSocios     Boolean @default(true)
   enableLigasModule           Boolean @default(false)
+  enablePlayersModule         Boolean @default(false)
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -723,6 +725,92 @@ model SocioCanje {
   @@index([socioBeneficioId])
   @@index([socioId])
   @@index([fecha])
+}
+
+// ─── Players / Jugadores ────────────────────────────────
+
+enum Sex {
+  M
+  F
+}
+
+enum AllowedSex {
+  M
+  F
+  X
+}
+
+enum PlayerCategoryType {
+  AGE
+  BIRTH_YEAR
+}
+
+model Player {
+  id            Int               @id @default(autoincrement())
+  firstName     String
+  lastName      String
+  dni           String            @unique
+  birthDate     DateTime
+  sex           Sex
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  tournaments   TournamentPlayer[]
+
+  @@map("players")
+}
+
+model PlayerCategory {
+  id              Int                  @id @default(autoincrement())
+  name            String
+  restrictionType PlayerCategoryType
+  ageMin          Int?
+  ageMax          Int?
+  ageCutoffMonth  Int?                 @default(12)
+  ageCutoffDay    Int?                 @default(31)
+  birthYear       Int?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  tournaments     TournamentCategory[]
+
+  @@map("player_categories")
+}
+
+model Tournament {
+  id             Int                  @id @default(autoincrement())
+  name           String
+  year           Int
+  allowedSex     AllowedSex
+  birthYearMin   Int?
+  birthYearMax   Int?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  categories     TournamentCategory[]
+  players        TournamentPlayer[]
+
+  @@map("tournaments")
+}
+
+model TournamentCategory {
+  tournamentId   Int
+  playerCategoryId Int
+  tournament     Tournament       @relation(fields: [tournamentId], references: [id])
+  category       PlayerCategory   @relation(fields: [playerCategoryId], references: [id])
+
+  @@id([tournamentId, playerCategoryId])
+  @@map("tournament_categories")
+}
+
+model TournamentPlayer {
+  id               Int        @id @default(autoincrement())
+  playerId         Int
+  tournamentId     Int
+  playerCategoryId Int
+  fichadoAt        DateTime   @default(now())
+  player           Player     @relation(fields: [playerId], references: [id])
+  tournament       Tournament @relation(fields: [tournamentId], references: [id])
+
+  @@unique([playerId, tournamentId])
+  @@map("tournament_players")
 }
 
 model UserModulePermission {
