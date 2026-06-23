@@ -588,6 +588,38 @@ class _HomePageState extends State<HomePage> {
       bytes += generator.text(separator);
     }
 
+    // VOUCHERS / PINs (Internet WiFi)
+    if (payload['vouchers'] != null) {
+      final vouchers = List<Map<String, dynamic>>.from(payload['vouchers'] as List);
+      if (vouchers.isNotEmpty) {
+        bytes += generator.feed(1);
+        bytes += generator.text(separator);
+        bytes += generator.text(
+          'INTERNET WIFI',
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+          ),
+        );
+        bytes += generator.feed(1);
+        for (final v in vouchers) {
+          final pin = v['pin'] as String? ?? '';
+          if (pin.isNotEmpty) {
+            bytes += generator.text(
+              pin,
+              styles: const PosStyles(
+                align: PosAlign.center,
+                bold: true,
+                height: PosTextSize.size2,
+                width: PosTextSize.size2,
+              ),
+            );
+          }
+        }
+        bytes += generator.text(separator);
+      }
+    }
+
     // MENSAJE DE AGRADECIMIENTO (solo para tickets de venta)
     final itemsStyle = payload['itemsStyle'] as String? ?? 'sale';
     if (payload['thanks'] != null && itemsStyle != 'summary') {
