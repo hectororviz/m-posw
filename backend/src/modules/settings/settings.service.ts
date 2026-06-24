@@ -62,6 +62,9 @@ export class SettingsService {
       enableLigasModule: settings.enableLigasModule,
       enablePlayersModule: settings.enablePlayersModule,
       enablePatrimonioModule: settings.enablePatrimonioModule,
+      enableAutoJournalPos: settings.enableAutoJournalPos,
+      enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores,
+      enableAutoJournalSocios: settings.enableAutoJournalSocios,
       movementInReasons: settings.movementInReasons,
       movementOutReasons: settings.movementOutReasons,
     };
