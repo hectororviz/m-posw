@@ -168,7 +168,7 @@ export const AdminUsersPage: React.FC = () => {
                         style={{ color: 'var(--color-danger-text)' }}
                         title="Eliminar"
                       >
-                        {deletingId === user.id ? '...' : '{<X size={16} />}'}
+                        {deletingId === user.id ? '...' : <X size={16} />}
                       </button>
                     </>
                   )}

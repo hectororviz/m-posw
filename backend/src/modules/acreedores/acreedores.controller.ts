@@ -1,40 +1,44 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { AcreedoresService } from './acreedores.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
 
 @Controller('acreedores')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
 export class AcreedoresController {
   constructor(private readonly acreedoresService: AcreedoresService) {}
 
   @Get('resumen')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
   getResumen() {
     return this.acreedoresService.getResumen();
   }
 
   @Get()
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
   findAll() {
     return this.acreedoresService.findAll();
   }
 
   @Get(':id')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.acreedoresService.findOne(id);
   }
 
   @Post()
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
   create(@Body() dto: CreateAcreedorDto) {
     return this.acreedoresService.create(dto);
   }
 
   @Patch(':id')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAcreedorDto,
@@ -43,16 +47,19 @@ export class AcreedoresController {
   }
 
   @Patch(':id/toggle')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
   toggleActive(@Param('id', ParseIntPipe) id: number) {
     return this.acreedoresService.toggleActive(id);
   }
 
   @Get(':id/deuda')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
   getDeuda(@Param('id', ParseIntPipe) id: number) {
     return this.acreedoresService.getDeuda(id);
   }
 
   @Post(':id/pagos')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
   addPago(
     @Req() req: { user: { sub: string } },
     @Param('id', ParseIntPipe) id: number,
