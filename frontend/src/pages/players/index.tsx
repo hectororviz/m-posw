@@ -36,6 +36,21 @@ export const PlayersDashboardPage: React.FC = () => {
     return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
   };
 
+  const formatDateLong = (iso: string) => {
+    const date = new Date(iso);
+    return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
+  };
+
+  const birthdayBorderColor = (daysUntil: number) => {
+    const ratio = Math.max(0, Math.min(1, (20 - daysUntil) / 20));
+    const r = Math.round(22 + ratio * (220 - 22));
+    const g = Math.round(163 + ratio * (38 - 163));
+    const b = Math.round(74 + ratio * (38 - 74));
+    return `rgb(${r},${g},${b})`;
+  };
+
+  const birthdayDisplay = (d?.upcomingBirthdays ?? []).slice(0, 10);
+
   return (
     <div className="admin-page">
       <div className="admin-page-header"><h2>Jugadores</h2></div>
@@ -96,16 +111,17 @@ export const PlayersDashboardPage: React.FC = () => {
         <div className="settings-section">
           <h3 className="settings-section-header" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <Cake size={16} />
-            Próximos cumpleaños (20 días)
+            Próximos cumpleaños
           </h3>
           <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', padding: '0.75rem 0', scrollSnapType: 'x mandatory' }}>
-            {(d?.upcomingBirthdays ?? []).map((p) => (
+            {birthdayDisplay.map((p) => (
               <div
                 key={p.id}
                 style={{
                   flex: '0 0 160px',
                   background: 'var(--color-surface)',
                   border: '1px solid var(--color-border)',
+                  borderLeft: `4px solid ${birthdayBorderColor(p.daysUntil)}`,
                   borderRadius: '0.75rem',
                   padding: '1rem 0.75rem',
                   scrollSnapAlign: 'start',
@@ -113,25 +129,24 @@ export const PlayersDashboardPage: React.FC = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   textAlign: 'center',
-                  gap: '0.25rem',
                 }}
               >
-                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-strong)' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#1a1a1a', lineHeight: 1.2, marginBottom: '0.5rem' }}>
                   {p.lastName}
                   <br />
                   {p.firstName}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--color-text-body)' }}>
-                  {formatDate(p.birthDate)}
+                <div style={{ fontSize: '1rem', color: '#444', lineHeight: 1.2, marginBottom: 0 }}>
+                  {formatDateLong(p.birthDate)}
                 </div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
-                  {p.daysUntil === 0 ? 'hoy 🎂' : `${p.daysUntil} días`}
+                <div style={{ fontSize: '0.85rem', color: '#444', lineHeight: 1.2, marginBottom: '1.2rem' }}>
+                  ({p.daysUntil === 0 ? 'hoy' : `${p.daysUntil} dias`})
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--color-text-body)', fontWeight: 600 }}>
+                <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#1a1a1a', lineHeight: 1.2, marginBottom: 2 }}>
                   {p.age} años
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                  {p.categoryName ?? '—'}
+                <div style={{ fontSize: '0.85rem', color: '#888', lineHeight: 1.2 }}>
+                  Cat.: {p.categoryName ?? '—'}
                 </div>
               </div>
             ))}
