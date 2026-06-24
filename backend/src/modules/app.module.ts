@@ -27,6 +27,7 @@ import { PlayersModule } from './players/players.module';
 import { PlayerCategoriesModule } from './player-categories/player-categories.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 import { PlayersStatsModule } from './players-stats/players-stats.module';
+import { PatrimonioModule } from './patrimonio/patrimonio.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { PlayersStatsModule } from './players-stats/players-stats.module';
     PlayerCategoriesModule,
     TournamentsModule,
     PlayersStatsModule,
+    PatrimonioModule,
   ],
   providers: [
     {

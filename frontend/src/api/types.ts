@@ -13,7 +13,8 @@ export type ModuleKey =
   | 'LIGAS'
   | 'PLAYERS'
   | 'REPORTES'
-  | 'CONFIGURACION';
+  | 'CONFIGURACION'
+  | 'PATRIMONIO';
 
 export type ModuleAccess = 'HIDDEN' | 'READ' | 'FULL';
 
@@ -173,6 +174,7 @@ export interface Setting {
   enableInternetModule?: boolean | null;
   enableLigasModule?: boolean | null;
   enablePlayersModule?: boolean | null;
+  enablePatrimonioModule?: boolean | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -812,4 +814,63 @@ export interface PlayersDashboard {
     daysUntil: number;
     categoryName: string | null;
   }[];
+}
+
+// ─── Patrimonio / Bienes ─────────────────────────────────
+
+export type AssetEventType = 'ALTA' | 'MODIFICACION' | 'CAMBIO_ESTADO' | 'BAJA';
+
+export interface AssetCategory {
+  id: number;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { assets: number };
+}
+
+export interface AssetStatus {
+  id: number;
+  name: string;
+  isSystem: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { assets: number };
+}
+
+export interface Asset {
+  id: number;
+  name: string;
+  description?: string | null;
+  categoryId: number;
+  category?: AssetCategory;
+  statusId: number;
+  status?: AssetStatus;
+  location?: string | null;
+  acquisitionDate?: string | null;
+  acquisitionValue?: number | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetEvent {
+  id: number;
+  assetId: number;
+  eventType: AssetEventType;
+  statusId?: number | null;
+  status?: AssetStatus | null;
+  description?: string | null;
+  eventDate: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface PaginatedAssets {
+  data: Asset[];
+  total: number;
+  page: number;
+  limit: number;
 }

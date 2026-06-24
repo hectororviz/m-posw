@@ -33,6 +33,7 @@ async function main() {
 
   await seedLedgerAccounts();
   await seedPaymentMethodAccounts();
+  await seedAssetStatuses();
 }
 
 async function seedLedgerAccounts() {
@@ -143,6 +144,17 @@ async function seedPaymentMethodAccounts() {
   }
 
   console.log('PaymentMethodAccount sembrado correctamente.');
+}
+
+async function seedAssetStatuses() {
+  await prisma.assetStatus.createMany({
+    data: [
+      { name: 'Activo', isSystem: true },
+      { name: 'De Baja', isSystem: true },
+    ],
+    skipDuplicates: true,
+  });
+  console.log('AssetStatus sembrado correctamente.');
 }
 
 main()

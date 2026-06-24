@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart2, Boxes, ChevronLeft, ChevronRight, House, Landmark, Package, Receipt, Settings, ShoppingCart, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
@@ -22,30 +22,60 @@ const navIcon = (icon: ReactNode) => <span className="nav-icon" aria-hidden="tru
 
 interface NavItem {
   to: string;
-  emoji: ReactNode;
+  icon: ReactNode;
   label: string;
-  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule';
+  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule' | 'enablePatrimonioModule';
   permissionModule?: string;
+}
+
+interface NavCategoryDef {
+  label: string;
+  icon: ReactNode;
+  children: NavItem[];
 }
 
 const iconSize = 18;
 
-const navItems: NavItem[] = [
-  { to: '/admin/home',      emoji: <House size={iconSize} />, label: 'Home',                            permissionModule: 'CONFIGURACION' },
-  { to: '/pos',              emoji: <ShoppingCart size={iconSize} />, label: 'POS',                 permissionModule: 'POS' },
-  { to: '/admin/sales',      emoji: <Receipt size={iconSize} />, label: 'Ventas',              permissionModule: 'VENTAS' },
-  { to: '/admin/stats',      emoji: <BarChart2 size={iconSize} />, label: 'Estadisticas',         permissionModule: 'REPORTES' },
-  { to: '/admin/tesoreria',  emoji: <Landmark size={iconSize} />, label: 'Tesorería',           moduleKey: 'enableTreasuryModule', permissionModule: 'TESORERIA' },
-  { to: '/admin/categories', emoji: <Tag size={iconSize} />, label: 'Categorias',           permissionModule: 'PRODUCTOS' },
-  { to: '/admin/products',   emoji: <Package size={iconSize} />, label: 'Productos',            permissionModule: 'PRODUCTOS' },
-  { to: '/admin/stock',      emoji: <Boxes size={iconSize} />, label: 'Stock',                permissionModule: 'PRODUCTOS' },
-  { to: '/admin/acreedores', emoji: <UserMinus size={iconSize} />, label: 'Acreedores',          moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
-  { to: '/admin/ligas',     emoji: <Trophy size={iconSize} />, label: 'Ligas',              moduleKey: 'enableLigasModule', permissionModule: 'LIGAS' },
-  { to: '/admin/players',   emoji: <UsersRound size={iconSize} />, label: 'Jugadores',          moduleKey: 'enablePlayersModule', permissionModule: 'PLAYERS' },
-  { to: '/admin/socios',     emoji: <Users size={iconSize} />, label: 'Socios',              moduleKey: 'enableSociosModule', permissionModule: 'SOCIOS' },
-  { to: '/admin/internet',   emoji: <Wifi size={iconSize} />, label: 'Internet',            moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
-  { to: '/admin/users',      emoji: <UserCog size={iconSize} />, label: 'Usuarios',            permissionModule: 'CONFIGURACION' },
-  { to: '/admin/settings',   emoji: <Settings size={iconSize} />, label: 'Configuracion',        permissionModule: 'CONFIGURACION' },
+const navCategories: NavCategoryDef[] = [
+  {
+    label: 'Ventas',
+    icon: <Store size={iconSize} />,
+    children: [
+      { to: '/pos',              icon: <ShoppingCart size={iconSize} />, label: 'POS',            permissionModule: 'POS' },
+      { to: '/admin/sales',      icon: <Receipt size={iconSize} />,      label: 'Ventas',         permissionModule: 'VENTAS' },
+      { to: '/admin/stats',      icon: <BarChart2 size={iconSize} />,    label: 'Estadisticas',   permissionModule: 'REPORTES' },
+      { to: '/admin/categories', icon: <Tag size={iconSize} />,          label: 'Categorias',     permissionModule: 'PRODUCTOS' },
+      { to: '/admin/products',   icon: <Package size={iconSize} />,      label: 'Productos',      permissionModule: 'PRODUCTOS' },
+      { to: '/admin/stock',      icon: <Boxes size={iconSize} />,        label: 'Stock',          permissionModule: 'PRODUCTOS' },
+    ],
+  },
+  {
+    label: 'Administracion',
+    icon: <Building2 size={iconSize} />,
+    children: [
+      { to: '/admin/acreedores', icon: <UserMinus size={iconSize} />,   label: 'Acreedores',     moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
+      { to: '/admin/socios',     icon: <Users size={iconSize} />,        label: 'Socios',         moduleKey: 'enableSociosModule',    permissionModule: 'SOCIOS' },
+      { to: '/admin/tesoreria',  icon: <Landmark size={iconSize} />,     label: 'Tesorería',      moduleKey: 'enableTreasuryModule',  permissionModule: 'TESORERIA' },
+      { to: '/admin/patrimonio', icon: <PenTool size={iconSize} />,      label: 'Patrimonio',     moduleKey: 'enablePatrimonioModule', permissionModule: 'PATRIMONIO' },
+    ],
+  },
+  {
+    label: 'Deportes',
+    icon: <Trophy size={iconSize} />,
+    children: [
+      { to: '/admin/ligas',     icon: <Trophy size={iconSize} />,       label: 'Ligas',          moduleKey: 'enableLigasModule',    permissionModule: 'LIGAS' },
+      { to: '/admin/players',   icon: <UsersRound size={iconSize} />,   label: 'Jugadores',      moduleKey: 'enablePlayersModule',  permissionModule: 'PLAYERS' },
+    ],
+  },
+  {
+    label: 'Sistema',
+    icon: <MonitorCog size={iconSize} />,
+    children: [
+      { to: '/admin/internet',  icon: <Wifi size={iconSize} />,         label: 'Internet',       moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
+      { to: '/admin/users',     icon: <UserCog size={iconSize} />,       label: 'Usuarios',       permissionModule: 'CONFIGURACION' },
+      { to: '/admin/settings',  icon: <Settings size={iconSize} />,      label: 'Configuracion',  permissionModule: 'CONFIGURACION' },
+    ],
+  },
 ];
 
 export const AdminLayout: React.FC = () => {
@@ -57,6 +87,7 @@ export const AdminLayout: React.FC = () => {
   const [logoError, setLogoError] = useState(false);
   const initials = getInitials(storeName);
   const showLogo = Boolean(logoUrl) && !logoError;
+  const location = useLocation();
 
   const moduleAccess = useModuleAccess;
 
@@ -70,6 +101,8 @@ export const AdminLayout: React.FC = () => {
     if (stored !== null) return stored === 'true';
     return window.innerWidth <= COLLAPSE_BREAKPOINT;
   });
+
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set(navCategories.map((c) => c.label)));
 
   useEffect(() => {
     setLogoError(false);
@@ -106,7 +139,19 @@ export const AdminLayout: React.FC = () => {
     });
   }, []);
 
-  const filteredNavItems = navItems.filter((item) => {
+  const toggleCategory = useCallback((label: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  }, []);
+
+  const isItemVisible = useCallback((item: NavItem) => {
     if (item.moduleKey) {
       const key = item.moduleKey;
       const settingVal = settings?.[key];
@@ -117,7 +162,36 @@ export const AdminLayout: React.FC = () => {
       if (access === 'HIDDEN') return false;
     }
     return true;
+  }, [settings, isAdmin, moduleAccess]);
+
+  const filteredCategories = useMemo(() => {
+    return navCategories
+      .map((cat) => ({
+        ...cat,
+        children: cat.children.filter(isItemVisible),
+      }))
+      .filter((cat) => cat.children.length > 0);
+  }, [isItemVisible]);
+
+  const homeVisible = isItemVisible({
+    to: '/admin/home',
+    icon: <House size={iconSize} />,
+    label: 'Home',
+    permissionModule: 'CONFIGURACION',
   });
+
+  const routeBelongsToCategory = useCallback((catLabel: string) => {
+    const cat = navCategories.find((c) => c.label === catLabel);
+    if (!cat) return false;
+    return cat.children.some((item) => {
+      if (item.to === location.pathname) return true;
+      if (item.to !== '/pos' && item.to !== '/admin/home') {
+        return location.pathname.startsWith(item.to);
+      }
+      if (item.to === '/pos' && location.pathname === '/pos') return true;
+      return false;
+    });
+  }, [location.pathname]);
 
   return (
     <AppLayout title="">
@@ -150,17 +224,55 @@ export const AdminLayout: React.FC = () => {
             </button>
           </div>
 
-          {filteredNavItems.map(({ to, emoji, label }) => (
+          {homeVisible && (
             <NavLink
-              key={to}
-              to={to}
+              to="/admin/home"
               className={({ isActive }) => isActive ? 'active' : ''}
-              title={isCollapsed ? label : undefined}
+              title={isCollapsed ? 'Home' : undefined}
             >
-              {navIcon(emoji)}
-              {!isCollapsed && label}
+              {navIcon(<House size={iconSize} />)}
+              {!isCollapsed && 'Home'}
             </NavLink>
-          ))}
+          )}
+
+          {filteredCategories.map((cat) => {
+            const isExpanded = expandedCategories.has(cat.label);
+            const isActiveCategory = routeBelongsToCategory(cat.label);
+            return (
+              <div key={cat.label} className={`sidebar-category${isExpanded ? ' is-expanded' : ''}`}>
+                <button
+                  type="button"
+                  className={`sidebar-category-header${isActiveCategory ? ' active-category' : ''}`}
+                  onClick={() => toggleCategory(cat.label)}
+                  title={isCollapsed ? cat.label : undefined}
+                >
+                  {navIcon(cat.icon)}
+                  {!isCollapsed && (
+                    <>
+                      <span className="sidebar-category-label">{cat.label}</span>
+                      <ChevronDown size={14} className={`sidebar-category-chevron${isExpanded ? ' rotated' : ''}`} />
+                    </>
+                  )}
+                </button>
+                {isExpanded && (
+                  <div className="sidebar-category-children">
+                    {cat.children.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        end={item.to === '/pos'}
+                        className={({ isActive }) => isActive ? 'active' : ''}
+                        title={isCollapsed ? item.label : undefined}
+                      >
+                        {navIcon(item.icon)}
+                        {!isCollapsed && item.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <div className="admin-content">
           <Outlet />

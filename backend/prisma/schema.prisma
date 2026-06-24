@@ -24,6 +24,14 @@ enum ModuleKey {
   REPORTES
   CONFIGURACION
   PLAYERS
+  PATRIMONIO
+}
+
+enum AssetEventType {
+  ALTA
+  MODIFICACION
+  CAMBIO_ESTADO
+  BAJA
 }
 
 enum ModuleAccess {
@@ -273,6 +281,7 @@ model Setting {
   enableAutoJournalSocios     Boolean @default(true)
   enableLigasModule           Boolean @default(false)
   enablePlayersModule         Boolean @default(false)
+  enablePatrimonioModule      Boolean @default(true)
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -824,4 +833,58 @@ model UserModulePermission {
   access    ModuleAccess
 
   @@unique([userId, module])
+}
+
+model AssetCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets    Asset[]
+}
+
+model AssetStatus {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isSystem  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets    Asset[]
+  events    AssetEvent[]
+}
+
+model Asset {
+  id               Int           @id @default(autoincrement())
+  name             String
+  description      String?
+  categoryId       Int
+  category         AssetCategory @relation(fields: [categoryId], references: [id])
+  statusId         Int
+  status           AssetStatus   @relation(fields: [statusId], references: [id])
+  location         String?
+  acquisitionDate  DateTime?
+  acquisitionValue Decimal?      @db.Decimal(12, 2)
+  notes            String?
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  events           AssetEvent[]
+}
+
+model AssetEvent {
+  id          Int            @id @default(autoincrement())
+  assetId     Int
+  asset       Asset          @relation(fields: [assetId], references: [id])
+  eventType   AssetEventType
+  statusId    Int?
+  status      AssetStatus?   @relation(fields: [statusId], references: [id])
+  description String?
+  eventDate   DateTime       @default(now())
+  userId      String         @db.Uuid
+  createdAt   DateTime       @default(now())
 }

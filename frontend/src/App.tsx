@@ -37,6 +37,9 @@ import { PlayersDashboardPage } from './pages/players';
 import { PlayersPage } from './pages/players/PlayersPage';
 import { PlayerCategoriesPage } from './pages/players/PlayerCategoriesPage';
 import { TournamentsPage } from './pages/players/TournamentsPage';
+import { PatrimonioPage } from './pages/patrimonio/PatrimonioPage';
+import { BienesPage } from './pages/patrimonio/BienesPage';
+import { ConfigPage } from './pages/patrimonio/ConfigPage';
 import { useAuth } from './context/AuthContext';
 import type { ModuleKey } from './api/types';
 
@@ -220,6 +223,15 @@ export const App: React.FC = () => {
           <Route path="movimientos" element={<TreasuryJournalEntriesPage />} />
           <Route path="cuentas" element={<TreasuryLedgerAccountsPage />} />
           <Route path="reportes" element={<TreasuryReportsPage />} />
+        </Route>
+        <Route path="patrimonio" element={
+          <ModuleRoute module="PATRIMONIO">
+            <PatrimonioPage />
+          </ModuleRoute>
+        }>
+          <Route index element={<Navigate to="/admin/patrimonio/bienes" replace />} />
+          <Route path="bienes" element={<BienesPage />} />
+          <Route path="configuracion" element={<ConfigPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/home" replace />} />

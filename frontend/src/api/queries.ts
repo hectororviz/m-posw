@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -697,3 +697,222 @@ export const usePlayersDashboard = () =>
       return response.data;
     },
   });
+
+// ─── Patrimonio / Bienes ─────────────────────────────────
+
+export const useAssets = (params?: {
+  categoryId?: number;
+  statusId?: number;
+  location?: string;
+  isActive?: boolean;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ['assets', params],
+    queryFn: async () => {
+      const response = await apiClient.get<PaginatedAssets>('/assets', { params });
+      return response.data;
+    },
+  });
+
+export const useAsset = (id?: number) =>
+  useQuery({
+    queryKey: ['asset', id],
+    queryFn: async () => {
+      const response = await apiClient.get<Asset>(`/assets/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useAssetEvents = (id?: number) =>
+  useQuery({
+    queryKey: ['asset-events', id],
+    queryFn: async () => {
+      const response = await apiClient.get<AssetEvent[]>(`/assets/${id}/events`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useAssetCategories = () =>
+  useQuery({
+    queryKey: ['asset-categories'],
+    queryFn: async () => {
+      const response = await apiClient.get<AssetCategory[]>('/asset-categories');
+      return response.data;
+    },
+  });
+
+export const useAssetStatuses = () =>
+  useQuery({
+    queryKey: ['asset-statuses'],
+    queryFn: async () => {
+      const response = await apiClient.get<AssetStatus[]>('/asset-statuses');
+      return response.data;
+    },
+  });
+
+export const useCreateAsset = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      name: string;
+      description?: string;
+      categoryId: number;
+      location?: string;
+      acquisitionDate?: string;
+      acquisitionValue?: string;
+      notes?: string;
+    }) => {
+      const response = await apiClient.post<Asset>('/assets', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+    },
+  });
+};
+
+export const useUpdateAsset = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: {
+      id: number;
+      name?: string;
+      description?: string;
+      categoryId?: number;
+      location?: string;
+      acquisitionDate?: string;
+      acquisitionValue?: string;
+      notes?: string;
+    }) => {
+      const response = await apiClient.patch<Asset>(`/assets/${id}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+    },
+  });
+};
+
+export const useChangeAssetStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, statusId, description }: {
+      id: number;
+      statusId: number;
+      description?: string;
+    }) => {
+      const response = await apiClient.patch<Asset>(`/assets/${id}/status`, { statusId, description });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+    },
+  });
+};
+
+export const useDeleteAsset = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiClient.delete<Asset>(`/assets/${id}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+    },
+  });
+};
+
+export const useCreateAssetCategory = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { name: string }) => {
+      const response = await apiClient.post<AssetCategory>('/asset-categories', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-categories'] });
+    },
+  });
+};
+
+export const useUpdateAssetCategory = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const response = await apiClient.patch<AssetCategory>(`/asset-categories/${id}`, { name });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-categories'] });
+    },
+  });
+};
+
+export const useToggleAssetCategory = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiClient.patch<AssetCategory>(`/asset-categories/${id}/toggle`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-categories'] });
+    },
+  });
+};
+
+export const useCreateAssetStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { name: string }) => {
+      const response = await apiClient.post<AssetStatus>('/asset-statuses', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-statuses'] });
+    },
+  });
+};
+
+export const useUpdateAssetStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      const response = await apiClient.patch<AssetStatus>(`/asset-statuses/${id}`, { name });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-statuses'] });
+    },
+  });
+};
+
+export const useToggleAssetStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiClient.patch<AssetStatus>(`/asset-statuses/${id}/toggle`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-statuses'] });
+    },
+  });
+};
+
+export const useDeleteAssetStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await apiClient.delete(`/asset-statuses/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asset-statuses'] });
+    },
+  });
+};

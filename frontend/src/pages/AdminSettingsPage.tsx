@@ -55,6 +55,7 @@ export const AdminSettingsPage: React.FC = () => {
     enableInternetModule: false,
     enableLigasModule: false,
     enablePlayersModule: false,
+    enablePatrimonioModule: true,
     enableAutoJournalPos: true,
     enableAutoJournalAcreedores: true,
     enableAutoJournalSocios: true,
@@ -151,6 +152,7 @@ export const AdminSettingsPage: React.FC = () => {
         enableInternetModule: settings.enableInternetModule ?? false,
         enableLigasModule: settings.enableLigasModule ?? false,
         enablePlayersModule: settings.enablePlayersModule ?? false,
+        enablePatrimonioModule: settings.enablePatrimonioModule ?? true,
         enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
         enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
         enableAutoJournalSocios: settings.enableAutoJournalSocios ?? true,
@@ -967,6 +969,19 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Modulo de Jugadores</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Gestion de jugadores, categorias y torneos deportivos</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enablePatrimonioModule}
+                  onChange={(e) => setForm({ ...form, enablePatrimonioModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Patrimonio</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Registro y gestion de bienes, activos e historial</small>
                 </span>
               </label>
             </div>

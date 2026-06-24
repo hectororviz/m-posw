@@ -80,6 +80,8 @@ Login unificado por `username` + `password`. El endpoint `POST /auth/login` devu
 | Acreedores | `ACREEDORES` | HIDDEN, READ, FULL |
 | Internet | `INTERNET` | HIDDEN, READ, FULL |
 | Ligas | `LIGAS` | HIDDEN, READ, FULL |
+| Jugadores | `PLAYERS` | HIDDEN, READ, FULL |
+| Patrimonio | `PATRIMONIO` | HIDDEN, READ, FULL |
 | Stock | `STOCK` | HIDDEN, READ, FULL |
 | Reportes | `REPORTES` | HIDDEN, READ, FULL |
 | Configuración | `CONFIGURACION` | HIDDEN, READ, FULL |
@@ -352,6 +354,8 @@ Solapa "Módulos" en Configuración (entre Usuarios y Sistema) para habilitar/de
 | `enableAcreedoresModule` | true | Oculta "Acreedores" del menú, el toggle Fiado en Ventas y el botón Fiado del checkout |
 | `enableInternetModule` | false | Activa el módulo de Vouchers WiFi. Agrega "Internet" al menú, la categoría en el POS, y genera vouchers al vender planes de internet |
 | `enableLigasModule` | false | Activa el módulo de Ligas Deportivas. Agrega "Ligas" al menú (solo ADMIN). Consulta Supabase para tablas de posiciones y próximos partidos |
+| `enablePlayersModule` | false | Activa el módulo de Jugadores. Agrega "Jugadores" al menú (sección Deportes). Gestión de jugadores, categorías por edad, torneos con fichaje |
+| `enablePatrimonioModule` | true | Activa el módulo de Patrimonio. Agrega "Patrimonio" al menú (sección Administración). Registro y gestión de bienes/activos con historial de eventos |
 
 Los toggles se persisten en la tabla `Setting` y se aplican en tiempo real sin recargar.
 
@@ -561,7 +565,280 @@ frontend/src/pages/
 - Los IDs de liga/equipo son UUIDs de Supabase — usar los endpoints `GET` para listarlos, no inventarlos.
 - `getTeams` consulta todos los matches de la liga para extraer los team IDs únicos, luego fetchea los detalles en chunks de 50 (límite de `or` en PostgREST).
 
-## Theme / Dark Mode
+## Jugadores / Players Module
+
+Módulo integral para gestión de jugadores de fútbol/torneos deportivos: padrón de jugadores, categorías por edad, torneos con fichaje, dashboard con estadísticas y cumpleaños. Solo ADMIN. Accesible desde `/admin/players`.
+
+### Arquitectura
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  PostgreSQL (local)                                               │
+│  Player, PlayerCategory, Tournament, TournamentCategory,          │
+│  TournamentPlayer                                                 │
+└────────┬─────────────────────────────────────────────────────────┘
+         │ Prisma
+         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  m-POSw Backend (NestJS)                                          │
+│  players/          — CRUD jugadores + import/export Excel         │
+│  player-categories/ — CRUD categorías (edad / año nacimiento)     │
+│  tournaments/      — CRUD torneos + fichaje/desfichaje + elegibles│
+│  players-stats/    — Dashboard (KPIs, gráfico fichados, cumpleaños)│
+└────────┬─────────────────────────────────────────────────────────┘
+         │ JSON (REST API)
+         ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  m-POSw Frontend (React + React Query)                            │
+│  PlayersLayout        — Sub-nav: Dashboard | Jugadores | Categ. | Torn. │
+│  PlayersDashboardPage — KPIs, barras por torneo/categoría, cumpleaños  │
+│  PlayersPage          — Tabla paginada con CRUD + import/export Excel │
+│  PlayerCategoriesPage — CRUD categorías + toggle activo/año corte     │
+│  TournamentsPage      — CRUD torneos + modal de gestión de jugadores  │
+│  TournamentPlayersModal — Fichar/desfichar jugadores por categoría    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Estructura
+
+```
+backend/src/modules/
+├── players/
+│   ├── players.module.ts
+│   ├── players.controller.ts
+│   ├── players.service.ts
+│   └── dto/
+│       ├── create-player.dto.ts
+│       └── update-player.dto.ts
+├── player-categories/
+│   ├── player-categories.module.ts
+│   ├── player-categories.controller.ts
+│   ├── player-categories.service.ts
+│   └── dto/
+│       ├── create-player-category.dto.ts
+│       └── update-player-category.dto.ts
+├── tournaments/
+│   ├── tournaments.module.ts
+│   ├── tournaments.controller.ts
+│   ├── tournaments.service.ts
+│   └── dto/
+│       ├── create-tournament.dto.ts
+│       ├── update-tournament.dto.ts
+│       └── fichar-jugadores.dto.ts
+└── players-stats/
+    ├── players-stats.module.ts
+    ├── players-stats.controller.ts
+    └── players-stats.service.ts
+```
+
+### Modelo de datos
+
+```
+Player ──1:N──> TournamentPlayer ──N:1──> Tournament
+PlayerCategory ──1:N──> TournamentCategory ──N:1──> Tournament
+```
+
+- **Player**: datos personales (firstName, lastName, dni, birthDate, sex). DNI único validado en service.
+- **PlayerCategory**: categoría por edad. Dos tipos: `AGE` (rango: ageMin/ageMax con cutoff month/day) o `BIRTH_YEAR` (año fijo).
+- **Tournament**: torneo (name, year, allowedSex: M/F/X, birthYearMin/Max, minPlayers/maxPlayers para visualización).
+- **TournamentCategory**: relación N:N entre torneo y categorías habilitadas.
+- **TournamentPlayer**: fichaje de un jugador en un torneo con categoría asignada automáticamente (`playerCategoryId`). Constraint única `[playerId, tournamentId]`.
+
+### Endpoints — Jugadores
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/players` | READ | Lista paginada con filtros `?search=`, `?sex=`, `?page=`, `?limit=` |
+| `GET` | `/players/export` | READ | Exportar Excel (.xlsx) |
+| `GET` | `/players/:id` | READ | Detalle del jugador con torneos |
+| `POST` | `/players` | FULL | Crear jugador |
+| `POST` | `/players/import-excel` | FULL | Importar desde .xlsx (multipart). Retorna `{ creados, errores[] }` |
+| `PUT` | `/players/:id` | FULL | Editar jugador |
+| `DELETE` | `/players/:id` | FULL | Eliminar jugador |
+
+### Endpoints — Categorías
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/player-categories` | READ | Lista todas con torneos asociados |
+| `GET` | `/player-categories/:id` | READ | Detalle de una categoría |
+| `POST` | `/player-categories` | FULL | Crear categoría |
+| `PUT` | `/player-categories/:id` | FULL | Editar categoría |
+| `DELETE` | `/player-categories/:id` | FULL | Eliminar (bloquea si está en uso) |
+
+### Endpoints — Torneos
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/tournaments` | READ | Lista paginada con filtros `?year=`, `?allowedSex=`, `?page=`, `?limit=` |
+| `GET` | `/tournaments/:id` | READ | Detalle del torneo |
+| `POST` | `/tournaments` | FULL | Crear torneo con `categoryIds?` |
+| `PUT` | `/tournaments/:id` | FULL | Editar torneo. Reemplaza categorías si se envía `categoryIds` |
+| `DELETE` | `/tournaments/:id` | FULL | Eliminar (bloquea si tiene jugadores fichados) |
+| `GET` | `/tournaments/:id/players` | READ | Jugadores fichados. Filtros: `?search=`, `?categoryId=` |
+| `POST` | `/tournaments/:id/players/eligible` | READ | Jugadores elegibles para fichar (usa POST por compatibilidad) |
+| `POST` | `/tournaments/:id/players` | FULL | Fichar jugadores. Body: `{ playerIds }`. Retorna `{ fichados, errores[] }` |
+| `DELETE` | `/tournaments/:id/players/:playerId` | FULL | Desfichar un jugador |
+
+### Endpoints — Dashboard
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/players-stats/dashboard` | READ | KPIs: totalPlayers, playersInTournaments, totalWithoutTournament, playersByCategory, upcomingBirthdays (próximos 20 días) |
+
+### Algoritmo de asignación de categoría al fichar
+
+- Para `BIRTH_YEAR`: compara `birthYear` del jugador con el de la categoría.
+- Para `AGE`: calcula `edad = año_torneo - año_nacimiento`. Si el cumpleaños es posterior al cutoff (`ageCutoffMonth`/`ageCutoffDay`), resta 1 año. Verifica `ageMin <= edad <= ageMax`.
+- Jugadores ya fichados en otro torneo del mismo año se marcan con `fichadoEnOtroTorneoMismoAnio` y se muestra warning.
+
+### Frontend
+
+```
+frontend/src/pages/players/
+├── PlayersLayout.tsx            # Sub-nav con 4 tabs
+├── index.tsx                    # Dashboard: KPIs, barras por torneo, cumpleaños
+├── PlayersPage.tsx              # Tabla paginada + CRUD + import/export Excel
+├── PlayerCategoriesPage.tsx     # CRUD categorías con campos dinámicos según tipo
+├── TournamentsPage.tsx          # CRUD torneos + modal de gestión de jugadores
+└── TournamentPlayersModal.tsx   # Fichar/desfichar jugadores por categoría
+```
+
+- React Query hooks en `api/queries.ts`: `usePlayers`, `usePlayer`, `usePlayerCategories`, `usePlayerCategory`, `useTournaments`, `useTournament`, `useTournamentPlayers`, `useEligiblePlayers`, `usePlayersDashboard`.
+- Tipos en `api/types.ts`: `Player`, `PaginatedPlayers`, `PlayerCategory`, `Tournament`, `PaginatedTournaments`, `EligiblePlayer`, `FichadoPlayer`, `PlayersDashboard`.
+- Sidebar: ícono UsersRound + label "Jugadores" en sección Deportes, condicionado a `enablePlayersModule` y permiso `PLAYERS`.
+
+### Configuración
+
+- `Setting.enablePlayersModule` (default: `false`): toggle en Configuración → Módulos.
+- Al activar, aparece "Jugadores" en el sidebar (solo ADMIN).
+
+## Patrimonio / Bienes Module
+
+Módulo de gestión de bienes/activos con historial de eventos inmutable. Accesible desde `/admin/patrimonio`. Permisos: HIDDEN / READ / FULL.
+
+### Arquitectura
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  PostgreSQL (local)                                           │
+│  AssetCategory, AssetStatus, Asset, AssetEvent                │
+└────────┬─────────────────────────────────────────────────────┘
+         │ Prisma
+         ▼
+┌──────────────────────────────────────────────────────────────┐
+│  m-POSw Backend (NestJS)                                      │
+│  assets/             — CRUD bienes + historial de eventos      │
+│  asset-categories/   — CRUD categorías + toggle active         │
+│  asset-statuses/     — CRUD estados intermedios + toggle       │
+└────────┬─────────────────────────────────────────────────────┘
+         │ JSON (REST API)
+         ▼
+┌──────────────────────────────────────────────────────────────┐
+│  m-POSw Frontend (React + React Query)                        │
+│  PatrimonioPage       — Layout con tabs: Bienes | Config      │
+│  BienesPage           — Tabla con filtros, CRUD, baja, eventos│
+│  CategoryManager      — ABM de categorías en tabla            │
+│  StatusManager        — ABM de estados intermedios            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Estructura
+
+```
+backend/src/modules/patrimonio/
+├── patrimonio.module.ts
+├── assets/
+│   ├── assets.controller.ts
+│   ├── assets.service.ts
+│   └── dto/
+│       ├── create-asset.dto.ts
+│       ├── update-asset.dto.ts
+│       └── change-status.dto.ts
+├── asset-categories/
+│   ├── asset-categories.controller.ts
+│   ├── asset-categories.service.ts
+│   └── dto/
+│       ├── create-category.dto.ts
+│       └── update-category.dto.ts
+└── asset-statuses/
+    ├── asset-statuses.controller.ts
+    ├── asset-statuses.service.ts
+    └── dto/
+        ├── create-status.dto.ts
+        └── update-status.dto.ts
+```
+
+### Modelo de datos
+
+```
+AssetCategory ──1:N──> Asset ──1:N──> AssetEvent
+AssetStatus   ──1:N──> Asset
+AssetStatus   ──1:N──> AssetEvent
+```
+
+- **AssetCategory**: nombre de categoría (ej: "Mobiliario", "Electrónica"). `isActive`.
+- **AssetStatus**: estado del bien. Dos estados del sistema (`isSystem: true`): "Activo" y "De Baja". Estados intermedios configurables por el usuario.
+- **Asset**: bien registrado. Campos: name, description, categoryId, statusId, location, acquisitionDate, acquisitionValue (Decimal 12,2), notes, isActive (soft delete).
+- **AssetEvent**: historial inmutable de eventos. Tipos: `ALTA`, `MODIFICACION`, `CAMBIO_ESTADO`, `BAJA`. Registra `userId`, `eventDate`, `description`, `statusId` resultante.
+
+### Endpoints
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/assets` | READ | Listado con filtros: `?categoryId=`, `?statusId=`, `?location=`, `?isActive=`, `?page=`, `?limit=` |
+| `GET` | `/assets/:id` | READ | Detalle del bien |
+| `POST` | `/assets` | FULL | Alta de bien (genera evento `ALTA`. status inicial = "Activo") |
+| `PATCH` | `/assets/:id` | FULL | Edición de datos generales (genera evento `MODIFICACION`) |
+| `PATCH` | `/assets/:id/status` | FULL | Cambio de estado (genera evento `CAMBIO_ESTADO`). No permite asignar "De Baja" |
+| `DELETE` | `/assets/:id` | FULL | Baja lógica: `isActive = false`, `status = DE_BAJA` (genera evento `BAJA`) |
+| `GET` | `/assets/:id/events` | READ | Historial del bien |
+| `GET` | `/asset-categories` | READ | Listado de categorías con contador de bienes |
+| `POST` | `/asset-categories` | FULL | Crear categoría |
+| `PATCH` | `/asset-categories/:id` | FULL | Editar nombre |
+| `PATCH` | `/asset-categories/:id/toggle` | FULL | Activar/desactivar (bloquea si tiene bienes activos) |
+| `GET` | `/asset-statuses` | READ | Listado de estados con contador de bienes |
+| `POST` | `/asset-statuses` | FULL | Crear estado intermedio |
+| `PATCH` | `/asset-statuses/:id` | FULL | Editar nombre (solo si `isSystem = false`) |
+| `PATCH` | `/asset-statuses/:id/toggle` | FULL | Activar/desactivar (solo si `isSystem = false`) |
+| `DELETE` | `/asset-statuses/:id` | FULL | Eliminar (solo si `isSystem = false` y sin bienes asociados) |
+
+### Reglas de negocio
+
+- **Baja**: verifica que el bien no esté ya en DE_BAJA. Setea `isActive = false` y `statusId = DE_BAJA`. Un bien dado de baja no puede volver a activarse ni cambiar de estado.
+- **Cambio de estado**: no permite asignar DE_BAJA desde este endpoint (solo vía DELETE). Registra estado anterior y nuevo en la descripción del evento.
+- **Modificación**: cualquier PATCH sobre datos del bien registra evento `MODIFICACION` con descripción de campos modificados.
+- **Estados del sistema**: si `isSystem = true`, los endpoints de edición, toggle y delete devuelven 403 Forbidden.
+- **Categorías**: no permite desactivar categorías con bienes activos asociados.
+- **Historial inmutable**: no hay endpoints de edición o eliminación de eventos.
+- **Bienes nunca se eliminan físicamente** de la base de datos.
+
+### Frontend
+
+```
+frontend/src/pages/patrimonio/
+├── PatrimonioPage.tsx              # Layout con tabs (treasury-subnav-link): Bienes | Config
+├── BienesPage.tsx                  # Tabla con filtros + FAB + modales
+├── ConfigPage.tsx                  # CategoryManager + StatusManager
+├── components/
+│   ├── AssetStatusBadge.tsx        # Badges de color por estado y tipo de evento
+│   ├── AssetForm.tsx               # Modal alta/edición (settings-field)
+│   ├── AssetDetail.tsx             # Modal detalle + tabla de historial
+│   ├── ChangeStatusModal.tsx       # Modal cambio de estado
+│   └── BajaConfirmModal.tsx        # Modal confirmación de baja
+└── config/
+    ├── CategoryManager.tsx         # ABM de categorías (tabla sales-table)
+    └── StatusManager.tsx           # ABM de estados intermedios
+```
+
+- React Query hooks en `api/queries.ts`: `useAssets`, `useAsset`, `useAssetEvents`, `useAssetCategories`, `useAssetStatuses`, `useCreateAsset`, `useUpdateAsset`, `useChangeAssetStatus`, `useDeleteAsset`, `useCreateAssetCategory`, `useUpdateAssetCategory`, `useToggleAssetCategory`, `useCreateAssetStatus`, `useUpdateAssetStatus`, `useToggleAssetStatus`, `useDeleteAssetStatus`.
+- Tipos en `api/types.ts`: `AssetCategory`, `AssetStatus`, `Asset`, `AssetEvent`, `PaginatedAssets`, `AssetEventType`.
+- Sidebar: ícono PenTool + label "Patrimonio" en sección Administración, condicionado a `enablePatrimonioModule` y permiso `PATRIMONIO`.
+
+### Configuración
+
+- `Setting.enablePatrimonioModule` (default: `true`): toggle en Configuración → Módulos.
+- Seed inserta estados del sistema "Activo" y "De Baja" (`isSystem: true`).
 
 Sistema de theming con CSS variables (`data-theme` attribute en `<html>`):
 
@@ -617,7 +894,11 @@ m-posw/
 │   │       ├── internet-vouchers/  # Vouchers WiFi (integración api-radius)
 │   │       ├── ligas/            # Ligas Deportivas (tablas + partidos vía Supabase)
 │   │       ├── mercadopago-oauth/ # OAuth 2.0 Mercado Pago
+│   │       ├── patrimonio/       # Patrimonio / Bienes (activos + historial)
 │   │       ├── payments/          # Transferencias (polling MP)
+│   │       ├── player-categories/ # Categorías de jugadores (edad / año nacimiento)
+│   │       ├── players/           # Gestión de jugadores + import/export Excel
+│   │       ├── players-stats/     # Dashboard de jugadores (KPIs, cumpleaños)
 │   │       ├── products/          # Productos + recetas
 │   │       ├── reports/           # Reportes generales
 │   │       ├── sales/             # Ventas + MP Instore + Webhooks + WebSockets
@@ -625,6 +906,7 @@ m-posw/
 │   │       ├── socios/            # Padrón de socios + Cuotas + Beneficios + Carnets
 │   │       ├── stats/             # Estadísticas y dashboard
 │   │       ├── stock/             # Control de stock
+│   │       ├── tournaments/       # Torneos deportivos (fichaje, elegibles, categorías)
 │   │       ├── treasury/          # Tesorería / Libro Diario (partida doble)
 │   │       └── users/             # Gestión de usuarios
 │   ├── prisma/        # Schema + migraciones + seed
