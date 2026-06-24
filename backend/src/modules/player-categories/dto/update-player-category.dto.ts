@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, Length, Min, Max } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Length, Min, Max } from 'class-validator';
 import { PlayerCategoryType } from '@prisma/client';
 
 export class UpdatePlayerCategoryDto {
@@ -38,4 +38,8 @@ export class UpdatePlayerCategoryDto {
   @IsOptional()
   @IsInt()
   birthYear?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }

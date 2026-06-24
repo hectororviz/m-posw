@@ -1,71 +1,142 @@
 import { usePlayersDashboard } from '../../api/queries';
-import { useSettings } from '../../api/queries';
-import { Users, UserMinus, Trophy } from 'lucide-react';
+import { Cake } from 'lucide-react';
 
 export const PlayersDashboardPage: React.FC = () => {
-  const { data: dashboard, isLoading } = usePlayersDashboard();
-  const { data: settings } = useSettings();
-  const storeName = settings?.storeName ?? 'm-POSw';
+  const { data: d, isLoading } = usePlayersDashboard();
 
   if (isLoading) {
     return <div className="page-loader">Cargando...</div>;
   }
 
-  const d = dashboard;
+  const bars = d?.playersByCategory ?? [];
+
+  const barColor = (count: number, min: number | null, max: number | null) => {
+    if (min != null && max != null && max > min) {
+      const ratio = Math.max(0, Math.min(1, (count - min) / (max - min)));
+      const r = Math.round(220 - ratio * 200);
+      const g = Math.round(38 + ratio * 182);
+      return `rgb(${r},${g},38)`;
+    }
+    const maxCount = Math.max(1, ...bars.map((b) => b.count));
+    const ratio = count / maxCount;
+    const r = Math.round(220 - ratio * 200);
+    const g = Math.round(38 + ratio * 182);
+    return `rgb(${r},${g},38)`;
+  };
+
+  // Group bars by tournament
+  const grouped = bars.reduce((acc, bar) => {
+    if (!acc[bar.tournamentName]) acc[bar.tournamentName] = [];
+    acc[bar.tournamentName].push(bar);
+    return acc;
+  }, {} as Record<string, typeof bars>);
+
+  const formatDate = (iso: string) => {
+    const date = new Date(iso);
+    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+  };
 
   return (
-    <div className="home-page">
-      <div className="home-header">
-        <h1 className="home-title">Módulo de Jugadores</h1>
-        <p className="home-subtitle">{storeName}</p>
-      </div>
-      <div className="home-grid">
-        <div className="module-card">
-          <div className="module-card-icon" style={{ background: 'var(--color-blue-bg, #dbeafe)', color: 'var(--color-blue-text, #1e40af)' }}>
-            <Users size={24} />
-          </div>
-          <div className="module-card-body">
-            <div className="module-card-value">{d?.totalPlayersRegistered ?? 0}</div>
-            <div className="module-card-label">Jugadores registrados</div>
-          </div>
+    <div className="admin-page">
+      <div className="admin-page-header"><h2>Jugadores</h2></div>
+
+      <div className="summary-cards">
+        <div className="summary-card summary-card--accent">
+          <span className="summary-card__label">Jugadores</span>
+          <span className="summary-card__value">{d?.totalPlayers ?? 0}</span>
         </div>
-        <div className="module-card">
-          <div className="module-card-icon" style={{ background: 'var(--color-amber-bg, #fef3c7)', color: 'var(--color-amber-text, #92400e)' }}>
-            <UserMinus size={24} />
-          </div>
-          <div className="module-card-body">
-            <div className="module-card-value">{d?.totalWithoutTournament ?? 0}</div>
-            <div className="module-card-label">Sin fichar este año</div>
-          </div>
+        <div className="summary-card summary-card--success">
+          <span className="summary-card__label">Fichados {new Date().getFullYear()}</span>
+          <span className="summary-card__value">{d?.playersInTournaments ?? 0}</span>
+        </div>
+        <div className="summary-card summary-card--info">
+          <span className="summary-card__label">Torneos</span>
+          <span className="summary-card__value">{d?.totalTournaments ?? 0}</span>
+        </div>
+        <div className="summary-card summary-card--danger">
+          <span className="summary-card__label">Categorías</span>
+          <span className="summary-card__value">{d?.totalCategories ?? 0}</span>
         </div>
       </div>
 
-      {d?.tournaments && d.tournaments.length > 0 && (
-        <>
-          <h2 style={{ margin: '1.5rem 0 0.75rem', fontSize: '1.1rem' }}>Torneos {new Date().getFullYear()}</h2>
-          <div className="home-grid">
-            {d.tournaments.map((t) => (
-              <div key={t.id} className="module-card">
-                <div className="module-card-icon" style={{ background: 'var(--color-green-bg, #dcfce7)', color: 'var(--color-green-text, #166534)' }}>
-                  <Trophy size={24} />
-                </div>
-                <div className="module-card-body">
-                  <div className="module-card-value">{t.totalPlayers}</div>
-                  <div className="module-card-label">{t.name}</div>
-                  {t.byCategory.length > 0 && (
-                    <div style={{ marginTop: '0.5rem' }}>
-                      {t.byCategory.map((c) => (
-                        <span key={c.name} style={{ display: 'inline-block', marginRight: '0.5rem', fontSize: '0.8rem', color: 'var(--color-text-faint)' }}>
-                          {c.name}: {c.count}
-                        </span>
-                      ))}
+      {Object.keys(grouped).length > 0 && (
+        <div className="settings-section" style={{ marginBottom: '1.5rem' }}>
+          <h3 className="settings-section-header">Fichados por torneo y categoría</h3>
+          {Object.entries(grouped).map(([tname, tbars]) => {
+            const maxW = Math.max(1, ...tbars.map((b) => b.count));
+            return (
+              <div key={tname} style={{ marginTop: '1rem' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--color-text-body)', marginBottom: '0.5rem' }}>{tname}:</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.5rem' }}>
+                  {tbars.map((bar) => (
+                    <div key={bar.categoryName} className="stats-bar" style={{ background: 'var(--color-surface)', borderRadius: '0.5rem', padding: '0.6rem 0.75rem', border: '1px solid var(--color-border-light)' }}>
+                      <div className="stats-bar-meta" style={{ marginTop: 0 }}>
+                        <span className="stats-bar-name">{bar.categoryName}</span>
+                        <span className="stats-bar-qty">{bar.count}</span>
+                      </div>
+                      <div className="stats-bar-track">
+                        <div
+                          className="stats-bar-fill"
+                          style={{
+                            width: `${(bar.count / maxW) * 100}%`,
+                            background: barColor(bar.count, bar.tournamentMinPlayers, bar.tournamentMaxPlayers),
+                          }}
+                        />
+                      </div>
                     </div>
-                  )}
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {(d?.upcomingBirthdays ?? []).length > 0 && (
+        <div className="settings-section">
+          <h3 className="settings-section-header" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Cake size={16} />
+            Próximos cumpleaños (20 días)
+          </h3>
+          <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', padding: '0.75rem 0', scrollSnapType: 'x mandatory' }}>
+            {(d?.upcomingBirthdays ?? []).map((p) => (
+              <div
+                key={p.id}
+                style={{
+                  flex: '0 0 160px',
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '0.75rem',
+                  padding: '1rem 0.75rem',
+                  scrollSnapAlign: 'start',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: '0.25rem',
+                }}
+              >
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-text-strong)' }}>
+                  {p.lastName}
+                  <br />
+                  {p.firstName}
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--color-text-body)' }}>
+                  {formatDate(p.birthDate)}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                  {p.daysUntil === 0 ? 'hoy 🎂' : `${p.daysUntil} días`}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--color-text-body)', fontWeight: 600 }}>
+                  {p.age} años
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                  {p.categoryName ?? '—'}
                 </div>
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

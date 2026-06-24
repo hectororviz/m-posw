@@ -50,6 +50,8 @@ export class TournamentsService {
         allowedSex: t.allowedSex,
         birthYearMin: t.birthYearMin,
         birthYearMax: t.birthYearMax,
+        minPlayers: t.minPlayers,
+        maxPlayers: t.maxPlayers,
         categories: t.categories.map((tc) => ({
           id: tc.category.id,
           name: tc.category.name,
@@ -99,6 +101,8 @@ export class TournamentsService {
       allowedSex: tournament.allowedSex,
       birthYearMin: tournament.birthYearMin,
       birthYearMax: tournament.birthYearMax,
+      minPlayers: tournament.minPlayers,
+      maxPlayers: tournament.maxPlayers,
       categories: tournament.categories.map((tc) => tc.category),
       playerCount: tournament._count.players,
       createdAt: tournament.createdAt,
@@ -114,6 +118,8 @@ export class TournamentsService {
         allowedSex: dto.allowedSex,
         birthYearMin: dto.birthYearMin,
         birthYearMax: dto.birthYearMax,
+        minPlayers: dto.minPlayers,
+        maxPlayers: dto.maxPlayers,
       },
     });
 
@@ -143,6 +149,8 @@ export class TournamentsService {
         ...(dto.allowedSex !== undefined && { allowedSex: dto.allowedSex }),
         ...(dto.birthYearMin !== undefined && { birthYearMin: dto.birthYearMin }),
         ...(dto.birthYearMax !== undefined && { birthYearMax: dto.birthYearMax }),
+        ...(dto.minPlayers !== undefined && { minPlayers: dto.minPlayers }),
+        ...(dto.maxPlayers !== undefined && { maxPlayers: dto.maxPlayers }),
       },
     });
 

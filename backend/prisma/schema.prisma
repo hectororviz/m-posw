@@ -749,7 +749,7 @@ model Player {
   id            Int               @id @default(autoincrement())
   firstName     String
   lastName      String
-  dni           String            @unique
+  dni           String?
   birthDate     DateTime
   sex           Sex
   createdAt     DateTime          @default(now())
@@ -768,6 +768,7 @@ model PlayerCategory {
   ageCutoffMonth  Int?                 @default(12)
   ageCutoffDay    Int?                 @default(31)
   birthYear       Int?
+  active          Boolean              @default(true)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   tournaments     TournamentCategory[]
@@ -782,6 +783,8 @@ model Tournament {
   allowedSex     AllowedSex
   birthYearMin   Int?
   birthYearMax   Int?
+  minPlayers     Int?
+  maxPlayers     Int?
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   categories     TournamentCategory[]

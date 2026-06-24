@@ -100,11 +100,13 @@ export class PlayersService {
   }
 
   async create(dto: CreatePlayerDto) {
-    const existing = await this.prisma.player.findUnique({
-      where: { dni: dto.dni },
-    });
-    if (existing) {
-      throw new BadRequestException('Ya existe un jugador con ese DNI');
+    if (dto.dni) {
+      const existing = await this.prisma.player.findFirst({
+        where: { dni: dto.dni },
+      });
+      if (existing) {
+        throw new BadRequestException('Ya existe un jugador con ese DNI');
+      }
     }
 
     return this.prisma.player.create({
@@ -125,7 +127,7 @@ export class PlayersService {
     }
 
     if (dto.dni && dto.dni !== player.dni) {
-      const existing = await this.prisma.player.findUnique({
+      const existing = await this.prisma.player.findFirst({
         where: { dni: dto.dni },
       });
       if (existing) {
@@ -188,10 +190,10 @@ export class PlayersService {
         const birthDateRaw = row['Fecha de Nacimiento'];
         const sexRaw = row['Sexo']?.toString().trim().toUpperCase();
 
-        if (!firstName || !lastName || !dni) {
+        if (!firstName || !lastName) {
           resultados.errores.push({
             fila: i + 2,
-            mensaje: 'Faltan campos obligatorios (Nombre, Apellido, DNI)',
+            mensaje: 'Faltan campos obligatorios (Nombre, Apellido)',
           });
           continue;
         }
@@ -229,13 +231,15 @@ export class PlayersService {
           continue;
         }
 
-        const existing = await this.prisma.player.findUnique({ where: { dni } });
-        if (existing) {
-          resultados.errores.push({
-            fila: i + 2,
-            mensaje: `DNI ${dni} ya existe`,
-          });
-          continue;
+        if (dni) {
+          const existing = await this.prisma.player.findFirst({ where: { dni } });
+          if (existing) {
+            resultados.errores.push({
+              fila: i + 2,
+              mensaje: `DNI ${dni} ya existe`,
+            });
+            continue;
+          }
         }
 
         await this.prisma.player.create({

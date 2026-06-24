@@ -704,7 +704,7 @@ export interface Player {
   id: number;
   firstName: string;
   lastName: string;
-  dni: string;
+  dni?: string | null;
   birthDate: string;
   sex: Sex;
   tournamentCount?: number;
@@ -737,6 +737,7 @@ export interface PlayerCategory {
   ageCutoffMonth?: number | null;
   ageCutoffDay?: number | null;
   birthYear?: number | null;
+  active?: boolean;
   tournaments?: { id: number; name: string }[];
   createdAt?: string;
   updatedAt?: string;
@@ -749,6 +750,8 @@ export interface Tournament {
   allowedSex: AllowedSex;
   birthYearMin?: number | null;
   birthYearMax?: number | null;
+  minPlayers?: number | null;
+  maxPlayers?: number | null;
   categories?: PlayerCategory[];
   playerCount?: number;
   createdAt?: string;
@@ -787,13 +790,26 @@ export interface FichadoPlayer {
 }
 
 export interface PlayersDashboard {
-  tournaments: {
-    id: number;
-    name: string;
-    year: number;
-    totalPlayers: number;
-    byCategory: { name: string; count: number }[];
-  }[];
-  totalPlayersRegistered: number;
+  totalPlayers: number;
+  totalTournaments: number;
+  totalCategories: number;
+  playersInTournaments: number;
   totalWithoutTournament: number;
+  playersByCategory: {
+    tournamentId: number;
+    tournamentName: string;
+    tournamentMinPlayers: number | null;
+    tournamentMaxPlayers: number | null;
+    categoryName: string;
+    count: number;
+  }[];
+  upcomingBirthdays: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    birthDate: string;
+    age: number;
+    daysUntil: number;
+    categoryName: string | null;
+  }[];
 }

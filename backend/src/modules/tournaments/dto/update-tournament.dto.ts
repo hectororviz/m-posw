@@ -24,6 +24,14 @@ export class UpdateTournamentDto {
   birthYearMax?: number;
 
   @IsOptional()
+  @IsInt()
+  minPlayers?: number;
+
+  @IsOptional()
+  @IsInt()
+  maxPlayers?: number;
+
+  @IsOptional()
   @IsArray()
   @IsInt({ each: true })
   categoryIds?: number[];

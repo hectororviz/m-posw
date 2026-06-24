@@ -32,6 +32,7 @@ export class PlayerCategoriesService {
       ageCutoffMonth: c.ageCutoffMonth,
       ageCutoffDay: c.ageCutoffDay,
       birthYear: c.birthYear,
+      active: c.active,
       tournaments: c.tournaments.map((tc) => ({
         id: tc.tournament.id,
         name: tc.tournament.name,
@@ -66,6 +67,7 @@ export class PlayerCategoriesService {
       ageCutoffMonth: category.ageCutoffMonth,
       ageCutoffDay: category.ageCutoffDay,
       birthYear: category.birthYear,
+      active: category.active,
       tournaments: category.tournaments.map((tc) => ({
         id: tc.tournament.id,
         name: tc.tournament.name,
@@ -107,6 +109,7 @@ export class PlayerCategoriesService {
         ...(dto.ageCutoffMonth !== undefined && { ageCutoffMonth: dto.ageCutoffMonth }),
         ...(dto.ageCutoffDay !== undefined && { ageCutoffDay: dto.ageCutoffDay }),
         ...(dto.birthYear !== undefined && { birthYear: dto.birthYear }),
+        ...(dto.active !== undefined && { active: dto.active }),
       },
     });
   }

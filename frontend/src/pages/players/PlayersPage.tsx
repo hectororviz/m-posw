@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../../api/client';
 import { usePlayers, usePlayer } from '../../api/queries';
 import { useToast } from '../../components/ToastProvider';
-import { Download, Plus, Search, Upload, X } from 'lucide-react';
+import { Download, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import type { Player as PlayerType } from '../../api/types';
 
 const LIMITS = [10, 25, 50, 100];
@@ -34,7 +34,7 @@ export const PlayersPage: React.FC = () => {
       setForm({
         firstName: editingPlayer.firstName,
         lastName: editingPlayer.lastName,
-        dni: editingPlayer.dni,
+        dni: editingPlayer.dni ?? '',
         birthDate: editingPlayer.birthDate?.slice(0, 10) ?? '',
         sex: editingPlayer.sex,
       });
@@ -47,13 +47,13 @@ export const PlayersPage: React.FC = () => {
 
   const handleSave = async () => {
     setFormError(null);
-    if (!form.firstName.trim() || !form.lastName.trim() || !form.dni.trim() || !form.birthDate) {
-      setFormError('Completá todos los campos obligatorios');
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.birthDate) {
+      setFormError('Completá los campos obligatorios');
       return;
     }
     setSaving(true);
     try {
-      const payload = { firstName: form.firstName.trim(), lastName: form.lastName.trim(), dni: form.dni.trim(), birthDate: new Date(form.birthDate).toISOString(), sex: form.sex };
+      const payload = { firstName: form.firstName.trim(), lastName: form.lastName.trim(), dni: form.dni.trim() || undefined, birthDate: new Date(form.birthDate).toISOString(), sex: form.sex };
       if (editingId) {
         await apiClient.put(`/players/${editingId}`, payload);
         pushToast('Jugador actualizado', 'success');
@@ -112,44 +112,46 @@ export const PlayersPage: React.FC = () => {
     <div className="admin-page">
       <div className="admin-page-header">
         <h2>Jugadores</h2>
-        <div className="admin-page-actions">
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <select value={sexFilter} onChange={(e) => { setSexFilter(e.target.value); setPage(1); }}>
+            <option value="">Sexo</option>
+            <option value="M">Masculino</option>
+            <option value="F">Femenino</option>
+          </select>
+          <div className="search-box" style={{ minWidth: '240px' }}>
+            <Search size={16} />
+            <input type="text" placeholder="Buscar..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button className="btn-ghost" onClick={handleExport} title="Exportar Excel"><Download size={16} /> Exportar</button>
           <label className="btn-ghost" style={{ cursor: 'pointer' }}>
-            <Upload size={16} /> Importar Excel
+            <Upload size={16} /> Importar
             <input type="file" accept=".xlsx" ref={fileInputRef} onChange={handleImport} style={{ display: 'none' }} />
           </label>
         </div>
       </div>
 
-      <div className="admin-filters">
-        <div className="search-box">
-          <Search size={16} />
-          <input type="text" placeholder="Buscar por nombre, apellido o DNI..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-        </div>
-        <select value={sexFilter} onChange={(e) => { setSexFilter(e.target.value); setPage(1); }}>
-          <option value="">Todos los sexos</option>
-          <option value="M">Masculino</option>
-          <option value="F">Femenino</option>
-        </select>
-      </div>
-
-      {importing && <p style={{ padding: '0.5rem 0' }}>Importando archivo...</p>}
+      {importing && <p style={{ padding: '0.25rem 0' }}>Importando archivo...</p>}
       {importResult && (
-        <div style={{ marginBottom: '1rem', padding: '1rem', background: 'var(--color-surface)', borderRadius: '0.75rem', border: '1px solid var(--color-border-light)' }}>
+        <div style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--color-surface)', borderRadius: '0.75rem', border: '1px solid var(--color-border-light)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong>Resultado de importación:</strong>
             <button onClick={() => setImportResult(null)} className="icon-button"><X size={14} /></button>
           </div>
           <p style={{ color: 'var(--color-green-text)', margin: '0.25rem 0' }}>{importResult.creados} jugadores creados</p>
           {importResult.errores.length > 0 && (
-            <div style={{ maxHeight: '200px', overflow: 'auto', marginTop: '0.5rem' }}>
+            <div style={{ maxHeight: '160px', overflow: 'auto', marginTop: '0.5rem' }}>
               {importResult.errores.map((e, i) => <p key={i} className="error-text" style={{ margin: '0.1rem 0', fontSize: '0.85rem' }}>Fila {e.fila}: {e.mensaje}</p>)}
             </div>
           )}
         </div>
       )}
 
-      <div className="sales-table-wrapper">
+      <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
         <div className="sales-table">
           <div className="sales-table-head">
             <span className="col-user" style={{ flex: 1 }}>Apellido</span>
@@ -158,7 +160,7 @@ export const PlayersPage: React.FC = () => {
             <span className="col-date" style={{ flex: '0 0 130px' }}>F. Nacimiento</span>
             <span className="col-method" style={{ flex: '0 0 90px' }}>Sexo</span>
             <span className="col-num" style={{ flex: '0 0 70px' }}>Torneos</span>
-            <span className="col-action" style={{ flex: '0 0 130px', textAlign: 'right' }}></span>
+            <span className="col-action" style={{ flex: '0 0 60px', textAlign: 'right' }}></span>
           </div>
           {isLoading ? (
             <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Cargando...</span></div>
@@ -173,9 +175,9 @@ export const PlayersPage: React.FC = () => {
                 <span className="col-date" style={{ flex: '0 0 130px' }}>{formatDate(p.birthDate)}</span>
                 <span className="col-method" style={{ flex: '0 0 90px' }}>{p.sex === 'M' ? 'Masculino' : 'Femenino'}</span>
                 <span className="col-num" style={{ flex: '0 0 70px', textAlign: 'center' }}>{p.tournamentCount ?? 0}</span>
-                <span className="col-action" style={{ flex: '0 0 130px', textAlign: 'right' }}>
-                  <button className="btn-ghost" onClick={() => openEdit(p.id)} style={{ marginRight: '0.25rem' }}>Editar</button>
-                  <button className="btn-ghost" onClick={() => setDeleteConfirm(p)} style={{ color: 'var(--color-danger)' }}>Eliminar</button>
+                <span className="col-action" style={{ flex: '0 0 60px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                  <button className="btn-ghost" onClick={() => openEdit(p.id)} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
+                  <button className="btn-ghost" onClick={() => setDeleteConfirm(p)} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
                 </span>
               </div>
             ))
@@ -183,15 +185,15 @@ export const PlayersPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="admin-pagination">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
         <span>Mostrando {playersData?.data?.length ?? 0} de {playersData?.total ?? 0}</span>
-        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-          <select value={limit} onChange={(e) => { setLimit(+e.target.value); setPage(1); }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <select value={limit} onChange={(e) => { setLimit(+e.target.value); setPage(1); }} style={{ padding: '0.3rem 0.5rem', borderRadius: '0.4rem', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: '0.8rem' }}>
             {LIMITS.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
-          <button className="btn-ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>Anterior</button>
+          <button className="btn-ghost" disabled={page <= 1} onClick={() => setPage(page - 1)} style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>Anterior</button>
           <span>Pág {page} de {totalPages || 1}</span>
-          <button className="btn-ghost" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Siguiente</button>
+          <button className="btn-ghost" disabled={page >= totalPages} onClick={() => setPage(page + 1)} style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}>Siguiente</button>
         </div>
       </div>
 
@@ -218,8 +220,8 @@ export const PlayersPage: React.FC = () => {
                   <input type="text" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="Nombre" />
                 </div>
                 <div className="settings-field">
-                  <label>DNI *</label>
-                  <input type="text" value={form.dni} onChange={(e) => setForm({ ...form, dni: e.target.value })} placeholder="DNI" />
+                  <label>DNI</label>
+                  <input type="text" value={form.dni} onChange={(e) => setForm({ ...form, dni: e.target.value })} placeholder="DNI (opcional)" />
                 </div>
                 <div className="settings-field">
                   <label>Fecha de Nacimiento *</label>
