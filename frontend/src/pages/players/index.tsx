@@ -31,11 +31,6 @@ export const PlayersDashboardPage: React.FC = () => {
     return acc;
   }, {} as Record<string, typeof bars>);
 
-  const formatDate = (iso: string) => {
-    const date = new Date(iso);
-    return date.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
-  };
-
   const formatDateLong = (iso: string) => {
     const date = new Date(iso);
     return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
