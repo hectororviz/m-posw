@@ -570,7 +570,7 @@ export const useLigasConfigs = () =>
 export const useLigasCreateConfig = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: { leagueId: string; leagueName: string; teamId: string; teamName: string }) => {
+    mutationFn: async (data: { nombre?: string; leagueId: string; leagueName: string; teamId: string; teamName: string }) => {
       const response = await apiClient.post<LigasConfig>('/ligas/configs', data);
       return response.data;
     },

@@ -265,6 +265,7 @@ export interface LigaMatchdayGroup {
 
 export interface LigasConfig {
   id: string;
+  nombre: string;
   leagueId: string;
   leagueName: string;
   teamId: string;

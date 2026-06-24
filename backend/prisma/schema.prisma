@@ -302,6 +302,7 @@ model Setting {
 
 model LigasConfig {
   id        String   @id @default(uuid()) @db.Uuid
+  nombre    String   @default("")
   leagueId  String
   leagueName String
   teamId    String

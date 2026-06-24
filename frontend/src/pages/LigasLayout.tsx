@@ -26,7 +26,7 @@ export const LigasLayout: React.FC = () => {
               isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'
             }
           >
-            {cfg.leagueName}
+            {cfg.nombre || cfg.leagueName}
           </NavLink>
         ))}
         <NavLink

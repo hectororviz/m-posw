@@ -1,6 +1,10 @@
-import { IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateLigaConfigDto {
+  @IsOptional()
+  @IsString()
+  nombre?: string;
+
   @IsString()
   leagueId: string;
 
