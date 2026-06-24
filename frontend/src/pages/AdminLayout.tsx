@@ -102,7 +102,7 @@ export const AdminLayout: React.FC = () => {
     return window.innerWidth <= COLLAPSE_BREAKPOINT;
   });
 
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set(navCategories.map((c) => c.label)));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setLogoError(false);
