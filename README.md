@@ -34,7 +34,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Dashboard de estadísticas**: KPIs con badges, últimos 15 días, últimos 6 meses, promedios con gráficos.
 - **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia) con movimientos de entrada/salida.
 - **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
-- **Módulos configurables**: activar/desactivar Socios, Tesorería y Acreedores según necesidad desde Configuración → Módulos.
+- **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Ligas, Jugadores, Patrimonio e Internet desde Configuración → Módulos.
 
 ### Padrón de Socios
 - **CRUD de socios**: datos personales, tipo de socio, estado (activo/inactivo/suspendido), fecha de alta.
@@ -50,6 +50,26 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Partidos pendientes anteriores**: detección de partidos no actualizados (fechas pasadas sin status finalizado), mostrados en sección separada con nota aclaratoria.
 - **Configuración por torneo**: asociar múltiples ligas y equipos a seguir. Cada torneo genera una pestaña de navegación independiente.
 - Los datos se obtienen de una base externa (Supabase) poblada por scraping automático.
+
+### Jugadores y Torneos
+- **Padrón de jugadores**: registro de jugadores con datos personales (nombre, apellido, DNI, fecha de nacimiento, sexo). Importación y exportación masiva desde Excel.
+- **Categorías por edad**: categorías configurables por rango de edad (ej: Sub-15, Sub-17) o por año de nacimiento fijo (ej: 2010). Mes y día de corte personalizables.
+- **Torneos**: gestión de torneos con año, sexo permitido (M/F/X), categorías habilitadas y límites de jugadores.
+- **Fichaje de jugadores**: asignación automática de categoría al fichar un jugador en un torneo. Detección de jugadores ya fichados en otros torneos del mismo año con advertencia visual.
+- **Dashboard**: KPIs de jugadores, gráfico de fichados por torneo y categoría, próximos cumpleaños.
+
+### Patrimonio / Bienes
+- **Registro de bienes**: alta de activos con categoría, estado, ubicación, fecha y valor de adquisición, notas.
+- **Historial inmutable de eventos**: cada operación (alta, modificación, cambio de estado, baja) genera un registro de auditoría. Sin posibilidad de editar o borrar el historial.
+- **Estados configurables**: dos estados del sistema (Activo y De Baja) + estados intermedios personalizados.
+- **Baja lógica**: los bienes nunca se eliminan físicamente de la base de datos. Soft delete con trazabilidad completa.
+- **Categorías de bienes**: clasificación por tipo (mobiliario, electrónica, etc.) con activación/desactivación.
+
+### Internet / Vouchers WiFi
+- **Gestión de planes**: crear planes de acceso a internet con duración, ancho de banda y precio. Cada plan genera automáticamente un producto en el POS bajo la categoría "Internet".
+- **Venta de vouchers**: al vender un plan desde el POS, el sistema genera un PIN de acceso único respaldado por RADIUS. El PIN se imprime en el ticket de venta.
+- **Integración con api-radius**: comunicación con servidor RADIUS externo para generación, consulta y anulación de vouchers.
+- **Control de vouchers**: listado de vouchers vendidos con estado (Activo/Usado), sin mostrar el PIN en pantalla por seguridad.
 
 ### Personalización
 - Nombre del comercio/club, logo, favicon y color principal de la UI configurable desde el panel admin.
@@ -72,7 +92,9 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | **Feria / puesto callejero** | App Android en celular con impresión Bluetooth. Sin necesidad de PC ni instalación compleja. |
 | **Comercio minorista** | Catálogo de productos con imágenes, múltiples métodos de cobro, cierre de caja diario, libro diario contable. Ventas fiadas con control de acreedores. |
 | **Evento con múltiples puestos** | Cada puesto es una caja independiente. Admin centralizado que ve reportes, estadísticas y tesorería de todas las cajas. |
-| **Club deportivo** | Tablas de posiciones y próximos partidos de ligas de fútbol. Seguimiento de uno o varios equipos por torneo. Datos actualizados vía scraping. |
+| **Club deportivo** | Tablas de posiciones y próximos partidos de ligas de fútbol. Gestión de jugadores y torneos con fichaje automático por categoría. Dashboard de jugadores y cumpleaños. Seguimiento de uno o varios equipos por torneo. |
+| **Institución educativa** | Registro y seguimiento del patrimonio institucional (mobiliario, equipamiento, etc.) con historial de eventos y auditoría. Bajas lógicas sin pérdida de trazabilidad. |
+| **Proveedor de WiFi** | Venta de vouchers de acceso a internet. Planes configurables, generación automática de PINs respaldados por RADIUS. Impresión del PIN en el ticket de venta. |
 
 ## Ventajas
 

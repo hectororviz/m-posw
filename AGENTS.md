@@ -483,7 +483,7 @@ backend/src/modules/ligas/
 
 ### Modelo de datos local
 
-- **LigasConfig**: asocia una liga y un equipo de Supabase para seguimiento. Campos: `leagueId`, `leagueName`, `teamId`, `teamName`, `active`.
+- **LigasConfig**: asocia una liga y un equipo de Supabase para seguimiento. Campos: `nombre` (nombre personalizado para el menú, opcional), `leagueId`, `leagueName`, `teamId`, `teamName`, `active`.
 - **Setting.enableLigasModule** (default: `false`): toggle del módulo.
 
 ### Datos remotos (Supabase)
