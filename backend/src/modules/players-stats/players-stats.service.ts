@@ -105,7 +105,7 @@ export class PlayersStatsService {
           thisYearBirthday.setFullYear(today.getFullYear() + 1);
         }
         const diffDays = Math.ceil((thisYearBirthday.getTime() - today.getTime()) / 86400000);
-        return diffDays >= 0 && diffDays <= 20;
+        return diffDays >= 0;
       })
       .map((p) => {
         const birth = new Date(p.birthDate);
