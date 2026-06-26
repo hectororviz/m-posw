@@ -1,1 +1,4 @@
-ALTER TYPE "ModuleKey" ADD VALUE 'LIGAS';
+DO $$ BEGIN
+  ALTER TYPE "ModuleKey" ADD VALUE 'LIGAS';
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
