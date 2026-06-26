@@ -26,14 +26,10 @@ export const TreasuryQuickExpensePage: React.FC = () => {
     if (!activeButton || !amount || parseFloat(amount) <= 0) return;
     setSaving(true);
     try {
-      await apiClient.post('/treasury/entries/expense', {
-        date: new Date().toISOString().slice(0, 10),
-        assetAccountId: activeButton.assetAccountId,
-        incomeExpenseAccountId: activeButton.expenseAccountId,
+      await apiClient.post('/treasury/quick-expense/buttons/submit', {
+        buttonId: activeButton.id,
         amount: parseFloat(amount),
-        description: activeButton.label,
-        notes: note || undefined,
-        status: 'POSTED',
+        note: note || undefined,
       });
       pushToast(`Gasto registrado: $${parseFloat(amount).toLocaleString('es-AR')} en ${activeButton.label}`, 'success');
       setActiveButton(null);

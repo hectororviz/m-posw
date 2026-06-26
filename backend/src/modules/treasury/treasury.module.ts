@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { UsersModule } from '../users/users.module';
 import { LedgerAccountsController } from './ledger-accounts.controller';
 import { LedgerAccountsService } from './ledger-accounts.service';
 import { JournalEntriesController } from './journal-entries.controller';
@@ -10,6 +11,7 @@ import { QuickExpenseController } from './quick-expense.controller';
 import { QuickExpenseService } from './quick-expense.service';
 
 @Module({
+  imports: [UsersModule],
   controllers: [
     LedgerAccountsController,
     JournalEntriesController,

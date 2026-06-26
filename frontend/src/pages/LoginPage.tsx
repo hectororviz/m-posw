@@ -38,7 +38,7 @@ export const LoginPage: React.FC = () => {
       const smartphoneModule = isMobile ? response.data.homeSmartphoneModule : null;
 
       if (smartphoneModule) {
-        const route = getModuleRoute(smartphoneModule);
+        const route = getSmartphoneRoute(smartphoneModule);
         if (route) {
           navigate(route, { replace: true });
           return;
@@ -126,13 +126,22 @@ function getModuleRoute(moduleKey: string): string | null {
     POS: '/pos',
     VENTAS: '/admin/sales',
     SOCIOS: '/admin/socios',
-    TESORERIA: '/admin/tesoreria/gastos',
+    TESORERIA: '/admin/tesoreria',
     ACREEDORES: '/admin/acreedores',
     PRODUCTOS: '/admin/products',
     INTERNET: '/admin/internet',
     PLAYERS: '/admin/players',
     REPORTES: '/admin/stats',
     CONFIGURACION: '/admin/settings',
+  };
+  return map[moduleKey] ?? null;
+}
+
+function getSmartphoneRoute(moduleKey: string): string | null {
+  const map: Record<string, string> = {
+    TESORERIA: '/admin/tesoreria/gastos',
+    POS: '/pos',
+    VENTAS: '/admin/sales',
   };
   return map[moduleKey] ?? null;
 }
