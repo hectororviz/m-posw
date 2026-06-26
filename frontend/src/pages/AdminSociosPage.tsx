@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas, useTreasuryAccounts } from '../api/queries';
@@ -583,9 +583,9 @@ export const AdminSociosPage: React.FC = () => {
                     <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
                   )}
                 </span>
-                <span className="col-action" style={{ flex: '0 0 180px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => openView(s.id)}>Ver</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(s.id)}>Editar</button>
+                <span className="col-action" style={{ flex: '0 0 160px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openView(s.id)} title="Ver">Ver</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(s.id)} title="Editar">{<Pencil size={16} />}</button>
                   {(s.deudaTotal ?? 0) > 0 && (
                     <button type="button" className="btn-ghost btn-sm" onClick={() => openPayModal(s.id)}>Pagar</button>
                   )}

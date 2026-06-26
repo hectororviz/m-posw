@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, X } from 'lucide-react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedores, useAcreedoresResumen } from '../api/queries';
 import type { Acreedor } from '../api/types';
@@ -218,9 +218,9 @@ export const AdminAcreedoresPage: React.FC = () => {
                     <span className="badge badge-neutral">Inactivo</span>
                   )}
                 </span>
-                <span className="col-action" style={{ flex: '0 0 90px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => navigate(`/admin/acreedores/${a.id}`)}>Ver</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(a.id)}>Editar</button>
+                <span className="col-action" style={{ flex: '0 0 70px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => navigate(`/admin/acreedores/${a.id}`)} title="Ver">Ver</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(a.id)} title="Editar">{<Pencil size={16} />}</button>
                 </span>
               </div>
             ))}

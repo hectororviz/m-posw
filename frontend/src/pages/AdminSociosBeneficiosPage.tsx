@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSociosTipos } from '../api/queries';
 import { useToast } from '../components/ToastProvider';
@@ -218,10 +218,10 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
                 <span className="col-method" style={{ flex: '0 0 80px' }}>
                   {b.activo ? <span className="badge badge-success">Activo</span> : <span className="badge badge-neutral">Inactivo</span>}
                 </span>
-                <span className="col-action" style={{ flex: '0 0 160px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(b)}>Editar</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => handleToggle(b)}>{b.activo ? 'Desactivar' : 'Activar'}</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => handleDelete(b.id)}>Eliminar</button>
+                <span className="col-action" style={{ flex: '0 0 120px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(b)} title="Editar">{<Pencil size={16} />}</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => handleToggle(b)} title={b.activo ? 'Desactivar' : 'Activar'} style={{ color: b.activo ? 'var(--color-danger-text)' : 'var(--color-success)' }}>{b.activo ? <Trash2 size={16} /> : <RotateCcw size={16} />}</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => handleDelete(b.id)} title="Eliminar" style={{ color: 'var(--color-danger-text)' }}>{<Trash2 size={16} />}</button>
                 </span>
               </div>
             ))}

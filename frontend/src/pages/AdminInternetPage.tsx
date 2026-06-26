@@ -344,7 +344,7 @@ export const AdminInternetPage: React.FC = () => {
                     </span>
                     <span className="col-action" style={{ flex: '0 0 80px', display: 'flex', gap: '0.25rem' }}>
                       <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(plan)} aria-label={`Editar ${plan.name}`}>{<Pencil size={16} />}</button>
-                      <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : '{<X size={16} />}'}</button>
+                      <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : <X size={16} />}</button>
                     </span>
                   </div>
                 ))}

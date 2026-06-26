@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSociosTipos } from '../api/queries';
 import type { SocioTipo } from '../api/types';
@@ -138,10 +138,10 @@ export const AdminSociosTiposPage: React.FC = () => {
                     <span className="badge badge-neutral">Inactivo</span>
                   )}
                 </span>
-                <span className="col-action" style={{ flex: '0 0 130px', display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(t.id)}>Editar</button>
+                <span className="col-action" style={{ flex: '0 0 80px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(t.id)} title="Editar">{<Pencil size={16} />}</button>
                   {t.activo && (
-                    <button type="button" className="btn-ghost btn-sm" onClick={() => handleDelete(t.id)}>Baja</button>
+                    <button type="button" className="btn-ghost btn-sm" onClick={() => handleDelete(t.id)} title="Baja" style={{ color: 'var(--color-danger-text)' }}>{<Trash2 size={16} />}</button>
                   )}
                 </span>
               </div>
