@@ -14,8 +14,7 @@ export const TreasuryQuickExpensePage: React.FC = () => {
     from: new Date().toISOString().slice(0, 10),
     to: new Date().toISOString().slice(0, 10),
     status: 'POSTED',
-    limit: 5,
-  } as any);
+  });
 
   const [activeButton, setActiveButton] = useState<QuickExpenseButton | null>(null);
   const [amount, setAmount] = useState('');

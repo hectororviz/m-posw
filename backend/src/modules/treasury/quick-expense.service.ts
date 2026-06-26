@@ -99,7 +99,7 @@ export class QuickExpenseService {
         date,
         description: button.label,
         notes: dto.note || null,
-        userId,
+        createdById: userId,
         status: 'POSTED',
         postedAt: new Date(),
         lines: {

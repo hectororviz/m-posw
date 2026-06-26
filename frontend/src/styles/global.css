@@ -6274,6 +6274,9 @@ button {
   background: var(--color-hover-alt);
   border-radius: 8px;
   border: 1px solid var(--color-border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
 }
 
 .treasury-subnav-link {
@@ -6287,6 +6290,8 @@ button {
   text-decoration: none;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .treasury-subnav-link:hover {
