@@ -1,26 +1,31 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../../api/client';
-import { useEligiblePlayers, useTournamentPlayers, usePlayerCategories } from '../../api/queries';
+import { useEligiblePlayers, useTournamentPlayers, usePlayerCategories, useTournamentCoaches, useCoaches } from '../../api/queries';
 import { useToast } from '../../components/ToastProvider';
 import { AlertTriangle, Search, X } from 'lucide-react';
-import type { EligiblePlayer, FichadoPlayer, Tournament } from '../../api/types';
+import type { EligiblePlayer, FichadoPlayer, Tournament, TournamentCoachCategory } from '../../api/types';
 
 interface Props { tournament: Tournament; onClose: () => void; }
 
 export const TournamentPlayersModal: React.FC<Props> = ({ tournament, onClose }) => {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
-  const [tab, setTab] = useState<'fichar' | 'fichados'>('fichar');
+  const [tab, setTab] = useState<'fichar' | 'fichados' | 'dts'>('fichar');
   const [searchFichar, setSearchFichar] = useState('');
   const [searchFichados, setSearchFichados] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [fichando, setFichando] = useState(false);
   const [desfichandoId, setDesfichandoId] = useState<number | null>(null);
+  const [assigningCatId, setAssigningCatId] = useState<number | null>(null);
+  const [selectedCoachId, setSelectedCoachId] = useState<number>(0);
+  const [assigningCoach, setAssigningCoach] = useState(false);
 
   const { data: eligible, isLoading: loadingEligible, refetch: refetchEligible } = useEligiblePlayers(tournament.id);
   const { data: fichados, isLoading: loadingFichados, refetch: refetchFichados } = useTournamentPlayers(tournament.id);
   const { data: allCategories } = usePlayerCategories();
+  const { data: tournamentCoaches, refetch: refetchTournamentCoaches } = useTournamentCoaches(tournament.id);
+  const { data: allCoaches } = useCoaches({});
 
   const categoryMap = useMemo(() => { const map = new Map<number, string>(); for (const c of allCategories ?? []) map.set(c.id, c.name); return map; }, [allCategories]);
 
@@ -87,6 +92,33 @@ export const TournamentPlayersModal: React.FC<Props> = ({ tournament, onClose })
     finally { setDesfichandoId(null); }
   };
 
+  const handleAssignCoach = async (categoryId: number) => {
+    if (!selectedCoachId) return;
+    setAssigningCoach(true);
+    try {
+      await apiClient.post(`/tournaments/${tournament.id}/coaches`, {
+        coachId: selectedCoachId,
+        playerCategoryId: categoryId,
+      });
+      pushToast('DT asignado', 'success');
+      refetchTournamentCoaches();
+      setAssigningCatId(null);
+      setSelectedCoachId(0);
+    } catch (err: any) {
+      pushToast(normalizeApiError(err) || 'Error al asignar DT', 'error');
+    } finally { setAssigningCoach(false); }
+  };
+
+  const handleUnassignCoach = async (coachId: number) => {
+    try {
+      await apiClient.delete(`/tournaments/${tournament.id}/coaches/${coachId}`);
+      pushToast('DT desfichado', 'success');
+      refetchTournamentCoaches();
+    } catch (err: any) {
+      pushToast(normalizeApiError(err) || 'Error al desfichar DT', 'error');
+    }
+  };
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-AR');
 
   return (
@@ -103,6 +135,9 @@ export const TournamentPlayersModal: React.FC<Props> = ({ tournament, onClose })
           </button>
           <button type="button" className={`sort-segment ${tab === 'fichados' ? 'sort-segment--active' : ''}`} onClick={() => setTab('fichados')} style={{ flex: 1 }}>
             Fichados ({fichados?.length ?? 0})
+          </button>
+          <button type="button" className={`sort-segment ${tab === 'dts' ? 'sort-segment--active' : ''}`} onClick={() => setTab('dts')} style={{ flex: 1 }}>
+            DT's
           </button>
         </div>
 
@@ -219,6 +254,55 @@ export const TournamentPlayersModal: React.FC<Props> = ({ tournament, onClose })
                     </div>
                   );
                 })
+              )}
+            </div>
+          )}
+
+          {tab === 'dts' && (
+            <div>
+              {!tournamentCoaches ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>Cargando...</p>
+              ) : (tournamentCoaches ?? []).length === 0 ? (
+                <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>No hay categorías en este torneo</p>
+              ) : (
+                (tournamentCoaches ?? []).map((tc: TournamentCoachCategory) => (
+                  <div key={tc.categoryId} style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--color-surface)', borderRadius: '0.5rem', border: '1px solid var(--color-border-light)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <strong style={{ fontSize: '0.9rem', background: 'var(--color-blue-bg)', color: 'var(--color-blue-text)', padding: '0.15rem 0.6rem', borderRadius: '4px' }}>{tc.categoryName}</strong>
+                    </div>
+
+                    {tc.coach ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <span style={{ fontWeight: 600 }}>{tc.coach.lastName}, {tc.coach.firstName}</span>
+                          {tc.coach.dni && <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>DNI: {tc.coach.dni}</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button className="btn-ghost" onClick={() => { setAssigningCatId(tc.categoryId); setSelectedCoachId(tc.coach!.id); }} style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}>Cambiar</button>
+                          <button className="btn-ghost" onClick={() => handleUnassignCoach(tc.coach!.id)} style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem', color: 'var(--color-danger)' }}>Quitar</button>
+                        </div>
+                      </div>
+                    ) : assigningCatId === tc.categoryId ? (
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <select value={selectedCoachId} onChange={(e) => setSelectedCoachId(+e.target.value)} style={{ flex: 1, padding: '0.35rem 0.5rem', borderRadius: '0.4rem', border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: '0.85rem' }}>
+                          <option value={0}>Seleccionar DT...</option>
+                          {(allCoaches as any)?.data?.map((c: any) => (
+                            <option key={c.id} value={c.id}>{c.lastName}, {c.firstName}</option>
+                          ))}
+                        </select>
+                        <button className="btn-primary" disabled={!selectedCoachId || assigningCoach} onClick={() => handleAssignCoach(tc.categoryId)} style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+                          {assigningCoach ? '...' : 'Asignar'}
+                        </button>
+                        <button className="btn-ghost" onClick={() => { setAssigningCatId(null); setSelectedCoachId(0); }} style={{ fontSize: '0.8rem' }}>Cancelar</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Sin DT asignado</span>
+                        <button className="btn-ghost" onClick={() => { setAssigningCatId(tc.categoryId); setSelectedCoachId(0); }} style={{ fontSize: '0.8rem', padding: '0.25rem 0.5rem' }}>Asignar</button>
+                      </div>
+                    )}
+                  </div>
+                ))
               )}
             </div>
           )}

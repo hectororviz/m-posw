@@ -1,8 +1,15 @@
-import { usePlayersDashboard } from '../../api/queries';
-import { Cake } from 'lucide-react';
+import { useState } from 'react';
+import { usePlayersDashboard, useTournaments } from '../../api/queries';
+import { Cake, Download } from 'lucide-react';
+import { useToast } from '../../components/ToastProvider';
 
 export const PlayersDashboardPage: React.FC = () => {
   const { data: d, isLoading } = usePlayersDashboard();
+  const { data: allTournaments } = useTournaments({});
+  const { pushToast } = useToast();
+  const [reportModal, setReportModal] = useState(false);
+  const [selectedReportTournamentId, setSelectedReportTournamentId] = useState<number | ''>('');
+  const [selectedReportCategoryId, setSelectedReportCategoryId] = useState<number | ''>('');
 
   if (isLoading) {
     return <div className="page-loader">Cargando...</div>;
@@ -46,9 +53,35 @@ export const PlayersDashboardPage: React.FC = () => {
 
   const birthdayDisplay = (d?.upcomingBirthdays ?? []).slice(0, 10);
 
+  const tournaments = (allTournaments as any)?.data ?? [];
+  const selectedTournament = Array.isArray(tournaments)
+    ? tournaments.find((t: any) => t.id === selectedReportTournamentId)
+    : null;
+
+  const handleDownloadReport = () => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    const token = localStorage.getItem('authToken');
+    const params = new URLSearchParams();
+    if (selectedReportTournamentId) params.set('tournamentId', String(selectedReportTournamentId));
+    if (selectedReportCategoryId) params.set('categoryId', String(selectedReportCategoryId));
+    const url = `${baseUrl}/coaches/report?${params.toString()}`;
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((resp) => {
+        if (!resp.ok) throw new Error('Error al generar informe');
+        return resp.blob();
+      })
+      .then((blob) => window.open(URL.createObjectURL(blob), '_blank'))
+      .catch(() => pushToast('Error al generar el informe PDF', 'error'));
+  };
+
   return (
     <div className="admin-page">
-      <div className="admin-page-header"><h2>Jugadores</h2></div>
+      <div className="admin-page-header">
+        <h2>Jugadores</h2>
+        <button className="btn-ghost" onClick={() => setReportModal(true)} title="Descargar informe PDF">
+          <Download size={16} /> Informe
+        </button>
+      </div>
 
       <div className="summary-cards">
         <div className="summary-card summary-card--accent">
@@ -66,6 +99,10 @@ export const PlayersDashboardPage: React.FC = () => {
         <div className="summary-card summary-card--danger">
           <span className="summary-card__label">Categorías</span>
           <span className="summary-card__value">{d?.totalCategories ?? 0}</span>
+        </div>
+        <div className="summary-card summary-card--info">
+          <span className="summary-card__label">DT's</span>
+          <span className="summary-card__value">{(d as any)?.totalCoaches ?? 0}</span>
         </div>
       </div>
 
@@ -145,6 +182,49 @@ export const PlayersDashboardPage: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {reportModal && (
+        <div className="modal-backdrop" onClick={() => setReportModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>Descargar Informe de Plantel</h3>
+              <button className="icon-button" onClick={() => setReportModal(false)}><Download size={16} style={{ transform: 'rotate(0deg)' }} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-field" style={{ marginBottom: '0.75rem' }}>
+                <label>Torneo</label>
+                <select
+                  value={selectedReportTournamentId}
+                  onChange={(e) => {
+                    setSelectedReportTournamentId(e.target.value ? +e.target.value : '');
+                    setSelectedReportCategoryId('');
+                  }}
+                >
+                  <option value="">Seleccionar torneo...</option>
+                  {Array.isArray(tournaments) && tournaments.map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.year})</option>
+                  ))}
+                </select>
+              </div>
+              {selectedTournament && (
+                <div className="settings-field">
+                  <label>Categoría</label>
+                  <select value={selectedReportCategoryId} onChange={(e) => setSelectedReportCategoryId(e.target.value ? +e.target.value : '')}>
+                    <option value="">Todas</option>
+                    {(selectedTournament.categories ?? (selectedTournament as any)?.categories ?? []).map((cat: any) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn-ghost" onClick={() => setReportModal(false)}>Cancelar</button>
+              <button type="button" className="btn-primary" onClick={handleDownloadReport}>Descargar PDF</button>
+            </div>
           </div>
         </div>
       )}

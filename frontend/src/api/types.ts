@@ -796,6 +796,7 @@ export interface PlayersDashboard {
   totalPlayers: number;
   totalTournaments: number;
   totalCategories: number;
+  totalCoaches: number;
   playersInTournaments: number;
   totalWithoutTournament: number;
   playersByCategory: {
@@ -815,6 +816,50 @@ export interface PlayersDashboard {
     daysUntil: number;
     categoryName: string | null;
   }[];
+}
+
+// ─── Coaches / DT's ──────────────────────────────────────
+
+export interface Coach {
+  id: number;
+  firstName: string;
+  lastName: string;
+  dni?: string | null;
+  birthDate?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  tournamentCount?: number;
+  tournaments?: CoachTournamentBrief[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CoachTournamentBrief {
+  id: number;
+  name: string;
+  year: number;
+  categoryId: number;
+  categoryName: string;
+  fichadoAt?: string;
+}
+
+export interface PaginatedCoaches {
+  data: Coach[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface TournamentCoachCategory {
+  categoryId: number;
+  categoryName: string;
+  coach: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    dni?: string | null;
+    fichadoAt: string;
+  } | null;
 }
 
 // ─── Patrimonio / Bienes ─────────────────────────────────

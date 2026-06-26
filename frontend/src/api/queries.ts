@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -696,6 +696,43 @@ export const usePlayersDashboard = () =>
       const response = await apiClient.get<PlayersDashboard>('/players-stats/dashboard');
       return response.data;
     },
+  });
+
+// ─── Coaches / DT's ──────────────────────────────────────
+
+export const useCoaches = (params?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ['coaches', params],
+    queryFn: async () => {
+      const response = await apiClient.get<PaginatedCoaches>('/coaches', { params });
+      return response.data;
+    },
+  });
+
+export const useCoach = (id?: number) =>
+  useQuery({
+    queryKey: ['coach', id],
+    queryFn: async () => {
+      const response = await apiClient.get<Coach>(`/coaches/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useTournamentCoaches = (tournamentId?: number) =>
+  useQuery({
+    queryKey: ['tournament-coaches', tournamentId],
+    queryFn: async () => {
+      const response = await apiClient.get<TournamentCoachCategory[]>(
+        `/tournaments/${tournamentId}/coaches`,
+      );
+      return response.data;
+    },
+    enabled: Boolean(tournamentId),
   });
 
 // ─── Patrimonio / Bienes ─────────────────────────────────

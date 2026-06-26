@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Tag, Trophy, Users } from 'lucide-react';
+import { LayoutDashboard, Tag, Trophy, Users, UserCog } from 'lucide-react';
 
 export const PlayersLayout: React.FC = () => (
   <div className="treasury-page">
@@ -9,6 +9,9 @@ export const PlayersLayout: React.FC = () => (
       </NavLink>
       <NavLink to="/admin/players/jugadores" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
         <Users size={14} /> Jugadores
+      </NavLink>
+      <NavLink to="/admin/players/dts" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
+        <UserCog size={14} /> DT's
       </NavLink>
       <NavLink to="/admin/players/categorias" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
         <Tag size={14} /> Categorías

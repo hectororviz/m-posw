@@ -783,6 +783,7 @@ model PlayerCategory {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   tournaments     TournamentCategory[]
+  coaches         TournamentCoach[]
 
   @@map("player_categories")
 }
@@ -800,6 +801,7 @@ model Tournament {
   updatedAt      DateTime             @updatedAt
   categories     TournamentCategory[]
   players        TournamentPlayer[]
+  coaches        TournamentCoach[]
 
   @@map("tournaments")
 }
@@ -825,6 +827,35 @@ model TournamentPlayer {
 
   @@unique([playerId, tournamentId])
   @@map("tournament_players")
+}
+
+model Coach {
+  id          Int               @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  dni         String?
+  birthDate   DateTime?
+  phone       String?
+  email       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  tournaments TournamentCoach[]
+
+  @@map("coaches")
+}
+
+model TournamentCoach {
+  id               Int             @id @default(autoincrement())
+  coachId          Int
+  tournamentId     Int
+  playerCategoryId Int
+  fichadoAt        DateTime        @default(now())
+  coach            Coach           @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  tournament       Tournament      @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  category         PlayerCategory  @relation(fields: [playerCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, playerCategoryId])
+  @@map("tournament_coaches")
 }
 
 model UserModulePermission {

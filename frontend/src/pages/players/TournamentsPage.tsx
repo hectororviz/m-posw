@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../../api/client';
 import { useTournaments, usePlayerCategories } from '../../api/queries';
 import { useToast } from '../../components/ToastProvider';
-import { Pencil, Plus, Search, Trash2, UserPlus, X } from 'lucide-react';
+import { Pencil, Plus, Search, Trash2, UserPlus, X, Download } from 'lucide-react';
 import { TournamentPlayersModal } from './TournamentPlayersModal';
 import type { Tournament } from '../../api/types';
 
@@ -23,6 +23,9 @@ export const TournamentsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Tournament | null>(null);
   const [playersModalTournament, setPlayersModalTournament] = useState<Tournament | null>(null);
+  const [reportModal, setReportModal] = useState(false);
+  const [selectedReportTournamentId, setSelectedReportTournamentId] = useState<number | ''>('');
+  const [selectedReportCategoryId, setSelectedReportCategoryId] = useState<number | ''>('');
 
   const { data: tournamentsData, isLoading } = useTournaments({ year: yearFilter ? +yearFilter : undefined, allowedSex: sexFilter || undefined, page, limit });
   const { data: allCategories } = usePlayerCategories();
@@ -65,6 +68,24 @@ export const TournamentsPage: React.FC = () => {
   const toggleCategory = (id: number) => setForm((prev) => ({ ...prev, categoryIds: prev.categoryIds.includes(id) ? prev.categoryIds.filter((c) => c !== id) : [...prev.categoryIds, id] }));
   const totalPages = Math.ceil((tournamentsData?.total ?? 0) / limit);
 
+  const handleDownloadReport = () => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    const token = localStorage.getItem('authToken');
+    const params = new URLSearchParams();
+    if (selectedReportTournamentId) params.set('tournamentId', String(selectedReportTournamentId));
+    if (selectedReportCategoryId) params.set('categoryId', String(selectedReportCategoryId));
+    const url = `${baseUrl}/coaches/report?${params.toString()}`;
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      .then((resp) => {
+        if (!resp.ok) throw new Error('Error al generar informe');
+        return resp.blob();
+      })
+      .then((blob) => window.open(URL.createObjectURL(blob), '_blank'))
+      .catch(() => pushToast('Error al generar el informe PDF', 'error'));
+  };
+
+  const selectedReportTournament = (tournamentsData?.data ?? []).find((t) => t.id === selectedReportTournamentId);
+
   return (
     <div className="admin-page">
       <div className="admin-page-header"><h2>Torneos</h2></div>
@@ -85,6 +106,11 @@ export const TournamentsPage: React.FC = () => {
             <Search size={16} />
             <input type="text" placeholder="Buscar torneo..." value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="btn-ghost" onClick={() => setReportModal(true)} title="Descargar informe PDF">
+            <Download size={16} /> Informe
+          </button>
         </div>
       </div>
 
@@ -222,6 +248,49 @@ export const TournamentsPage: React.FC = () => {
 
       {playersModalTournament && (
         <TournamentPlayersModal tournament={playersModalTournament} onClose={() => { setPlayersModalTournament(null); queryClient.invalidateQueries({ queryKey: ['tournaments'] }); }} />
+      )}
+
+      {reportModal && (
+        <div className="modal-backdrop" onClick={() => setReportModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>Descargar Informe de Plantel</h3>
+              <button className="icon-button" onClick={() => setReportModal(false)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-field" style={{ marginBottom: '0.75rem' }}>
+                <label>Torneo</label>
+                <select
+                  value={selectedReportTournamentId}
+                  onChange={(e) => {
+                    setSelectedReportTournamentId(e.target.value ? +e.target.value : '');
+                    setSelectedReportCategoryId('');
+                  }}
+                >
+                  <option value="">Seleccionar torneo...</option>
+                  {(tournamentsData?.data ?? []).map((t) => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.year})</option>
+                  ))}
+                </select>
+              </div>
+              {selectedReportTournament && (
+                <div className="settings-field">
+                  <label>Categoría</label>
+                  <select value={selectedReportCategoryId} onChange={(e) => setSelectedReportCategoryId(e.target.value ? +e.target.value : '')}>
+                    <option value="">Todas</option>
+                    {(selectedReportTournament.categories ?? []).map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn-ghost" onClick={() => setReportModal(false)}>Cancelar</button>
+              <button type="button" className="btn-primary" onClick={handleDownloadReport}>Descargar PDF</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

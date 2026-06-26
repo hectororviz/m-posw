@@ -8,7 +8,7 @@ export class PlayersStatsService {
   async getDashboard() {
     const currentYear = new Date().getFullYear();
 
-    const [totalPlayers, totalTournaments, totalCategories, playersInTournaments] =
+    const [totalPlayers, totalTournaments, totalCategories, playersInTournaments, totalCoaches] =
       await Promise.all([
         this.prisma.player.count(),
         this.prisma.tournament.count({ where: { year: currentYear } }),
@@ -16,6 +16,7 @@ export class PlayersStatsService {
         this.prisma.tournamentPlayer.count({
           where: { tournament: { year: currentYear } },
         }),
+        this.prisma.coach.count(),
       ]);
 
     const totalWithoutTournament = await this.prisma.player.count({
@@ -130,6 +131,7 @@ export class PlayersStatsService {
       totalPlayers,
       totalTournaments,
       totalCategories,
+      totalCoaches,
       playersInTournaments,
       totalWithoutTournament,
       playersByCategory,

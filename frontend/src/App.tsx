@@ -35,6 +35,7 @@ import { LigasConfigPage } from './pages/LigasConfigPage';
 import { PlayersLayout } from './pages/players/PlayersLayout';
 import { PlayersDashboardPage } from './pages/players';
 import { PlayersPage } from './pages/players/PlayersPage';
+import { CoachesPage } from './pages/players/CoachesPage';
 import { PlayerCategoriesPage } from './pages/players/PlayerCategoriesPage';
 import { TournamentsPage } from './pages/players/TournamentsPage';
 import { PatrimonioPage } from './pages/patrimonio/PatrimonioPage';
@@ -196,6 +197,7 @@ export const App: React.FC = () => {
         }>
           <Route index element={<PlayersDashboardPage />} />
           <Route path="jugadores" element={<PlayersPage />} />
+          <Route path="dts" element={<CoachesPage />} />
           <Route path="categorias" element={<PlayerCategoriesPage />} />
           <Route path="torneos" element={<TournamentsPage />} />
         </Route>
