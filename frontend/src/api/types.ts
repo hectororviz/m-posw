@@ -815,6 +815,7 @@ export interface PlayersDashboard {
     age: number;
     daysUntil: number;
     categoryName: string | null;
+    type: 'player' | 'coach';
   }[];
 }
 

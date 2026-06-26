@@ -51,7 +51,7 @@ export const PlayersDashboardPage: React.FC = () => {
     return `rgb(${r},${g},${b})`;
   };
 
-  const birthdayDisplay = (d?.upcomingBirthdays ?? []).slice(0, 10);
+  const birthdayDisplay = (d?.upcomingBirthdays ?? []).slice(0, 12);
 
   const tournaments = (allTournaments as any)?.data ?? [];
   const selectedTournament = Array.isArray(tournaments)
@@ -178,7 +178,11 @@ export const PlayersDashboardPage: React.FC = () => {
                   {p.age} años
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#888', lineHeight: 1.2 }}>
-                  Cat.: {p.categoryName ?? '—'}
+                  {p.type === 'coach' ? (
+                    <span style={{ background: 'var(--color-blue-bg)', color: 'var(--color-blue-text)', padding: '0.1rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>DT</span>
+                  ) : (
+                    <>Cat.: {p.categoryName ?? '—'}</>
+                  )}
                 </div>
               </div>
             ))}

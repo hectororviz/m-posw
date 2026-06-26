@@ -123,8 +123,45 @@ export class PlayersStatsService {
           age: thisYearBirthday.getFullYear() - birth.getFullYear(),
           daysUntil: Math.ceil((thisYearBirthday.getTime() - today.getTime()) / 86400000),
           categoryName: catId ? (catNameMap.get(catId) ?? null) : null,
+          type: 'player' as const,
         };
+      });
+
+    // Coach birthdays
+    const coaches = await this.prisma.coach.findMany({
+      where: { birthDate: { not: null } },
+      select: { id: true, firstName: true, lastName: true, birthDate: true },
+    });
+
+    const coachBirthdays = coaches
+      .filter((c) => {
+        const birth = new Date(c.birthDate!);
+        const thisYearBirthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+        if (thisYearBirthday < today) {
+          thisYearBirthday.setFullYear(today.getFullYear() + 1);
+        }
+        const diffDays = Math.ceil((thisYearBirthday.getTime() - today.getTime()) / 86400000);
+        return diffDays >= 0;
       })
+      .map((c) => {
+        const birth = new Date(c.birthDate!);
+        const thisYearBirthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
+        if (thisYearBirthday < today) {
+          thisYearBirthday.setFullYear(today.getFullYear() + 1);
+        }
+        return {
+          id: c.id,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          birthDate: c.birthDate!.toISOString(),
+          age: thisYearBirthday.getFullYear() - birth.getFullYear(),
+          daysUntil: Math.ceil((thisYearBirthday.getTime() - today.getTime()) / 86400000),
+          categoryName: 'DT' as const,
+          type: 'coach' as const,
+        };
+      });
+
+    const allBirthdays = [...upcomingBirthdays, ...coachBirthdays]
       .sort((a, b) => a.daysUntil - b.daysUntil);
 
     return {
@@ -135,7 +172,7 @@ export class PlayersStatsService {
       playersInTournaments,
       totalWithoutTournament,
       playersByCategory,
-      upcomingBirthdays,
+      upcomingBirthdays: allBirthdays,
     };
   }
 }
