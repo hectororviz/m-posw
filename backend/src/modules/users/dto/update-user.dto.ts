@@ -29,6 +29,10 @@ export class UpdateUserDto {
   homeModule?: string;
 
   @IsOptional()
+  @IsString()
+  homeSmartphoneModule?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PermissionInput)

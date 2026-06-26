@@ -16,6 +16,12 @@ export const TreasuryLayout: React.FC = () => {
         <NavLink to="/admin/tesoreria/reportes" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
           Reportes
         </NavLink>
+        <NavLink to="/admin/tesoreria/gastos" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
+          Gastos
+        </NavLink>
+        <NavLink to="/admin/tesoreria/configuracion" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
+          Configuración
+        </NavLink>
       </nav>
       <div className="treasury-content">
         <Outlet />

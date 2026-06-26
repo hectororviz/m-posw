@@ -87,6 +87,7 @@ model User {
   role      Role     @default(USER)
   active    Boolean  @default(true)
   homeModule String?
+  homeSmartphoneModule String?
   externalPosId   String?
   externalStoreId String?
   createdAt DateTime @default(now())
@@ -443,6 +444,8 @@ model LedgerAccount {
   paymentMethodAccounts PaymentMethodAccount[] @relation("PaymentMethodAccountLedger")
   pagoAcreedores  PagoAcreedor[]   @relation("PagoAcreedorTreasuryAccount")
   socioPagos      SocioPago[]      @relation("SocioPagoTreasuryAccount")
+  quickExpenseButtonsAsset   QuickExpenseButton[] @relation("QebAsset")
+  quickExpenseButtonsExpense QuickExpenseButton[] @relation("QebExpense")
 
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -513,6 +516,21 @@ model PaymentMethodAccount {
   paymentMethod    PaymentMethod  @unique
   ledgerAccountId  String         @db.Uuid
   ledgerAccount    LedgerAccount  @relation("PaymentMethodAccountLedger", fields: [ledgerAccountId], references: [id])
+}
+
+model QuickExpenseButton {
+  id               Int            @id @default(autoincrement())
+  label            String
+  assetAccountId   String         @db.Uuid
+  assetAccount     LedgerAccount  @relation("QebAsset", fields: [assetAccountId], references: [id])
+  expenseAccountId String         @db.Uuid
+  expenseAccount   LedgerAccount  @relation("QebExpense", fields: [expenseAccountId], references: [id])
+  position         Int            @default(0)
+  active           Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@map("quick_expense_buttons")
 }
 
 model Acreedor {

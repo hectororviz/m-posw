@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -327,6 +327,26 @@ export const useAvailabilities = (asOf?: string) =>
       );
       return response.data;
     },
+  });
+
+export const useQuickExpenseButtons = () =>
+  useQuery({
+    queryKey: ['quick-expense-buttons'],
+    queryFn: async () => {
+      const response = await apiClient.get<QuickExpenseButton[]>('/treasury/quick-expense/buttons');
+      return response.data;
+    },
+    staleTime: fiveMinutes,
+  });
+
+export const useQuickExpenseButtonsAll = () =>
+  useQuery({
+    queryKey: ['quick-expense-buttons-all'],
+    queryFn: async () => {
+      const response = await apiClient.get<QuickExpenseButton[]>('/treasury/quick-expense/buttons/all');
+      return response.data;
+    },
+    staleTime: fiveMinutes,
   });
 
 export const useAcreedores = () =>

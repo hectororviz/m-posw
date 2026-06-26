@@ -34,6 +34,17 @@ export const LoginPage: React.FC = () => {
       const response = await apiClient.post<AuthResponse>('/auth/login', { username, password });
       login(response.data);
 
+      const isMobile = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+      const smartphoneModule = isMobile ? response.data.homeSmartphoneModule : null;
+
+      if (smartphoneModule) {
+        const route = getModuleRoute(smartphoneModule);
+        if (route) {
+          navigate(route, { replace: true });
+          return;
+        }
+      }
+
       const homeModule = response.data.homeModule;
       if (homeModule) {
         const route = getModuleRoute(homeModule);
@@ -115,7 +126,7 @@ function getModuleRoute(moduleKey: string): string | null {
     POS: '/pos',
     VENTAS: '/admin/sales',
     SOCIOS: '/admin/socios',
-    TESORERIA: '/admin/tesoreria',
+    TESORERIA: '/admin/tesoreria/gastos',
     ACREEDORES: '/admin/acreedores',
     PRODUCTOS: '/admin/products',
     INTERNET: '/admin/internet',

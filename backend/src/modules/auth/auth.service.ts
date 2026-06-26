@@ -47,6 +47,7 @@ export class AuthService {
         role: user.role,
       },
       homeModule: user.homeModule ?? null,
+      homeSmartphoneModule: user.homeSmartphoneModule ?? null,
       permissions,
     };
   }

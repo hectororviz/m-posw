@@ -26,8 +26,9 @@ export interface ModulePermission {
 export interface AuthResponse {
   accessToken: string;
   user: User;
-  homeModule: string | null;
   permissions: ModulePermission[];
+  homeModule: string | null;
+  homeSmartphoneModule: string | null;
 }
 
 export interface User {
@@ -37,6 +38,7 @@ export interface User {
   role: Role;
   active?: boolean;
   homeModule?: string | null;
+  homeSmartphoneModule?: string | null;
   externalPosId?: string | null;
   externalStoreId?: string | null;
   permissions?: ModulePermission[];
@@ -449,6 +451,17 @@ export interface TreasurySummary {
     netResult: number;
   };
   lastEntries: JournalEntry[];
+}
+
+export interface QuickExpenseButton {
+  id: number;
+  label: string;
+  assetAccountId: string;
+  assetAccount: { id: string; code: string; name: string };
+  expenseAccountId: string;
+  expenseAccount: { id: string; code: string; name: string };
+  position: number;
+  active: boolean;
 }
 
 export interface LedgerBookRow {

@@ -6,18 +6,22 @@ import { JournalEntriesController } from './journal-entries.controller';
 import { JournalEntriesService } from './journal-entries.service';
 import { TreasuryReportsController } from './reports.controller';
 import { TreasuryReportsService } from './reports.service';
+import { QuickExpenseController } from './quick-expense.controller';
+import { QuickExpenseService } from './quick-expense.service';
 
 @Module({
   controllers: [
     LedgerAccountsController,
     JournalEntriesController,
     TreasuryReportsController,
+    QuickExpenseController,
   ],
   providers: [
     PrismaService,
     LedgerAccountsService,
     JournalEntriesService,
     TreasuryReportsService,
+    QuickExpenseService,
   ],
   exports: [LedgerAccountsService, JournalEntriesService],
 })

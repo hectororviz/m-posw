@@ -23,6 +23,10 @@ export class CreateUserDto {
   homeModule?: string;
 
   @IsOptional()
+  @IsString()
+  homeSmartphoneModule?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PermissionInput)

@@ -33,6 +33,7 @@ export class UsersService {
           role: 'USER',
           active: true,
           homeModule: dto.homeModule ?? null,
+          homeSmartphoneModule: dto.homeSmartphoneModule ?? null,
         },
         select: {
           id: true,
@@ -40,6 +41,7 @@ export class UsersService {
           role: true,
           active: true,
           homeModule: true,
+          homeSmartphoneModule: true,
           externalPosId: true,
           externalStoreId: true,
         },
@@ -69,6 +71,7 @@ export class UsersService {
         role: true,
         active: true,
         homeModule: true,
+        homeSmartphoneModule: true,
         externalPosId: true,
         externalStoreId: true,
         createdAt: true,
@@ -105,6 +108,7 @@ export class UsersService {
     if (dto.username !== undefined) data.username = dto.username;
     if (dto.active !== undefined) data.active = dto.active;
     if (dto.homeModule !== undefined) data.homeModule = dto.homeModule;
+    if (dto.homeSmartphoneModule !== undefined) data.homeSmartphoneModule = dto.homeSmartphoneModule;
     if (dto.externalPosId !== undefined) data.externalPosId = dto.externalPosId;
     if (dto.externalStoreId !== undefined) data.externalStoreId = dto.externalStoreId;
     if (dto.password) {
@@ -120,6 +124,7 @@ export class UsersService {
         role: true,
         active: true,
         homeModule: true,
+        homeSmartphoneModule: true,
         externalPosId: true,
         externalStoreId: true,
       },

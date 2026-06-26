@@ -20,6 +20,13 @@ const ALL_MODULES: { key: ModuleKey; label: string }[] = [
   { key: 'CONFIGURACION', label: 'Usuarios / Configuración' },
 ];
 
+const HOME_SMARTPHONE_OPTIONS = [
+  { value: '', label: 'Igual que escritorio' },
+  { value: 'POS', label: 'POS' },
+  { value: 'TESORERIA', label: 'Gastos rápidos' },
+  { value: 'VENTAS', label: 'Ventas' },
+];
+
 const accessOptions: { value: ModuleAccess; label: string }[] = [
   { value: 'HIDDEN', label: 'Oculto' },
   { value: 'READ', label: 'Lectura' },
@@ -40,6 +47,7 @@ export const AdminUsersPage: React.FC = () => {
   const [form, setForm] = useState(emptyForm);
   const [permissions, setPermissions] = useState<ModulePermission[]>(defaultPermissions);
   const [homeModule, setHomeModule] = useState('');
+  const [homeSmartphoneModule, setHomeSmartphoneModule] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const rendered = useMemo(() => users ?? [], [users]);
@@ -62,6 +70,7 @@ export const AdminUsersPage: React.FC = () => {
     setForm(emptyForm);
     setPermissions(defaultPermissions());
     setHomeModule('');
+    setHomeSmartphoneModule('');
     setError(null);
     setSuccess(null);
   };
@@ -72,6 +81,7 @@ export const AdminUsersPage: React.FC = () => {
     setForm({ username: user.username, password: '' });
     setPermissions(user.permissions ?? defaultPermissions());
     setHomeModule(user.homeModule ?? '');
+    setHomeSmartphoneModule(user.homeSmartphoneModule ?? '');
     setError(null);
     setSuccess(null);
   };
@@ -90,6 +100,7 @@ export const AdminUsersPage: React.FC = () => {
           username: form.username,
           password: form.password,
           homeModule: homeModule || undefined,
+          homeSmartphoneModule: homeSmartphoneModule || undefined,
           permissions,
         });
         setSuccess('Usuario creado exitosamente');
@@ -97,6 +108,7 @@ export const AdminUsersPage: React.FC = () => {
         const payload: Record<string, unknown> = {
           username: form.username,
           homeModule: homeModule || undefined,
+          homeSmartphoneModule: homeSmartphoneModule || undefined,
           permissions,
         };
         if (form.password) payload.password = form.password;
@@ -146,6 +158,7 @@ export const AdminUsersPage: React.FC = () => {
               <th>Usuario</th>
               <th>Rol</th>
               <th>Home</th>
+              <th>Home Móvil</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -159,6 +172,7 @@ export const AdminUsersPage: React.FC = () => {
                   </span>
                 </td>
                 <td>{getHomeLabel(user.homeModule)}</td>
+                <td>{HOME_SMARTPHONE_OPTIONS.find((o) => o.value === (user.homeSmartphoneModule ?? ''))?.label ?? 'Igual que escritorio'}</td>
                 <td className="users-table-actions">
                   {user.role !== 'ADMIN' && (
                     <>
@@ -227,6 +241,18 @@ export const AdminUsersPage: React.FC = () => {
                     <option value="">Home genérico</option>
                     {ALL_MODULES.map((m) => (
                       <option key={m.key} value={m.key}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label htmlFor="user-home-smartphone">Home Smartphone</label>
+                  <select
+                    id="user-home-smartphone"
+                    value={homeSmartphoneModule}
+                    onChange={(e) => setHomeSmartphoneModule(e.target.value)}
+                  >
+                    {HOME_SMARTPHONE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
                 </div>
