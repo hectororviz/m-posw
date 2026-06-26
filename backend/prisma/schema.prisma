@@ -25,6 +25,7 @@ enum ModuleKey {
   CONFIGURACION
   PLAYERS
   PATRIMONIO
+  LIGAS
 }
 
 enum AssetEventType {

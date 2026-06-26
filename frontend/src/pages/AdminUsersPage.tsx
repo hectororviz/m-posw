@@ -9,14 +9,15 @@ const ALL_MODULES: { key: ModuleKey; label: string }[] = [
   { key: 'POS', label: 'POS' },
   { key: 'VENTAS', label: 'Ventas' },
   { key: 'REPORTES', label: 'Estadisticas' },
-  { key: 'PRODUCTOS', label: 'Productos' },
+  { key: 'PRODUCTOS', label: 'Categorias / Productos / Stock' },
   { key: 'ACREEDORES', label: 'Acreedores' },
   { key: 'SOCIOS', label: 'Socios' },
   { key: 'TESORERIA', label: 'Tesorería' },
   { key: 'PATRIMONIO', label: 'Patrimonio' },
+  { key: 'LIGAS', label: 'Ligas' },
   { key: 'PLAYERS', label: 'Jugadores' },
   { key: 'INTERNET', label: 'Internet' },
-  { key: 'CONFIGURACION', label: 'Configuración' },
+  { key: 'CONFIGURACION', label: 'Usuarios / Configuración' },
 ];
 
 const accessOptions: { value: ModuleAccess; label: string }[] = [
