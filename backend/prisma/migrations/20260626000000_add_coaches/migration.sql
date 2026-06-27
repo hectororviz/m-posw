@@ -14,7 +14,7 @@ CREATE TABLE "coaches" (
 );
 
 -- CreateTable
-CREATE TABLE "tournament_coaches" (
+CREATE TABLE IF NOT EXISTS "tournament_coaches" (
     "id" SERIAL NOT NULL,
     "coachId" INTEGER NOT NULL,
     "tournamentId" INTEGER NOT NULL,
@@ -25,13 +25,16 @@ CREATE TABLE "tournament_coaches" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "tournament_coaches_tournamentId_playerCategoryId_key" ON "tournament_coaches"("tournamentId", "playerCategoryId");
+CREATE UNIQUE INDEX IF NOT EXISTS "tournament_coaches_tournamentId_playerCategoryId_key" ON "tournament_coaches"("tournamentId", "playerCategoryId");
 
 -- AddForeignKey
 ALTER TABLE "tournament_coaches" ADD CONSTRAINT "tournament_coaches_coachId_fkey" FOREIGN KEY ("coachId") REFERENCES "coaches"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "tournament_coaches" ADD CONSTRAINT "tournament_coaches_tournamentId_fkey" FOREIGN KEY ("tournamentId") REFERENCES "tournaments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (wrapped — tournaments and player_categories are created by a later migration)
+DO $$ BEGIN
+  ALTER TABLE "tournament_coaches" ADD CONSTRAINT "tournament_coaches_tournamentId_fkey" FOREIGN KEY ("tournamentId") REFERENCES "tournaments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN undefined_table THEN NULL; END $$;
 
--- AddForeignKey
-ALTER TABLE "tournament_coaches" ADD CONSTRAINT "tournament_coaches_playerCategoryId_fkey" FOREIGN KEY ("playerCategoryId") REFERENCES "player_categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "tournament_coaches" ADD CONSTRAINT "tournament_coaches_playerCategoryId_fkey" FOREIGN KEY ("playerCategoryId") REFERENCES "player_categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN undefined_table THEN NULL; END $$;

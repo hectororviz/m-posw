@@ -1,5 +1,10 @@
--- AlterEnum
-ALTER TYPE "ModuleKey" ADD VALUE 'PATRIMONIO';
+-- AlterEnum (wrapped — enum may not exist yet if migration ran before add_username_and_permissions)
+DO $$ BEGIN
+  ALTER TYPE "ModuleKey" ADD VALUE 'PATRIMONIO';
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- CreateEnum
 CREATE TYPE "AssetEventType" AS ENUM ('ALTA', 'MODIFICACION', 'CAMBIO_ESTADO', 'BAJA');
