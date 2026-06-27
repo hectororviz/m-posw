@@ -26,7 +26,7 @@ type WebhookPayload = {
 @Injectable()
 export class MercadoPagoWebhookProcessorService {
   private readonly logger = new Logger(MercadoPagoWebhookProcessorService.name);
-  private readonly paymentRetryDelaysMs = [3000, 10000, 20000];
+  private readonly paymentRetryDelaysMs = [3000, 10000, 20000, 40000, 80000];
 
   constructor(
     private prisma: PrismaService,
@@ -39,9 +39,9 @@ export class MercadoPagoWebhookProcessorService {
   async processWebhook(payload: WebhookPayload) {
     const { topic, resourceId, requestId } = payload;
     const eventResourceId = resourceId ?? 'unknown';
-    const shouldProcess = await this.ensureIdempotency(topic, eventResourceId);
-    if (!shouldProcess) {
-      return;
+    const isNewEvent = await this.ensureIdempotency(topic, eventResourceId);
+    if (!isNewEvent) {
+      this.logger.debug(`WEBHOOK_MP_DUPLICATE_EVENT topic=${topic} resourceId=${eventResourceId} — processing anyway to catch status transitions`);
     }
 
     if (topic === 'merchant_order') {

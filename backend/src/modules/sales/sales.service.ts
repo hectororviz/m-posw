@@ -14,7 +14,7 @@ import {
 
 @Injectable()
 export class SalesService {
-  private readonly paymentExpirationMinutes = 2;
+  private readonly paymentExpirationMinutes = 10;
   private readonly logger = new Logger(SalesService.name);
 
   constructor(
