@@ -13,6 +13,7 @@ export const PlayersPage: React.FC = () => {
   const { pushToast } = useToast();
   const [search, setSearch] = useState('');
   const [sexFilter, setSexFilter] = useState('');
+  const [birthYearFilter, setBirthYearFilter] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(25);
   const [modalOpen, setModalOpen] = useState(false);
@@ -26,7 +27,7 @@ export const PlayersPage: React.FC = () => {
   const [form, setForm] = useState({ firstName: '', lastName: '', dni: '', birthDate: '', sex: 'M' as 'M' | 'F' });
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data: playersData, isLoading } = usePlayers({ search: search || undefined, sex: sexFilter || undefined, page, limit });
+  const { data: playersData, isLoading } = usePlayers({ search: search || undefined, sex: sexFilter || undefined, birthYear: birthYearFilter || undefined, page, limit });
   const { data: editingPlayer } = usePlayer(editingId ?? undefined);
 
   useEffect(() => {
@@ -98,6 +99,7 @@ export const PlayersPage: React.FC = () => {
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (sexFilter) params.set('sex', sexFilter);
+      if (birthYearFilter) params.set('birthYear', birthYearFilter);
       const res = await apiClient.get(`/players/export?${params.toString()}`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a'); a.href = url; a.download = 'jugadores.xlsx'; a.click();
@@ -107,6 +109,7 @@ export const PlayersPage: React.FC = () => {
 
   const formatDate = (d: string) => new Date(d).toLocaleDateString('es-AR');
   const totalPages = Math.ceil((playersData?.total ?? 0) / limit);
+  const birthYears = Array.from({ length: new Date().getFullYear() - 2009 }, (_, i) => new Date().getFullYear() - i);
 
   return (
     <div className="admin-page">
@@ -120,6 +123,12 @@ export const PlayersPage: React.FC = () => {
             <option value="">Sexo</option>
             <option value="M">Masculino</option>
             <option value="F">Femenino</option>
+          </select>
+          <select value={birthYearFilter} onChange={(e) => { setBirthYearFilter(e.target.value); setPage(1); }}>
+            <option value="">Año nac.</option>
+            {birthYears.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
           </select>
           <div className="search-box" style={{ minWidth: '240px' }}>
             <Search size={16} />

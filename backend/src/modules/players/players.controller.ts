@@ -34,12 +34,14 @@ export class PlayersController {
   findAll(
     @Query('search') search?: string,
     @Query('sex') sex?: string,
+    @Query('birthYear') birthYear?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.playersService.findAll({
       search,
       sex,
+      birthYear,
       page: page ? +page : undefined,
       limit: limit ? +limit : undefined,
     });

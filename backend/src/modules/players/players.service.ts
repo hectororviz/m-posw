@@ -15,10 +15,11 @@ export class PlayersService {
   async findAll(params: {
     search?: string;
     sex?: string;
+    birthYear?: string;
     page?: number;
     limit?: number;
   }) {
-    const { search, sex, page = 1, limit = 25 } = params;
+    const { search, sex, birthYear, page = 1, limit = 25 } = params;
     const where: any = {};
 
     if (search) {
@@ -31,6 +32,14 @@ export class PlayersService {
 
     if (sex) {
       where.sex = sex;
+    }
+
+    if (birthYear) {
+      const y = +birthYear;
+      where.birthDate = {
+        gte: new Date(y, 0, 1),
+        lt: new Date(y + 1, 0, 1),
+      };
     }
 
     const [data, total] = await Promise.all([

@@ -617,6 +617,7 @@ export const useLigasDeleteConfig = () => {
 export const usePlayers = (params?: {
   search?: string;
   sex?: string;
+  birthYear?: string;
   page?: number;
   limit?: number;
 }) =>
