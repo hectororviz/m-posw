@@ -154,6 +154,7 @@ export interface ManualMovement {
   type: 'ENTRADA' | 'SALIDA';
   amount: number;
   reason: string;
+  description?: string | null;
   userId: string;
 }
 

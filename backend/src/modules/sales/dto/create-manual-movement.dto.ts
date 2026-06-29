@@ -1,4 +1,4 @@
-import { IsIn, IsNumber, IsString, Min } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateManualMovementDto {
   @IsString()
@@ -11,4 +11,8 @@ export class CreateManualMovementDto {
 
   @IsString()
   reason: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 }

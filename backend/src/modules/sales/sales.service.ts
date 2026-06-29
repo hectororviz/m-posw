@@ -414,6 +414,7 @@ export class SalesService {
         type: dto.type as MovementType,
         amount: this.roundToCurrency(dto.amount),
         reason,
+        description: dto.description?.trim() || null,
       },
     });
   }
