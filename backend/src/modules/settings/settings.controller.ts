@@ -111,7 +111,6 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
-  @UseGuards(JwtAuthGuard)
   get() {
     return this.settingsService.get();
   }
