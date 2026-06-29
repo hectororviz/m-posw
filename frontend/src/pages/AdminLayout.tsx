@@ -80,6 +80,12 @@ export const AdminLayout: React.FC = () => {
   const { data: settings } = useSettings();
   const { user, permissions } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const storeName = settings?.storeName ?? 'm-POSw';
+  const logoUrl = buildImageUrl(settings?.logoUrl);
+  const [logoError, setLogoError] = useState(false);
+  const initials = getInitials(storeName);
+  const showLogo = Boolean(logoUrl) && !logoError;
+  const location = useLocation();
 
   const getModuleAccess = useCallback((module: string): string => {
     if (isAdmin) return 'FULL';
