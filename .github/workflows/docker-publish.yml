@@ -60,8 +60,7 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags_backend }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: Build and push Frontend image
         uses: docker/build-push-action@v6
@@ -73,5 +72,3 @@ jobs:
             VITE_API_BASE_URL=/api
             VITE_UPLOADS_BASE_URL=
           tags: ${{ steps.meta.outputs.tags_frontend }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
