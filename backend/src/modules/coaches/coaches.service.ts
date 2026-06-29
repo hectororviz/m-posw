@@ -373,10 +373,15 @@ export class CoachesService {
           const dt = coachMap.get(cat.id);
           const players = playersByCategory.get(cat.id) || [];
 
+          // Ensure enough space for category header + DT + table header (~ 60pt)
+          if (doc.y + 60 > doc.page.height - 40) {
+            doc.addPage();
+          }
+
           doc.fontSize(11).font('Helvetica-Bold').fill('#1a1a1a')
-            .text(`Categoría: ${cat.name}`);
+            .text(`Categoría: ${cat.name}`, 50);
           doc.fontSize(9).font('Helvetica')
-            .text(`DT: ${dt ? `${dt.lastName}, ${dt.firstName}` : 'Sin asignar'}`);
+            .text(`DT: ${dt ? `${dt.lastName}, ${dt.firstName}` : 'Sin asignar'}`, 50);
           doc.moveDown(0.3);
 
           const tableTop = doc.y;
@@ -397,10 +402,26 @@ export class CoachesService {
             doc.text('Sin jugadores fichados', 50, doc.y, { width: 495 });
             doc.moveDown(0.5);
           } else {
+            const bottomMargin = 40;
+            const rowHeight = 14;
+
             doc.fontSize(8).font('Helvetica').fill('#333333');
             players
               .sort((a, b) => a.player.lastName.localeCompare(b.player.lastName))
               .forEach((tp, idx2) => {
+                if (doc.y + rowHeight > doc.page.height - bottomMargin) {
+                  doc.addPage();
+                  doc.moveDown(0.3);
+                  const newTableTop = doc.y;
+                  doc.fontSize(8).font('Helvetica-Bold').fill('#555555');
+                  headers.forEach((h, i) => {
+                    doc.text(h, colX[i], newTableTop, { width: [30, 170, 150, 145][i], lineBreak: false });
+                  });
+                  doc.moveDown(0.15);
+                  doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#dddddd');
+                  doc.moveDown(0.15);
+                  doc.fontSize(8).font('Helvetica').fill('#333333');
+                }
                 const rowY = doc.y;
                 doc.text(`${idx2 + 1}`, colX[0], rowY, { width: 30, lineBreak: false });
                 doc.text(tp.player.lastName, colX[1], rowY, { width: 170, lineBreak: false });
