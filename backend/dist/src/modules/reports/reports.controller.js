@@ -16,8 +16,8 @@ exports.ReportsController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
+const module_access_guard_1 = require("../common/module-access.guard");
+const module_access_decorator_1 = require("../common/module-access.decorator");
 const report_query_dto_1 = require("./dto/report-query.dto");
 const reports_service_1 = require("./reports.service");
 let ReportsController = class ReportsController {
@@ -62,7 +62,7 @@ __decorate([
 ], ReportsController.prototype, "export", null);
 exports.ReportsController = ReportsController = __decorate([
     (0, common_1.Controller)('reports'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.REPORTES, client_1.ModuleAccess.READ),
     __metadata("design:paramtypes", [reports_service_1.ReportsService])
 ], ReportsController);

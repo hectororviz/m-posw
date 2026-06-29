@@ -16,8 +16,8 @@ exports.JournalEntriesController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
+const module_access_guard_1 = require("../common/module-access.guard");
+const module_access_decorator_1 = require("../common/module-access.decorator");
 const journal_entry_dto_1 = require("./dto/journal-entry.dto");
 const journal_entries_service_1 = require("./journal-entries.service");
 let JournalEntriesController = class JournalEntriesController {
@@ -55,6 +55,7 @@ let JournalEntriesController = class JournalEntriesController {
 exports.JournalEntriesController = JournalEntriesController;
 __decorate([
     (0, common_1.Get)(),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [journal_entry_dto_1.ListJournalEntriesDto]),
@@ -62,6 +63,7 @@ __decorate([
 ], JournalEntriesController.prototype, "list", null);
 __decorate([
     (0, common_1.Get)(':id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -69,6 +71,7 @@ __decorate([
 ], JournalEntriesController.prototype, "getById", null);
 __decorate([
     (0, common_1.Post)(),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -77,6 +80,7 @@ __decorate([
 ], JournalEntriesController.prototype, "create", null);
 __decorate([
     (0, common_1.Post)('income'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -85,6 +89,7 @@ __decorate([
 ], JournalEntriesController.prototype, "createSimpleIncome", null);
 __decorate([
     (0, common_1.Post)('expense'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -93,6 +98,7 @@ __decorate([
 ], JournalEntriesController.prototype, "createSimpleExpense", null);
 __decorate([
     (0, common_1.Patch)(':id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __param(2, (0, common_1.Body)()),
@@ -102,6 +108,7 @@ __decorate([
 ], JournalEntriesController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -109,6 +116,7 @@ __decorate([
 ], JournalEntriesController.prototype, "delete", null);
 __decorate([
     (0, common_1.Post)(':id/post'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -116,6 +124,7 @@ __decorate([
 ], JournalEntriesController.prototype, "post", null);
 __decorate([
     (0, common_1.Post)(':id/void'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __param(2, (0, common_1.Body)()),
@@ -125,7 +134,6 @@ __decorate([
 ], JournalEntriesController.prototype, "void", null);
 exports.JournalEntriesController = JournalEntriesController = __decorate([
     (0, common_1.Controller)('treasury/entries'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
     __metadata("design:paramtypes", [journal_entries_service_1.JournalEntriesService])
 ], JournalEntriesController);

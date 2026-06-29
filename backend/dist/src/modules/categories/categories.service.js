@@ -27,10 +27,15 @@ let CategoriesService = CategoriesService_1 = class CategoriesService {
             orderBy: { name: 'asc' },
         });
     }
-    listAll() {
-        return this.prisma.category.findMany({
+    async listAll() {
+        const setting = await this.prisma.setting.findFirst();
+        const categories = await this.prisma.category.findMany({
             orderBy: { createdAt: 'desc' },
         });
+        if (!setting?.enableInternetModule) {
+            return categories.filter((c) => c.name !== 'Internet');
+        }
+        return categories;
     }
     create(dto) {
         return this.prisma.category.create({
@@ -60,6 +65,8 @@ let CategoriesService = CategoriesService_1 = class CategoriesService {
         return this.prisma.category.update({ where: { id }, data });
     }
     async listProducts(categoryId, includeInactive = false) {
+        const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
+        const isInternetCategory = category?.name === 'Internet';
         const products = await this.prisma.product.findMany({
             where: {
                 categoryId,
@@ -72,10 +79,19 @@ let CategoriesService = CategoriesService_1 = class CategoriesService {
                         rawMaterial: true,
                     },
                 },
+                ...(isInternetCategory ? { internetPlan: true } : {}),
             },
             orderBy: { name: 'asc' },
         });
-        return products.map(product => {
+        let sorted = products;
+        if (isInternetCategory) {
+            sorted = [...products].sort((a, b) => {
+                const durA = a.internetPlan?.duration ?? 0;
+                const durB = b.internetPlan?.duration ?? 0;
+                return durA - durB;
+            });
+        }
+        return sorted.map(product => {
             if (product.type === client_1.ProductType.COMPOSITE && product.recipeAsComposite.length > 0) {
                 const possibleUnits = product.recipeAsComposite.map(ingredient => {
                     const rawMaterialStock = Number(ingredient.rawMaterial.stock);

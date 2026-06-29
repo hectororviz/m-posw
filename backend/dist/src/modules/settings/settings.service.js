@@ -38,19 +38,48 @@ let SettingsService = class SettingsService {
                 enableCashPayment: true,
                 enableQrPayment: true,
                 enableTransferPayment: true,
+                enableFiadoPayment: false,
+                enableSociosModule: true,
+                enableTreasuryModule: true,
+                enableAcreedoresModule: true,
+                enableInternetModule: false,
+                enableLigasModule: false,
+                enablePlayersModule: false,
+                enablePatrimonioModule: true,
                 movementInReasons: [],
                 movementOutReasons: [],
             },
             update: {},
         });
         return {
-            ...settings,
+            storeName: settings.storeName,
+            clubName: settings.clubName,
+            enableTicketPrinting: settings.enableTicketPrinting,
+            logoUrl: settings.logoUrl,
+            faviconUrl: settings.faviconUrl,
             okAnimationUrl: settings.okAnimationUrl ?? DEFAULT_OK_ANIMATION_URL,
             errorAnimationUrl: settings.errorAnimationUrl ?? DEFAULT_ERROR_ANIMATION_URL,
+            accentColor: settings.accentColor,
+            enableCashPayment: settings.enableCashPayment,
+            enableQrPayment: settings.enableQrPayment,
+            enableTransferPayment: settings.enableTransferPayment,
+            enableFiadoPayment: settings.enableFiadoPayment,
+            enableSociosModule: settings.enableSociosModule,
+            enableTreasuryModule: settings.enableTreasuryModule,
+            enableAcreedoresModule: settings.enableAcreedoresModule,
+            enableInternetModule: settings.enableInternetModule,
+            enableLigasModule: settings.enableLigasModule,
+            enablePlayersModule: settings.enablePlayersModule,
+            enablePatrimonioModule: settings.enablePatrimonioModule,
+            enableAutoJournalPos: settings.enableAutoJournalPos,
+            enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores,
+            enableAutoJournalSocios: settings.enableAutoJournalSocios,
+            movementInReasons: settings.movementInReasons,
+            movementOutReasons: settings.movementOutReasons,
         };
     }
     async update(dto) {
-        return this.prisma.setting.upsert({
+        const result = await this.prisma.setting.upsert({
             where: { id: DEFAULT_SETTING_ID },
             create: {
                 id: DEFAULT_SETTING_ID,
@@ -65,6 +94,17 @@ let SettingsService = class SettingsService {
                 enableCashPayment: dto.enableCashPayment ?? true,
                 enableQrPayment: dto.enableQrPayment ?? true,
                 enableTransferPayment: dto.enableTransferPayment ?? true,
+                enableFiadoPayment: dto.enableFiadoPayment ?? false,
+                enableSociosModule: dto.enableSociosModule ?? true,
+                enableTreasuryModule: dto.enableTreasuryModule ?? true,
+                enableAcreedoresModule: dto.enableAcreedoresModule ?? true,
+                enableInternetModule: dto.enableInternetModule ?? false,
+                enableLigasModule: dto.enableLigasModule ?? false,
+                enablePlayersModule: dto.enablePlayersModule ?? false,
+                enablePatrimonioModule: dto.enablePatrimonioModule ?? true,
+                enableAutoJournalPos: dto.enableAutoJournalPos ?? true,
+                enableAutoJournalAcreedores: dto.enableAutoJournalAcreedores ?? true,
+                enableAutoJournalSocios: dto.enableAutoJournalSocios ?? true,
                 movementInReasons: dto.movementInReasons ?? [],
                 movementOutReasons: dto.movementOutReasons ?? [],
             },
@@ -82,10 +122,28 @@ let SettingsService = class SettingsService {
                 ...(dto.enableCashPayment !== undefined ? { enableCashPayment: dto.enableCashPayment } : {}),
                 ...(dto.enableQrPayment !== undefined ? { enableQrPayment: dto.enableQrPayment } : {}),
                 ...(dto.enableTransferPayment !== undefined ? { enableTransferPayment: dto.enableTransferPayment } : {}),
+                ...(dto.enableFiadoPayment !== undefined ? { enableFiadoPayment: dto.enableFiadoPayment } : {}),
+                ...(dto.enableSociosModule !== undefined ? { enableSociosModule: dto.enableSociosModule } : {}),
+                ...(dto.enableTreasuryModule !== undefined ? { enableTreasuryModule: dto.enableTreasuryModule } : {}),
+                ...(dto.enableAcreedoresModule !== undefined ? { enableAcreedoresModule: dto.enableAcreedoresModule } : {}),
+                ...(dto.enableInternetModule !== undefined ? { enableInternetModule: dto.enableInternetModule } : {}),
+                ...(dto.enableLigasModule !== undefined ? { enableLigasModule: dto.enableLigasModule } : {}),
+                ...(dto.enablePlayersModule !== undefined ? { enablePlayersModule: dto.enablePlayersModule } : {}),
+                ...(dto.enablePatrimonioModule !== undefined ? { enablePatrimonioModule: dto.enablePatrimonioModule } : {}),
+                ...(dto.enableAutoJournalPos !== undefined ? { enableAutoJournalPos: dto.enableAutoJournalPos } : {}),
+                ...(dto.enableAutoJournalAcreedores !== undefined ? { enableAutoJournalAcreedores: dto.enableAutoJournalAcreedores } : {}),
+                ...(dto.enableAutoJournalSocios !== undefined ? { enableAutoJournalSocios: dto.enableAutoJournalSocios } : {}),
                 ...(dto.movementInReasons !== undefined ? { movementInReasons: dto.movementInReasons } : {}),
                 ...(dto.movementOutReasons !== undefined ? { movementOutReasons: dto.movementOutReasons } : {}),
             },
         });
+        if (dto.enableInternetModule !== undefined) {
+            await this.prisma.category.updateMany({
+                where: { name: 'Internet' },
+                data: { active: dto.enableInternetModule },
+            });
+        }
+        return result;
     }
 };
 exports.SettingsService = SettingsService;

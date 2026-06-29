@@ -19,38 +19,69 @@ const client_1 = require("@prisma/client");
 const fs_1 = require("fs");
 const multer_1 = require("multer");
 const path_1 = require("path");
+const sharp = require("sharp");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
+const module_access_guard_1 = require("../common/module-access.guard");
+const module_access_decorator_1 = require("../common/module-access.decorator");
 const upload_constants_1 = require("../common/upload.constants");
 const update_setting_dto_1 = require("./dto/update-setting.dto");
 const settings_service_1 = require("./settings.service");
 const uploadDir = (0, path_1.join)(upload_constants_1.UPLOADS_DIR, upload_constants_1.SETTINGS_IMAGE_SUBDIR);
 (0, fs_1.mkdirSync)(uploadDir, { recursive: true });
+const MIME_TO_EXT = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/webp': '.webp',
+    'image/x-icon': '.ico',
+    'image/vnd.microsoft.icon': '.ico',
+};
+function safeFilename(file) {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = MIME_TO_EXT[file.mimetype];
+    if (!ext) {
+        throw new common_1.BadRequestException('Tipo de archivo no soportado');
+    }
+    return `${unique}${ext}`;
+}
+const allowedLogoTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const logoUploadOptions = {
     storage: (0, multer_1.diskStorage)({
         destination: uploadDir,
         filename: (_req, file, cb) => {
-            const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-            cb(null, `${unique}${(0, path_1.extname)(file.originalname)}`);
+            try {
+                cb(null, safeFilename(file));
+            }
+            catch (err) {
+                cb(err, '');
+            }
         },
     }),
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-            cb(new common_1.BadRequestException('Tipo de archivo inválido para logo'), false);
+        if (!allowedLogoTypes.has(file.mimetype)) {
+            cb(new common_1.BadRequestException('Tipo de archivo inválido para logo. Usar PNG, JPEG o WebP.'), false);
             return;
         }
         cb(null, true);
     },
 };
-const allowedFaviconTypes = new Set(['image/x-icon', 'image/vnd.microsoft.icon', 'image/png', 'image/svg+xml']);
+const allowedFaviconTypes = new Set(['image/x-icon', 'image/vnd.microsoft.icon', 'image/png']);
 const faviconUploadOptions = {
-    storage: logoUploadOptions.storage,
+    storage: (0, multer_1.diskStorage)({
+        destination: uploadDir,
+        filename: (_req, file, cb) => {
+            try {
+                cb(null, safeFilename(file));
+            }
+            catch (err) {
+                cb(err, '');
+            }
+        },
+    }),
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
         if (!allowedFaviconTypes.has(file.mimetype)) {
-            cb(new common_1.BadRequestException('Tipo de archivo inválido para favicon'), false);
+            cb(new common_1.BadRequestException('Tipo de archivo inválido para favicon. Usar PNG o ICO.'), false);
             return;
         }
         cb(null, true);
@@ -58,12 +89,17 @@ const faviconUploadOptions = {
 };
 const allowedAnimationTypes = new Set(['application/json', 'text/plain', 'application/octet-stream']);
 const animationUploadOptions = {
-    storage: logoUploadOptions.storage,
+    storage: (0, multer_1.diskStorage)({
+        destination: uploadDir,
+        filename: (_req, file, cb) => {
+            const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+            cb(null, `${unique}.json`);
+        },
+    }),
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-        const extension = (0, path_1.extname)(file.originalname).toLowerCase();
-        if (!allowedAnimationTypes.has(file.mimetype) && extension !== '.json') {
-            cb(new common_1.BadRequestException('Tipo de archivo inválido para animación'), false);
+        if (!allowedAnimationTypes.has(file.mimetype)) {
+            cb(new common_1.BadRequestException('Tipo de archivo inválido para animación. Usar JSON.'), false);
             return;
         }
         cb(null, true);
@@ -77,14 +113,38 @@ let SettingsController = class SettingsController {
         return this.settingsService.get();
     }
     update(dto) {
-        console.log('Update settings dto:', dto);
         return this.settingsService.update(dto);
     }
-    uploadLogo(file) {
+    async uploadLogo(file) {
         if (!file) {
             throw new common_1.BadRequestException('Logo requerido');
         }
-        return this.settingsService.update({ logoUrl: `/uploads/${upload_constants_1.SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
+        const originalPath = (0, path_1.join)(uploadDir, file.filename);
+        const webpName = file.filename.replace(/\.\w+$/, '.webp');
+        const webpPath = (0, path_1.join)(uploadDir, webpName);
+        try {
+            const buffer = (0, fs_1.readFileSync)(originalPath);
+            await sharp(buffer)
+                .resize({
+                width: upload_constants_1.IMAGE_MAX_DIMENSION,
+                height: upload_constants_1.IMAGE_MAX_DIMENSION,
+                fit: 'inside',
+                withoutEnlargement: true,
+            })
+                .webp({ quality: upload_constants_1.IMAGE_QUALITY })
+                .toFile(webpPath);
+            if (webpPath !== originalPath) {
+                (0, fs_1.unlinkSync)(originalPath);
+            }
+            return this.settingsService.update({ logoUrl: `/uploads/${upload_constants_1.SETTINGS_IMAGE_SUBDIR}/${webpName}` });
+        }
+        catch {
+            try {
+                (0, fs_1.unlinkSync)(originalPath);
+            }
+            catch { }
+            throw new common_1.BadRequestException('Error al procesar la imagen del logo');
+        }
     }
     uploadFavicon(file) {
         if (!file) {
@@ -96,11 +156,27 @@ let SettingsController = class SettingsController {
         if (!file) {
             throw new common_1.BadRequestException('Animación OK requerida');
         }
+        const filePath = (0, path_1.join)(uploadDir, file.filename);
+        try {
+            JSON.parse((0, fs_1.readFileSync)(filePath, 'utf8'));
+        }
+        catch {
+            (0, fs_1.unlinkSync)(filePath);
+            throw new common_1.BadRequestException('El archivo de animación no contiene JSON válido');
+        }
         return this.settingsService.update({ okAnimationUrl: `/uploads/${upload_constants_1.SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
     }
     uploadErrorAnimation(file) {
         if (!file) {
             throw new common_1.BadRequestException('Animación Error requerida');
+        }
+        const filePath = (0, path_1.join)(uploadDir, file.filename);
+        try {
+            JSON.parse((0, fs_1.readFileSync)(filePath, 'utf8'));
+        }
+        catch {
+            (0, fs_1.unlinkSync)(filePath);
+            throw new common_1.BadRequestException('El archivo de animación no contiene JSON válido');
         }
         return this.settingsService.update({ errorAnimationUrl: `/uploads/${upload_constants_1.SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
     }
@@ -108,14 +184,15 @@ let SettingsController = class SettingsController {
 exports.SettingsController = SettingsController;
 __decorate([
     (0, common_1.Get)(),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], SettingsController.prototype, "get", null);
 __decorate([
     (0, common_1.Patch)(),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [update_setting_dto_1.UpdateSettingDto]),
@@ -123,18 +200,18 @@ __decorate([
 ], SettingsController.prototype, "update", null);
 __decorate([
     (0, common_1.Post)('logo'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', logoUploadOptions)),
     __param(0, (0, common_1.UploadedFile)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], SettingsController.prototype, "uploadLogo", null);
 __decorate([
     (0, common_1.Post)('favicon'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', faviconUploadOptions)),
     __param(0, (0, common_1.UploadedFile)()),
     __metadata("design:type", Function),
@@ -143,8 +220,8 @@ __decorate([
 ], SettingsController.prototype, "uploadFavicon", null);
 __decorate([
     (0, common_1.Post)('animation-ok'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', animationUploadOptions)),
     __param(0, (0, common_1.UploadedFile)()),
     __metadata("design:type", Function),
@@ -153,8 +230,8 @@ __decorate([
 ], SettingsController.prototype, "uploadOkAnimation", null);
 __decorate([
     (0, common_1.Post)('animation-error'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', animationUploadOptions)),
     __param(0, (0, common_1.UploadedFile)()),
     __metadata("design:type", Function),

@@ -17,6 +17,16 @@ const schedule_1 = require("@nestjs/schedule");
 const mp_config_service_1 = require("../common/mp-config.service");
 const prisma_service_1 = require("../common/prisma.service");
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
+const ML_TO_MP_STATE = {
+    'Bs.As. Costa Atlántica': 'Buenos Aires',
+    'Bs.As. G.B.A. Norte': 'Buenos Aires',
+    'Bs.As. G.B.A. Oeste': 'Buenos Aires',
+    'Bs.As. G.B.A. Sur': 'Buenos Aires',
+    'Buenos Aires Interior': 'Buenos Aires',
+};
+function normalizeStateName(name) {
+    return ML_TO_MP_STATE[name] || name;
+}
 let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauthService {
     constructor(prisma, config, mpConfig) {
         this.prisma = prisma;
@@ -72,7 +82,8 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
             });
             tokenData = (await response.json());
             if (!response.ok || !tokenData.access_token) {
-                this.logger.error(`MP OAuth token exchange failed: ${JSON.stringify(tokenData)}`);
+                const { access_token, refresh_token, ...safeData } = tokenData;
+                this.logger.error(`MP OAuth token exchange failed: ${JSON.stringify(safeData)}`);
                 throw new common_1.HttpException('Error al intercambiar el código por token de MercadoPago', common_1.HttpStatus.BAD_GATEWAY);
             }
         }
@@ -254,8 +265,8 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
             create: {
                 id: DEFAULT_SETTING_ID,
                 storeName: 'MiBPS Demo',
-                mpStoreId: storeId,
-                mpPosId: posId,
+                mpStoreId: String(storeId),
+                mpPosId: String(posId),
                 mpStoreName: `Tienda ${storeId}`,
                 mpPosName: posName,
                 mpQrData: qrData,
@@ -263,8 +274,8 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
                 mpExternalStoreId: externalStoreId,
             },
             update: {
-                mpStoreId: storeId,
-                mpPosId: posId,
+                mpStoreId: String(storeId),
+                mpPosId: String(posId),
                 mpStoreName: `Tienda ${storeId}`,
                 mpPosName: posName,
                 mpQrData: qrData,
@@ -275,7 +286,30 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
         this.logger.log(`MP store/pos seleccionados: storeId=${storeId}, posId=${posId}`);
         return { ok: true, qrUrl: qrData };
     }
-    async setupPos(storeName, posName, streetName, streetNumber, cityName, stateName, zipCode) {
+    async setupPos(storeName, posName, streetName, streetNumber, cityName, stateName, zipCode, latitude, longitude) {
+        let resolvedCityName = cityName;
+        let resolvedStateName = stateName;
+        let mpCityMapping = await this.prisma.mpCityMapping.findUnique({
+            where: { zipCode },
+        });
+        if (!mpCityMapping) {
+            const numeric = zipCode.match(/\d{4}/);
+            if (numeric) {
+                mpCityMapping = await this.prisma.mpCityMapping.findUnique({
+                    where: { zipCode: numeric[0] },
+                });
+            }
+        }
+        if (mpCityMapping) {
+            resolvedCityName = mpCityMapping.cityName;
+            resolvedStateName = normalizeStateName(mpCityMapping.stateName);
+            this.logger.log(`[MpCityMapping] CP ${zipCode} resuelto a ciudad: ${resolvedCityName}`);
+        }
+        else {
+            this.logger.warn(`[MpCityMapping] CP ${zipCode} no encontrado en tabla, usando ciudad del frontend: ${cityName}`);
+        }
+        const numericZipMatch = zipCode.match(/\d{4}/);
+        const mpZipCode = numericZipMatch ? numericZipMatch[0] : zipCode;
         const token = await this.mpConfig.getAccessToken();
         if (!token) {
             throw new common_1.HttpException('Sin access token de MercadoPago', common_1.HttpStatus.INTERNAL_SERVER_ERROR);
@@ -285,6 +319,9 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
             throw new common_1.HttpException('Sin collectorId de MercadoPago', common_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
         const subdomain = this.config.get('INSTANCE_SUBDOMAIN') || 'default';
+        const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9]/g, '');
+        const externalPosId = `${safeSubdomain}pos${Math.floor(Date.now() / 1000)}`;
+        this.logger.log(`[MpSetup] Generando POS con external_id: ${externalPosId}`);
         const mpHeaders = {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -302,18 +339,21 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
                     location: {
                         street_name: streetName,
                         street_number: streetNumber,
-                        city_name: cityName,
-                        state_name: stateName,
-                        zip_code: zipCode,
-                        latitude: -34.603722,
-                        longitude: -58.381592,
+                        city_name: resolvedCityName,
+                        state_name: resolvedStateName,
+                        zip_code: mpZipCode,
+                        ...(latitude !== undefined && { latitude }),
+                        ...(longitude !== undefined && { longitude }),
                     },
                 }),
             });
             const storeData = (await storeRes.json());
             if (!storeRes.ok || !storeData.id) {
                 this.logger.error(`MP POS setup - store creation failed: ${JSON.stringify(storeData)}`);
-                throw new common_1.HttpException(storeData.message || 'Error al crear la tienda en MercadoPago', common_1.HttpStatus.BAD_REQUEST);
+                const causeMessages = storeData.causes
+                    ?.map((c) => c.description)
+                    ?.join('; ');
+                throw new common_1.HttpException(causeMessages || storeData.message || 'Error al crear la tienda en MercadoPago', common_1.HttpStatus.BAD_REQUEST);
             }
             storeId = storeData.id;
         }
@@ -333,13 +373,16 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
                     name: posName,
                     store_id: storeId,
                     category: 621102,
-                    external_id: `${subdomain}_pos`,
+                    external_id: externalPosId,
                 }),
             });
             const posData = (await posRes.json());
             if (!posRes.ok || !posData.id) {
-                this.logger.error(`MP POS setup - pos creation failed: ${JSON.stringify(posData)}`);
-                throw new common_1.HttpException(posData.message || 'Error al crear el POS en MercadoPago', common_1.HttpStatus.BAD_REQUEST);
+                this.logger.error(`MP POS setup - pos creation failed (external_id=${externalPosId}): ${JSON.stringify(posData)}`);
+                const causeMessages = posData.causes
+                    ?.map((c) => c.description)
+                    ?.join('; ');
+                throw new common_1.HttpException(causeMessages || posData.message || `Error al crear el POS en MercadoPago (external_id=${externalPosId})`, common_1.HttpStatus.BAD_REQUEST);
             }
             posId = posData.id;
             qrData = posData.qr?.image ?? '';
@@ -350,23 +393,22 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
             this.logger.error(`MP POS setup - pos network error: ${error}`);
             throw new common_1.HttpException('Error de red al crear el POS en MP', common_1.HttpStatus.BAD_GATEWAY);
         }
-        const externalPosId = `${subdomain}_pos`;
         await this.prisma.setting.upsert({
             where: { id: DEFAULT_SETTING_ID },
             create: {
                 id: DEFAULT_SETTING_ID,
                 storeName: 'MiBPS Demo',
-                mpStoreId: storeId,
-                mpPosId: posId,
+                mpStoreId: String(storeId),
+                mpPosId: String(posId),
                 mpStoreName: storeName,
                 mpPosName: posName,
                 mpQrData: qrData,
                 mpExternalPosId: externalPosId,
-                mpExternalStoreId: storeId,
+                mpExternalStoreId: String(storeId),
             },
             update: {
-                mpStoreId: storeId,
-                mpPosId: posId,
+                mpStoreId: String(storeId),
+                mpPosId: String(posId),
                 mpStoreName: storeName,
                 mpPosName: posName,
                 mpQrData: qrData,
@@ -417,6 +459,106 @@ let MercadoPagoOauthService = MercadoPagoOauthService_1 = class MercadoPagoOauth
     async handleTokenRefresh() {
         this.logger.debug('Cron: verificando renovacion proactiva de token MP...');
         await this.mpConfig.tryRefreshToken();
+    }
+    async cityByZip(zipCode) {
+        let mapping = await this.prisma.mpCityMapping.findUnique({
+            where: { zipCode },
+            select: { cityName: true, stateName: true },
+        });
+        if (!mapping) {
+            const numeric = zipCode.match(/\d{4}/);
+            if (numeric) {
+                mapping = await this.prisma.mpCityMapping.findUnique({
+                    where: { zipCode: numeric[0] },
+                    select: { cityName: true, stateName: true },
+                });
+            }
+        }
+        return mapping ? { cityName: mapping.cityName, stateName: normalizeStateName(mapping.stateName) } : null;
+    }
+    async searchCities(query) {
+        const rows = await this.prisma.$queryRawUnsafe(`SELECT DISTINCT city_name AS "cityName", state_name AS "stateName"
+       FROM mp_city_mappings
+       WHERE unaccent(city_name) ILIKE unaccent($1)
+       ORDER BY city_name ASC
+       LIMIT 20`, `%${query}%`);
+        return rows.map((r) => ({ cityName: r.cityName, stateName: normalizeStateName(r.stateName) }));
+    }
+    async getMpCityList() {
+        const rows = await this.prisma.mpCityMapping.findMany({
+            distinct: ['cityName'],
+            select: { cityName: true, stateName: true },
+            orderBy: { cityName: 'asc' },
+        });
+        return rows.map((r) => ({
+            cityName: normalizeStateName(r.cityName),
+            stateName: normalizeStateName(r.stateName),
+        }));
+    }
+    async getCityZipcodes(cityName) {
+        const rows = await this.prisma.mpCityMapping.findMany({
+            where: {
+                OR: [
+                    { cityName: { equals: cityName, mode: 'insensitive' } },
+                    { cityName: { equals: cityName.replace(/[áéíóúÁÉÍÓÚ]/g, (c) => ({ á: 'a', é: 'e', í: 'i', ó: 'o', ú: 'u', Á: 'A', É: 'E', Í: 'I', Ó: 'O', Ú: 'U' })[c]), mode: 'insensitive' } },
+                ],
+            },
+            select: { zipCode: true },
+            orderBy: { zipCode: 'asc' },
+        });
+        const zipCodes = rows.map((r) => r.zipCode);
+        return { zipCodes };
+    }
+    async getCities(stateName) {
+        const stateMap = {
+            'Buenos Aires': 'AR-B',
+            'Capital Federal': 'AR-C',
+            'Catamarca': 'AR-K',
+            'Chaco': 'AR-H',
+            'Chubut': 'AR-U',
+            'Cordoba': 'AR-X',
+            'Corrientes': 'AR-W',
+            'Entre Rios': 'AR-E',
+            'Formosa': 'AR-P',
+            'Jujuy': 'AR-Y',
+            'La Pampa': 'AR-L',
+            'La Rioja': 'AR-F',
+            'Mendoza': 'AR-M',
+            'Misiones': 'AR-N',
+            'Neuquen': 'AR-Q',
+            'Rio Negro': 'AR-R',
+            'Salta': 'AR-A',
+            'San Juan': 'AR-J',
+            'San Luis': 'AR-D',
+            'Santa Cruz': 'AR-Z',
+            'Santa Fe': 'AR-S',
+            'Santiago del Estero': 'AR-G',
+            'Tierra del Fuego': 'AR-V',
+            'Tucuman': 'AR-T',
+        };
+        const stateIds = stateName && stateMap[stateName]
+            ? [stateMap[stateName]]
+            : Object.values(stateMap);
+        try {
+            const allCities = [];
+            for (const stateId of stateIds) {
+                const res = await fetch(`https://api.mercadolibre.com/classified_locations/states/${stateId}`);
+                if (!res.ok)
+                    continue;
+                const data = (await res.json());
+                if (data.cities) {
+                    for (const c of data.cities) {
+                        allCities.push(c.name);
+                    }
+                }
+            }
+            const unique = [...new Set(allCities)].sort((a, b) => a.localeCompare(b, 'es'));
+            return { cities: unique };
+        }
+        catch (error) {
+            this.logger.error(`MP getCities error: ${error}`);
+            return { cities: [] };
+        }
     }
 };
 exports.MercadoPagoOauthService = MercadoPagoOauthService;

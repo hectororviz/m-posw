@@ -4,22 +4,17 @@ const client_1 = require("@prisma/client");
 const bcrypt = require("bcrypt");
 const prisma = new client_1.PrismaClient();
 async function main() {
-    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
     const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
-    const adminName = process.env.ADMIN_NAME || 'admin';
-    if (!adminEmail) {
-        throw new Error('ADMIN_EMAIL es requerido para el usuario admin.');
-    }
     const passwordHash = await bcrypt.hash(adminPassword, 10);
     const adminData = {
-        name: adminName,
+        username: adminUsername,
         password: passwordHash,
         role: client_1.Role.ADMIN,
         active: true,
-        email: adminEmail,
     };
     await prisma.user.upsert({
-        where: { name: adminName },
+        where: { username: adminUsername },
         update: adminData,
         create: adminData,
     });
@@ -33,6 +28,8 @@ async function main() {
         });
     }
     await seedLedgerAccounts();
+    await seedPaymentMethodAccounts();
+    await seedAssetStatuses();
 }
 async function seedLedgerAccounts() {
     const accounts = [
@@ -44,6 +41,7 @@ async function seedLedgerAccounts() {
         { code: '1.2', name: 'Créditos', type: 'ASSET', acceptsEntries: false },
         { code: '1.2.01', name: 'Créditos a cobrar', type: 'ASSET', acceptsEntries: true },
         { code: '1.2.02', name: 'Anticipos entregados', type: 'ASSET', acceptsEntries: true },
+        { code: '1.2.03', name: 'Deudores por ventas fiadas', type: 'ASSET', acceptsEntries: true },
         { code: '2', name: 'Pasivo', type: 'LIABILITY', acceptsEntries: false },
         { code: '2.1', name: 'Deudas', type: 'LIABILITY', acceptsEntries: false },
         { code: '2.1.01', name: 'Proveedores a pagar', type: 'LIABILITY', acceptsEntries: true },
@@ -106,6 +104,43 @@ async function seedLedgerAccounts() {
         }
     }
     console.log('Plan de cuentas contable sembrado correctamente.');
+}
+async function seedPaymentMethodAccounts() {
+    const accounts = await prisma.ledgerAccount.findMany({
+        where: { code: { in: ['1.1.01', '1.1.02', '1.2.03'] } },
+    });
+    const byCode = {};
+    for (const a of accounts)
+        byCode[a.code] = a.id;
+    const mappings = [
+        { paymentMethod: 'CASH', ledgerAccountCode: '1.1.01' },
+        { paymentMethod: 'MP_QR', ledgerAccountCode: '1.1.02' },
+        { paymentMethod: 'TRANSFER', ledgerAccountCode: '1.1.02' },
+        { paymentMethod: 'FIADO', ledgerAccountCode: '1.2.03' },
+    ];
+    for (const m of mappings) {
+        const ledgerAccountId = byCode[m.ledgerAccountCode];
+        if (!ledgerAccountId) {
+            console.warn(`Cuenta ${m.ledgerAccountCode} no encontrada para PaymentMethodAccount ${m.paymentMethod}`);
+            continue;
+        }
+        await prisma.paymentMethodAccount.upsert({
+            where: { paymentMethod: m.paymentMethod },
+            update: { ledgerAccountId },
+            create: { paymentMethod: m.paymentMethod, ledgerAccountId },
+        });
+    }
+    console.log('PaymentMethodAccount sembrado correctamente.');
+}
+async function seedAssetStatuses() {
+    await prisma.assetStatus.createMany({
+        data: [
+            { name: 'Activo', isSystem: true },
+            { name: 'De Baja', isSystem: true },
+        ],
+        skipDuplicates: true,
+    });
+    console.log('AssetStatus sembrado correctamente.');
 }
 main()
     .catch((error) => {

@@ -16,8 +16,8 @@ exports.TreasuryReportsController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
+const module_access_guard_1 = require("../common/module-access.guard");
+const module_access_decorator_1 = require("../common/module-access.decorator");
 const report_query_dto_1 = require("./dto/report-query.dto");
 const reports_service_1 = require("./reports.service");
 let TreasuryReportsController = class TreasuryReportsController {
@@ -76,6 +76,7 @@ let TreasuryReportsController = class TreasuryReportsController {
 exports.TreasuryReportsController = TreasuryReportsController;
 __decorate([
     (0, common_1.Get)('summary'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [report_query_dto_1.DateRangeDto]),
@@ -83,6 +84,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "summary", null);
 __decorate([
     (0, common_1.Get)('ledger-book'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [report_query_dto_1.DateRangeDto]),
@@ -90,6 +92,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "ledgerBook", null);
 __decorate([
     (0, common_1.Get)('ledger-account'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [report_query_dto_1.LedgerAccountQueryDto]),
@@ -97,6 +100,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "ledgerAccount", null);
 __decorate([
     (0, common_1.Get)('trial-balance'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [report_query_dto_1.DateRangeDto]),
@@ -104,6 +108,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "trialBalance", null);
 __decorate([
     (0, common_1.Get)('income-statement'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [report_query_dto_1.DateRangeDto]),
@@ -111,6 +116,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "incomeStatement", null);
 __decorate([
     (0, common_1.Get)('availabilities'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)('asOf')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -118,6 +124,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "availabilities", null);
 __decorate([
     (0, common_1.Get)('export/ledger-book'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, common_1.Res)()),
     __metadata("design:type", Function),
@@ -126,6 +133,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "exportLedgerBook", null);
 __decorate([
     (0, common_1.Get)('export/ledger-account'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, common_1.Res)()),
     __metadata("design:type", Function),
@@ -134,6 +142,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "exportLedgerAccount", null);
 __decorate([
     (0, common_1.Get)('export/trial-balance'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, common_1.Res)()),
     __metadata("design:type", Function),
@@ -142,6 +151,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "exportTrialBalance", null);
 __decorate([
     (0, common_1.Get)('export/income-statement'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)()),
     __param(1, (0, common_1.Res)()),
     __metadata("design:type", Function),
@@ -150,6 +160,7 @@ __decorate([
 ], TreasuryReportsController.prototype, "exportIncomeStatement", null);
 __decorate([
     (0, common_1.Get)('export/availabilities'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
     __param(0, (0, common_1.Query)('asOf')),
     __param(1, (0, common_1.Res)()),
     __metadata("design:type", Function),
@@ -158,7 +169,6 @@ __decorate([
 ], TreasuryReportsController.prototype, "exportAvailabilities", null);
 exports.TreasuryReportsController = TreasuryReportsController = __decorate([
     (0, common_1.Controller)('treasury/reports'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
     __metadata("design:paramtypes", [reports_service_1.TreasuryReportsService])
 ], TreasuryReportsController);

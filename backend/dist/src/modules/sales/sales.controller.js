@@ -14,10 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SalesController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
 const create_manual_movement_dto_1 = require("./dto/create-manual-movement.dto");
 const create_sale_dto_1 = require("./dto/create-sale.dto");
 const sales_service_1 = require("./sales.service");
@@ -30,6 +27,9 @@ let SalesController = class SalesController {
     }
     createQr(req, dto) {
         return this.salesService.createQrSale(req.user.sub, dto);
+    }
+    createFiado(req, dto) {
+        return this.salesService.createFiadoSale(req.user.sub, dto);
     }
     list(req) {
         return this.salesService.listSales({ id: req.user.sub, role: req.user.role });
@@ -67,7 +67,6 @@ let SalesController = class SalesController {
 exports.SalesController = SalesController;
 __decorate([
     (0, common_1.Post)('cash'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -76,7 +75,6 @@ __decorate([
 ], SalesController.prototype, "createCash", null);
 __decorate([
     (0, common_1.Post)('qr'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -84,8 +82,15 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], SalesController.prototype, "createQr", null);
 __decorate([
+    (0, common_1.Post)('fiado'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, create_sale_dto_1.CreateFiadoSaleDto]),
+    __metadata("design:returntype", void 0)
+], SalesController.prototype, "createFiado", null);
+__decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -93,7 +98,6 @@ __decorate([
 ], SalesController.prototype, "list", null);
 __decorate([
     (0, common_1.Post)('manual-movements'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -102,7 +106,6 @@ __decorate([
 ], SalesController.prototype, "createManualMovement", null);
 __decorate([
     (0, common_1.Get)('manual-movements'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
@@ -110,7 +113,6 @@ __decorate([
 ], SalesController.prototype, "listManualMovements", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -119,7 +121,6 @@ __decorate([
 ], SalesController.prototype, "getById", null);
 __decorate([
     (0, common_1.Get)(':id/status'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -128,7 +129,6 @@ __decorate([
 ], SalesController.prototype, "getStatus", null);
 __decorate([
     (0, common_1.Get)(':id/payment-status'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __param(2, (0, common_1.Res)({ passthrough: true })),
@@ -138,7 +138,6 @@ __decorate([
 ], SalesController.prototype, "getPaymentStatus", null);
 __decorate([
     (0, common_1.Post)(':id/complete'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -147,7 +146,6 @@ __decorate([
 ], SalesController.prototype, "completeSale", null);
 __decorate([
     (0, common_1.Post)(':id/cancel'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -156,7 +154,6 @@ __decorate([
 ], SalesController.prototype, "cancelQrSale", null);
 __decorate([
     (0, common_1.Post)(':id/ticket-printed'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -165,6 +162,6 @@ __decorate([
 ], SalesController.prototype, "markTicketPrinted", null);
 exports.SalesController = SalesController = __decorate([
     (0, common_1.Controller)('sales'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [sales_service_1.SalesService])
 ], SalesController);

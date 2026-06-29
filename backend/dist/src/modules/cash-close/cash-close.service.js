@@ -116,7 +116,7 @@ let CashCloseService = class CashCloseService {
     async getById(id) {
         const cashClose = await this.prisma.cashClose.findUnique({
             where: { id },
-            include: { closedBy: { select: { id: true, name: true, role: true } } },
+            include: { closedBy: { select: { id: true, username: true, role: true } } },
         });
         if (!cashClose) {
             throw new common_1.NotFoundException('Cierre no encontrado');
@@ -125,7 +125,7 @@ let CashCloseService = class CashCloseService {
     }
     list(limit = 20, offset = 0) {
         return this.prisma.cashClose.findMany({
-            include: { closedBy: { select: { id: true, name: true, role: true } } },
+            include: { closedBy: { select: { id: true, username: true, role: true } } },
             orderBy: { to: 'desc' },
             take: Math.min(limit, 100),
             skip: offset,

@@ -14,53 +14,46 @@ const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcrypt");
 const prisma_service_1 = require("../common/prisma.service");
+const user_permissions_service_1 = require("../users/user-permissions.service");
 let AuthService = class AuthService {
-    constructor(prisma, jwtService) {
+    constructor(prisma, jwtService, userPermissionsService) {
         this.prisma = prisma;
         this.jwtService = jwtService;
+        this.userPermissionsService = userPermissionsService;
     }
-    async validateUser(identifier, credential) {
-        if (!identifier.email && !identifier.name) {
-            throw new common_1.UnauthorizedException('Credenciales inválidas');
-        }
-        const user = identifier.email
-            ? await this.prisma.user.findUnique({ where: { email: identifier.email } })
-            : await this.prisma.user.findUnique({ where: { name: identifier.name } });
+    async login(dto) {
+        const user = await this.prisma.user.findUnique({ where: { username: dto.username } });
         if (!user || !user.active) {
             throw new common_1.UnauthorizedException('Credenciales inválidas');
         }
-        const valid = await bcrypt.compare(credential, user.password);
+        const valid = await bcrypt.compare(dto.password, user.password);
         if (!valid) {
             throw new common_1.UnauthorizedException('Credenciales inválidas');
         }
-        return user;
-    }
-    async login(dto) {
-        const credential = dto.pin ?? dto.password;
-        if (!credential) {
-            throw new common_1.UnauthorizedException('Credenciales inválidas');
-        }
-        const user = await this.validateUser({ email: dto.email, name: dto.name }, credential);
         const session = await this.prisma.$transaction(async (tx) => {
             await tx.session.updateMany({
                 where: { userId: user.id, revokedAt: null },
                 data: { revokedAt: new Date() },
             });
             return tx.session.create({
-                data: {
-                    userId: user.id,
-                },
+                data: { userId: user.id },
             });
         });
-        const payload = { sub: user.id, role: user.role, name: user.name, sessionId: session.id };
+        const payload = { sub: user.id, role: user.role, username: user.username, sessionId: session.id };
+        const permissions = user.role === 'ADMIN'
+            ? []
+            : await this.userPermissionsService.getPermissions(user.id);
         return {
             accessToken: await this.jwtService.signAsync(payload),
             user: {
                 id: user.id,
-                name: user.name,
+                username: user.username,
                 email: user.email,
                 role: user.role,
             },
+            homeModule: user.homeModule ?? null,
+            homeSmartphoneModule: user.homeSmartphoneModule ?? null,
+            permissions,
         };
     }
     async logout(sessionId) {
@@ -73,5 +66,7 @@ let AuthService = class AuthService {
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService, jwt_1.JwtService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        jwt_1.JwtService,
+        user_permissions_service_1.UserPermissionsService])
 ], AuthService);

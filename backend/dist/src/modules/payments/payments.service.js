@@ -14,10 +14,16 @@ exports.PaymentsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../common/prisma.service");
 const mp_config_service_1 = require("../common/mp-config.service");
+const journal_entries_service_1 = require("../treasury/journal-entries.service");
+const sales_service_1 = require("../sales/sales.service");
+const internet_vouchers_service_1 = require("../internet-vouchers/internet-vouchers.service");
 let PaymentsService = PaymentsService_1 = class PaymentsService {
-    constructor(prisma, mpConfig) {
+    constructor(prisma, mpConfig, salesService, journalEntriesService, internetVouchers) {
         this.prisma = prisma;
         this.mpConfig = mpConfig;
+        this.salesService = salesService;
+        this.journalEntriesService = journalEntriesService;
+        this.internetVouchers = internetVouchers;
         this.baseUrl = 'https://api.mercadopago.com';
         this.timeoutMs = 8000;
         this.logger = new common_1.Logger(PaymentsService_1.name);
@@ -182,8 +188,40 @@ let PaymentsService = PaymentsService_1 = class PaymentsService {
                     procesado: true,
                 },
             });
+            const setting = await tx.setting.findFirst();
+            if (setting?.enableAutoJournalPos) {
+                const pma = await tx.paymentMethodAccount.findUnique({
+                    where: { paymentMethod: 'TRANSFER' },
+                });
+                const ingresosAccount = await tx.ledgerAccount.findUnique({
+                    where: { code: '4.1.01' },
+                });
+                if (pma && ingresosAccount) {
+                    const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
+                        date: new Date(),
+                        description: `Venta POS - TRANSFER - Venta #${sale.id}`,
+                        lines: [
+                            { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
+                            { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
+                        ],
+                        sourceType: 'VENTA_POS',
+                        sourceId: sale.orderNumber,
+                    });
+                    await tx.sale.update({
+                        where: { id: sale.id },
+                        data: { journalEntryId: entry.id },
+                    });
+                }
+            }
             return sale;
         });
+        this.logger.log(`Venta transferencia creada saleId=${result.id}, decrementando stock...`);
+        await this.salesService.decrementStockForSale(result.id);
+        this.logger.log(`Stock decrementado para venta transferencia saleId=${result.id}`);
+        const vouchers = await this.internetVouchers.generateVouchersForSale(result.id);
+        if (vouchers.length > 0) {
+            this.logger.log(`${vouchers.length} voucher(s) generado(s) para venta transferencia saleId=${result.id}`);
+        }
         return {
             success: true,
             saleId: result.id,
@@ -199,5 +237,8 @@ exports.PaymentsService = PaymentsService;
 exports.PaymentsService = PaymentsService = PaymentsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        mp_config_service_1.MercadoPagoConfigService])
+        mp_config_service_1.MercadoPagoConfigService,
+        sales_service_1.SalesService,
+        journal_entries_service_1.JournalEntriesService,
+        internet_vouchers_service_1.InternetVouchersService])
 ], PaymentsService);

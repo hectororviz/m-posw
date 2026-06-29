@@ -9,9 +9,22 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ConfirmTransferDto = exports.PollTransferDto = void 0;
+exports.ConfirmTransferWithItemsDto = exports.ConfirmTransferDto = exports.PollTransferDto = exports.ConfirmTransferItemDto = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
+class ConfirmTransferItemDto {
+}
+exports.ConfirmTransferItemDto = ConfirmTransferItemDto;
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], ConfirmTransferItemDto.prototype, "productId", void 0);
+__decorate([
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_transformer_1.Type)(() => Number),
+    __metadata("design:type", Number)
+], ConfirmTransferItemDto.prototype, "quantity", void 0);
 class PollTransferDto {
 }
 exports.PollTransferDto = PollTransferDto;
@@ -40,3 +53,13 @@ __decorate([
     (0, class_transformer_1.Type)(() => Number),
     __metadata("design:type", Number)
 ], ConfirmTransferDto.prototype, "monto_esperado", void 0);
+class ConfirmTransferWithItemsDto extends ConfirmTransferDto {
+}
+exports.ConfirmTransferWithItemsDto = ConfirmTransferWithItemsDto;
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayMinSize)(1),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => ConfirmTransferItemDto),
+    __metadata("design:type", Array)
+], ConfirmTransferWithItemsDto.prototype, "items", void 0);

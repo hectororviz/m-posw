@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MercadoPagoWebhookController = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const throttler_1 = require("@nestjs/throttler");
 const mercadopago_webhook_processor_service_1 = require("../services/mercadopago-webhook-processor.service");
 const mercadopago_webhook_utils_1 = require("./mercadopago-webhook.utils");
 let MercadoPagoWebhookController = MercadoPagoWebhookController_1 = class MercadoPagoWebhookController {
@@ -126,6 +127,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MercadoPagoWebhookController.prototype, "handleWebhook", null);
 exports.MercadoPagoWebhookController = MercadoPagoWebhookController = MercadoPagoWebhookController_1 = __decorate([
+    (0, throttler_1.SkipThrottle)(),
     (0, common_1.Controller)('webhooks'),
     __metadata("design:paramtypes", [config_1.ConfigService,
         mercadopago_webhook_processor_service_1.MercadoPagoWebhookProcessorService])

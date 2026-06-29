@@ -14,20 +14,16 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const common_1 = require("@nestjs/common");
+const throttler_1 = require("@nestjs/throttler");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
 const auth_service_1 = require("./auth.service");
 const login_dto_1 = require("./dto/login.dto");
-const users_service_1 = require("../users/users.service");
 let AuthController = class AuthController {
-    constructor(authService, usersService) {
+    constructor(authService) {
         this.authService = authService;
-        this.usersService = usersService;
     }
     login(dto) {
         return this.authService.login(dto);
-    }
-    loginUsers() {
-        return this.usersService.listForLogin();
     }
     logout(req) {
         return this.authService.logout(req.user.sessionId);
@@ -35,18 +31,13 @@ let AuthController = class AuthController {
 };
 exports.AuthController = AuthController;
 __decorate([
+    (0, throttler_1.Throttle)({ default: { ttl: 60000, limit: 5 } }),
     (0, common_1.Post)('login'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [login_dto_1.LoginDto]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
-__decorate([
-    (0, common_1.Get)('login-users'),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", void 0)
-], AuthController.prototype, "loginUsers", null);
 __decorate([
     (0, common_1.Post)('logout'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
@@ -57,6 +48,5 @@ __decorate([
 ], AuthController.prototype, "logout", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
-    __metadata("design:paramtypes", [auth_service_1.AuthService,
-        users_service_1.UsersService])
+    __metadata("design:paramtypes", [auth_service_1.AuthService])
 ], AuthController);

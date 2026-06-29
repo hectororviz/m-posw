@@ -116,6 +116,17 @@ let LedgerAccountsService = class LedgerAccountsService {
             orderBy: { code: 'asc' },
         });
     }
+    async getTreasuryAccounts() {
+        return this.prisma.ledgerAccount.findMany({
+            where: {
+                acceptsEntries: true,
+                active: true,
+                code: { startsWith: '1.1' },
+            },
+            orderBy: { code: 'asc' },
+            select: { id: true, code: true, name: true },
+        });
+    }
 };
 exports.LedgerAccountsService = LedgerAccountsService;
 exports.LedgerAccountsService = LedgerAccountsService = __decorate([

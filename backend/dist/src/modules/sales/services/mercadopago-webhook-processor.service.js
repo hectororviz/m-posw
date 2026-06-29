@@ -16,21 +16,25 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../common/prisma.service");
 const mercadopago_query_service_1 = require("./mercadopago-query.service");
 const sales_gateway_1 = require("../websockets/sales.gateway");
+const sales_service_1 = require("../sales.service");
+const internet_vouchers_service_1 = require("../../internet-vouchers/internet-vouchers.service");
 const mercadopago_webhook_utils_1 = require("../webhooks/mercadopago-webhook.utils");
 let MercadoPagoWebhookProcessorService = MercadoPagoWebhookProcessorService_1 = class MercadoPagoWebhookProcessorService {
-    constructor(prisma, mpQueryService, salesGateway) {
+    constructor(prisma, mpQueryService, salesGateway, salesService, internetVouchers) {
         this.prisma = prisma;
         this.mpQueryService = mpQueryService;
         this.salesGateway = salesGateway;
+        this.salesService = salesService;
+        this.internetVouchers = internetVouchers;
         this.logger = new common_1.Logger(MercadoPagoWebhookProcessorService_1.name);
-        this.paymentRetryDelaysMs = [3000, 10000, 20000];
+        this.paymentRetryDelaysMs = [3000, 10000, 20000, 40000, 80000];
     }
     async processWebhook(payload) {
         const { topic, resourceId, requestId } = payload;
         const eventResourceId = resourceId ?? 'unknown';
-        const shouldProcess = await this.ensureIdempotency(topic, eventResourceId);
-        if (!shouldProcess) {
-            return;
+        const isNewEvent = await this.ensureIdempotency(topic, eventResourceId);
+        if (!isNewEvent) {
+            this.logger.debug(`WEBHOOK_MP_DUPLICATE_EVENT topic=${topic} resourceId=${eventResourceId} — processing anyway to catch status transitions`);
         }
         if (topic === 'merchant_order') {
             const resourceUrl = typeof payload.body?.resource === 'string' ? payload.body.resource : null;
@@ -137,7 +141,8 @@ let MercadoPagoWebhookProcessorService = MercadoPagoWebhookProcessorService_1 = 
             data: updateData,
         });
         if (wasNotApproved && resolvedSaleStatus === client_1.SaleStatus.APPROVED) {
-            await this.decrementStockForSale(sale.id);
+            await this.salesService.decrementStockForSale(sale.id);
+            this.internetVouchers.generateVouchersForSale(sale.id).catch(err => this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`));
         }
         this.salesGateway.notifyPaymentStatusChanged({
             saleId: updatedSale.id,
@@ -364,23 +369,13 @@ let MercadoPagoWebhookProcessorService = MercadoPagoWebhookProcessorService_1 = 
         }
         return [];
     }
-    async decrementStockForSale(saleId) {
-        const saleItems = await this.prisma.saleItem.findMany({
-            where: { saleId },
-            select: { productId: true, quantity: true },
-        });
-        for (const item of saleItems) {
-            await this.prisma.product.update({
-                where: { id: item.productId },
-                data: { stock: { decrement: item.quantity } },
-            });
-        }
-    }
 };
 exports.MercadoPagoWebhookProcessorService = MercadoPagoWebhookProcessorService;
 exports.MercadoPagoWebhookProcessorService = MercadoPagoWebhookProcessorService = MercadoPagoWebhookProcessorService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         mercadopago_query_service_1.MercadoPagoQueryService,
-        sales_gateway_1.SalesGateway])
+        sales_gateway_1.SalesGateway,
+        sales_service_1.SalesService,
+        internet_vouchers_service_1.InternetVouchersService])
 ], MercadoPagoWebhookProcessorService);

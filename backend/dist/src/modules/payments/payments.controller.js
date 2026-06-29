@@ -14,10 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentsController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
 const payments_service_1 = require("./payments.service");
 const transfer_dto_1 = require("./dto/transfer.dto");
 let PaymentsController = class PaymentsController {
@@ -34,7 +31,6 @@ let PaymentsController = class PaymentsController {
 exports.PaymentsController = PaymentsController;
 __decorate([
     (0, common_1.Post)('poll-transfer'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -43,15 +39,14 @@ __decorate([
 ], PaymentsController.prototype, "pollTransfer", null);
 __decorate([
     (0, common_1.Post)('confirm-transfer'),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object, transfer_dto_1.ConfirmTransferWithItemsDto]),
     __metadata("design:returntype", Promise)
 ], PaymentsController.prototype, "confirmTransfer", null);
 exports.PaymentsController = PaymentsController = __decorate([
     (0, common_1.Controller)('payments'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [payments_service_1.PaymentsService])
 ], PaymentsController);

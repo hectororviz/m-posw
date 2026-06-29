@@ -17,9 +17,10 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const ExcelJS = require("exceljs");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
+const module_access_guard_1 = require("../common/module-access.guard");
+const module_access_decorator_1 = require("../common/module-access.decorator");
 const accounting_service_1 = require("./accounting.service");
+const ledger_accounts_service_1 = require("../treasury/ledger-accounts.service");
 const assign_category_dto_1 = require("./dto/assign-category.dto");
 const create_category_dto_1 = require("./dto/create-category.dto");
 const create_movement_dto_1 = require("./dto/create-movement.dto");
@@ -27,8 +28,12 @@ const query_movements_dto_1 = require("./dto/query-movements.dto");
 const update_category_dto_1 = require("./dto/update-category.dto");
 const update_movement_dto_1 = require("./dto/update-movement.dto");
 let AccountingController = class AccountingController {
-    constructor(accountingService) {
+    constructor(accountingService, ledgerAccountsService) {
         this.accountingService = accountingService;
+        this.ledgerAccountsService = ledgerAccountsService;
+    }
+    getTreasuryAccounts() {
+        return this.ledgerAccountsService.getTreasuryAccounts();
     }
     listCategories(type) {
         return this.accountingService.listCategories(type);
@@ -149,6 +154,12 @@ let AccountingController = class AccountingController {
 };
 exports.AccountingController = AccountingController;
 __decorate([
+    (0, common_1.Get)('accounts/treasury'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AccountingController.prototype, "getTreasuryAccounts", null);
+__decorate([
     (0, common_1.Get)('categories'),
     __param(0, (0, common_1.Query)('type')),
     __metadata("design:type", Function),
@@ -157,6 +168,7 @@ __decorate([
 ], AccountingController.prototype, "listCategories", null);
 __decorate([
     (0, common_1.Post)('categories'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [create_category_dto_1.CreateCategoryDto]),
@@ -164,6 +176,7 @@ __decorate([
 ], AccountingController.prototype, "createCategory", null);
 __decorate([
     (0, common_1.Patch)('categories/:id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -172,6 +185,7 @@ __decorate([
 ], AccountingController.prototype, "updateCategory", null);
 __decorate([
     (0, common_1.Delete)('categories/:id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -186,6 +200,7 @@ __decorate([
 ], AccountingController.prototype, "listMovements", null);
 __decorate([
     (0, common_1.Post)('movements'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [create_movement_dto_1.CreateMovementDto]),
@@ -193,6 +208,7 @@ __decorate([
 ], AccountingController.prototype, "createMovement", null);
 __decorate([
     (0, common_1.Patch)('movements/:id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -201,6 +217,7 @@ __decorate([
 ], AccountingController.prototype, "updateMovement", null);
 __decorate([
     (0, common_1.Delete)('movements/:id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -215,6 +232,7 @@ __decorate([
 ], AccountingController.prototype, "listManualMovements", null);
 __decorate([
     (0, common_1.Post)('manual-movements/:id/category'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -223,6 +241,7 @@ __decorate([
 ], AccountingController.prototype, "assignCategory", null);
 __decorate([
     (0, common_1.Delete)('manual-movements/:id/category'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -247,7 +266,8 @@ __decorate([
 ], AccountingController.prototype, "exportExcel", null);
 exports.AccountingController = AccountingController = __decorate([
     (0, common_1.Controller)('accounting'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
-    __metadata("design:paramtypes", [accounting_service_1.AccountingService])
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.TESORERIA, client_1.ModuleAccess.READ),
+    __metadata("design:paramtypes", [accounting_service_1.AccountingService,
+        ledger_accounts_service_1.LedgerAccountsService])
 ], AccountingController);

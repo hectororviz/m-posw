@@ -14,121 +14,147 @@ const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const bcrypt = require("bcrypt");
 const prisma_service_1 = require("../common/prisma.service");
+const user_permissions_service_1 = require("./user-permissions.service");
 let UsersService = class UsersService {
-    constructor(prisma) {
+    constructor(prisma, userPermissionsService) {
         this.prisma = prisma;
+        this.userPermissionsService = userPermissionsService;
     }
     async create(dto) {
         if (!dto?.password) {
             throw new common_1.BadRequestException('Password requerido');
         }
-        const role = dto.role || 'USER';
-        const externalPosId = dto.externalPosId || (role === 'USER' ? `POS-${dto.name.replace(/\s+/g, '')}-${Date.now().toString(36)}` : undefined);
-        const existingByName = await this.prisma.user.findUnique({ where: { name: dto.name } });
-        if (existingByName) {
+        const existingByUsername = await this.prisma.user.findUnique({ where: { username: dto.username } });
+        if (existingByUsername) {
             throw new common_1.BadRequestException('Usuario ya registrado');
-        }
-        if (dto.email) {
-            const existingByEmail = await this.prisma.user.findUnique({ where: { email: dto.email } });
-            if (existingByEmail) {
-                throw new common_1.BadRequestException('Email ya registrado');
-            }
         }
         const password = await bcrypt.hash(dto.password, 10);
         try {
-            return await this.prisma.user.create({
+            const user = await this.prisma.user.create({
                 data: {
-                    email: dto.email,
-                    name: dto.name,
+                    username: dto.username,
                     password,
-                    role,
+                    role: 'USER',
                     active: true,
-                    externalPosId,
-                    externalStoreId: dto.externalStoreId,
+                    homeModule: dto.homeModule ?? null,
+                    homeSmartphoneModule: dto.homeSmartphoneModule ?? null,
                 },
                 select: {
                     id: true,
-                    email: true,
-                    name: true,
+                    username: true,
                     role: true,
                     active: true,
+                    homeModule: true,
+                    homeSmartphoneModule: true,
                     externalPosId: true,
                     externalStoreId: true,
                 },
             });
+            if (dto.permissions && dto.permissions.length > 0) {
+                await this.userPermissionsService.setPermissions(user.id, dto.permissions);
+            }
+            const permissions = await this.userPermissionsService.getPermissions(user.id);
+            return { ...user, permissions };
         }
         catch (error) {
             if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                const target = error.meta?.target;
-                const targets = Array.isArray(target) ? target : typeof target === 'string' ? [target] : [];
-                if (targets.includes('email')) {
-                    throw new common_1.BadRequestException('Email ya registrado');
-                }
-                if (targets.includes('name')) {
-                    throw new common_1.BadRequestException('Usuario ya registrado');
-                }
                 throw new common_1.BadRequestException('Usuario ya registrado');
             }
             throw error;
         }
     }
-    list() {
-        return this.prisma.user.findMany({
+    async list() {
+        const users = await this.prisma.user.findMany({
             select: {
                 id: true,
+                username: true,
                 email: true,
-                name: true,
                 role: true,
                 active: true,
+                homeModule: true,
+                homeSmartphoneModule: true,
                 externalPosId: true,
                 externalStoreId: true,
                 createdAt: true,
             },
             orderBy: { createdAt: 'desc' },
         });
-    }
-    listForLogin() {
-        return this.prisma.user.findMany({
-            where: { active: true },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                role: true,
-                active: true,
-                externalPosId: true,
-            },
-            orderBy: { name: 'asc' },
-        });
+        const result = [];
+        for (const user of users) {
+            const permissions = user.role === 'ADMIN'
+                ? []
+                : await this.userPermissionsService.getPermissions(user.id);
+            result.push({ ...user, permissions });
+        }
+        return result;
     }
     async update(id, dto) {
-        const data = { ...dto };
+        const user = await this.prisma.user.findUnique({
+            where: { id },
+            select: { role: true },
+        });
+        if (!user) {
+            throw new common_1.BadRequestException('Usuario no encontrado');
+        }
+        if (user.role === 'ADMIN') {
+            throw new common_1.BadRequestException('No se puede modificar al administrador');
+        }
+        const data = {};
+        if (dto.username !== undefined)
+            data.username = dto.username;
+        if (dto.active !== undefined)
+            data.active = dto.active;
+        if (dto.homeModule !== undefined)
+            data.homeModule = dto.homeModule;
+        if (dto.homeSmartphoneModule !== undefined)
+            data.homeSmartphoneModule = dto.homeSmartphoneModule;
+        if (dto.externalPosId !== undefined)
+            data.externalPosId = dto.externalPosId;
+        if (dto.externalStoreId !== undefined)
+            data.externalStoreId = dto.externalStoreId;
         if (dto.password) {
             data.password = await bcrypt.hash(dto.password, 10);
         }
-        return this.prisma.user.update({
+        const result = await this.prisma.user.update({
             where: { id },
             data,
             select: {
                 id: true,
-                email: true,
-                name: true,
+                username: true,
                 role: true,
                 active: true,
+                homeModule: true,
+                homeSmartphoneModule: true,
                 externalPosId: true,
                 externalStoreId: true,
             },
         });
+        if (dto.permissions !== undefined) {
+            await this.userPermissionsService.setPermissions(id, dto.permissions);
+        }
+        const permissions = await this.userPermissionsService.getPermissions(result.id);
+        return { ...result, permissions };
     }
     async remove(id) {
+        const user = await this.prisma.user.findUnique({
+            where: { id },
+            select: { role: true, username: true },
+        });
+        if (!user) {
+            throw new common_1.BadRequestException('Usuario no encontrado');
+        }
+        if (user.role === 'ADMIN') {
+            throw new common_1.BadRequestException('No se puede eliminar al administrador');
+        }
         return this.prisma.user.delete({
             where: { id },
-            select: { id: true, name: true },
+            select: { id: true, username: true },
         });
     }
 };
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        user_permissions_service_1.UserPermissionsService])
 ], UsersService);

@@ -16,8 +16,8 @@ exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
+const module_access_guard_1 = require("../common/module-access.guard");
+const module_access_decorator_1 = require("../common/module-access.decorator");
 const create_user_dto_1 = require("./dto/create-user.dto");
 const update_user_dto_1 = require("./dto/update-user.dto");
 const users_service_1 = require("./users.service");
@@ -41,6 +41,7 @@ let UsersController = class UsersController {
 exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Post)(),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [create_user_dto_1.CreateUserDto]),
@@ -54,6 +55,7 @@ __decorate([
 ], UsersController.prototype, "list", null);
 __decorate([
     (0, common_1.Patch)(':id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -62,6 +64,7 @@ __decorate([
 ], UsersController.prototype, "update", null);
 __decorate([
     (0, common_1.Delete)(':id'),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -69,7 +72,7 @@ __decorate([
 ], UsersController.prototype, "remove", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.Controller)('users'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.READ),
     __metadata("design:paramtypes", [users_service_1.UsersService])
 ], UsersController);

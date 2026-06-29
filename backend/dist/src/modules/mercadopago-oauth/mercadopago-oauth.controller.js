@@ -16,8 +16,11 @@ exports.MercadoPagoOauthController = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
+const module_access_guard_1 = require("../common/module-access.guard");
+const module_access_decorator_1 = require("../common/module-access.decorator");
+const select_store_dto_1 = require("./dto/select-store.dto");
+const setup_pos_dto_1 = require("./dto/setup-pos.dto");
+const token_exchange_dto_1 = require("./dto/token-exchange.dto");
 const mercadopago_oauth_service_1 = require("./mercadopago-oauth.service");
 let MercadoPagoOauthController = class MercadoPagoOauthController {
     constructor(mpOauthService) {
@@ -42,10 +45,35 @@ let MercadoPagoOauthController = class MercadoPagoOauthController {
         return this.mpOauthService.selectStore(body.storeId, body.posId);
     }
     setupPos(body) {
-        return this.mpOauthService.setupPos(body.storeName, body.posName, body.streetName, body.streetNumber, body.cityName, body.stateName, body.zipCode);
+        return this.mpOauthService.setupPos(body.storeName, body.posName, body.streetName, body.streetNumber, body.cityName, body.stateName, body.zipCode, body.latitude, body.longitude);
     }
     getQr() {
         return this.mpOauthService.getQr();
+    }
+    async cityByZip(zip) {
+        if (!zip) {
+            throw new common_1.HttpException('Parametro "zip" requerido', common_1.HttpStatus.BAD_REQUEST);
+        }
+        const result = await this.mpOauthService.cityByZip(zip);
+        if (!result) {
+            throw new common_1.HttpException('Ciudad no encontrada para ese codigo postal', common_1.HttpStatus.NOT_FOUND);
+        }
+        return result;
+    }
+    async cities(stateName, q) {
+        if (q) {
+            return this.mpOauthService.searchCities(q);
+        }
+        return this.mpOauthService.getCities(stateName);
+    }
+    async citiesList() {
+        return this.mpOauthService.getMpCityList();
+    }
+    async cityZipcodes(city) {
+        if (!city) {
+            throw new common_1.HttpException('Parametro "city" requerido', common_1.HttpStatus.BAD_REQUEST);
+        }
+        return this.mpOauthService.getCityZipcodes(city);
     }
     deletePosSetup() {
         return this.mpOauthService.deletePosSetup();
@@ -62,7 +90,7 @@ __decorate([
     (0, common_1.Post)('token'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [token_exchange_dto_1.TokenExchangeDto]),
     __metadata("design:returntype", void 0)
 ], MercadoPagoOauthController.prototype, "token", null);
 __decorate([
@@ -87,14 +115,14 @@ __decorate([
     (0, common_1.Post)('select-store'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [select_store_dto_1.SelectStoreDto]),
     __metadata("design:returntype", void 0)
 ], MercadoPagoOauthController.prototype, "selectStore", null);
 __decorate([
     (0, common_1.Post)('setup-pos'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [setup_pos_dto_1.SetupPosDto]),
     __metadata("design:returntype", void 0)
 ], MercadoPagoOauthController.prototype, "setupPos", null);
 __decorate([
@@ -104,6 +132,34 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], MercadoPagoOauthController.prototype, "getQr", null);
 __decorate([
+    (0, common_1.Get)('city-by-zip'),
+    __param(0, (0, common_1.Query)('zip')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], MercadoPagoOauthController.prototype, "cityByZip", null);
+__decorate([
+    (0, common_1.Get)('cities'),
+    __param(0, (0, common_1.Query)('stateName')),
+    __param(1, (0, common_1.Query)('q')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], MercadoPagoOauthController.prototype, "cities", null);
+__decorate([
+    (0, common_1.Get)('cities-list'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], MercadoPagoOauthController.prototype, "citiesList", null);
+__decorate([
+    (0, common_1.Get)('city-zipcodes'),
+    __param(0, (0, common_1.Query)('city')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], MercadoPagoOauthController.prototype, "cityZipcodes", null);
+__decorate([
     (0, common_1.Delete)('setup-pos'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
@@ -111,7 +167,7 @@ __decorate([
 ], MercadoPagoOauthController.prototype, "deletePosSetup", null);
 exports.MercadoPagoOauthController = MercadoPagoOauthController = __decorate([
     (0, common_1.Controller)('mp-oauth'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, module_access_guard_1.ModuleAccessGuard),
+    (0, module_access_decorator_1.RequireModule)(client_1.ModuleKey.CONFIGURACION, client_1.ModuleAccess.FULL),
     __metadata("design:paramtypes", [mercadopago_oauth_service_1.MercadoPagoOauthService])
 ], MercadoPagoOauthController);

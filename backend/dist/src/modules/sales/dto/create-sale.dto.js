@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateQrSaleDto = exports.CreateCashSaleDto = exports.CreateSaleDto = exports.SaleItemInputDto = void 0;
+exports.CreateFiadoSaleDto = exports.CreateQrSaleDto = exports.CreateCashSaleDto = exports.CreateSaleDto = exports.SaleItemInputDto = void 0;
 const class_validator_1 = require("class-validator");
 class SaleItemInputDto {
 }
@@ -66,3 +66,20 @@ __decorate([
     (0, class_validator_1.IsIn)(['MP_QR']),
     __metadata("design:type", String)
 ], CreateQrSaleDto.prototype, "paymentMethod", void 0);
+class CreateFiadoSaleDto extends CreateSaleDto {
+}
+exports.CreateFiadoSaleDto = CreateFiadoSaleDto;
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
+    __metadata("design:type", Number)
+], CreateFiadoSaleDto.prototype, "total", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsIn)(['FIADO']),
+    __metadata("design:type", String)
+], CreateFiadoSaleDto.prototype, "paymentMethod", void 0);
+__decorate([
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], CreateFiadoSaleDto.prototype, "acreedorId", void 0);

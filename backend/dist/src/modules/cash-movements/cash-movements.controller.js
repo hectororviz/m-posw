@@ -14,10 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CashMovementsController = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
 const jwt_auth_guard_1 = require("../common/jwt-auth.guard");
-const roles_decorator_1 = require("../common/roles.decorator");
-const roles_guard_1 = require("../common/roles.guard");
 const create_cash_movement_dto_1 = require("./dto/create-cash-movement.dto");
 const cash_movements_service_1 = require("./cash-movements.service");
 let CashMovementsController = class CashMovementsController {
@@ -34,7 +31,6 @@ let CashMovementsController = class CashMovementsController {
 exports.CashMovementsController = CashMovementsController;
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -43,7 +39,6 @@ __decorate([
 ], CashMovementsController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)(client_1.Role.ADMIN, client_1.Role.USER),
     __param(0, (0, common_1.Query)('limit')),
     __param(1, (0, common_1.Query)('offset')),
     __metadata("design:type", Function),
@@ -52,6 +47,6 @@ __decorate([
 ], CashMovementsController.prototype, "list", null);
 exports.CashMovementsController = CashMovementsController = __decorate([
     (0, common_1.Controller)('cash-movements'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __metadata("design:paramtypes", [cash_movements_service_1.CashMovementsService])
 ], CashMovementsController);

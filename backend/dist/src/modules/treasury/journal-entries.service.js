@@ -40,17 +40,17 @@ let JournalEntriesService = class JournalEntriesService {
         return this.prisma.journalEntry.findMany({
             where,
             include: {
-                createdBy: { select: { id: true, name: true } },
+                createdBy: { select: { id: true, username: true } },
                 lines: { include: { account: true } },
             },
-            orderBy: { date: 'desc' },
+            orderBy: { entryNumber: 'desc' },
         });
     }
     async getById(id) {
         const entry = await this.prisma.journalEntry.findUnique({
             where: { id },
             include: {
-                createdBy: { select: { id: true, name: true } },
+                createdBy: { select: { id: true, username: true } },
                 lines: {
                     include: { account: true },
                     orderBy: { createdAt: 'asc' },
@@ -98,7 +98,7 @@ let JournalEntriesService = class JournalEntriesService {
                     },
                 },
                 include: {
-                    createdBy: { select: { id: true, name: true } },
+                    createdBy: { select: { id: true, username: true } },
                     lines: { include: { account: true } },
                 },
             });
@@ -170,7 +170,7 @@ let JournalEntriesService = class JournalEntriesService {
                 where: { id },
                 data,
                 include: {
-                    createdBy: { select: { id: true, name: true } },
+                    createdBy: { select: { id: true, username: true } },
                     lines: { include: { account: true } },
                 },
             });
@@ -204,7 +204,7 @@ let JournalEntriesService = class JournalEntriesService {
             where: { id },
             data: { status: 'POSTED', postedAt: new Date() },
             include: {
-                createdBy: { select: { id: true, name: true } },
+                createdBy: { select: { id: true, username: true } },
                 lines: { include: { account: true } },
             },
         });
@@ -261,6 +261,38 @@ let JournalEntriesService = class JournalEntriesService {
                 },
             });
             return reversal;
+        });
+    }
+    async createAutomatedEntry(tx, userId, params) {
+        this.validateLines(params.lines);
+        const date = params.date || new Date();
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const seq = await this.getNextSequence(tx, year);
+        const entryNumber = this.formatEntryNumber(seq, month, year);
+        const status = params.status || 'POSTED';
+        return tx.journalEntry.create({
+            data: {
+                entryNumber,
+                sequenceNumber: seq,
+                fiscalYear: year,
+                month,
+                date,
+                description: params.description,
+                status,
+                postedAt: status === 'POSTED' ? new Date() : null,
+                sourceType: params.sourceType,
+                sourceId: params.sourceId,
+                createdById: userId,
+                lines: {
+                    create: params.lines.map((l) => ({
+                        accountId: l.accountId,
+                        debit: l.debit,
+                        credit: l.credit,
+                        description: l.description,
+                    })),
+                },
+            },
         });
     }
     async getNextSequence(tx, fiscalYear) {
