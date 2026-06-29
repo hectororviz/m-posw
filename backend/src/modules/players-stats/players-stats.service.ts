@@ -66,7 +66,7 @@ export class PlayersStatsService {
       }
     }
 
-    playersByCategory.sort((a, b) => b.count - a.count || a.tournamentName.localeCompare(b.tournamentName));
+    playersByCategory.sort((a, b) => a.categoryName.localeCompare(b.categoryName, undefined, { numeric: true }));
 
     // Upcoming birthdays (next 20 days) — include category from most recent tournament
     const today = new Date();
