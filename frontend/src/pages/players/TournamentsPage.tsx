@@ -44,6 +44,12 @@ export const TournamentsPage: React.FC = () => {
   const handleSave = async () => {
     setFormError(null);
     if (!form.name.trim()) { setFormError('El nombre es obligatorio'); return; }
+    const byMin = form.birthYearMin ? +form.birthYearMin : 0;
+    const byMax = form.birthYearMax ? +form.birthYearMax : 0;
+    if (byMin && byMax && byMin > byMax) {
+      setFormError('El año de nacimiento mínimo no puede ser mayor al máximo');
+      return;
+    }
     setSaving(true);
     try {
       const payload: any = { name: form.name.trim(), year: +form.year, allowedSex: form.allowedSex, categoryIds: form.categoryIds };

@@ -111,6 +111,7 @@ export class TournamentsService {
   }
 
   async create(dto: CreateTournamentDto) {
+    this.validateBirthYearRange(dto.birthYearMin, dto.birthYearMax);
     const tournament = await this.prisma.tournament.create({
       data: {
         name: dto.name,
@@ -140,6 +141,10 @@ export class TournamentsService {
     if (!tournament) {
       throw new NotFoundException('Torneo no encontrado');
     }
+
+    const effectiveMin = dto.birthYearMin !== undefined ? dto.birthYearMin : tournament.birthYearMin;
+    const effectiveMax = dto.birthYearMax !== undefined ? dto.birthYearMax : tournament.birthYearMax;
+    this.validateBirthYearRange(effectiveMin, effectiveMax);
 
     const updated = await this.prisma.tournament.update({
       where: { id },
@@ -450,5 +455,13 @@ export class TournamentsService {
     }
 
     return null;
+  }
+
+  private validateBirthYearRange(min?: number | null, max?: number | null) {
+    if (min != null && max != null && min > max) {
+      throw new BadRequestException(
+        `El año de nacimiento mínimo (${min}) no puede ser mayor al máximo (${max})`,
+      );
+    }
   }
 }
