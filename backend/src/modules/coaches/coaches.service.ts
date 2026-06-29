@@ -413,6 +413,7 @@ export class CoachesService {
           doc.moveDown(0.2);
           doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke('#eeeeee');
           doc.moveDown(0.5);
+          doc.x = 50;
         }
       });
 
