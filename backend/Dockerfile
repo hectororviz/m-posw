@@ -8,7 +8,7 @@ COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 COPY public ./public
 COPY resources ./resources
-RUN npm run build && npx tsc --outDir dist-prisma --rootDir prisma prisma/seed.ts
+RUN node -e "console.log(process.arch, process.version)" && npx prisma -v && npm run build && npx tsc --outDir dist-prisma --rootDir prisma prisma/seed.ts
 
 FROM node:20-bookworm-slim
 WORKDIR /app
