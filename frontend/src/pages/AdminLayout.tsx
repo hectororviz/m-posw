@@ -3,8 +3,6 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
-import { AppLayout } from '../components/AppLayout';
-import { useModuleAccess } from '../hooks/useModuleAccess';
 import { useAuth } from '../context/AuthContext';
 
 const COLLAPSE_BREAKPOINT = 1200;
@@ -80,16 +78,14 @@ const navCategories: NavCategoryDef[] = [
 
 export const AdminLayout: React.FC = () => {
   const { data: settings } = useSettings();
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
-  const storeName = settings?.storeName ?? 'm-POSw';
-  const logoUrl = buildImageUrl(settings?.logoUrl);
-  const [logoError, setLogoError] = useState(false);
-  const initials = getInitials(storeName);
-  const showLogo = Boolean(logoUrl) && !logoError;
-  const location = useLocation();
 
-  const moduleAccess = useModuleAccess;
+  const getModuleAccess = useCallback((module: string): string => {
+    if (isAdmin) return 'FULL';
+    const perm = permissions.find((p: any) => p.module === module);
+    return perm?.access ?? 'HIDDEN';
+  }, [isAdmin, permissions]);
 
   const prevWidthRef = useRef<number>(
     typeof window !== 'undefined' ? window.innerWidth : COLLAPSE_BREAKPOINT + 1
@@ -158,11 +154,11 @@ export const AdminLayout: React.FC = () => {
       if (settingVal === false) return false;
     }
     if (!isAdmin && item.permissionModule) {
-      const access = moduleAccess(item.permissionModule as any);
+      const access = getModuleAccess(item.permissionModule);
       if (access === 'HIDDEN') return false;
     }
     return true;
-  }, [settings, isAdmin, moduleAccess]);
+  }, [settings, isAdmin, getModuleAccess]);
 
   const filteredCategories = useMemo(() => {
     return navCategories

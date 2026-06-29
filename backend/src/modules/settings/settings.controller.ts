@@ -10,15 +10,15 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import type { Express } from 'express';
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { diskStorage } from 'multer';
 import { join } from 'path';
 import sharp = require('sharp');
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { SETTINGS_IMAGE_SUBDIR, UPLOADS_DIR, IMAGE_MAX_DIMENSION, IMAGE_QUALITY } from '../common/upload.constants';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 import { SettingsService } from './settings.service';
@@ -111,20 +111,21 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
   get() {
     return this.settingsService.get();
   }
 
   @Patch()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
   update(@Body() dto: UpdateSettingDto) {
     return this.settingsService.update(dto);
   }
 
   @Post('logo')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
   @UseInterceptors(FileInterceptor('file', logoUploadOptions))
   async uploadLogo(@UploadedFile() file?: Express.Multer.File) {
     if (!file) {
@@ -155,8 +156,8 @@ export class SettingsController {
   }
 
   @Post('favicon')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
   @UseInterceptors(FileInterceptor('file', faviconUploadOptions))
   uploadFavicon(@UploadedFile() file?: Express.Multer.File) {
     if (!file) {
@@ -166,8 +167,8 @@ export class SettingsController {
   }
 
   @Post('animation-ok')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
   @UseInterceptors(FileInterceptor('file', animationUploadOptions))
   uploadOkAnimation(@UploadedFile() file?: Express.Multer.File) {
     if (!file) {
@@ -184,8 +185,8 @@ export class SettingsController {
   }
 
   @Post('animation-error')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
   @UseInterceptors(FileInterceptor('file', animationUploadOptions))
   uploadErrorAnimation(@UploadedFile() file?: Express.Multer.File) {
     if (!file) {

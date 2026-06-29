@@ -1,13 +1,13 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { StatsService } from './stats.service';
 
 @Controller('stats')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
+@RequireModule(ModuleKey.REPORTES, ModuleAccess.READ)
 export class StatsController {
   constructor(private readonly statsService: StatsService) {}
 

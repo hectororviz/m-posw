@@ -10,12 +10,12 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import type { Response } from 'express';
 import * as ExcelJS from 'exceljs';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { AccountingService } from './accounting.service';
 import { LedgerAccountsService } from '../treasury/ledger-accounts.service';
 import { AssignCategoryDto } from './dto/assign-category.dto';
@@ -26,8 +26,8 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateMovementDto } from './dto/update-movement.dto';
 
 @Controller('accounting')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
+@RequireModule(ModuleKey.TESORERIA, ModuleAccess.READ)
 export class AccountingController {
   constructor(
     private readonly accountingService: AccountingService,
@@ -49,16 +49,19 @@ export class AccountingController {
   }
 
   @Post('categories')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   createCategory(@Body() dto: CreateCategoryDto) {
     return this.accountingService.createCategory(dto);
   }
 
   @Patch('categories/:id')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   updateCategory(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
     return this.accountingService.updateCategory(id, dto);
   }
 
   @Delete('categories/:id')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   deleteCategory(@Param('id') id: string) {
     return this.accountingService.deleteCategory(id);
   }
@@ -71,16 +74,19 @@ export class AccountingController {
   }
 
   @Post('movements')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   createMovement(@Body() dto: CreateMovementDto) {
     return this.accountingService.createMovement(dto);
   }
 
   @Patch('movements/:id')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   updateMovement(@Param('id') id: string, @Body() dto: UpdateMovementDto) {
     return this.accountingService.updateMovement(id, dto);
   }
 
   @Delete('movements/:id')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   deleteMovement(@Param('id') id: string) {
     return this.accountingService.deleteMovement(id);
   }
@@ -93,11 +99,13 @@ export class AccountingController {
   }
 
   @Post('manual-movements/:id/category')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   assignCategory(@Param('id') id: string, @Body() dto: AssignCategoryDto) {
     return this.accountingService.assignCategoryToManualMovement(id, dto);
   }
 
   @Delete('manual-movements/:id/category')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   removeCategory(@Param('id') id: string) {
     return this.accountingService.removeCategoryFromManualMovement(id);
   }

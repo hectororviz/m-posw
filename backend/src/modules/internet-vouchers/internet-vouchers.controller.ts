@@ -1,8 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
 import { PrismaService } from '../common/prisma.service';
 import { GenerateVoucherDto } from './dto/generate-voucher.dto';
 import { InternetVouchersService } from './internet-vouchers.service';

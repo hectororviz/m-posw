@@ -2,8 +2,17 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 
+const ACCESS_CACHE_TTL_MS = 5000; // 5 seconds
+
+interface CacheEntry {
+  access: ModuleAccess;
+  ts: number;
+}
+
 @Injectable()
 export class UserPermissionsService {
+  private accessCache = new Map<string, CacheEntry>();
+
   constructor(private prisma: PrismaService) {}
 
   async getPermissions(userId: string): Promise<{ module: ModuleKey; access: ModuleAccess }[]> {
@@ -64,9 +73,18 @@ export class UserPermissionsService {
         });
       }
     });
+
+    // Invalidate all cache entries for this user
+    this.invalidateUserCache(userId);
   }
 
   async resolveAccess(userId: string, module: ModuleKey): Promise<ModuleAccess> {
+    const cacheKey = `${userId}:${module}`;
+    const cached = this.accessCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < ACCESS_CACHE_TTL_MS) {
+      return cached.access;
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { role: true },
@@ -77,6 +95,8 @@ export class UserPermissionsService {
     }
 
     if (user.role === 'ADMIN') {
+      // Cache admin access too
+      this.accessCache.set(cacheKey, { access: 'FULL', ts: Date.now() });
       return 'FULL';
     }
 
@@ -84,6 +104,17 @@ export class UserPermissionsService {
       where: { userId_module: { userId, module } },
     });
 
-    return perm?.access ?? 'HIDDEN';
+    const access = perm?.access ?? 'HIDDEN';
+    this.accessCache.set(cacheKey, { access, ts: Date.now() });
+    return access;
+  }
+
+  private invalidateUserCache(userId: string) {
+    const prefix = `${userId}:`;
+    for (const key of this.accessCache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.accessCache.delete(key);
+      }
+    }
   }
 }

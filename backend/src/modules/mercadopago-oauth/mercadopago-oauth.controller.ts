@@ -1,16 +1,16 @@
 import { Body, Controller, Delete, Get, HttpException, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { SelectStoreDto } from './dto/select-store.dto';
 import { SetupPosDto } from './dto/setup-pos.dto';
 import { TokenExchangeDto } from './dto/token-exchange.dto';
 import { MercadoPagoOauthService } from './mercadopago-oauth.service';
 
 @Controller('mp-oauth')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
+@RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
 export class MercadoPagoOauthController {
   constructor(private readonly mpOauthService: MercadoPagoOauthService) {}
 

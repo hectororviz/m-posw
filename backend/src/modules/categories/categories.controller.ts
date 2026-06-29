@@ -14,12 +14,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import type { Express } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../common/upload.constants';
 import { mapProducts } from '../products/product.mapper';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -39,22 +39,22 @@ export class CategoriesController {
   }
 
   @Get('all')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.READ)
   listAll() {
     return this.categoriesService.listAll();
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   create(@Body() dto: CreateCategoryDto) {
     return this.categoriesService.create(dto);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   update(@Param('id') id: string, @Body() dto: UpdateCategoryDto) {
     if (process.env.NODE_ENV !== 'production') {
       this.logger.debug(`PATCH /categories/${id} body: ${JSON.stringify(dto)}`);
@@ -73,15 +73,15 @@ export class CategoriesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   remove(@Param('id') id: string) {
     return this.categoriesService.remove(id);
   }
 
   @Post(':id/image')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -103,8 +103,11 @@ export class CategoriesController {
   }
 
   @Delete(':id/image')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
+  @Delete(':id/image')
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   deleteImage(@Param('id') id: string) {
     return this.categoriesService.deleteImage(id);
   }

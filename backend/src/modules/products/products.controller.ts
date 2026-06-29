@@ -13,12 +13,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import type { Express } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from '../common/upload.constants';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -37,16 +37,16 @@ export class ProductsController {
   }
 
   @Get('raw-materials')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.READ)
   async listRawMaterials() {
     const products = await this.productsService.listRawMaterials();
     return mapProducts(products);
   }
 
   @Get('all')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.READ)
   async listAll() {
     const products = await this.productsService.listAll();
     return products.map(product => ({
@@ -61,8 +61,8 @@ export class ProductsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   async create(@Body() dto: CreateProductDto) {
     const product = await this.productsService.create(dto);
     return {
@@ -77,8 +77,8 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     const product = await this.productsService.update(id, dto);
     return {
@@ -93,15 +93,15 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
 
   @Post(':id/image')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -123,8 +123,8 @@ export class ProductsController {
   }
 
   @Delete(':id/image')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.PRODUCTOS, ModuleAccess.FULL)
   async deleteImage(@Param('id') id: string) {
     const product = await this.productsService.deleteImage(id);
     return mapProduct(product);

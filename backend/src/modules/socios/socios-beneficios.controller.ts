@@ -1,16 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { CreateBeneficioDto } from './dto/create-beneficio.dto';
 import { UpdateBeneficioDto } from './dto/update-beneficio.dto';
 import { CreateCanjesDto } from './dto/create-canjes.dto';
 import { SociosBeneficiosService } from './socios-beneficios.service';
 
 @Controller('socios/beneficios')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
+@RequireModule(ModuleKey.SOCIOS, ModuleAccess.READ)
 export class SociosBeneficiosController {
   constructor(private readonly beneficiosService: SociosBeneficiosService) {}
 
@@ -20,24 +20,26 @@ export class SociosBeneficiosController {
   }
 
   @Post()
+  @RequireModule(ModuleKey.SOCIOS, ModuleAccess.FULL)
   create(@Body() dto: CreateBeneficioDto) {
     return this.beneficiosService.create(dto);
   }
 
   @Put(':id')
+  @RequireModule(ModuleKey.SOCIOS, ModuleAccess.FULL)
   update(@Param('id') id: string, @Body() dto: UpdateBeneficioDto) {
     return this.beneficiosService.update(id, dto);
   }
 
   @Delete(':id')
+  @RequireModule(ModuleKey.SOCIOS, ModuleAccess.FULL)
   remove(@Param('id') id: string) {
     return this.beneficiosService.remove(id);
   }
 }
 
 @Controller('socios/canjes')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.USER)
+@UseGuards(JwtAuthGuard)
 export class SociosCanjesController {
   constructor(private readonly beneficiosService: SociosBeneficiosService) {}
 

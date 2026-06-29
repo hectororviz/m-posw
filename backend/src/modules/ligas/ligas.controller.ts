@@ -8,16 +8,16 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { CreateLigaConfigDto } from './dto/create-liga-config.dto';
 import { LigasService } from './ligas.service';
 
 @Controller('ligas')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
+@RequireModule(ModuleKey.LIGAS, ModuleAccess.READ)
 export class LigasController {
   constructor(private readonly ligasService: LigasService) {}
 
@@ -75,11 +75,13 @@ export class LigasController {
   }
 
   @Post('configs')
+  @RequireModule(ModuleKey.LIGAS, ModuleAccess.FULL)
   createConfig(@Body() dto: CreateLigaConfigDto) {
     return this.ligasService.createConfig(dto);
   }
 
   @Delete('configs/:id')
+  @RequireModule(ModuleKey.LIGAS, ModuleAccess.FULL)
   deleteConfig(@Param('id') id: string) {
     return this.ligasService.deleteConfig(id);
   }

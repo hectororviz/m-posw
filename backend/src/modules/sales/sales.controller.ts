@@ -1,44 +1,36 @@
 import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { Role } from '@prisma/client';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
-import { Roles } from '../common/roles.decorator';
-import { RolesGuard } from '../common/roles.guard';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
 import { SalesService } from './sales.service';
 
 @Controller('sales')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard)
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Post('cash')
-  @Roles(Role.ADMIN, Role.USER)
   createCash(@Req() req: { user: { sub: string } }, @Body() dto: CreateCashSaleDto) {
     return this.salesService.createCashSale(req.user.sub, dto);
   }
 
   @Post('qr')
-  @Roles(Role.ADMIN, Role.USER)
   createQr(@Req() req: { user: { sub: string } }, @Body() dto: CreateQrSaleDto) {
     return this.salesService.createQrSale(req.user.sub, dto);
   }
 
   @Post('fiado')
-  @Roles(Role.ADMIN, Role.USER)
   createFiado(@Req() req: { user: { sub: string } }, @Body() dto: CreateFiadoSaleDto) {
     return this.salesService.createFiadoSale(req.user.sub, dto);
   }
 
   @Get()
-  @Roles(Role.ADMIN, Role.USER)
-  list(@Req() req: { user: { sub: string; role: Role } }) {
+  list(@Req() req: { user: { sub: string; role: string } }) {
     return this.salesService.listSales({ id: req.user.sub, role: req.user.role });
   }
 
   @Post('manual-movements')
-  @Roles(Role.ADMIN, Role.USER)
   createManualMovement(
     @Req() req: { user: { sub: string } },
     @Body() dto: CreateManualMovementDto,
@@ -47,13 +39,11 @@ export class SalesController {
   }
 
   @Get('manual-movements')
-  @Roles(Role.ADMIN, Role.USER)
-  listManualMovements(@Req() req: { user: { sub: string; role: Role } }) {
+  listManualMovements(@Req() req: { user: { sub: string; role: string } }) {
     return this.salesService.listManualMovements({ id: req.user.sub, role: req.user.role });
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.USER)
   getById(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -62,7 +52,6 @@ export class SalesController {
   }
 
   @Get(':id/status')
-  @Roles(Role.ADMIN, Role.USER)
   getStatus(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -71,7 +60,6 @@ export class SalesController {
   }
 
   @Get(':id/payment-status')
-  @Roles(Role.ADMIN, Role.USER)
   getPaymentStatus(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -86,7 +74,6 @@ export class SalesController {
   }
 
   @Post(':id/complete')
-  @Roles(Role.ADMIN, Role.USER)
   completeSale(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -95,7 +82,6 @@ export class SalesController {
   }
 
   @Post(':id/cancel')
-  @Roles(Role.ADMIN, Role.USER)
   cancelQrSale(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -104,7 +90,6 @@ export class SalesController {
   }
 
   @Post(':id/ticket-printed')
-  @Roles(Role.ADMIN, Role.USER)
   markTicketPrinted(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
