@@ -380,9 +380,18 @@ export class SalesService {
 
   async listSales(requester?: { id: string; role: string }) {
     const createdAtFilter = await this.getCurrentScopeFromLastClose(requester);
+    const isAdmin = requester?.role === 'ADMIN';
+
+    const where: any = {};
+    if (!isAdmin && requester) {
+      where.userId = requester.id;
+    }
+    if (createdAtFilter) {
+      where.createdAt = { gte: createdAtFilter };
+    }
 
     return this.prisma.sale.findMany({
-      where: createdAtFilter ? { createdAt: { gte: createdAtFilter } } : undefined,
+      where: Object.keys(where).length > 0 ? where : undefined,
       include: {
         user: { select: { id: true, username: true } },
         items: { include: { product: { include: { category: true } } } },
