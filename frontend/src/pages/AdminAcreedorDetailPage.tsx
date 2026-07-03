@@ -35,6 +35,13 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [ajusteModal, setAjusteModal] = useState(false);
+  const [ajusteForm, setAjusteForm] = useState({
+    monto: '',
+    fecha: new Date().toISOString().slice(0, 10),
+    descripcion: '',
+  });
+
   const handlePagoSave = async () => {
     const monto = Number(pagoForm.monto);
     if (!monto || monto <= 0) {
@@ -64,6 +71,37 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         fecha: new Date().toISOString().slice(0, 10),
         notas: '',
         treasuryAccountId: autoTreasuryId,
+      });
+    } catch (err) {
+      setError(normalizeApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAjusteSave = async () => {
+    const monto = Number(ajusteForm.monto);
+    if (!monto || monto <= 0) {
+      setError('El monto debe ser mayor a 0');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await apiClient.post(`/acreedores/${acreedorId}/ajustes`, {
+        monto,
+        fecha: ajusteForm.fecha,
+        descripcion: ajusteForm.descripcion || undefined,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['acreedor-deuda', acreedorId] });
+      await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
+      await queryClient.invalidateQueries({ queryKey: ['acreedores-resumen'] });
+      pushToast('Deuda agregada', 'success');
+      setAjusteModal(false);
+      setAjusteForm({
+        monto: '',
+        fecha: new Date().toISOString().slice(0, 10),
+        descripcion: '',
       });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -133,7 +171,10 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', gap: '0.5rem' }}>
+        <button type="button" className="btn-ghost" onClick={() => { setError(null); setAjusteModal(true); }}>
+          + Agregar a deuda
+        </button>
         <button type="button" className="btn-primary" onClick={() => { setError(null); setPagoForm(prev => ({ ...prev, treasuryAccountId: autoTreasuryId })); setPagoModal(true); }}>
           + Registrar pago
         </button>
@@ -175,6 +216,42 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+
+          <div className="settings-section" style={{ marginBottom: '1.5rem' }}>
+            <h3 className="settings-section-header">Ajustes</h3>
+            {deuda.ajustes && deuda.ajustes.length > 0 ? (
+              <div className="fiado-ventas-table">
+                <div className="fiado-ventas-table-head">
+                  <span className="fv-col-fecha">Fecha</span>
+                  <span className="fv-col-monto">Monto</span>
+                  <span className="fv-col-saldo">Saldo</span>
+                </div>
+                {deuda.ajustes.map((a) => (
+                  <div
+                    key={a.id}
+                    className={`fiado-ventas-table-row ${a.saldoRestante !== undefined && a.saldoRestante > 0 ? 'row-pending-debt' : ''}`}
+                  >
+                    <span className="fv-col-fecha">{formatDate(a.fecha)}</span>
+                    <span className="fv-col-monto">{formatCurrency(a.monto)}</span>
+                    <span className={`fv-col-saldo ${a.saldoRestante !== undefined && a.saldoRestante > 0 ? 'fv-saldo-pendiente' : ''}`}>
+                      {a.saldoRestante !== undefined
+                        ? a.saldoRestante > 0
+                          ? formatCurrency(a.saldoRestante)
+                          : <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
+                        : '--'}
+                    </span>
+                    {a.descripcion && (
+                      <span style={{ gridColumn: '1 / -1', fontSize: '0.8rem', color: 'var(--color-text-muted)', paddingLeft: '0.5rem' }}>
+                        {a.descripcion}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--color-text-faint)' }}>No hay ajustes registrados.</p>
             )}
           </div>
 
@@ -257,6 +334,54 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                 <button type="button" className="btn-ghost" onClick={() => setPagoModal(false)}>Cancelar</button>
                 <button type="button" className="btn-primary" onClick={handlePagoSave} disabled={saving}>
                   {saving ? 'Guardando...' : 'Registrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ajusteModal && (
+        <div className="modal-backdrop" onClick={() => setAjusteModal(false)}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Agregar a deuda</h3>
+              <button className="icon-button" onClick={() => setAjusteModal(false)}>{<X size={16} />}</button>
+            </div>
+            <div className="modal-body">
+              {error && <p className="error-text">{error}</p>}
+              <div className="settings-field">
+                <label>Monto *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={ajusteForm.monto}
+                  onChange={(e) => setAjusteForm({ ...ajusteForm, monto: e.target.value })}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="settings-field">
+                <label>Fecha *</label>
+                <input
+                  type="date"
+                  value={ajusteForm.fecha}
+                  onChange={(e) => setAjusteForm({ ...ajusteForm, fecha: e.target.value })}
+                />
+              </div>
+              <div className="settings-field">
+                <label>Descripción</label>
+                <textarea
+                  rows={2}
+                  value={ajusteForm.descripcion}
+                  onChange={(e) => setAjusteForm({ ...ajusteForm, descripcion: e.target.value })}
+                  placeholder="Descripción del ajuste"
+                />
+              </div>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={() => setAjusteModal(false)}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={handleAjusteSave} disabled={saving}>
+                  {saving ? 'Guardando...' : 'Agregar'}
                 </button>
               </div>
             </div>

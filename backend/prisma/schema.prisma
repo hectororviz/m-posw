@@ -535,14 +535,15 @@ model QuickExpenseButton {
 }
 
 model Acreedor {
-  id          Int           @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   nombre      String
   telefono    String?
   notas       String?
-  activo      Boolean       @default(true)
-  createdAt   DateTime      @default(now())
+  activo      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
   fiadoVentas FiadoVenta[]
   pagos       PagoAcreedor[]
+  ajustes     AjusteAcreedor[]
 }
 
 model FiadoVenta {
@@ -573,6 +574,18 @@ model PagoAcreedor {
   journalEntry     JournalEntry?   @relation("JournalEntryPagoAcreedor", fields: [journalEntryId], references: [id])
   treasuryAccountId String?        @db.Uuid
   treasuryAccount  LedgerAccount?  @relation("PagoAcreedorTreasuryAccount", fields: [treasuryAccountId], references: [id])
+
+  @@index([acreedorId])
+}
+
+model AjusteAcreedor {
+  id          Int      @id @default(autoincrement())
+  acreedorId  Int
+  monto       Decimal  @db.Decimal(10, 2)
+  descripcion String?
+  fecha       DateTime
+  createdAt   DateTime @default(now())
+  acreedor    Acreedor @relation(fields: [acreedorId], references: [id])
 
   @@index([acreedorId])
 }

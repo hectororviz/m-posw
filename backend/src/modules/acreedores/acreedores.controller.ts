@@ -7,6 +7,7 @@ import { AcreedoresService } from './acreedores.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
+import { CreateAjusteDto } from './dto/create-ajuste.dto';
 
 @Controller('acreedores')
 @UseGuards(JwtAuthGuard, ModuleAccessGuard)
@@ -66,5 +67,14 @@ export class AcreedoresController {
     @Body() dto: CreatePagoDto,
   ) {
     return this.acreedoresService.addPago(req.user.sub, id, dto);
+  }
+
+  @Post(':id/ajustes')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
+  addAjuste(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateAjusteDto,
+  ) {
+    return this.acreedoresService.addAjuste(id, dto);
   }
 }

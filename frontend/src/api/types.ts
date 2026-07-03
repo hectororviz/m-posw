@@ -568,8 +568,18 @@ export interface PagoAcreedorItem {
   notas?: string | null;
 }
 
+export interface AjusteAcreedorItem {
+  id: number;
+  monto: number;
+  fecha: string;
+  descripcion: string | null;
+  saldoRestante?: number;
+  esAjuste: true;
+}
+
 export interface AcreedorDeuda {
   fiadoVentas: FiadoVentaItem[];
+  ajustes: AjusteAcreedorItem[];
   pagos: PagoAcreedorItem[];
   totalFiado: number;
   totalPagado: number;

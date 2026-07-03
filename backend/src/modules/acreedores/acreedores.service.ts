@@ -4,6 +4,7 @@ import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
+import { CreateAjusteDto } from './dto/create-ajuste.dto';
 
 interface FiadoVentaRaw {
   id: number;
@@ -13,16 +14,41 @@ interface FiadoVentaRaw {
   saldoRestante?: number;
 }
 
+interface AjusteRaw {
+  monto: number;
+  fecha: Date;
+}
+
 interface PagoRaw {
   monto: number;
   fecha: Date;
 }
 
+interface FiadoVentaConSaldo {
+  id: number;
+  monto: number;
+  createdAt: string;
+  ventaId: string;
+  saldoRestante: number;
+}
+
+interface AjusteConSaldo {
+  id: number;
+  monto: number;
+  fecha: string;
+  descripcion: string | null;
+  saldoRestante: number;
+  esAjuste: true;
+}
+
+type DeudaEntry = FiadoVentaConSaldo | AjusteConSaldo;
+
 interface FifoResult {
   deudaMasAntigua: string | null;
   diasSinPagar: number | null;
   alertaDeuda: boolean;
-  fiadoVentasConSaldo: Array<{ id: number; monto: number; createdAt: string; ventaId: string; saldoRestante: number }>;
+  fiadoVentasConSaldo: FiadoVentaConSaldo[];
+  ajustesConSaldo: AjusteConSaldo[];
 }
 
 @Injectable()
@@ -32,36 +58,60 @@ export class AcreedoresService {
     private journalEntriesService: JournalEntriesService,
   ) {}
 
-  private calculateFifo(fiadoVentas: FiadoVentaRaw[], pagos: PagoRaw[]): FifoResult {
+  private calculateFifo(
+    fiadoVentas: FiadoVentaRaw[],
+    ajustes: AjusteRaw[],
+    pagos: PagoRaw[],
+  ): FifoResult {
     const sortedVentas = [...fiadoVentas].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+    const sortedAjustes = [...ajustes].sort(
+      (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
     );
     const sortedPagos = [...pagos].sort(
       (a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
     );
 
+    const deudaEntries: Array<{ date: Date; monto: number; venta?: FiadoVentaRaw; ajuste?: AjusteRaw }> = [
+      ...sortedVentas.map((v) => ({ date: new Date(v.createdAt), monto: Number(v.monto), venta: v })),
+      ...sortedAjustes.map((a, idx) => ({ date: new Date(a.fecha), monto: Number(a.monto), ajuste: a, _idx: idx })),
+    ].sort((a, b) => a.date.getTime() - b.date.getTime());
+
     let pagoRemaining = sortedPagos.reduce((sum, p) => sum + Number(p.monto), 0);
 
     let deudaMasAntigua: string | null = null;
-    const fiadoVentasConSaldo: FifoResult['fiadoVentasConSaldo'] = [];
+    const fiadoVentasConSaldo: FiadoVentaConSaldo[] = [];
+    const ajustesConSaldo: AjusteConSaldo[] = [];
+    let ajusteSeq = 1;
 
-    for (const venta of sortedVentas) {
-      const monto = Number(venta.monto);
-      const aplicado = Math.min(monto, pagoRemaining);
-      const saldo = monto - aplicado;
+    for (const entry of deudaEntries) {
+      const aplicado = Math.min(entry.monto, pagoRemaining);
+      const saldo = entry.monto - aplicado;
       pagoRemaining -= aplicado;
 
       if (saldo > 0 && !deudaMasAntigua) {
-        deudaMasAntigua = venta.createdAt.toISOString();
+        deudaMasAntigua = entry.date.toISOString();
       }
 
-      fiadoVentasConSaldo.push({
-        id: venta.id,
-        monto,
-        createdAt: venta.createdAt.toISOString(),
-        ventaId: venta.ventaId,
-        saldoRestante: saldo,
-      });
+      if (entry.venta) {
+        fiadoVentasConSaldo.push({
+          id: entry.venta.id,
+          monto: entry.monto,
+          createdAt: entry.venta.createdAt.toISOString(),
+          ventaId: entry.venta.ventaId,
+          saldoRestante: saldo,
+        });
+      } else if (entry.ajuste) {
+        ajustesConSaldo.push({
+          id: ajusteSeq++,
+          monto: entry.monto,
+          fecha: entry.date.toISOString(),
+          descripcion: (entry.ajuste as unknown as { descripcion?: string | null }).descripcion ?? null,
+          saldoRestante: saldo,
+          esAjuste: true as const,
+        });
+      }
     }
 
     let diasSinPagar: number | null = null;
@@ -76,7 +126,13 @@ export class AcreedoresService {
       alertaDeuda = diasSinPagar >= 30;
     }
 
-    return { deudaMasAntigua, diasSinPagar, alertaDeuda, fiadoVentasConSaldo };
+    return {
+      deudaMasAntigua,
+      diasSinPagar,
+      alertaDeuda,
+      fiadoVentasConSaldo,
+      ajustesConSaldo,
+    };
   }
 
   async getResumen() {
@@ -84,6 +140,7 @@ export class AcreedoresService {
       include: {
         fiadoVentas: true,
         pagos: true,
+        ajustes: true,
       },
     });
 
@@ -92,8 +149,9 @@ export class AcreedoresService {
 
     for (const a of acreedores) {
       const totalFiado = a.fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
+      const totalAjustes = a.ajustes.reduce((sum, aj) => sum + Number(aj.monto), 0);
       const totalPagado = a.pagos.reduce((sum, p) => sum + Number(p.monto), 0);
-      const saldo = totalFiado - totalPagado;
+      const saldo = totalFiado + totalAjustes - totalPagado;
       deudaTotal += saldo;
       if (saldo > 0) acreedoresConDeuda++;
     }
@@ -106,15 +164,18 @@ export class AcreedoresService {
       include: {
         fiadoVentas: { orderBy: { createdAt: 'asc' } },
         pagos: true,
+        ajustes: true,
       },
       orderBy: { nombre: 'asc' },
     });
 
     return acreedores.map((a) => {
       const totalFiado = a.fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
+      const totalAjustes = a.ajustes.reduce((sum, aj) => sum + Number(aj.monto), 0);
       const totalPagado = a.pagos.reduce((sum, p) => sum + Number(p.monto), 0);
       const { alertaDeuda, diasSinPagar } = this.calculateFifo(
         a.fiadoVentas as unknown as FiadoVentaRaw[],
+        a.ajustes as unknown as AjusteRaw[],
         a.pagos as unknown as PagoRaw[],
       );
       return {
@@ -126,7 +187,7 @@ export class AcreedoresService {
         createdAt: a.createdAt,
         alertaDeuda,
         diasSinPagar,
-        saldo: totalFiado - totalPagado,
+        saldo: totalFiado + totalAjustes - totalPagado,
       };
     });
   }
@@ -168,6 +229,12 @@ export class AcreedoresService {
       select: { id: true, monto: true, createdAt: true, ventaId: true },
     });
 
+    const ajustes = await this.prisma.ajusteAcreedor.findMany({
+      where: { acreedorId: id },
+      orderBy: { fecha: 'desc' },
+      select: { id: true, monto: true, fecha: true, descripcion: true },
+    });
+
     const pagos = await this.prisma.pagoAcreedor.findMany({
       where: { acreedorId: id },
       orderBy: { fecha: 'desc' },
@@ -175,16 +242,22 @@ export class AcreedoresService {
     });
 
     const totalFiado = fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
+    const totalAjustes = ajustes.reduce((sum, a) => sum + Number(a.monto), 0);
     const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0);
-    const saldoPendiente = totalFiado - totalPagado;
+    const saldoPendiente = totalFiado + totalAjustes - totalPagado;
 
-    const { deudaMasAntigua, diasSinPagar, alertaDeuda, fiadoVentasConSaldo } =
-      this.calculateFifo(fiadoVentas as unknown as FiadoVentaRaw[], pagos as unknown as PagoRaw[]);
+    const { deudaMasAntigua, diasSinPagar, alertaDeuda, fiadoVentasConSaldo, ajustesConSaldo } =
+      this.calculateFifo(
+        fiadoVentas as unknown as FiadoVentaRaw[],
+        ajustes as unknown as AjusteRaw[],
+        pagos as unknown as PagoRaw[],
+      );
 
     return {
       fiadoVentas: fiadoVentasConSaldo,
+      ajustes: ajustesConSaldo,
       pagos,
-      totalFiado,
+      totalFiado: totalFiado + totalAjustes,
       totalPagado,
       saldoPendiente,
       deudaMasAntigua,
@@ -265,5 +338,24 @@ export class AcreedoresService {
     });
 
     return result;
+  }
+
+  async addAjuste(acreedorId: number, dto: CreateAjusteDto) {
+    await this.findOne(acreedorId);
+
+    if (dto.monto <= 0) {
+      throw new BadRequestException('El monto debe ser mayor a 0');
+    }
+
+    const [year, month, day] = dto.fecha.split('-').map(Number);
+
+    return this.prisma.ajusteAcreedor.create({
+      data: {
+        acreedorId,
+        monto: dto.monto,
+        descripcion: dto.descripcion,
+        fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+      },
+    });
   }
 }
