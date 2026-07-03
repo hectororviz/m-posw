@@ -180,7 +180,6 @@ export const AdminLayout: React.FC = () => {
     to: '/admin/home',
     icon: <House size={iconSize} />,
     label: 'Home',
-    permissionModule: 'CONFIGURACION',
   });
 
   const routeBelongsToCategory = useCallback((catLabel: string) => {

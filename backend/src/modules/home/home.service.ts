@@ -168,14 +168,18 @@ export class HomeService {
   }
 
   private async getAcreedoresMetrics(): Promise<AcreedoresMetrics | null> {
-    const [fiadosGroup, pagosGroup, acreedoresActivos] = await Promise.all([
+    const [fiadosGroup, pagosGroup, ajustesGroup, acreedoresActivos] = await Promise.all([
       this.prisma.fiadoVenta.groupBy({ by: ['acreedorId'], _sum: { monto: true } }),
       this.prisma.pagoAcreedor.groupBy({ by: ['acreedorId'], _sum: { monto: true } }),
+      this.prisma.ajusteAcreedor.groupBy({ by: ['acreedorId'], _sum: { monto: true } }),
       this.prisma.acreedor.findMany({ where: { activo: true }, select: { id: true } }),
     ]);
 
     const deudaMap = new Map<number, number>();
     for (const f of fiadosGroup) deudaMap.set(f.acreedorId, Number(f._sum.monto || 0));
+    for (const a of ajustesGroup) {
+      deudaMap.set(a.acreedorId, (deudaMap.get(a.acreedorId) || 0) + Number(a._sum.monto || 0));
+    }
     for (const p of pagosGroup) {
       deudaMap.set(p.acreedorId, (deudaMap.get(p.acreedorId) || 0) - Number(p._sum.monto || 0));
     }
