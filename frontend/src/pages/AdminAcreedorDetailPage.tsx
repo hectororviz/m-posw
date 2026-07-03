@@ -265,8 +265,8 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                       >
                         {amountDisplay}
                       </span>
-                      <span className="col-method" style={{ whiteSpace: 'nowrap' }}>{concepto}</span>
-                      <span className="col-user">{detalle}</span>
+                      <span className="col-method" style={{ whiteSpace: 'nowrap', paddingLeft: '1.5rem' }}>{concepto}</span>
+                      <span className="col-user" style={{ paddingLeft: '1.5rem' }}>{detalle}</span>
                     </div>
                   );
                 })}
