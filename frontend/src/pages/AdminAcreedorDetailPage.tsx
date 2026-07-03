@@ -229,7 +229,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                 <div className="sales-table-head">
                   <span className="col-date">Fecha</span>
                   <span className="col-total" style={{ flex: '0 0 140px' }}>Monto</span>
-                  <span className="col-method">Concepto</span>
+                  <span className="col-method" style={{ whiteSpace: 'nowrap' }}>Concepto</span>
                   <span className="col-user">Detalle</span>
                 </div>
                 {history.map((entry, i) => {
@@ -265,7 +265,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                       >
                         {amountDisplay}
                       </span>
-                      <span className="col-method">{concepto}</span>
+                      <span className="col-method" style={{ whiteSpace: 'nowrap' }}>{concepto}</span>
                       <span className="col-user">{detalle}</span>
                     </div>
                   );
