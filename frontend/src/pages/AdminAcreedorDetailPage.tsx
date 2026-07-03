@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedor, useAcreedorDeuda, useTreasuryAccounts } from '../api/queries';
+import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
@@ -41,6 +42,37 @@ export const AdminAcreedorDetailPage: React.FC = () => {
     fecha: new Date().toISOString().slice(0, 10),
     descripcion: '',
   });
+
+  type HistoryEntry =
+    | { kind: 'venta'; data: FiadoVentaItem; date: string; monto: number }
+    | { kind: 'ajuste'; data: AjusteAcreedorItem; date: string; monto: number }
+    | { kind: 'pago'; data: PagoAcreedorItem; date: string; monto: number };
+
+  const history = useMemo<HistoryEntry[]>(() => {
+    if (!deuda) return [];
+    const entries: HistoryEntry[] = [
+      ...deuda.fiadoVentas.map((fv) => ({
+        kind: 'venta' as const,
+        data: fv,
+        date: fv.createdAt,
+        monto: Number(fv.monto),
+      })),
+      ...(deuda.ajustes || []).map((a) => ({
+        kind: 'ajuste' as const,
+        data: a,
+        date: a.fecha,
+        monto: a.monto,
+      })),
+      ...deuda.pagos.map((p) => ({
+        kind: 'pago' as const,
+        data: p,
+        date: p.fecha,
+        monto: -Number(p.monto),
+      })),
+    ];
+    entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return entries;
+  }, [deuda]);
 
   const handlePagoSave = async () => {
     const monto = Number(pagoForm.monto);
@@ -188,93 +220,56 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         <p style={{ color: 'var(--color-text-faint)', textAlign: 'center' }}>Sin datos de deuda.</p>
       ) : (
         <>
-          <div className="settings-section" style={{ marginBottom: '1.5rem' }}>
-            <h3 className="settings-section-header">Ventas fiadas</h3>
-            {deuda.fiadoVentas.length === 0 ? (
-              <p style={{ color: 'var(--color-text-faint)' }}>No hay ventas fiadas registradas.</p>
-            ) : (
-              <div className="fiado-ventas-table">
-                <div className="fiado-ventas-table-head">
-                  <span className="fv-col-fecha">Fecha</span>
-                  <span className="fv-col-monto">Monto</span>
-                  <span className="fv-col-saldo">Saldo</span>
-                </div>
-                {deuda.fiadoVentas.map((fv) => (
-                  <div
-                    key={fv.id}
-                    className={`fiado-ventas-table-row ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'row-pending-debt' : ''}`}
-                  >
-                    <span className="fv-col-fecha">{formatDate(fv.createdAt)}</span>
-                    <span className="fv-col-monto">{formatCurrency(Number(fv.monto))}</span>
-                    <span className={`fv-col-saldo ${fv.saldoRestante !== undefined && fv.saldoRestante > 0 ? 'fv-saldo-pendiente' : ''}`}>
-                      {fv.saldoRestante !== undefined
-                        ? fv.saldoRestante > 0
-                          ? formatCurrency(fv.saldoRestante)
-                          : <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
-                        : '--'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="settings-section" style={{ marginBottom: '1.5rem' }}>
-            <h3 className="settings-section-header">Ajustes</h3>
-            {deuda.ajustes && deuda.ajustes.length > 0 ? (
-              <div className="fiado-ventas-table">
-                <div className="fiado-ventas-table-head">
-                  <span className="fv-col-fecha">Fecha</span>
-                  <span className="fv-col-monto">Monto</span>
-                  <span className="fv-col-saldo">Saldo</span>
-                </div>
-                {deuda.ajustes.map((a) => (
-                  <div
-                    key={a.id}
-                    className={`fiado-ventas-table-row ${a.saldoRestante !== undefined && a.saldoRestante > 0 ? 'row-pending-debt' : ''}`}
-                  >
-                    <span className="fv-col-fecha">{formatDate(a.fecha)}</span>
-                    <span className="fv-col-monto">{formatCurrency(a.monto)}</span>
-                    <span className={`fv-col-saldo ${a.saldoRestante !== undefined && a.saldoRestante > 0 ? 'fv-saldo-pendiente' : ''}`}>
-                      {a.saldoRestante !== undefined
-                        ? a.saldoRestante > 0
-                          ? formatCurrency(a.saldoRestante)
-                          : <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
-                        : '--'}
-                    </span>
-                    {a.descripcion && (
-                      <span style={{ gridColumn: '1 / -1', fontSize: '0.8rem', color: 'var(--color-text-muted)', paddingLeft: '0.5rem' }}>
-                        {a.descripcion}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p style={{ color: 'var(--color-text-faint)' }}>No hay ajustes registrados.</p>
-            )}
-          </div>
-
           <div className="settings-section">
-            <h3 className="settings-section-header">Pagos realizados</h3>
-            {deuda.pagos.length === 0 ? (
-              <p style={{ color: 'var(--color-text-faint)' }}>No hay pagos registrados.</p>
+            <h3 className="settings-section-header">Historial</h3>
+            {history.length === 0 ? (
+              <p style={{ color: 'var(--color-text-faint)' }}>Sin movimientos registrados.</p>
             ) : (
               <div className="sales-table">
                 <div className="sales-table-head">
                   <span className="col-date">Fecha</span>
-                  <span className="col-total">Monto</span>
-                  <span className="col-method">Medio de pago</span>
-                  <span className="col-user">Notas</span>
+                  <span className="col-total" style={{ flex: '0 0 140px' }}>Monto</span>
+                  <span className="col-method">Concepto</span>
+                  <span className="col-user">Detalle</span>
                 </div>
-                {deuda.pagos.map((p) => (
-                  <div key={p.id} className="sales-table-row">
-                    <span className="col-date">{formatDate(p.fecha)}</span>
-                    <span className="col-total" style={{ color: 'var(--color-success)', fontWeight: 500 }}>-{formatCurrency(Number(p.monto))}</span>
-                    <span className="col-method">{getMedioPagoLabel(p.medioPago)}</span>
-                    <span className="col-user">{p.notas || '--'}</span>
-                  </div>
-                ))}
+                {history.map((entry, i) => {
+                  const isPayment = entry.kind === 'pago';
+                  const dateStr = formatDate(entry.date);
+                  const amountDisplay = isPayment
+                    ? `-${formatCurrency(Math.abs(entry.monto))}`
+                    : formatCurrency(entry.monto);
+
+                  let concepto: string;
+                  let detalle: string;
+                  if (entry.kind === 'venta') {
+                    concepto = 'Venta fiada';
+                    detalle = `Venta #${entry.data.ventaId.slice(0, 8)}`;
+                  } else if (entry.kind === 'ajuste') {
+                    concepto = 'Ajuste';
+                    detalle = entry.data.descripcion || '--';
+                  } else {
+                    concepto = getMedioPagoLabel(entry.data.medioPago);
+                    detalle = entry.data.notas || '--';
+                  }
+
+                  return (
+                    <div key={`${entry.kind}-${i}`} className="sales-table-row">
+                      <span className="col-date">{dateStr}</span>
+                      <span
+                        className="col-total"
+                        style={{
+                          flex: '0 0 140px',
+                          fontWeight: 500,
+                          color: isPayment ? 'var(--color-success)' : 'var(--color-warning, #f59e0b)',
+                        }}
+                      >
+                        {amountDisplay}
+                      </span>
+                      <span className="col-method">{concepto}</span>
+                      <span className="col-user">{detalle}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

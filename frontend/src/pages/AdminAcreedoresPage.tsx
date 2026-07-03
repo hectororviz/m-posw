@@ -197,7 +197,12 @@ export const AdminAcreedoresPage: React.FC = () => {
               <span className="col-action" style={{ flex: '0 0 90px' }}></span>
             </div>
             {filtered.map((a) => (
-              <div key={a.id} className="sales-table-row">
+              <div
+                key={a.id}
+                className="sales-table-row"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/admin/acreedores/${a.id}`)}
+              >
                 <span className="col-date" style={{ fontWeight: 500 }}>{a.nombre}</span>
                 <span className="col-user">{a.telefono || '--'}</span>
                 <span className="col-total" style={{ flex: '0 0 110px' }}>{getSaldoDisplay(a)}</span>
@@ -219,8 +224,8 @@ export const AdminAcreedoresPage: React.FC = () => {
                   )}
                 </span>
                 <span className="col-action" style={{ flex: '0 0 70px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => navigate(`/admin/acreedores/${a.id}`)} title="Ver">{<Eye size={16} />}</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(a.id)} title="Editar">{<Pencil size={16} />}</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); navigate(`/admin/acreedores/${a.id}`); }} title="Ver">{<Eye size={16} />}</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(a.id); }} title="Editar">{<Pencil size={16} />}</button>
                 </span>
               </div>
             ))}
