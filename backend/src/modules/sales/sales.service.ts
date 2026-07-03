@@ -378,11 +378,8 @@ export class SalesService {
     }
   }
 
-  async listSales(requester?: { id: string; role: string }) {
-    const createdAtFilter = await this.getCurrentScopeFromLastClose(requester);
-
+  async listSales() {
     return this.prisma.sale.findMany({
-      where: createdAtFilter ? { createdAt: { gte: createdAtFilter } } : undefined,
       include: {
         user: { select: { id: true, username: true } },
         items: { include: { product: { include: { category: true } } } },
@@ -393,11 +390,8 @@ export class SalesService {
   }
 
 
-  async listManualMovements(requester?: { id: string; role: string }) {
-    const createdAtFilter = await this.getCurrentScopeFromLastClose(requester);
-
+  async listManualMovements() {
     return this.prisma.manualMovement.findMany({
-      where: createdAtFilter ? { createdAt: { gte: createdAtFilter } } : undefined,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -419,19 +413,6 @@ export class SalesService {
     });
   }
 
-
-  private async getCurrentScopeFromLastClose(requester?: { id: string; role: string }) {
-    if (!requester || requester.role === 'ADMIN') {
-      return null;
-    }
-
-    const lastClose = await this.prisma.cashClose.findFirst({
-      orderBy: { to: 'desc' },
-      select: { to: true },
-    });
-
-    return lastClose?.to ?? null;
-  }
 
   async getSaleById(
     saleId: string,

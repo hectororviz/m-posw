@@ -26,8 +26,8 @@ export class SalesController {
   }
 
   @Get()
-  list(@Req() req: { user: { sub: string; role: string } }) {
-    return this.salesService.listSales({ id: req.user.sub, role: req.user.role });
+  list() {
+    return this.salesService.listSales();
   }
 
   @Post('manual-movements')
@@ -39,8 +39,8 @@ export class SalesController {
   }
 
   @Get('manual-movements')
-  listManualMovements(@Req() req: { user: { sub: string; role: string } }) {
-    return this.salesService.listManualMovements({ id: req.user.sub, role: req.user.role });
+  listManualMovements() {
+    return this.salesService.listManualMovements();
   }
 
   @Get(':id')
