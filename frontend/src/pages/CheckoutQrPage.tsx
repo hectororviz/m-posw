@@ -5,6 +5,7 @@ import type { PaymentStatus, Sale } from '../api/types';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
 import { useToast } from '../components/ToastProvider';
+import { useSocketContext } from '../socket/SocketProvider';
 import { useCart } from '../context/CartContext';
 import { maybePrintTicket } from '../utils/ticketPrinting';
 
@@ -66,6 +67,7 @@ export const CheckoutQrPage: React.FC = () => {
   const { clear, items } = useCart();
   const { pushToast } = useToast();
   const { data: settings } = useSettings();
+  const { socket } = useSocketContext();
   const defaultTimeout = 120;
   const configuredTimeout = Number(import.meta.env.VITE_QR_PAYMENT_TIMEOUT ?? defaultTimeout);
   const paymentTimeoutSeconds =
@@ -199,6 +201,30 @@ export const CheckoutQrPage: React.FC = () => {
       stopPolling();
     };
   }, [saleId, handleStatusUpdate]);
+
+  useEffect(() => {
+    if (!saleId || !socket) {
+      return;
+    }
+    const handlePaymentStatus = (payload: { saleId: string; paymentStatus: string; mpStatus?: string | null; mpStatusDetail?: string | null }) => {
+      if (payload.saleId !== saleId) {
+        return;
+      }
+      const status = payload.paymentStatus as PaymentStatus;
+      const detail = payload.mpStatusDetail ?? null;
+      handleStatusUpdate({
+        saleId,
+        status,
+        mpStatus: payload.mpStatus ?? null,
+        mpStatusDetail: detail,
+      });
+    };
+    socket.emit('sale.join', { saleId });
+    socket.on('sale.payment_status_changed', handlePaymentStatus);
+    return () => {
+      socket.off('sale.payment_status_changed', handlePaymentStatus);
+    };
+  }, [saleId, socket, handleStatusUpdate]);
 
   useEffect(() => {
     if (!saleId || hasCompletedRef.current) {

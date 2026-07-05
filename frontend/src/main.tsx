@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { ToastProvider } from './components/ToastProvider';
 import { ThemeProvider } from './context/ThemeContext';
+import { SocketProvider } from './socket/SocketProvider';
 import './styles/tokens.css';
 import './styles/global.css';
 
@@ -24,13 +25,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <CartProvider>
-            <ToastProvider>
-              <BrowserRouter>
-                <App />
-              </BrowserRouter>
-            </ToastProvider>
-          </CartProvider>
+          <SocketProvider>
+            <CartProvider>
+              <ToastProvider>
+                <BrowserRouter>
+                  <App />
+                </BrowserRouter>
+              </ToastProvider>
+            </CartProvider>
+          </SocketProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

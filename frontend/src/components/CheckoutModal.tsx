@@ -7,6 +7,7 @@ import type { PaymentMethod, Sale, SaleStatus, PollTransferResponse, ConfirmTran
 import { useSettings } from '../api/queries';
 import { useCart } from '../context/CartContext';
 import { useToast } from './ToastProvider';
+import { useSocketContext } from '../socket/SocketProvider';
 import { maybePrintTicket } from '../utils/ticketPrinting';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 
@@ -90,6 +91,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const [fiadoError, setFiadoError] = useState<string | null>(null);
   
   const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
+  const { socket } = useSocketContext();
   const qrRequestRef = useRef<AbortController | null>(null);
   const qrPollRef = useRef<number | null>(null);
   const qrTimerRef = useRef<number | null>(null);
@@ -418,6 +420,82 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
       }
     }, 2000);
   }, [step, saleId, timeLeft, total, settings, clear, handleClose, pushToast]);
+
+  const handleQrStatusChange = useCallback(async (status: string) => {
+    if (!saleId || status === qrStatus) {
+      return;
+    }
+    setQrStatus(status as SaleStatus);
+    if (status === 'APPROVED') {
+      clearQrTimers();
+      try {
+        const saleResponse = await apiClient.get<Sale>(`/sales/${saleId}`);
+        const sale = saleResponse.data;
+        await maybePrintTicket({
+          settings,
+          saleId,
+          dateTimeISO: new Date().toISOString(),
+          total,
+          items: sale.items.map((item) => ({
+            qty: item.quantity,
+            name: item.product.name,
+            category: item.product.category?.name,
+            orderNumber: item.orderNumber,
+            categoryTicket: item.product.category?.ticket,
+          })),
+          vouchers: sale.vouchers?.map((v) => ({ pin: v.pin, plan_name: v.plan?.name || 'Internet', valid_hours: v.plan ? Math.round(v.plan.duration / 3600) : 24 })),
+          onPopupBlocked: () =>
+            pushToast('No se pudo abrir la ventana de impresión. Revisá el bloqueador de popups.', 'error'),
+          onAlreadyPrinted: () => pushToast('El ticket ya fue impreso.', 'error'),
+          onError: (message) => pushToast(message, 'error'),
+        });
+        registerCanjes(saleId);
+        clear();
+        setQrResult('SUCCESS');
+        setQrResultMessage('Pago confirmado.');
+        setStep('QR_RESULT');
+      } catch (error) {
+        clearQrTimers();
+        const message = normalizeApiError(error);
+        setQrError(message);
+        setQrResult('ERROR');
+        setQrResultMessage(message);
+        setStep('QR_RESULT');
+      }
+    } else if (status === 'REJECTED' || status === 'EXPIRED' || status === 'CANCELLED') {
+      clearQrTimers();
+      const message =
+        status === 'REJECTED'
+          ? 'Pago rechazado.'
+          : status === 'EXPIRED'
+            ? 'El pago expiró.'
+            : 'Pago cancelado.';
+      setQrMessage(message);
+      setQrResult('ERROR');
+      setQrResultMessage(message);
+      setStep('QR_RESULT');
+    }
+  }, [saleId, qrStatus, total, settings, clear, pushToast]);
+
+  useEffect(() => {
+    if (step !== 'QR_WAIT' || !saleId || !socket) {
+      return;
+    }
+    const handlePaymentStatus = (payload: { saleId: string; paymentStatus: string; mpStatus?: string | null; mpStatusDetail?: string | null }) => {
+      if (payload.saleId !== saleId) {
+        return;
+      }
+      const status = payload.paymentStatus;
+      if (status === 'APPROVED' || status === 'REJECTED' || status === 'EXPIRED' || status === 'CANCELLED') {
+        handleQrStatusChange(status);
+      }
+    };
+    socket.emit('sale.join', { saleId });
+    socket.on('sale.payment_status_changed', handlePaymentStatus);
+    return () => {
+      socket.off('sale.payment_status_changed', handlePaymentStatus);
+    };
+  }, [step, saleId, socket, handleQrStatusChange]);
 
   useEffect(() => {
     if (step !== 'QR_WAIT' || !saleId) {
