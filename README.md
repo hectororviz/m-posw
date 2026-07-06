@@ -34,7 +34,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Dashboard de estadísticas**: KPIs con badges, últimos 15 días, últimos 6 meses, promedios con gráficos.
 - **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia) con movimientos de entrada/salida.
 - **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
-- **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Ligas, Jugadores, Patrimonio e Internet desde Configuración → Módulos.
+- **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, WhatsApp, Ligas, Jugadores, Patrimonio e Internet desde Configuración → Módulos.
 
 ### Padrón de Socios
 - **CRUD de socios**: datos personales, tipo de socio, estado (activo/inactivo/suspendido), fecha de alta.
@@ -70,6 +70,15 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Venta de vouchers**: al vender un plan desde el POS, el sistema genera un PIN de acceso único respaldado por RADIUS. El PIN se imprime en el ticket de venta.
 - **Integración con api-radius**: comunicación con servidor RADIUS externo para generación, consulta y anulación de vouchers.
 - **Control de vouchers**: listado de vouchers vendidos con estado (Activo/Usado), sin mostrar el PIN en pantalla por seguridad.
+- **Integración con api-radius**: comunicación con servidor RADIUS externo para generación, consulta y anulación de vouchers.
+- **Control de vouchers**: listado de vouchers vendidos con estado (Activo/Usado), sin mostrar el PIN en pantalla por seguridad.
+
+### WhatsApp / Notificaciones de deuda
+- **Notificación vía OpenWA**: envío de mensajes WhatsApp a acreedores con deuda pendiente, usando el gateway [OpenWA](https://github.com/rmyndharis/OpenWA) (contenedor aparte).
+- **Botón en acreedores**: desde la lista de acreedores o el detalle, un clic envía el mensaje con el saldo y la antigüedad de la deuda.
+- **Plantilla personalizable**: mensaje configurable desde la GUI con variables `{{nombre}}`, `{{saldo}}` y `{{dias}}` que se reemplazan automáticamente.
+- **Rate limiting**: 30 segundos de espera entre envíos para evitar spam accidental.
+- **Historial de envíos**: registro completo de cada notificación (destinatario, mensaje, estado, error) en `/admin/whatsapp?tab=history`.
 
 ### Personalización
 - Nombre del comercio/club, logo, favicon y color principal de la UI configurable desde el panel admin.
@@ -95,6 +104,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | **Club deportivo** | Tablas de posiciones y próximos partidos de ligas de fútbol. Gestión de jugadores y torneos con fichaje automático por categoría. Dashboard de jugadores y cumpleaños. Seguimiento de uno o varios equipos por torneo. |
 | **Institución educativa** | Registro y seguimiento del patrimonio institucional (mobiliario, equipamiento, etc.) con historial de eventos y auditoría. Bajas lógicas sin pérdida de trazabilidad. |
 | **Proveedor de WiFi** | Venta de vouchers de acceso a internet. Planes configurables, generación automática de PINs respaldados por RADIUS. Impresión del PIN en el ticket de venta. |
+| **Club con acreedores** | Notificación automática por WhatsApp a acreedores con deuda pendiente. Mensaje personalizable con monto y antigüedad. Control de envíos para evitar spam. |
 
 ## Ventajas
 
@@ -118,6 +128,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | Base de datos | PostgreSQL 16 |
 | Infraestructura | Docker Compose (3 contenedores) |
 | Pagos | API Mercado Pago (Instore QR v2 + OAuth 2.0 + Search payments) + Fiado |
+| Mensajería | [OpenWA](https://github.com/rmyndharis/OpenWA) REST API (notificaciones WhatsApp) |
 | Comunicación en tiempo real | WebSockets (Socket.IO) |
 | App Android | Flutter + WebView + impresión Bluetooth nativa |
 | Estilos | CSS Variables + Modo Oscuro |
