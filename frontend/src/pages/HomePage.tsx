@@ -80,6 +80,11 @@ export const HomePage: React.FC = () => {
       { icon: <UserMinus size={cardIconSize} />, label: 'Acreedores con deuda', value: String(metrics.acreedores.activos), key: 'acreedores', level: 'standard' },
       { icon: <Clock size={cardIconSize} />, label: 'Deuda total', value: `$${formatCurrency(deudaTotal)}`, key: 'deuda', level: 'standard', alert: deudaTotal > 0 ? 'warning' : undefined },
     );
+    if (metrics.acreedores.conCredito > 0) {
+      standardCards.push(
+        { icon: <UserMinus size={cardIconSize} />, label: 'Con crédito a favor', value: String(metrics.acreedores.conCredito), key: 'acreedores-credito', level: 'standard' },
+      );
+    }
   }
 
   if (metrics?.internet) {

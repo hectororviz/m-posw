@@ -550,6 +550,7 @@ export interface Acreedor {
   alertaDeuda?: boolean;
   diasSinPagar?: number | null;
   saldo?: number;
+  saldoFavor?: number;
 }
 
 export interface FiadoVentaItem {
@@ -584,6 +585,7 @@ export interface AcreedorDeuda {
   totalFiado: number;
   totalPagado: number;
   saldoPendiente: number;
+  saldoFavor: number;
   deudaMasAntigua: string | null;
   diasSinPagar: number | null;
   alertaDeuda: boolean;
@@ -591,7 +593,9 @@ export interface AcreedorDeuda {
 
 export interface AcreedoresResumen {
   deudaTotal: number;
+  creditoTotal: number;
   acreedoresConDeuda: number;
+  acreedoresConCredito: number;
 }
 
 export interface SocioTipo {

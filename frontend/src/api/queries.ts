@@ -227,7 +227,7 @@ export const useTreasuryAccounts = () =>
   useQuery({
     queryKey: ['treasury-accounts'],
     queryFn: async () => {
-      const response = await apiClient.get<TreasuryAccount[]>('/accounting/accounts/treasury');
+      const response = await apiClient.get<TreasuryAccount[]>('/acreedores/treasury-accounts');
       return response.data;
     },
   });

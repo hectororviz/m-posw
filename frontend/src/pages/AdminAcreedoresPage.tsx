@@ -109,6 +109,10 @@ export const AdminAcreedoresPage: React.FC = () => {
 
   const getSaldoDisplay = (a: Acreedor) => {
     const s = a.saldo ?? 0;
+    const sf = a.saldoFavor ?? 0;
+    if (sf > 0) {
+      return <span className="success-text" style={{ fontWeight: 600 }}>{`A favor: ${formatCurrency(sf)}`}</span>;
+    }
     if (s > 0 && a.alertaDeuda) {
       return <span className="error-text" style={{ fontWeight: 600 }}>{formatCurrency(s)}</span>;
     }
@@ -145,6 +149,18 @@ export const AdminAcreedoresPage: React.FC = () => {
             <span className="sales-kpi-label">Acreedores con deuda</span>
             <span className="sales-kpi-value">{resumen.acreedoresConDeuda}</span>
           </div>
+          {resumen.creditoTotal > 0 && (
+            <div className="sales-kpi-card">
+              <span className="sales-kpi-label">Crédito a favor</span>
+              <span className="sales-kpi-value success-text">{formatCurrency(resumen.creditoTotal)}</span>
+            </div>
+          )}
+          {resumen.acreedoresConCredito > 0 && (
+            <div className="sales-kpi-card">
+              <span className="sales-kpi-label">Con crédito a favor</span>
+              <span className="sales-kpi-value">{resumen.acreedoresConCredito}</span>
+            </div>
+          )}
         </div>
       )}
 

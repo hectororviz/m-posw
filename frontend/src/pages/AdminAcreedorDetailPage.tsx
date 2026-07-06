@@ -194,12 +194,21 @@ export const AdminAcreedorDetailPage: React.FC = () => {
             <span className="sales-kpi-label">Total pagado</span>
             <span className="sales-kpi-value">{formatCurrency(deuda.totalPagado)}</span>
           </div>
-          <div className="sales-kpi-card">
-            <span className="sales-kpi-label">Saldo pendiente</span>
-            <span className={`sales-kpi-value ${deuda.saldoPendiente > 0 ? 'warning-text' : 'success-text'}`}>
-              {formatCurrency(deuda.saldoPendiente)}
-            </span>
-          </div>
+          {deuda.saldoFavor > 0 ? (
+            <div className="sales-kpi-card">
+              <span className="sales-kpi-label">Saldo a favor</span>
+              <span className="sales-kpi-value success-text">
+                {formatCurrency(deuda.saldoFavor)}
+              </span>
+            </div>
+          ) : (
+            <div className="sales-kpi-card">
+              <span className="sales-kpi-label">Saldo pendiente</span>
+              <span className={`sales-kpi-value ${deuda.saldoPendiente > 0 ? 'warning-text' : 'success-text'}`}>
+                {formatCurrency(deuda.saldoPendiente)}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

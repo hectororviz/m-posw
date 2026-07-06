@@ -49,6 +49,7 @@ interface FifoResult {
   alertaDeuda: boolean;
   fiadoVentasConSaldo: FiadoVentaConSaldo[];
   ajustesConSaldo: AjusteConSaldo[];
+  saldoFavor: number;
 }
 
 @Injectable()
@@ -126,12 +127,15 @@ export class AcreedoresService {
       alertaDeuda = diasSinPagar >= 30;
     }
 
+    const saldoFavor = pagoRemaining > 0.001 ? parseFloat(pagoRemaining.toFixed(2)) : 0;
+
     return {
       deudaMasAntigua,
       diasSinPagar,
       alertaDeuda,
       fiadoVentasConSaldo,
       ajustesConSaldo,
+      saldoFavor,
     };
   }
 
@@ -145,18 +149,25 @@ export class AcreedoresService {
     });
 
     let deudaTotal = 0;
+    let creditoTotal = 0;
     let acreedoresConDeuda = 0;
+    let acreedoresConCredito = 0;
 
     for (const a of acreedores) {
       const totalFiado = a.fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
       const totalAjustes = a.ajustes.reduce((sum, aj) => sum + Number(aj.monto), 0);
       const totalPagado = a.pagos.reduce((sum, p) => sum + Number(p.monto), 0);
       const saldo = totalFiado + totalAjustes - totalPagado;
-      deudaTotal += saldo;
-      if (saldo > 0) acreedoresConDeuda++;
+      if (saldo > 0) {
+        deudaTotal += saldo;
+        acreedoresConDeuda++;
+      } else if (saldo < 0) {
+        creditoTotal += Math.abs(saldo);
+        acreedoresConCredito++;
+      }
     }
 
-    return { deudaTotal, acreedoresConDeuda };
+    return { deudaTotal, creditoTotal, acreedoresConDeuda, acreedoresConCredito };
   }
 
   async findAll() {
@@ -173,11 +184,12 @@ export class AcreedoresService {
       const totalFiado = a.fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
       const totalAjustes = a.ajustes.reduce((sum, aj) => sum + Number(aj.monto), 0);
       const totalPagado = a.pagos.reduce((sum, p) => sum + Number(p.monto), 0);
-      const { alertaDeuda, diasSinPagar } = this.calculateFifo(
+      const { alertaDeuda, diasSinPagar, saldoFavor } = this.calculateFifo(
         a.fiadoVentas as unknown as FiadoVentaRaw[],
         a.ajustes as unknown as AjusteRaw[],
         a.pagos as unknown as PagoRaw[],
       );
+      const saldo = totalFiado + totalAjustes - totalPagado;
       return {
         id: a.id,
         nombre: a.nombre,
@@ -185,9 +197,10 @@ export class AcreedoresService {
         notas: a.notas,
         activo: a.activo,
         createdAt: a.createdAt,
-        alertaDeuda,
-        diasSinPagar,
-        saldo: totalFiado + totalAjustes - totalPagado,
+        alertaDeuda: saldo <= 0 ? false : alertaDeuda,
+        diasSinPagar: saldo <= 0 ? null : diasSinPagar,
+        saldo,
+        saldoFavor: saldo < 0 ? Math.abs(saldo) : 0,
       };
     });
   }
@@ -244,7 +257,9 @@ export class AcreedoresService {
     const totalFiado = fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
     const totalAjustes = ajustes.reduce((sum, a) => sum + Number(a.monto), 0);
     const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0);
-    const saldoPendiente = totalFiado + totalAjustes - totalPagado;
+    const saldoBruto = totalFiado + totalAjustes - totalPagado;
+    const saldoPendiente = saldoBruto > 0 ? parseFloat(saldoBruto.toFixed(2)) : 0;
+    const saldoFavor = saldoBruto < 0 ? parseFloat(Math.abs(saldoBruto).toFixed(2)) : 0;
 
     const { deudaMasAntigua, diasSinPagar, alertaDeuda, fiadoVentasConSaldo, ajustesConSaldo } =
       this.calculateFifo(
@@ -260,9 +275,10 @@ export class AcreedoresService {
       totalFiado: totalFiado + totalAjustes,
       totalPagado,
       saldoPendiente,
-      deudaMasAntigua,
-      diasSinPagar,
-      alertaDeuda,
+      saldoFavor,
+      deudaMasAntigua: saldoBruto > 0 ? deudaMasAntigua : null,
+      diasSinPagar: saldoBruto > 0 ? diasSinPagar : null,
+      alertaDeuda: saldoBruto <= 0 ? false : alertaDeuda,
     };
   }
 

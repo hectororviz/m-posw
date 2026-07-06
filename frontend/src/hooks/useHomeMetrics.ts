@@ -15,6 +15,8 @@ export interface HomeMetrics {
   acreedores?: {
     activos: number;
     deudaTotal: number;
+    conCredito: number;
+    creditoTotal: number;
   };
   internet?: {
     vouchersActivos: number;

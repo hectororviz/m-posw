@@ -18,6 +18,8 @@ interface SociosMetrics {
 interface AcreedoresMetrics {
   activos: number;
   deudaTotal: number;
+  conCredito: number;
+  creditoTotal: number;
 }
 
 interface InternetMetrics {
@@ -185,16 +187,21 @@ export class HomeService {
     }
 
     let deudaTotal = 0;
+    let creditoTotal = 0;
     let activos = 0;
+    let conCredito = 0;
     for (const a of acreedoresActivos) {
       const deuda = deudaMap.get(a.id) || 0;
       if (deuda > 0) {
         activos++;
         deudaTotal += deuda;
+      } else if (deuda < 0) {
+        conCredito++;
+        creditoTotal += Math.abs(deuda);
       }
     }
 
-    return { activos, deudaTotal };
+    return { activos, deudaTotal, conCredito, creditoTotal };
   }
 
   private async getInternetMetrics(): Promise<InternetMetrics | null> {
