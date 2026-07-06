@@ -67,6 +67,22 @@ export class WhatsappService {
     if (!apiUrl) throw new BadRequestException('URL de OpenWA no configurada');
     if (!apiKey) throw new BadRequestException('API Key de OpenWA no configurada');
 
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+    const lastSent = await this.prisma.notificationLog.findFirst({
+      where: {
+        phoneNumber,
+        status: 'SENT',
+        createdAt: { gte: oneMinuteAgo },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (lastSent) {
+      const secondsLeft = 60 - Math.floor((Date.now() - lastSent.createdAt.getTime()) / 1000);
+      throw new BadRequestException(
+        `Esperá ${secondsLeft} segundo(s) antes de enviar otro mensaje a ${phoneNumber}`,
+      );
+    }
+
     const fullUrl = `${apiUrl}/sessions/${sessionId}/messages/send-text`;
     const body = JSON.stringify({
       chatId: phoneNumber,
