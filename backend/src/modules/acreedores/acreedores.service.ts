@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { JournalEntriesService } from '../treasury/journal-entries.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -57,6 +58,7 @@ export class AcreedoresService {
   constructor(
     private prisma: PrismaService,
     private journalEntriesService: JournalEntriesService,
+    private whatsappService: WhatsappService,
   ) {}
 
   private calculateFifo(
@@ -373,5 +375,58 @@ export class AcreedoresService {
         fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
       },
     });
+  }
+
+  async notificarDeuda(id: number) {
+    const setting = await this.prisma.setting.findFirst();
+    if (!setting?.enableWhatsappModule) {
+      throw new BadRequestException('El módulo de WhatsApp no está habilitado');
+    }
+
+    if (!setting?.openwaApiUrl || !setting?.openwaApiKey) {
+      throw new BadRequestException('OpenWA no está configurado (URL y API Key requeridos)');
+    }
+
+    const acreedor = await this.findOne(id);
+
+    if (!acreedor.telefono) {
+      throw new BadRequestException('El acreedor no tiene teléfono registrado');
+    }
+
+    const deuda = await this.getDeuda(id);
+
+    if (deuda.saldoPendiente <= 0) {
+      throw new BadRequestException('El acreedor no tiene deuda pendiente');
+    }
+
+    const template =
+      setting.openwaMessageTemplate ||
+      'Hola {{nombre}}, te recordamos que tenés una deuda pendiente de ${{saldo}} con {{dias}} días de antigüedad. Por favor regularizá tu situación a la brevedad. Gracias.';
+
+    const saldoStr = deuda.saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const dias = deuda.diasSinPagar ?? 0;
+
+    const text = template
+      .replace(/\{\{nombre\}\}/g, acreedor.nombre)
+      .replace(/\{\{saldo\}\}/g, saldoStr)
+      .replace(/\{\{dias\}\}/g, String(dias));
+
+    const phoneNumber = this.formatPhoneNumber(acreedor.telefono);
+
+    return this.whatsappService.sendMessage(phoneNumber, text, 'ACREEDORES', id);
+  }
+
+  private formatPhoneNumber(tel: string): string {
+    let cleaned = tel.replace(/[^0-9]/g, '');
+    if (!cleaned.startsWith('549')) {
+      if (cleaned.startsWith('54')) {
+        cleaned = '549' + cleaned.slice(2);
+      } else if (cleaned.startsWith('9')) {
+        cleaned = '54' + cleaned;
+      } else {
+        cleaned = '549' + cleaned;
+      }
+    }
+    return cleaned + '@c.us';
   }
 }

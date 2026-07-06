@@ -14,7 +14,8 @@ export type ModuleKey =
   | 'PLAYERS'
   | 'REPORTES'
   | 'CONFIGURACION'
-  | 'PATRIMONIO';
+  | 'PATRIMONIO'
+  | 'WHATSAPP';
 
 export type ModuleAccess = 'HIDDEN' | 'READ' | 'FULL';
 
@@ -178,6 +179,11 @@ export interface Setting {
   enableLigasModule?: boolean | null;
   enablePlayersModule?: boolean | null;
   enablePatrimonioModule?: boolean | null;
+  enableWhatsappModule?: boolean | null;
+  openwaApiUrl?: string | null;
+  openwaApiKey?: string | null;
+  openwaSessionName?: string | null;
+  openwaMessageTemplate?: string | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -948,4 +954,25 @@ export interface PaginatedAssets {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface NotificationLog {
+  id: number;
+  recipient: string;
+  phoneNumber: string;
+  messageText: string;
+  status: string;
+  errorMessage?: string | null;
+  createdAt: string;
+  acreedorId?: number | null;
+  sourceModule?: string | null;
+}
+
+export interface WhatsappStatus {
+  status: string;
+}
+
+export interface WhatsappQrResponse {
+  qrCode?: string;
+  status?: string;
 }

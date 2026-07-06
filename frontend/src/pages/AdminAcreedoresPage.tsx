@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Eye, Pencil, Plus, X } from 'lucide-react';
+import { Eye, MessageCircle, Pencil, Plus, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedores, useAcreedoresResumen } from '../api/queries';
+import { useAcreedores, useAcreedoresResumen, useNotificarDeuda, useSettings } from '../api/queries';
 import type { Acreedor } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -22,6 +22,8 @@ const getAntiguedadColor = (dias: number | null | undefined, saldo: number | und
 export const AdminAcreedoresPage: React.FC = () => {
   const { data: acreedores = [], isLoading } = useAcreedores();
   const { data: resumen } = useAcreedoresResumen();
+  const { data: settings } = useSettings();
+  const notificarMutation = useNotificarDeuda();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const navigate = useNavigate();
@@ -32,6 +34,9 @@ export const AdminAcreedoresPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
+  const [notifyingId, setNotifyingId] = useState<number | null>(null);
+
+  const whatsappEnabled = settings?.enableWhatsappModule ?? false;
 
   const filtered = useMemo(() => {
     let list = [...acreedores];
@@ -104,6 +109,18 @@ export const AdminAcreedoresPage: React.FC = () => {
       setError(normalizeApiError(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleNotificar = async (acreedorId: number) => {
+    setNotifyingId(acreedorId);
+    try {
+      await notificarMutation.mutateAsync(acreedorId);
+      pushToast('Notificación enviada', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setNotifyingId(null);
     }
   };
 
@@ -210,7 +227,7 @@ export const AdminAcreedoresPage: React.FC = () => {
               <span className="col-total" style={{ flex: '0 0 110px' }}>Saldo</span>
               <span className="col-total" style={{ flex: '0 0 90px' }}>Antiguedad</span>
               <span className="col-method" style={{ flex: '0 0 70px' }}>Estado</span>
-              <span className="col-action" style={{ flex: '0 0 90px' }}></span>
+              <span className="col-action" style={{ flex: '0 0 110px' }}></span>
             </div>
             {filtered.map((a) => (
               <div
@@ -239,7 +256,18 @@ export const AdminAcreedoresPage: React.FC = () => {
                     <span className="badge badge-neutral">Inactivo</span>
                   )}
                 </span>
-                <span className="col-action" style={{ flex: '0 0 70px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                <span className="col-action" style={{ flex: '0 0 110px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                  {whatsappEnabled && a.telefono && (a.saldo ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      className="btn-ghost btn-sm"
+                      onClick={(e) => { e.stopPropagation(); handleNotificar(a.id); }}
+                      title="Notificar deuda por WhatsApp"
+                      disabled={notifyingId === a.id}
+                    >
+                      <MessageCircle size={16} />
+                    </button>
+                  )}
                   <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); navigate(`/admin/acreedores/${a.id}`); }} title="Ver">{<Eye size={16} />}</button>
                   <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(a.id); }} title="Editar">{<Pencil size={16} />}</button>
                 </span>

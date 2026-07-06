@@ -91,6 +91,26 @@ export class UpdateSettingDto {
   enablePatrimonioModule?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  enableWhatsappModule?: boolean;
+
+  @IsOptional()
+  @IsString()
+  openwaApiUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  openwaApiKey?: string;
+
+  @IsOptional()
+  @IsString()
+  openwaSessionName?: string;
+
+  @IsOptional()
+  @IsString()
+  openwaMessageTemplate?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];

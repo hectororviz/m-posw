@@ -56,6 +56,7 @@ export const AdminSettingsPage: React.FC = () => {
     enableLigasModule: false,
     enablePlayersModule: false,
     enablePatrimonioModule: true,
+    enableWhatsappModule: false,
     enableAutoJournalPos: true,
     enableAutoJournalAcreedores: true,
     enableAutoJournalSocios: true,
@@ -153,6 +154,7 @@ export const AdminSettingsPage: React.FC = () => {
         enableLigasModule: settings.enableLigasModule ?? false,
         enablePlayersModule: settings.enablePlayersModule ?? false,
         enablePatrimonioModule: settings.enablePatrimonioModule ?? true,
+        enableWhatsappModule: settings.enableWhatsappModule ?? false,
         enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
         enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
         enableAutoJournalSocios: settings.enableAutoJournalSocios ?? true,
@@ -982,6 +984,19 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Modulo de Patrimonio</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Registro y gestion de bienes, activos e historial</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableWhatsappModule}
+                  onChange={(e) => setForm({ ...form, enableWhatsappModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de WhatsApp</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Envío de notificaciones de deuda vía WhatsApp usando OpenWA</small>
                 </span>
               </label>
             </div>

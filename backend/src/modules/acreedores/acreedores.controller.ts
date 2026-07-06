@@ -87,4 +87,10 @@ export class AcreedoresController {
   ) {
     return this.acreedoresService.addAjuste(id, dto);
   }
+
+  @Post(':id/notificar-deuda')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
+  notificarDeuda(@Param('id', ParseIntPipe) id: number) {
+    return this.acreedoresService.notificarDeuda(id);
+  }
 }

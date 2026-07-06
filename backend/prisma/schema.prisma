@@ -26,6 +26,7 @@ enum ModuleKey {
   PLAYERS
   PATRIMONIO
   LIGAS
+  WHATSAPP
 }
 
 enum AssetEventType {
@@ -285,6 +286,11 @@ model Setting {
   enableLigasModule           Boolean @default(false)
   enablePlayersModule         Boolean @default(false)
   enablePatrimonioModule      Boolean @default(true)
+  enableWhatsappModule        Boolean @default(false)
+  openwaApiUrl                String?
+  openwaApiKey                String?
+  openwaSessionName           String?   @default("mposw")
+  openwaMessageTemplate       String?
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -544,6 +550,7 @@ model Acreedor {
   fiadoVentas FiadoVenta[]
   pagos       PagoAcreedor[]
   ajustes     AjusteAcreedor[]
+  notifications NotificationLog[]
 }
 
 model FiadoVenta {
@@ -952,4 +959,21 @@ model AssetEvent {
   eventDate   DateTime       @default(now())
   userId      String         @db.Uuid
   createdAt   DateTime       @default(now())
+}
+
+model NotificationLog {
+  id           Int       @id @default(autoincrement())
+  recipient    String
+  phoneNumber  String
+  messageText  String
+  status       String    @default("SENT")
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+  acreedorId   Int?
+  acreedor     Acreedor? @relation(fields: [acreedorId], references: [id])
+  sourceModule String?   @default("ACREEDORES")
+
+  @@index([acreedorId])
+  @@index([status])
+  @@index([createdAt])
 }
