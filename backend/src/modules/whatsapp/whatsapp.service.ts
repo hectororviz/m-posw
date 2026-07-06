@@ -18,8 +18,13 @@ export class WhatsappService {
 
   private async getOpenwaConfig() {
     const setting = await this.prisma.setting.findFirst();
+    let apiUrl = setting?.openwaApiUrl || this.config.get<string>('OPENWA_API_URL', 'http://localhost:2785/api');
+    apiUrl = apiUrl.replace(/\/+$/, '');
+    if (!apiUrl.endsWith('/api')) {
+      apiUrl += '/api';
+    }
     return {
-      apiUrl: setting?.openwaApiUrl || this.config.get<string>('OPENWA_API_URL', 'http://localhost:2785/api'),
+      apiUrl,
       apiKey: setting?.openwaApiKey || this.config.get<string>('OPENWA_API_KEY', ''),
       sessionName: setting?.openwaSessionName || this.config.get<string>('OPENWA_SESSION_NAME', 'mposw'),
       messageTemplate: setting?.openwaMessageTemplate || DEFAULT_MESSAGE_TEMPLATE,
