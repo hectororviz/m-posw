@@ -356,6 +356,7 @@ Solapa "Módulos" en Configuración (entre Usuarios y Sistema) para habilitar/de
 | `enableLigasModule` | false | Activa el módulo de Ligas Deportivas. Agrega "Ligas" al menú (solo ADMIN). Consulta Supabase para tablas de posiciones y próximos partidos |
 | `enablePlayersModule` | false | Activa el módulo de Jugadores. Agrega "Jugadores" al menú (sección Deportes). Gestión de jugadores, categorías por edad, torneos con fichaje |
 | `enablePatrimonioModule` | true | Activa el módulo de Patrimonio. Agrega "Patrimonio" al menú (sección Administración). Registro y gestión de bienes/activos con historial de eventos |
+| `enableWhatsappModule` | false | Activa el módulo de WhatsApp. Agrega "WhatsApp" al menú (sección Sistema). Envío de notificaciones de deuda a acreedores vía WhatsApp usando OpenWA |
 
 Los toggles se persisten en la tabla `Setting` y se aplican en tiempo real sin recargar.
 
@@ -847,6 +848,127 @@ Sistema de theming con CSS variables (`data-theme` attribute en `<html>`):
 - **Detección automática**: respeta `prefers-color-scheme` del sistema.
 - **CSS Variables**: todos los colores tokenizados (primary, surface, text, border, etc.).
 
+## WhatsApp / Notificaciones Módulo
+
+Módulo para envío de notificaciones de deuda a acreedores vía WhatsApp, usando [OpenWA](https://github.com/rmyndharis/OpenWA) como gateway de WhatsApp.
+
+### Arquitectura
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  m-POSw Backend    │  OpenWA (externo)   │  WhatsApp Cloud   │
+│  Port: 3000        │  REST API + Baileys │                   │
+└──────┬─────────────────────┬─────────────────────────────────┘
+       │  X-API-Key header   │
+       │  POST send-text     │
+       ├────────────────────▶│
+       │                     │──▶ WhatsApp
+```
+
+- **OpenWA** corre por fuera de m-POSw (contenedor separado o servidor externo).
+- El backend de m-POSw se comunica con OpenWA vía REST API con autenticación `X-API-Key`.
+- La URL de OpenWA y la API Key se configuran desde la GUI en `/admin/whatsapp`.
+
+### Estructura
+
+```
+backend/src/modules/whatsapp/
+├── whatsapp.module.ts
+├── whatsapp.controller.ts       # Endpoints: status, QR, start, send, logs
+├── whatsapp.service.ts          # Cliente HTTP → OpenWA + rate limiting + logs
+└── dto/
+    └── send-message.dto.ts
+```
+
+### Modelos
+
+- **NotificationLog**: registra cada intento de envío (SENT/FAILED), destinatario, mensaje, timestamp. Relación opcional con `Acreedor` (`acreedorId`).
+- **Setting**: campos de configuración — `openwaApiUrl`, `openwaApiKey`, `openwaSessionName`, `openwaMessageTemplate`.
+
+### Flujo
+
+1. Admin activa el módulo en Configuración → Módulos → "Modulo de WhatsApp"
+2. Admin configura URL de OpenWA, API Key y nombre de sesión en `/admin/whatsapp?tab=config`
+3. Admin inicia sesión y escanea QR para vincular WhatsApp (si es necesario)
+4. En Acreedores, aparece botón de WhatsApp en la lista (por fila) y en el detalle
+5. Al clickear "Notificar deuda", el backend:
+   - Verifica `enableWhatsappModule === true`
+   - Verifica que el acreedor tenga teléfono y saldo > 0
+   - Resuelve el nombre de sesión a UUID (consultando `GET /sessions` de OpenWA)
+   - Aplica rate limit de 30 segundos entre envíos (global, no por destinatario)
+   - Reemplaza `{{nombre}}`, `{{saldo}}` y `{{dias}}` en la plantilla de mensaje
+   - Formatea el número a formato internacional (`549{numero}@c.us`)
+   - Envía mediante `POST /api/sessions/{uuid}/messages/send-text` a OpenWA
+   - Registra en `NotificationLog`
+6. El historial completo de envíos se ve en `/admin/whatsapp?tab=history`
+
+### Endpoints del módulo
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/whatsapp/status` | FULL | Estado de la sesión OpenWA |
+| `GET` | `/whatsapp/qr` | FULL | QR para vincular WhatsApp |
+| `POST` | `/whatsapp/start` | FULL | Iniciar/reiniciar sesión |
+| `POST` | `/whatsapp/send` | FULL | Enviar mensaje manual |
+| `GET` | `/whatsapp/logs` | FULL | Historial de notificaciones (últimos 100) |
+
+### Endpoint en Acreedores
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `POST` | `/acreedores/:id/notificar-deuda` | FULL | Enviar WhatsApp con deuda actual del acreedor |
+
+### Frontend
+
+```
+frontend/src/pages/
+├── AdminWhatsappPage.tsx       # Tabs: Historial (tabla de envíos) + Configuración (URL, API Key, QR, plantilla)
+└── AdminAcreedoresPage.tsx     # Botón WhatsApp en fila (solo si módulo activo, tiene teléfono, saldo > 0)
+```
+
+### Configuración desde la GUI
+
+**Pestaña "Configuración" en `/admin/whatsapp`:**
+- **URL de OpenWA**: URL base del servidor OpenWA (se agrega `/api` automáticamente)
+- **API Key**: clave de API generada en el dashboard de OpenWA (rol `operator` mínimo)
+- **Nombre de sesión**: nombre de la sesión WhatsApp en OpenWA (se resuelve a UUID automáticamente)
+- **QR**: escanear para vincular la sesión con WhatsApp
+- **Plantilla de mensaje**: texto con variables `{{nombre}}`, `{{saldo}}`, `{{dias}}` que se reemplazan al enviar
+
+### Configuración relacionada
+
+- `Setting.enableWhatsappModule` (default: `false`): toggle en Configuración → Módulos.
+- `Setting.openwaApiUrl`: URL base de OpenWA (ej: `https://notif.mposw.com.ar`).
+- `Setting.openwaApiKey`: API Key de OpenWA.
+- `Setting.openwaSessionName` (default: `mposw`): nombre de la sesión WhatsApp.
+- `Setting.openwaMessageTemplate`: plantilla de mensaje con `{{nombre}}`, `{{saldo}}` y `{{dias}}`.
+
+### Variables de entorno
+
+| Variable | Propósito |
+|----------|-----------|
+| `OPENWA_API_URL` | URL base de OpenWA (fallback si no se configuró desde GUI) |
+| `OPENWA_API_KEY` | API Key (fallback si no se configuró desde GUI) |
+
+### Rate limiting
+
+- **30 segundos globales** entre cualquier envío, sin importar el destinatario.
+- Verificado contra `NotificationLog` (solo registros `SENT`).
+- Si se intenta antes, devuelve `"Esperá X segundo(s) antes de enviar otro mensaje"`.
+
+### Plantilla por defecto
+
+```
+Hola {{nombre}}, te recordamos que tenés una deuda pendiente de ${{saldo}} con {{dias}} días de antigüedad. Por favor regularizá tu situación a la brevedad. Gracias.
+```
+
+### Repositorio de OpenWA
+
+- [https://github.com/rmyndharis/OpenWA](https://github.com/rmyndharis/OpenWA)
+- Stack: NestJS + TypeScript, soporta Baileys (WebSocket) y whatsapp-web.js (Chromium)
+- Licencia: MIT
+- Puerto por defecto: `2785`, API prefix: `/api`
+
 ## Important Constraints
 
 - **Migraciones**: Se aplican automáticamente al iniciar el contenedor backend. No ejecutar manualmente en producción a menos que sepas lo que hacés.
@@ -908,7 +1030,8 @@ m-posw/
 │   │       ├── stock/             # Control de stock
 │   │       ├── tournaments/       # Torneos deportivos (fichaje, elegibles, categorías)
 │   │       ├── treasury/          # Tesorería / Libro Diario (partida doble)
-│   │       └── users/             # Gestión de usuarios
+│   │       ├── users/             # Gestión de usuarios
+│   │       └── whatsapp/          # Notificaciones WhatsApp vía OpenWA
 │   ├── prisma/        # Schema + migraciones + seed
 │   ├── scripts/       # Utilidades
 │   └── Dockerfile
@@ -941,3 +1064,5 @@ m-posw/
 4. **QR no genera**: Revisá que `externalStoreId` y `externalPosId` estén configurados para el usuario/caja en la BD (o usá OAuth que lo configura automáticamente).
 5. **OAuth no funciona**: Verificá `MP_CLIENT_ID`, `MP_CLIENT_SECRET`, `MP_OAUTH_REDIRECT_URI` y `INSTANCE_SUBDOMAIN`. El redirect URI debe coincidir exactamente con lo configurado en la app de MP.
 6. **Sidebar no colapsa**: Limpiá `localStorage` si el estado persistido está corrupto.
+7. **WhatsApp 400 Bad Request**: Verificá que el nombre de sesión configurado coincida exactamente con el nombre en OpenWA (ej: `mposw-bot`). El backend resuelve el nombre a UUID automáticamente, pero si no encuentra la sesión, OpenWA devuelve 400.
+8. **WhatsApp no envía**: Revisá los logs del backend (`docker compose logs backend`) y los de OpenWA (`docker logs openwa-api`). Verificá que la API Key tenga rol `operator` como mínimo.
