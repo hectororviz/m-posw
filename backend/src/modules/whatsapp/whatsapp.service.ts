@@ -31,19 +31,52 @@ export class WhatsappService {
     };
   }
 
-  async sendMessage(phoneNumber: string, text: string, sourceModule = 'ACREEDORES', acreedorId?: number) {
+  private async resolveSessionId(): Promise<string> {
     const { apiUrl, apiKey, sessionName } = await this.getOpenwaConfig();
 
     if (!apiUrl) throw new BadRequestException('URL de OpenWA no configurada');
     if (!apiKey) throw new BadRequestException('API Key de OpenWA no configurada');
 
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(sessionName)) {
+      return sessionName;
+    }
+
+    try {
+      const sessions = await this.httpGetJson(`${apiUrl}/sessions`, apiKey);
+      if (Array.isArray(sessions)) {
+        const match = sessions.find(
+          (s: any) => s.name === sessionName || s.id === sessionName,
+        );
+        if (match?.id) {
+          this.logger.log(`Resolved session name "${sessionName}" to UUID ${match.id}`);
+          return match.id;
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Could not resolve session name "${sessionName}": ${err}`);
+    }
+
+    return sessionName;
+  }
+
+  async sendMessage(phoneNumber: string, text: string, sourceModule = 'ACREEDORES', acreedorId?: number) {
+    const { apiUrl, apiKey } = await this.getOpenwaConfig();
+    const sessionId = await this.resolveSessionId();
+
+    if (!apiUrl) throw new BadRequestException('URL de OpenWA no configurada');
+    if (!apiKey) throw new BadRequestException('API Key de OpenWA no configurada');
+
+    const fullUrl = `${apiUrl}/sessions/${sessionId}/messages/send-text`;
     const body = JSON.stringify({
       chatId: phoneNumber,
       text,
     });
 
+    this.logger.log(`Sending WhatsApp via ${fullUrl} | chatId: ${phoneNumber}`);
+
     try {
-      const data = await this.httpPost(`${apiUrl}/sessions/${sessionName}/messages/send-text`, body, apiKey);
+      const data = await this.httpPost(fullUrl, body, apiKey);
 
       await this.prisma.notificationLog.create({
         data: {
@@ -79,13 +112,14 @@ export class WhatsappService {
   }
 
   async getSessionStatus() {
-    const { apiUrl, apiKey, sessionName } = await this.getOpenwaConfig();
+    const { apiUrl, apiKey } = await this.getOpenwaConfig();
 
     if (!apiUrl) return { status: 'no_config' };
     if (!apiKey) return { status: 'no_api_key' };
 
     try {
-      const data = await this.httpGet(`${apiUrl}/sessions/${sessionName}`, apiKey);
+      const sessionId = await this.resolveSessionId();
+      const data = await this.httpGetJson(`${apiUrl}/sessions/${sessionId}`, apiKey);
       return data;
     } catch {
       return { status: 'unknown' };
@@ -93,13 +127,14 @@ export class WhatsappService {
   }
 
   async getQrCode() {
-    const { apiUrl, apiKey, sessionName } = await this.getOpenwaConfig();
+    const { apiUrl, apiKey } = await this.getOpenwaConfig();
 
     if (!apiUrl) throw new BadRequestException('URL de OpenWA no configurada');
     if (!apiKey) throw new BadRequestException('API Key de OpenWA no configurada');
 
     try {
-      const data = await this.httpGet(`${apiUrl}/sessions/${sessionName}/qr`, apiKey);
+      const sessionId = await this.resolveSessionId();
+      const data = await this.httpGet(`${apiUrl}/sessions/${sessionId}/qr`, apiKey);
       return JSON.parse(data);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
@@ -116,7 +151,8 @@ export class WhatsappService {
     try {
       const body = JSON.stringify({ name: sessionName });
       await this.httpPost(`${apiUrl}/sessions`, body, apiKey);
-      await this.httpPost(`${apiUrl}/sessions/${sessionName}/start`, '{}', apiKey);
+      const sessionId = await this.resolveSessionId();
+      await this.httpPost(`${apiUrl}/sessions/${sessionId}/start`, '{}', apiKey);
       return { success: true };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
@@ -153,7 +189,8 @@ export class WhatsappService {
             try {
               const parsed = JSON.parse(data);
               if (res.statusCode && res.statusCode >= 400) {
-                reject(new Error(`OpenWA error ${res.statusCode}: ${parsed.error || parsed.message || 'unknown'}`));
+                this.logger.error(`OpenWA HTTP ${res.statusCode} for ${fullUrl}: ${data.substring(0, 300)}`);
+                reject(new Error(`OpenWA error ${res.statusCode}: ${parsed.error || parsed.message || data.substring(0, 200)}`));
               } else {
                 resolve(parsed);
               }
@@ -215,5 +252,10 @@ export class WhatsappService {
 
       req.end();
     });
+  }
+
+  private async httpGetJson(urlStr: string, apiKey: string): Promise<any> {
+    const data = await this.httpGet(urlStr, apiKey);
+    return JSON.parse(data);
   }
 }
