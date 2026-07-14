@@ -41,6 +41,8 @@ export const AdminWhatsappPage: React.FC = () => {
     openwaApiKey: '',
     openwaSessionName: 'mposw',
     openwaMessageTemplate: DEFAULT_TEMPLATE,
+    openwaMinDelay: '30',
+    openwaMaxDelay: '120',
   });
 
   useEffect(() => {
@@ -50,6 +52,8 @@ export const AdminWhatsappPage: React.FC = () => {
         openwaApiKey: settings.openwaApiKey ?? '',
         openwaSessionName: settings.openwaSessionName ?? 'mposw',
         openwaMessageTemplate: settings.openwaMessageTemplate ?? DEFAULT_TEMPLATE,
+        openwaMinDelay: String(settings.openwaMinDelay ?? 30),
+        openwaMaxDelay: String(settings.openwaMaxDelay ?? 120),
       });
     }
   }, [settings]);
@@ -57,7 +61,15 @@ export const AdminWhatsappPage: React.FC = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await apiClient.patch('/settings', form);
+      const payload = {
+        openwaApiUrl: form.openwaApiUrl || undefined,
+        openwaApiKey: form.openwaApiKey || undefined,
+        openwaSessionName: form.openwaSessionName || undefined,
+        openwaMessageTemplate: form.openwaMessageTemplate || undefined,
+        openwaMinDelay: Number(form.openwaMinDelay) || 30,
+        openwaMaxDelay: Number(form.openwaMaxDelay) || 120,
+      };
+      const response = await apiClient.patch('/settings', payload);
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       pushToast('Configuración de WhatsApp guardada', 'success');
@@ -255,6 +267,30 @@ export const AdminWhatsappPage: React.FC = () => {
                   onChange={(e) => setForm({ ...form, openwaSessionName: e.target.value })}
                   placeholder="mposw"
                 />
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="settings-field" style={{ flex: 1 }}>
+                  <label htmlFor="wa-min-delay">Delay mínimo (segundos)</label>
+                  <input
+                    id="wa-min-delay"
+                    type="number"
+                    min="5"
+                    max="600"
+                    value={form.openwaMinDelay}
+                    onChange={(e) => setForm({ ...form, openwaMinDelay: e.target.value })}
+                  />
+                </div>
+                <div className="settings-field" style={{ flex: 1 }}>
+                  <label htmlFor="wa-max-delay">Delay máximo (segundos)</label>
+                  <input
+                    id="wa-max-delay"
+                    type="number"
+                    min="5"
+                    max="600"
+                    value={form.openwaMaxDelay}
+                    onChange={(e) => setForm({ ...form, openwaMaxDelay: e.target.value })}
+                  />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn-secondary" onClick={handleStart} disabled={starting}>

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotificationLog, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, WhatsappStatus, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, BatchStatus, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotificationJob, NotificationStatusMap, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, NotificationLog, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, WhatsappStatus, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1008,3 +1008,49 @@ export const useNotificarDeuda = () => {
     },
   });
 };
+
+export const useNotificarDeudaBatch = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: NotificarDeudaBatchRequest) => {
+      const response = await apiClient.post<NotificarDeudaBatchResponse>('/acreedores/notificar-deuda-batch', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['acreedores'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-logs'] });
+    },
+  });
+};
+
+export const useBatchStatus = (batchId?: string) =>
+  useQuery({
+    queryKey: ['batch-status', batchId],
+    queryFn: async () => {
+      const response = await apiClient.get<BatchStatus>(`/acreedores/batch/${batchId}/status`);
+      return response.data;
+    },
+    enabled: Boolean(batchId),
+    refetchInterval: 5000,
+  });
+
+export const useAcreedorNotificaciones = (acreedorId?: number) =>
+  useQuery({
+    queryKey: ['acreedor-notificaciones', acreedorId],
+    queryFn: async () => {
+      const response = await apiClient.get<NotificationJob[]>(`/acreedores/${acreedorId}/notificaciones`);
+      return response.data;
+    },
+    enabled: Boolean(acreedorId),
+  });
+
+export const useNotificationStatus = (acreedorIds: number[]) =>
+  useQuery({
+    queryKey: ['notification-status', acreedorIds],
+    queryFn: async () => {
+      const ids = acreedorIds.join(',');
+      const response = await apiClient.get<NotificationStatusMap>(`/acreedores/notification-status?ids=${ids}`);
+      return response.data;
+    },
+    enabled: acreedorIds.length > 0,
+  });

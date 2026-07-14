@@ -291,6 +291,8 @@ model Setting {
   openwaApiKey                String?
   openwaSessionName           String?   @default("mposw")
   openwaMessageTemplate       String?
+  openwaMinDelay              Int       @default(30)
+  openwaMaxDelay              Int       @default(120)
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -975,5 +977,30 @@ model NotificationLog {
 
   @@index([acreedorId])
   @@index([status])
+  @@index([createdAt])
+}
+
+model NotificationJob {
+  id           Int       @id @default(autoincrement())
+  creditorId   Int?
+  acreedor     Acreedor? @relation(fields: [creditorId], references: [id])
+  type         String    @default("DEBT_REMINDER")
+  channel      String    @default("WHATSAPP")
+  status       String    @default("QUEUED")
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(3)
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        String?
+  payload      Json      @default("{}")
+  batchId      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([creditorId])
+  @@index([status])
+  @@index([type])
+  @@index([batchId])
   @@index([createdAt])
 }

@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, MessageCircle, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Clock, Loader, MessageCircle, Slash, X, XCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedor, useAcreedorDeuda, useNotificarDeuda, useSettings, useTreasuryAccounts } from '../api/queries';
-import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem } from '../api/types';
+import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useNotificarDeuda, useSettings, useTreasuryAccounts } from '../api/queries';
+import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificationJob } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
@@ -13,8 +13,96 @@ const formatCurrency = (value: number) =>
 const formatDate = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
+const formatDateTime = (value: string) =>
+  new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
 const getMedioPagoLabel = (medio: string) =>
   medio === 'transferencia' ? 'Transferencia' : 'Efectivo';
+
+const getTypeLabel = (type: string) => {
+  switch (type) {
+    case 'DEBT_REMINDER': return 'Recordatorio';
+    case 'RECEIPT': return 'Recibo';
+    case 'WELCOME': return 'Bienvenida';
+    case 'PROMOTION': return 'Promoción';
+    default: return type;
+  }
+};
+
+const getNotifStatusDisplay = (job: NotificationJob) => {
+  const { status } = job;
+  switch (status) {
+    case 'SENT':
+      return <span className="badge badge-success">Enviado</span>;
+    case 'FAILED':
+      return <span className="badge badge-error">Falló</span>;
+    case 'QUEUED':
+      return <span className="badge badge-warning">En cola</span>;
+    case 'PROCESSING':
+      return <span className="badge badge-info">Enviando...</span>;
+    case 'RETRYING':
+      return <span className="badge badge-warning">Reintentando</span>;
+    case 'CANCELLED':
+      return <span className="badge badge-neutral">Cancelado</span>;
+    default:
+      return <span className="badge badge-neutral">{status}</span>;
+  }
+};
+
+const AcreedorNotificaciones: React.FC<{ acreedorId: number }> = ({ acreedorId }) => {
+  const { data: notificaciones = [], isLoading } = useAcreedorNotificaciones(acreedorId);
+
+  if (isLoading) {
+    return (
+      <div className="settings-section" style={{ textAlign: 'center', padding: '1.5rem' }}>
+        <div className="spinner" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  if (notificaciones.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="settings-section" style={{ marginTop: '1.5rem' }}>
+      <h3 className="settings-section-header">Notificaciones</h3>
+      <div className="sales-table">
+        <div className="sales-table-head">
+          <span className="col-date">Fecha</span>
+          <span className="col-method" style={{ whiteSpace: 'nowrap', flex: 2 }}>Tipo</span>
+          <span className="col-method" style={{ flex: '0 0 120px' }}>Estado</span>
+          <span className="col-user">Detalle</span>
+        </div>
+        {notificaciones.map((job) => (
+          <div key={job.id} className="sales-table-row" style={{ cursor: 'default' }}>
+            <span className="col-date">{job.createdAt ? formatDateTime(job.createdAt) : '--'}</span>
+            <span className="col-method" style={{ whiteSpace: 'nowrap', flex: 2 }}>
+              {getTypeLabel(job.type)}
+              {job.attempts > 1 && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)', marginLeft: '0.35rem' }}>
+                  (intento {job.attempts})
+                </span>
+              )}
+            </span>
+            <span className="col-method" style={{ flex: '0 0 120px' }}>{getNotifStatusDisplay(job)}</span>
+            <span className="col-user" style={{ fontSize: '0.85rem' }}>
+              {job.error ? (
+                <span style={{ color: 'var(--color-danger)' }} title={job.error}>
+                  {job.error.length > 50 ? job.error.slice(0, 50) + '...' : job.error}
+                </span>
+              ) : job.status === 'SENT' && job.completedAt ? (
+                <span style={{ color: 'var(--color-text-faint)' }}>{formatDate(job.completedAt)}</span>
+              ) : (
+                <span style={{ color: 'var(--color-text-faint)' }}>--</span>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const AdminAcreedorDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -306,6 +394,10 @@ export const AdminAcreedorDetailPage: React.FC = () => {
             )}
           </div>
         </>
+      )}
+
+      {whatsappEnabled && (
+        <AcreedorNotificaciones acreedorId={acreedorId!} />
       )}
 
       {pagoModal && (

@@ -2111,6 +2111,10 @@ button {
   }
 }
 
+.spin-icon {
+  animation: spin 1.5s linear infinite;
+}
+
 .toast-container {
   position: fixed;
   right: 1.5rem;

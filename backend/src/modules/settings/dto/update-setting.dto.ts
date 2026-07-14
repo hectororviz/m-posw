@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
+import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateSettingDto {
   @IsOptional()
@@ -109,6 +109,14 @@ export class UpdateSettingDto {
   @IsOptional()
   @IsString()
   openwaMessageTemplate?: string;
+
+  @IsOptional()
+  @IsInt()
+  openwaMinDelay?: number;
+
+  @IsOptional()
+  @IsInt()
+  openwaMaxDelay?: number;
 
   @IsOptional()
   @IsArray()

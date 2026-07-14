@@ -184,6 +184,8 @@ export interface Setting {
   openwaApiKey?: string | null;
   openwaSessionName?: string | null;
   openwaMessageTemplate?: string | null;
+  openwaMinDelay?: number | null;
+  openwaMaxDelay?: number | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -966,6 +968,88 @@ export interface NotificationLog {
   createdAt: string;
   acreedorId?: number | null;
   sourceModule?: string | null;
+}
+
+export interface NotificationJob {
+  id: number;
+  creditorId: number | null;
+  type: string;
+  channel: string;
+  status: string;
+  attempts: number;
+  error: string | null;
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  payload?: Record<string, unknown>;
+}
+
+export interface NotificationJobStatus {
+  id: number;
+  creditorId: number | null;
+  status: string;
+  attempts: number;
+  error: string | null;
+  createdAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface BatchStatus {
+  batchId: string;
+  total: number;
+  sent: number;
+  failed: number;
+  queued: number;
+  cancelled: number;
+  isRunning: boolean;
+  jobs: NotificationJobStatus[];
+}
+
+export interface NotificarDeudaBatchRequest {
+  acreedorIds: number[];
+}
+
+export interface NotificarDeudaBatchDetail {
+  acreedorId: number;
+  nombre: string;
+  telefono: string | null;
+  enviable: boolean;
+  omitido: boolean;
+  motivo: string;
+  jobId: number | null;
+  status: string;
+}
+
+export interface NotificarDeudaBatchResponse {
+  batchId: string;
+  total: number;
+  enviables: number;
+  sinTelefono: number;
+  sinDeuda: number;
+  omitidos: number;
+  tiempoEstimado: string;
+  details: NotificarDeudaBatchDetail[];
+}
+
+export interface NotificationStatusMap {
+  [acreedorId: number]: {
+    status: string;
+    completedAt: string | null;
+    createdAt: string | null;
+    error: string | null;
+    attempts: number;
+  } | null;
+}
+
+export interface JobUpdatedEvent {
+  batchId: string;
+  creditorId: number;
+  jobId: number;
+  status: string;
+  completedAt?: string | null;
+  error?: string | null;
+  attempts?: number;
 }
 
 export interface WhatsappStatus {

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../common/prisma.service';
 import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { NotificationQueueService } from '../whatsapp/notification-queue.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -59,6 +60,7 @@ export class AcreedoresService {
     private prisma: PrismaService,
     private journalEntriesService: JournalEntriesService,
     private whatsappService: WhatsappService,
+    private notificationQueueService: NotificationQueueService,
   ) {}
 
   private calculateFifo(
@@ -428,5 +430,213 @@ export class AcreedoresService {
       }
     }
     return cleaned + '@c.us';
+  }
+
+  async notificarDeudaBatch(acreedorIds: number[]) {
+    const setting = await this.prisma.setting.findFirst();
+    if (!setting?.enableWhatsappModule) {
+      throw new BadRequestException('El módulo de WhatsApp no está habilitado');
+    }
+
+    if (!setting?.openwaApiUrl || !setting?.openwaApiKey) {
+      throw new BadRequestException('OpenWA no está configurado (URL y API Key requeridos)');
+    }
+
+    const template =
+      setting.openwaMessageTemplate ||
+      'Hola {{nombre}}, te recordamos que tenés una deuda pendiente de ${{saldo}} con {{dias}} días de antigüedad. Por favor regularizá tu situación a la brevedad. Gracias.';
+
+    const batchId = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const details: Array<{
+      acreedorId: number;
+      nombre: string;
+      telefono: string | null;
+      enviable: boolean;
+      omitido: boolean;
+      motivo: string;
+      jobId: number | null;
+      status: string;
+    }> = [];
+
+    let enviables = 0;
+    let sinTelefono = 0;
+    let sinDeuda = 0;
+
+    for (const id of acreedorIds) {
+      const acreedor = await this.prisma.acreedor.findUnique({ where: { id } });
+      if (!acreedor) {
+        details.push({
+          acreedorId: id,
+          nombre: `#${id}`,
+          telefono: null,
+          enviable: false,
+          omitido: true,
+          motivo: 'Acreedor no encontrado',
+          jobId: null,
+          status: 'SKIPPED',
+        });
+        continue;
+      }
+
+      if (!acreedor.telefono) {
+        details.push({
+          acreedorId: id,
+          nombre: acreedor.nombre,
+          telefono: null,
+          enviable: false,
+          omitido: true,
+          motivo: 'Sin teléfono',
+          jobId: null,
+          status: 'SKIPPED',
+        });
+        sinTelefono++;
+        continue;
+      }
+
+      const deuda = await this.getDeuda(id);
+      if (deuda.saldoPendiente <= 0) {
+        details.push({
+          acreedorId: id,
+          nombre: acreedor.nombre,
+          telefono: acreedor.telefono,
+          enviable: false,
+          omitido: true,
+          motivo: 'Sin deuda pendiente',
+          jobId: null,
+          status: 'SKIPPED',
+        });
+        sinDeuda++;
+        continue;
+      }
+
+      enviables++;
+      details.push({
+        acreedorId: id,
+        nombre: acreedor.nombre,
+        telefono: acreedor.telefono,
+        enviable: true,
+        omitido: false,
+        motivo: '',
+        jobId: null,
+        status: 'QUEUED',
+      });
+    }
+
+    const minTime = Math.ceil(enviables * (setting.openwaMinDelay ?? 30) / 60);
+    const maxTime = Math.ceil(enviables * (setting.openwaMaxDelay ?? 120) / 60);
+    const tiempoEstimado = minTime === maxTime ? `${minTime} minutos` : `${minTime} a ${maxTime} minutos`;
+
+    if (enviables === 0) {
+      throw new BadRequestException('Ninguno de los acreedores seleccionados es enviable');
+    }
+
+    const finalJobs: Array<{ creditorId: number; phoneNumber: string; text: string }> = [];
+    for (const d of details.filter((d) => d.enviable)) {
+      const acreedor = await this.prisma.acreedor.findUnique({ where: { id: d.acreedorId } });
+      if (!acreedor) continue;
+      const deudaCheck = await this.getDeuda(d.acreedorId);
+      const saldoStr = deudaCheck.saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      const dias = deudaCheck.diasSinPagar ?? 0;
+      const text = template
+        .replace(/\{\{nombre\}\}/g, acreedor.nombre)
+        .replace(/\{\{saldo\}\}/g, saldoStr)
+        .replace(/\{\{dias\}\}/g, String(dias));
+      finalJobs.push({
+        creditorId: d.acreedorId,
+        phoneNumber: this.formatPhoneNumber(acreedor.telefono!),
+        text,
+      });
+    }
+
+    await this.notificationQueueService.enqueueBatch(finalJobs, batchId);
+
+    for (let i = 0; i < details.length; i++) {
+      if (details[i].enviable) {
+        const dbJob = await this.prisma.notificationJob.findFirst({
+          where: { batchId, creditorId: details[i].acreedorId },
+          orderBy: { id: 'desc' },
+        });
+        details[i].jobId = dbJob?.id ?? null;
+      }
+    }
+
+    return {
+      batchId,
+      total: acreedorIds.length,
+      enviables,
+      sinTelefono,
+      sinDeuda,
+      omitidos: sinTelefono + sinDeuda,
+      tiempoEstimado,
+      details,
+    };
+  }
+
+  async getBatchStatus(batchId: string) {
+    return this.notificationQueueService.getBatchStatus(batchId);
+  }
+
+  async getNotificaciones(acreedorId: number) {
+    return this.prisma.notificationJob.findMany({
+      where: { creditorId: acreedorId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        channel: true,
+        status: true,
+        attempts: true,
+        error: true,
+        createdAt: true,
+        startedAt: true,
+        completedAt: true,
+        payload: true,
+      },
+      take: 50,
+    });
+  }
+
+  async getNotificationStatus(acreedorIds: number[]) {
+    if (acreedorIds.length === 0) {
+      return {};
+    }
+
+    const jobs = await this.prisma.notificationJob.findMany({
+      where: { creditorId: { in: acreedorIds } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        creditorId: true,
+        status: true,
+        completedAt: true,
+        createdAt: true,
+        error: true,
+        attempts: true,
+      },
+    });
+
+    const result: Record<number, {
+      status: string;
+      completedAt: string | null;
+      createdAt: string | null;
+      error: string | null;
+      attempts: number;
+    } | null> = {};
+
+    for (const id of acreedorIds) {
+      const latest = jobs.find((j) => j.creditorId === id);
+      result[id] = latest
+        ? {
+            status: latest.status,
+            completedAt: latest.completedAt?.toISOString() ?? null,
+            createdAt: latest.createdAt?.toISOString() ?? null,
+            error: latest.error,
+            attempts: latest.attempts,
+          }
+        : null;
+    }
+
+    return result;
   }
 }
