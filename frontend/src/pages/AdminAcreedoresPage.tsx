@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, Eye, Loader, MessageCircle, Pencil, Plus, Slash, X, XCircle } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedores, useAcreedoresResumen, useNotificarDeuda, useNotificarDeudaBatch, useNotificationStatus, useSettings } from '../api/queries';
-import type { Acreedor, JobUpdatedEvent, NotificationStatusMap, NotificarDeudaBatchResponse } from '../api/types';
+import { useAcreedores, useAcreedorNotificaciones, useAcreedoresResumen, useNotificarDeudaBatch, useNotificationStatus, useSettings } from '../api/queries';
+import type { Acreedor, JobUpdatedEvent, NotificationJob, NotificationStatusMap, NotificarDeudaBatchResponse } from '../api/types';
 import { useSocketContext } from '../socket/SocketProvider';
 import { useToast } from '../components/ToastProvider';
 
@@ -89,7 +89,6 @@ export const AdminAcreedoresPage: React.FC = () => {
   const { data: acreedores = [], isLoading } = useAcreedores();
   const { data: resumen } = useAcreedoresResumen();
   const { data: settings } = useSettings();
-  const notificarMutation = useNotificarDeuda();
   const batchMutation = useNotificarDeudaBatch();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
@@ -102,13 +101,13 @@ export const AdminAcreedoresPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
-  const [notifyingId, setNotifyingId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [batchResult, setBatchResult] = useState<NotificarDeudaBatchResponse | null>(null);
   const [batchSending, setBatchSending] = useState(false);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [wsJobStatus, setWsJobStatus] = useState<Record<number, { status: string; completedAt?: string | null; error?: string | null }>>({});
+  const [historyModalAcreedor, setHistoryModalAcreedor] = useState<number | null>(null);
 
   const acreedorIds = useMemo(() => acreedores.map((a) => a.id), [acreedores]);
   const { data: notificationStatus } = useNotificationStatus(
@@ -297,18 +296,6 @@ export const AdminAcreedoresPage: React.FC = () => {
     }
   };
 
-  const handleNotificar = async (acreedorId: number) => {
-    setNotifyingId(acreedorId);
-    try {
-      await notificarMutation.mutateAsync(acreedorId);
-      pushToast('Notificación enviada', 'success');
-    } catch (err) {
-      pushToast(normalizeApiError(err), 'error');
-    } finally {
-      setNotifyingId(null);
-    }
-  };
-
   const getSaldoDisplay = (a: Acreedor) => {
     const s = a.saldo ?? 0;
     const sf = a.saldoFavor ?? 0;
@@ -493,9 +480,8 @@ export const AdminAcreedoresPage: React.FC = () => {
                       <button
                         type="button"
                         className="btn-ghost btn-sm"
-                        onClick={(e) => { e.stopPropagation(); handleNotificar(a.id); }}
-                        title="Notificar deuda por WhatsApp"
-                        disabled={notifyingId === a.id}
+                        onClick={(e) => { e.stopPropagation(); setHistoryModalAcreedor(a.id); }}
+                        title="Ver notificaciones enviadas"
                       >
                         <MessageCircle size={16} />
                       </button>
@@ -695,6 +681,89 @@ export const AdminAcreedoresPage: React.FC = () => {
           </div>
         </div>
       )}
+      {historyModalAcreedor !== null && (
+        <AcreedorNotificacionesModal acreedorId={historyModalAcreedor} onClose={() => setHistoryModalAcreedor(null)} />
+      )}
+    </div>
+  );
+};
+
+const AcreedorNotificacionesModal: React.FC<{ acreedorId: number; onClose: () => void }> = ({ acreedorId, onClose }) => {
+  const { data: notificaciones = [], isLoading } = useAcreedorNotificaciones(acreedorId);
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'DEBT_REMINDER': return 'Recordatorio';
+      case 'RECEIPT': return 'Recibo';
+      case 'WELCOME': return 'Bienvenida';
+      case 'PROMOTION': return 'Promoción';
+      default: return type;
+    }
+  };
+
+  const getNotifBadge = (status: string) => {
+    switch (status) {
+      case 'SENT': return <span className="badge badge-success">Enviado</span>;
+      case 'FAILED': return <span className="badge badge-error">Falló</span>;
+      case 'QUEUED': return <span className="badge badge-warning">En cola</span>;
+      case 'PROCESSING': return <span className="badge badge-info">Enviando...</span>;
+      case 'RETRYING': return <span className="badge badge-warning">Reintentando</span>;
+      case 'CANCELLED': return <span className="badge badge-neutral">Cancelado</span>;
+      default: return <span className="badge badge-neutral">{status}</span>;
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
+        <div className="modal-header">
+          <h3>Historial de notificaciones</h3>
+          <button className="icon-button" onClick={onClose}>{<X size={16} />}</button>
+        </div>
+        <div className="modal-body">
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div className="spinner" aria-hidden="true" />
+            </div>
+          ) : notificaciones.length === 0 ? (
+            <p style={{ color: 'var(--color-text-faint)', textAlign: 'center', padding: '2rem' }}>
+              No hay notificaciones registradas para este acreedor.
+            </p>
+          ) : (
+            <div className="sales-table">
+              <div className="sales-table-head">
+                <span className="col-date">Fecha</span>
+                <span className="col-method">Tipo</span>
+                <span className="col-total" style={{ flex: '0 0 110px' }}>Estado</span>
+                <span className="col-user">Detalle</span>
+              </div>
+              {notificaciones.map((job: NotificationJob) => (
+                <div key={job.id} className="sales-table-row" style={{ cursor: 'default' }}>
+                  <span className="col-date">{job.createdAt ? formatDateTime(job.createdAt) : '--'}</span>
+                  <span className="col-method">
+                    {getTypeLabel(job.type)}
+                    {job.attempts > 1 && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)', marginLeft: '0.35rem' }}>
+                        (×{job.attempts})
+                      </span>
+                    )}
+                  </span>
+                  <span className="col-total" style={{ flex: '0 0 110px' }}>{getNotifBadge(job.status)}</span>
+                  <span className="col-user" style={{ fontSize: '0.85rem' }}>
+                    {job.error ? (
+                      <span style={{ color: 'var(--color-danger)' }} title={job.error}>
+                        {job.error.length > 50 ? job.error.slice(0, 50) + '...' : job.error}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--color-text-faint)' }}>--</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

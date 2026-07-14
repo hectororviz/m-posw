@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, MessageCircle, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useNotificarDeuda, useSettings, useTreasuryAccounts } from '../api/queries';
+import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useSettings, useTreasuryAccounts } from '../api/queries';
 import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificationJob } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -111,7 +111,6 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const { data: deuda, isLoading: deudaLoading } = useAcreedorDeuda(acreedorId);
   const { data: treasuryAccounts = [] } = useTreasuryAccounts();
   const { data: settings } = useSettings();
-  const notificarMutation = useNotificarDeuda();
   const whatsappEnabled = settings?.enableWhatsappModule ?? false;
   const autoTreasuryId = treasuryAccounts.length === 1 ? treasuryAccounts[0].id : '';
   const queryClient = useQueryClient();
@@ -233,20 +232,6 @@ export const AdminAcreedorDetailPage: React.FC = () => {
     }
   };
 
-  const handleNotificar = async () => {
-    if (!acreedorId) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await notificarMutation.mutateAsync(acreedorId);
-      pushToast('Notificación enviada', 'success');
-    } catch (err) {
-      setError(normalizeApiError(err));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (!acreedor) {
     return (
       <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
@@ -318,12 +303,6 @@ export const AdminAcreedorDetailPage: React.FC = () => {
       )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', gap: '0.5rem' }}>
-        {whatsappEnabled && acreedor.telefono && deuda && deuda.saldoPendiente > 0 && (
-          <button type="button" className="btn-secondary" onClick={handleNotificar} disabled={saving} title="Notificar deuda por WhatsApp">
-            <MessageCircle size={16} style={{ marginRight: '0.35rem' }} />
-            Notificar por WhatsApp
-          </button>
-        )}
         <button type="button" className="btn-ghost" onClick={() => { setError(null); setAjusteModal(true); }}>
           + Agregar a deuda
         </button>
