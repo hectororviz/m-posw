@@ -15,7 +15,7 @@ CREATE TABLE "NotificationJob" (
     "startedAt" TIMESTAMP(3),
     "completedAt" TIMESTAMP(3),
     "error" TEXT,
-    "payload" JSONB NOT NULL DEFAULT '{}',
+    "payload" JSONB,
     "batchId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

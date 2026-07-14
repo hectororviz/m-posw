@@ -993,7 +993,7 @@ model NotificationJob {
   startedAt    DateTime?
   completedAt  DateTime?
   error        String?
-  payload      Json      @default("{}")
+  payload      Json?
   batchId      String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
