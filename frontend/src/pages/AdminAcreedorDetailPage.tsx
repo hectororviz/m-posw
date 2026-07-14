@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Check, Clock, Loader, MessageCircle, Slash, X, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, MessageCircle, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
