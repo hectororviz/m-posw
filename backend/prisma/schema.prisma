@@ -552,7 +552,8 @@ model Acreedor {
   fiadoVentas FiadoVenta[]
   pagos       PagoAcreedor[]
   ajustes     AjusteAcreedor[]
-  notifications NotificationLog[]
+  notifications  NotificationLog[]
+  notificationJobs NotificationJob[]
 }
 
 model FiadoVenta {
