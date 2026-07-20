@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings, useWhatsappStatus, useWhatsappLogs, useWhatsappQueue, useRetryJobs, usePauseQueue, useResumeQueue, useCancelAllQueued } from '../api/queries';
-import type { NotificationLog, NotificationJob } from '../api/types';
+import type { NotificationLog } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 type TabId = 'history' | 'config' | 'queue';
