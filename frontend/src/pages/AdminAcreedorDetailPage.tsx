@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useSettings, useTreasuryAccounts } from '../api/queries';
-import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificationJob } from '../api/types';
+import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificationJob, Sale } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
@@ -15,6 +15,13 @@ const formatDate = (value: string) =>
 
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+const getPaymentMethodLabel = (method?: string) => {
+  if (method === 'MP_QR') return 'QR';
+  if (method === 'TRANSFER') return 'Transf.';
+  if (method === 'FIADO') return 'Fiado';
+  return 'Efectivo';
+};
 
 const getMedioPagoLabel = (medio: string) =>
   medio === 'transferencia' ? 'Transferencia' : 'Efectivo';
@@ -126,6 +133,10 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [saleLoading, setSaleLoading] = useState(false);
+
   const [ajusteModal, setAjusteModal] = useState(false);
   const [ajusteForm, setAjusteForm] = useState({
     monto: '',
@@ -229,6 +240,20 @@ export const AdminAcreedorDetailPage: React.FC = () => {
       setError(normalizeApiError(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOpenSaleDetail = async (saleId: string) => {
+    setSelectedSaleId(saleId);
+    setSaleLoading(true);
+    try {
+      const response = await apiClient.get<Sale>(`/sales/${saleId}`);
+      setSelectedSale(response.data);
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+      setSelectedSaleId(null);
+    } finally {
+      setSaleLoading(false);
     }
   };
 
@@ -352,7 +377,16 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                   }
 
                   return (
-                    <div key={`${entry.kind}-${i}`} className="sales-table-row">
+                    <div
+                      key={`${entry.kind}-${i}`}
+                      className="sales-table-row"
+                      style={{ cursor: entry.kind === 'venta' ? 'pointer' : 'default' }}
+                      onClick={() => {
+                        if (entry.kind === 'venta') {
+                          handleOpenSaleDetail(entry.data.ventaId);
+                        }
+                      }}
+                    >
                       <span className="col-date">{dateStr}</span>
                       <span
                         className="col-total"
@@ -365,7 +399,14 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                         {amountDisplay}
                       </span>
                       <span className="col-method" style={{ whiteSpace: 'nowrap', paddingLeft: '1.5rem' }}>{concepto}</span>
-                      <span className="col-user" style={{ paddingLeft: '1.5rem' }}>{detalle}</span>
+                      <span className="col-user" style={{ paddingLeft: '1.5rem' }}>
+                        {detalle}
+                        {entry.kind === 'venta' && (
+                          <span style={{ color: 'var(--color-primary)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
+                            (Ver detalle)
+                          </span>
+                        )}
+                      </span>
                     </div>
                   );
                 })}
@@ -482,6 +523,67 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                   {saving ? 'Guardando...' : 'Agregar'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedSaleId && (
+        <div className="modal-backdrop" onClick={() => { setSelectedSaleId(null); setSelectedSale(null); }}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Detalle de venta</h3>
+              <button className="icon-button" onClick={() => { setSelectedSaleId(null); setSelectedSale(null); }}>{<X size={16} />}</button>
+            </div>
+            <div className="modal-body">
+              {saleLoading ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  <div className="spinner" aria-hidden="true" />
+                </div>
+              ) : selectedSale ? (
+                <>
+                  <div className="sales-detail-row">
+                    <span>Fecha</span>
+                    <span>{formatDate(selectedSale.createdAt)} {new Date(selectedSale.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                  </div>
+                  <div className="sales-detail-row">
+                    <span>Total</span>
+                    <strong>{formatCurrency(selectedSale.total)}</strong>
+                  </div>
+                  <div className="sales-detail-row">
+                    <span>Medio de pago</span>
+                    <span>{getPaymentMethodLabel(selectedSale.paymentMethod)}</span>
+                  </div>
+                  <div className="sales-detail-products">
+                    {selectedSale.items.map((item) => (
+                      <div key={item.id} className="sales-detail-product">
+                        {item.quantity} x {item.product.name} <span>{formatCurrency(item.subtotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedSale.vouchers && selectedSale.vouchers.length > 0 && (
+                    <>
+                      <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.75rem 0' }} />
+                      <div className="sales-detail-row">
+                        <span>Vouchers WiFi</span>
+                      </div>
+                      {selectedSale.vouchers.map((v) => (
+                        <div key={v.id} className="sales-detail-row" style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.1rem', letterSpacing: '2px' }}>
+                          <span>{v.plan?.name}</span>
+                          <span>{v.pin}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                    <button type="button" className="btn-ghost" onClick={() => { setSelectedSaleId(null); setSelectedSale(null); }}>
+                      Cerrar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: 'var(--color-text-faint)', textAlign: 'center' }}>No se pudo cargar la venta.</p>
+              )}
             </div>
           </div>
         </div>

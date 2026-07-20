@@ -15,7 +15,9 @@ interface EnqueuedJob {
 export class NotificationQueueService {
   private readonly logger = new Logger(NotificationQueueService.name);
   private running = false;
+  private paused = false;
   private activeBatchId: string | null = null;
+  private cancelRequested = false;
 
   constructor(
     private prisma: PrismaService,
@@ -69,14 +71,21 @@ export class NotificationQueueService {
     this.logger.log(`Starting batch ${batchId} with ${jobs.length} jobs`);
 
     for (const job of jobs) {
-      const setting = await this.prisma.setting.findFirst();
-      const minDelay = (setting?.openwaMinDelay ?? 30) * 1000;
-      const maxDelay = (setting?.openwaMaxDelay ?? 120) * 1000;
-      const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+      if (this.cancelRequested) {
+        this.logger.log(`Cancel requested for batch ${batchId}, stopping`);
+        this.cancelBatch(batchId);
+        break;
+      }
 
-      if (job !== jobs[0]) {
-        this.logger.log(`Waiting ${Math.round(delay / 1000)}s before next job (batch ${batchId})`);
-        await this.sleep(delay);
+      while (this.paused) {
+        this.logger.log(`Queue paused (batch ${batchId}), waiting...`);
+        this.gateway.notifyJobUpdated({
+          batchId,
+          creditorId: 0,
+          jobId: 0,
+          status: 'PAUSED',
+        });
+        await this.sleep(2000);
       }
 
       const dbJob = await this.prisma.notificationJob.findUnique({ where: { id: job.id } });
@@ -89,6 +98,16 @@ export class NotificationQueueService {
           status: 'CANCELLED',
         });
         continue;
+      }
+
+      const setting = await this.prisma.setting.findFirst();
+      const minDelay = (setting?.openwaMinDelay ?? 30) * 1000;
+      const maxDelay = (setting?.openwaMaxDelay ?? 120) * 1000;
+      const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+
+      if (job !== jobs[0]) {
+        this.logger.log(`Waiting ${Math.round(delay / 1000)}s before next job (batch ${batchId})`);
+        await this.sleep(delay);
       }
 
       await this.prisma.notificationJob.update({
@@ -185,6 +204,8 @@ export class NotificationQueueService {
 
     this.running = false;
     this.activeBatchId = null;
+    this.paused = false;
+    this.cancelRequested = false;
     this.logger.log(`Batch ${batchId} completed`);
   }
 
@@ -193,6 +214,113 @@ export class NotificationQueueService {
       where: { batchId, status: { in: ['QUEUED', 'RETRYING'] } },
       data: { status: 'CANCELLED', completedAt: new Date() },
     });
+
+    return { cancelled: result.count };
+  }
+
+  async pauseQueue(): Promise<void> {
+    this.paused = true;
+    this.logger.log('Queue paused');
+  }
+
+  async resumeQueue(): Promise<void> {
+    this.paused = false;
+    this.logger.log('Queue resumed');
+  }
+
+  isQueuePaused(): boolean {
+    return this.paused;
+  }
+
+  async requestCancelQueue(): Promise<void> {
+    this.cancelRequested = true;
+    this.logger.log(`Cancel requested for batch ${this.activeBatchId}`);
+  }
+
+  async listQueue(status?: string, page = 1, limit = 50) {
+    const where: any = {};
+    if (status) {
+      where.status = status;
+    }
+
+    const [jobs, total] = await Promise.all([
+      this.prisma.notificationJob.findMany({
+        where,
+        orderBy: { id: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          acreedor: {
+            select: { id: true, nombre: true },
+          },
+        },
+      }),
+      this.prisma.notificationJob.count({ where }),
+    ]);
+
+    const counts: Record<string, number> = {};
+    const countResults = await this.prisma.notificationJob.groupBy({
+      by: ['status'],
+      _count: { id: true },
+    });
+    for (const c of countResults) {
+      counts[c.status] = c._count.id;
+    }
+
+    return {
+      jobs,
+      total,
+      page,
+      limit,
+      counts,
+      isRunning: this.running,
+      isPaused: this.paused,
+      activeBatchId: this.activeBatchId,
+    };
+  }
+
+  async retryJobs(jobIds: number[]): Promise<{ retried: number }> {
+    const result = await this.prisma.notificationJob.updateMany({
+      where: {
+        id: { in: jobIds },
+        status: { in: ['FAILED', 'CANCELLED'] },
+      },
+      data: {
+        status: 'QUEUED',
+        error: null,
+        completedAt: null,
+        startedAt: null,
+      },
+    });
+
+    if (result.count > 0) {
+      const retriedJobs = await this.prisma.notificationJob.findMany({
+        where: { id: { in: jobIds }, status: 'QUEUED' },
+      });
+
+      const enqueued: EnqueuedJob[] = retriedJobs.map((j) => ({
+        id: j.id,
+        creditorId: j.creditorId ?? 0,
+        batchId: `retry-${Date.now()}`,
+        phoneNumber: (j.payload as any)?.phoneNumber ?? '',
+        text: (j.payload as any)?.messageText ?? '',
+      }));
+
+      if (enqueued.length > 0 && !this.running) {
+        this.processQueue(`retry-${Date.now()}`, enqueued);
+      }
+    }
+
+    return { retried: result.count };
+  }
+
+  async cancelAllQueued(): Promise<{ cancelled: number }> {
+    const result = await this.prisma.notificationJob.updateMany({
+      where: { status: { in: ['QUEUED', 'RETRYING', 'PROCESSING'] } },
+      data: { status: 'CANCELLED', completedAt: new Date() },
+    });
+
+    this.cancelRequested = true;
 
     return { cancelled: result.count };
   }

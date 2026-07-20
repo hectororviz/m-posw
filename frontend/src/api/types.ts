@@ -973,6 +973,7 @@ export interface NotificationLog {
 export interface NotificationJob {
   id: number;
   creditorId: number | null;
+  acreedor?: { id: number; nombre: string } | null;
   type: string;
   channel: string;
   status: string;
@@ -982,6 +983,7 @@ export interface NotificationJob {
   startedAt: string | null;
   completedAt: string | null;
   payload?: Record<string, unknown>;
+  batchId?: string | null;
 }
 
 export interface NotificationJobStatus {
@@ -1059,4 +1061,15 @@ export interface WhatsappStatus {
 export interface WhatsappQrResponse {
   qrCode?: string;
   status?: string;
+}
+
+export interface WhatsappQueueResponse {
+  jobs: NotificationJob[];
+  total: number;
+  page: number;
+  limit: number;
+  counts: Record<string, number>;
+  isRunning: boolean;
+  isPaused: boolean;
+  activeBatchId: string | null;
 }

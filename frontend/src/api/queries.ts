@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, BatchStatus, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotificationJob, NotificationStatusMap, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, NotificationLog, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, WhatsappStatus, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, BatchStatus, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotificationJob, NotificationStatusMap, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, NotificationLog, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, WhatsappQueueResponse, WhatsappStatus, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1054,3 +1054,69 @@ export const useNotificationStatus = (acreedorIds: number[]) =>
     },
     enabled: acreedorIds.length > 0,
   });
+
+export const useWhatsappQueue = (status?: string, page = 1, limit = 50) =>
+  useQuery({
+    queryKey: ['whatsapp-queue', status, page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      const response = await apiClient.get<WhatsappQueueResponse>(`/whatsapp/queue?${params}`);
+      return response.data;
+    },
+    refetchInterval: 8000,
+  });
+
+export const useRetryJobs = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobIds: number[]) => {
+      const response = await apiClient.post('/whatsapp/queue/retry', { jobIds });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
+    },
+  });
+};
+
+export const usePauseQueue = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post('/whatsapp/queue/pause');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
+    },
+  });
+};
+
+export const useResumeQueue = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post('/whatsapp/queue/resume');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
+    },
+  });
+};
+
+export const useCancelAllQueued = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post('/whatsapp/queue/cancel-all');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
+    },
+  });
+};
