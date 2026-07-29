@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MessageSquare, Send, X } from 'lucide-react';
-import { useConversations, useConversationMessages, useMarkConversationRead, useSendConversationMessage } from '../api/queries';
+import { useConversations, useConversationMessages, useMarkConversationRead, useSendConversationMessage, useSettings } from '../api/queries';
 import { useSocketContext } from '../socket/SocketProvider';
-import { useSettings } from '../api/queries';
 
 export const ConversationsDrawer: React.FC = () => {
   const { data: settings } = useSettings();
