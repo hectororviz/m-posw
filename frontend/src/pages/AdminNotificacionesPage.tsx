@@ -74,7 +74,7 @@ export const AdminNotificacionesPage: React.FC = () => {
       </div>
 
       <div className="treasury-subnav" style={{ marginBottom: '1rem' }}>
-        {(['history', 'queue', ...(hasConfigAccess ? ['config' as Tab] : [])]).map((t) => (
+        {(('history queue config'.split(' ') as Tab[]).filter((t) => t !== 'config' || hasConfigAccess)).map((t) => (
           <button
             key={t}
             className={`treasury-subnav-link${tab === t ? ' active' : ''}`}
