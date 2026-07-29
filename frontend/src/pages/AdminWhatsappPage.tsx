@@ -59,7 +59,7 @@ export const AdminWhatsappPage: React.FC = () => {
   const handleTestConnection = async () => {
     try {
       const result = await testConnMutation.mutateAsync();
-      pushToast(result.message, result.ok ? 'success' : 'warning');
+      pushToast(result.message, result.ok ? 'success' : 'error');
       await refetchConfig();
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
