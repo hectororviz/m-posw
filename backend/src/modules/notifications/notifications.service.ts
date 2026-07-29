@@ -9,7 +9,7 @@ import { normalizeArgentinaPhone } from './phone-normalize';
 import * as crypto from 'crypto';
 
 const DEFAULT_DEBT_TEMPLATE =
-  'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días). Alias para transferir: {{alias}}.';
+  'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).';
 
 export interface EnqueuedJob {
   id: number;

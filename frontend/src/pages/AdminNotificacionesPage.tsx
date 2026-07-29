@@ -102,35 +102,36 @@ const HistoryTab: React.FC = () => {
         </div>
       )}
       {jobs.length > 0 && (
-        <table className="sales-table" style={{ width: '100%' }}>
+        <table className="sales-table" style={{ width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Destinatario</th>
-              <th>Proveedor</th>
-              <th>Estado</th>
+              <th style={{ width: '140px' }}>Fecha</th>
+              <th style={{ width: '130px' }}>Destinatario</th>
+              <th style={{ width: '80px' }}>Proveedor</th>
+              <th style={{ width: '100px' }}>Estado</th>
               <th>Error</th>
             </tr>
           </thead>
           <tbody>
             {jobs.map((job) => (
               <tr key={job.id}>
-                <td>{job.createdAt ? new Date(job.createdAt).toLocaleString('es-AR') : '-'}</td>
-                <td>{job.acreedor?.nombre || `#${job.creditorId || '-'}`}</td>
-                <td>{job.provider || job.channel || '-'}</td>
+                <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{job.createdAt ? new Date(job.createdAt).toLocaleString('es-AR') : '-'}</td>
+                <td style={{ fontSize: '0.85rem' }}>{job.acreedor?.nombre || `#${job.creditorId || '-'}`}</td>
+                <td style={{ fontSize: '0.8rem' }}>{job.provider || job.channel || '-'}</td>
                 <td>
                   <span style={{
                     padding: '0.15rem 0.5rem',
                     borderRadius: '999px',
                     fontSize: '0.75rem',
                     fontWeight: 500,
+                    whiteSpace: 'nowrap',
                     backgroundColor: (STATUS_COLORS[job.status] || '#6b7280') + '20',
                     color: STATUS_COLORS[job.status] || '#6b7280',
                   }}>
                     {STATUS_LABELS[job.status] || job.status}
                   </span>
                 </td>
-                <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <td style={{ fontSize: '0.8rem', wordBreak: 'break-word', whiteSpace: 'normal' }}>
                   {job.error || '-'}
                 </td>
               </tr>
@@ -221,37 +222,38 @@ const QueueTab: React.FC = () => {
         </div>
       )}
       {jobs.length > 0 && (
-        <table className="sales-table" style={{ width: '100%' }}>
+        <table className="sales-table" style={{ width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th>Creado</th>
-              <th>Destinatario</th>
-              <th>Estado</th>
-              <th>Proveedor</th>
-              <th>Intentos</th>
+              <th style={{ width: '140px' }}>Creado</th>
+              <th style={{ width: '120px' }}>Destinatario</th>
+              <th style={{ width: '100px' }}>Estado</th>
+              <th style={{ width: '75px' }}>Proveedor</th>
+              <th style={{ width: '65px' }}>Intentos</th>
               <th>Error</th>
             </tr>
           </thead>
           <tbody>
             {jobs.map((job) => (
               <tr key={job.id}>
-                <td>{job.createdAt ? new Date(job.createdAt).toLocaleString('es-AR') : '-'}</td>
-                <td>{job.acreedor?.nombre || `#${job.creditorId || '-'}`}</td>
+                <td style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{job.createdAt ? new Date(job.createdAt).toLocaleString('es-AR') : '-'}</td>
+                <td style={{ fontSize: '0.85rem' }}>{job.acreedor?.nombre || `#${job.creditorId || '-'}`}</td>
                 <td>
                   <span style={{
                     padding: '0.15rem 0.5rem',
                     borderRadius: '999px',
                     fontSize: '0.75rem',
                     fontWeight: 500,
+                    whiteSpace: 'nowrap',
                     backgroundColor: (STATUS_COLORS[job.status] || '#6b7280') + '20',
                     color: STATUS_COLORS[job.status] || '#6b7280',
                   }}>
                     {STATUS_LABELS[job.status] || job.status}
                   </span>
                 </td>
-                <td>{job.provider || job.channel || '-'}</td>
-                <td>{job.attempts}</td>
-                <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <td style={{ fontSize: '0.8rem' }}>{job.provider || job.channel || '-'}</td>
+                <td style={{ fontSize: '0.85rem', textAlign: 'center' }}>{job.attempts}</td>
+                <td style={{ fontSize: '0.8rem', wordBreak: 'break-word', whiteSpace: 'normal' }}>
                   {job.error || '-'}
                 </td>
               </tr>

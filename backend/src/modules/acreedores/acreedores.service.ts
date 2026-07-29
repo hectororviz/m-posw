@@ -397,19 +397,17 @@ export class AcreedoresService {
 
     const template =
       setting.debtReminderTemplate ||
-      'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días). Alias para transferir: {{alias}}.';
+      'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).';
 
     const saldoStr = deuda.saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     const dias = deuda.diasSinPagar ?? 0;
     const club = setting.clubName || setting.storeName || 'nuestro club';
-    const alias = '';
 
     const text = template
       .replace(/\{\{nombre\}\}/g, acreedor.nombre)
       .replace(/\{\{saldo\}\}/g, saldoStr)
       .replace(/\{\{dias\}\}/g, String(dias))
-      .replace(/\{\{club\}\}/g, club)
-      .replace(/\{\{alias\}\}/g, alias);
+      .replace(/\{\{club\}\}/g, club);
 
     const phoneNumber = this.notificationsService.normalizePhone(acreedor.telefono);
 
@@ -430,7 +428,7 @@ export class AcreedoresService {
 
     const template =
       setting.debtReminderTemplate ||
-      'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días). Alias para transferir: {{alias}}.';
+      'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).';
     const club = setting.clubName || setting.storeName || 'nuestro club';
 
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -505,8 +503,7 @@ export class AcreedoresService {
         .replace(/\{\{nombre\}\}/g, acreedor.nombre)
         .replace(/\{\{saldo\}\}/g, saldoStr)
         .replace(/\{\{dias\}\}/g, String(dias))
-        .replace(/\{\{club\}\}/g, club)
-        .replace(/\{\{alias\}\}/g, '');
+        .replace(/\{\{club\}\}/g, club);
       finalJobs.push({
         creditorId: d.acreedorId,
         phoneNumber: this.notificationsService.normalizePhone(acreedor.telefono!),

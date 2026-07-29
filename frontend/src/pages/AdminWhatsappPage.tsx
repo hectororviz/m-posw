@@ -5,7 +5,7 @@ import { useSettings, useNotificationsConfig, useTestConnection } from '../api/q
 import { useToast } from '../components/ToastProvider';
 
 const DEFAULT_TEMPLATE =
-  'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días). Alias para transferir: {{alias}}.';
+  'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).';
 
 export const AdminWhatsappPage: React.FC = () => {
   const queryClient = useQueryClient();
@@ -74,8 +74,7 @@ export const AdminWhatsappPage: React.FC = () => {
     .replace(/\{\{nombre\}\}/g, 'Juan Pérez')
     .replace(/\{\{saldo\}\}/g, '15.000')
     .replace(/\{\{dias\}\}/g, '45')
-    .replace(/\{\{club\}\}/g, settings?.clubName || settings?.storeName || 'nuestro club')
-    .replace(/\{\{alias\}\}/g, 'club.alias.transfer');
+    .replace(/\{\{club\}\}/g, settings?.clubName || settings?.storeName || 'nuestro club');
 
   const charCount = previewText.length;
   const hasAccents = /[áéíóúüñÁÉÍÓÚÜÑ]/.test(previewText);
@@ -198,7 +197,7 @@ export const AdminWhatsappPage: React.FC = () => {
         <div className="settings-section" style={{ marginTop: '1.5rem' }}>
           <h3 className="settings-section-header">Plantilla de mensaje (recordatorio de deuda)</h3>
           <p className="settings-section-desc">
-            Usá {'{{nombre}}'}, {'{{saldo}}'}, {'{{dias}}'}, {'{{club}}'} y {'{{alias}}'} como variables.
+            Usá {'{{nombre}}'}, {'{{saldo}}'}, {'{{dias}}'} y {'{{club}}'} como variables.
             SMS es texto libre — no requiere aprobación de plantillas.
           </p>
 
