@@ -57,6 +57,7 @@ export const AdminSettingsPage: React.FC = () => {
     enablePlayersModule: false,
     enablePatrimonioModule: true,
     enableWhatsappModule: false,
+    enableNotificationsModule: false,
     enableAutoJournalPos: true,
     enableAutoJournalAcreedores: true,
     enableAutoJournalSocios: true,
@@ -155,6 +156,7 @@ export const AdminSettingsPage: React.FC = () => {
         enablePlayersModule: settings.enablePlayersModule ?? false,
         enablePatrimonioModule: settings.enablePatrimonioModule ?? true,
         enableWhatsappModule: settings.enableWhatsappModule ?? false,
+        enableNotificationsModule: settings.enableNotificationsModule ?? false,
         enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
         enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
         enableAutoJournalSocios: settings.enableAutoJournalSocios ?? true,
@@ -997,6 +999,19 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Modulo de WhatsApp</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Envío de notificaciones de deuda vía WhatsApp usando OpenWA</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableNotificationsModule}
+                  onChange={(e) => setForm({ ...form, enableNotificationsModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Modulo de Notificaciones (SMS)</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Centro de notificaciones vía SMS usando httpSMS. Envío de recordatorios de deuda.</small>
                 </span>
               </label>
             </div>

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, BatchStatus, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotificationJob, NotificationStatusMap, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, NotificationLog, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, WhatsappQueueResponse, WhatsappStatus, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, BatchStatus, CashClose, Category, Coach, Conversation, ConversationMessage, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotificationHistoryResponse, NotificationQueueResponse, NotificationsConfig, NotificationJob, NotificationStatusMap, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, NotificationLog, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, WhatsappQueueResponse, WhatsappStatus, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1004,7 +1004,127 @@ export const useNotificarDeuda = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
+    },
+  });
+};
+
+// ─── Notificaciones (httpSMS) ────────────────────────────
+
+export const useNotificationsConfig = () =>
+  useQuery({
+    queryKey: ['notifications-config'],
+    queryFn: async () => {
+      const response = await apiClient.get<NotificationsConfig>('/notifications/config');
+      return response.data;
+    },
+    staleTime: 15000,
+  });
+
+export const useTestConnection = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post<{ ok: boolean; message: string }>('/notifications/test-connection');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications-config'] });
+    },
+  });
+};
+
+export const useNotificationsHistory = (page = 1, limit = 50, filters?: { status?: string; provider?: string }) =>
+  useQuery({
+    queryKey: ['notifications-history', page, limit, filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters?.status) params.set('status', filters.status);
+      if (filters?.provider) params.set('provider', filters.provider);
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      const response = await apiClient.get<NotificationHistoryResponse>(`/notifications/history?${params}`);
+      return response.data;
+    },
+  });
+
+export const useNotificationsQueue = (status?: string, page = 1, limit = 50) =>
+  useQuery({
+    queryKey: ['notifications-queue', status, page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      const response = await apiClient.get<NotificationQueueResponse>(`/notifications/queue?${params}`);
+      return response.data;
+    },
+    refetchInterval: 8000,
+  });
+
+export const useCancelAllNotifications = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post('/notifications/queue/cancel-all');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications-queue'] });
+    },
+  });
+};
+
+// --- Conversations ---
+
+export const useConversations = (page = 1, limit = 50) =>
+  useQuery({
+    queryKey: ['conversations', page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      const response = await apiClient.get<ConversationsResponse>(`/notifications/conversations?${params}`);
+      return response.data;
+    },
+    refetchInterval: 15000,
+  });
+
+export const useConversationMessages = (conversationId: number, page = 1, limit = 50) =>
+  useQuery({
+    queryKey: ['conversation-messages', conversationId, page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      const response = await apiClient.get<ConversationMessagesResponse>(`/notifications/conversations/${conversationId}/messages?${params}`);
+      return response.data;
+    },
+    enabled: Boolean(conversationId),
+  });
+
+export const useMarkConversationRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (conversationId: number) => {
+      const response = await apiClient.post(`/notifications/conversations/${conversationId}/read`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+};
+
+export const useSendConversationMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ conversationId, text }: { conversationId: number; text: string }) => {
+      const response = await apiClient.post(`/notifications/conversations/${conversationId}/send`, { text });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
 };

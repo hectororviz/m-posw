@@ -133,6 +133,7 @@ function getModuleRoute(moduleKey: string): string | null {
     PLAYERS: '/admin/players',
     REPORTES: '/admin/stats',
     CONFIGURACION: '/admin/settings',
+    NOTIFICACIONES: '/admin/notificaciones',
   };
   return map[moduleKey] ?? null;
 }

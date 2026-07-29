@@ -119,6 +119,30 @@ export class UpdateSettingDto {
   openwaMaxDelay?: number;
 
   @IsOptional()
+  @IsBoolean()
+  enableNotificationsModule?: boolean;
+
+  @IsOptional()
+  @IsString()
+  httpsmsApiKey?: string;
+
+  @IsOptional()
+  @IsString()
+  httpsmsBaseUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  httpsmsFromNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  httpsmsSigningKey?: string;
+
+  @IsOptional()
+  @IsString()
+  debtReminderTemplate?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];

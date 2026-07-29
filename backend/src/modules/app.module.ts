@@ -30,6 +30,7 @@ import { PlayersStatsModule } from './players-stats/players-stats.module';
 import { PatrimonioModule } from './patrimonio/patrimonio.module';
 import { CoachesModule } from './coaches/coaches.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     PatrimonioModule,
     CoachesModule,
     WhatsappModule,
+    NotificationsModule,
   ],
   providers: [
     {

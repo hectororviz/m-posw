@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useSettings } from '../api/queries';
 import { AppHeader } from './AppHeader';
+import { ConversationsDrawer } from './ConversationsDrawer';
 
 interface AppLayoutProps {
   title?: string;
@@ -32,6 +33,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ title, children }) => {
         )}
         {children}
       </main>
+      <ConversationsDrawer />
     </div>
   );
 };

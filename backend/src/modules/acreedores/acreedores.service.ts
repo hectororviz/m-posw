@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { JournalEntriesService } from '../treasury/journal-entries.service';
-import { WhatsappService } from '../whatsapp/whatsapp.service';
-import { NotificationQueueService } from '../whatsapp/notification-queue.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -59,8 +58,7 @@ export class AcreedoresService {
   constructor(
     private prisma: PrismaService,
     private journalEntriesService: JournalEntriesService,
-    private whatsappService: WhatsappService,
-    private notificationQueueService: NotificationQueueService,
+    private notificationsService: NotificationsService,
   ) {}
 
   private calculateFifo(
@@ -381,12 +379,8 @@ export class AcreedoresService {
 
   async notificarDeuda(id: number) {
     const setting = await this.prisma.setting.findFirst();
-    if (!setting?.enableWhatsappModule) {
-      throw new BadRequestException('El módulo de WhatsApp no está habilitado');
-    }
-
-    if (!setting?.openwaApiUrl || !setting?.openwaApiKey) {
-      throw new BadRequestException('OpenWA no está configurado (URL y API Key requeridos)');
+    if (!setting?.enableNotificationsModule) {
+      throw new BadRequestException('El módulo de Notificaciones no está habilitado');
     }
 
     const acreedor = await this.findOne(id);
@@ -402,49 +396,42 @@ export class AcreedoresService {
     }
 
     const template =
-      setting.openwaMessageTemplate ||
-      'Hola {{nombre}}, te recordamos que tenés una deuda pendiente de ${{saldo}} con {{dias}} días de antigüedad. Por favor regularizá tu situación a la brevedad. Gracias.';
+      setting.debtReminderTemplate ||
+      'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días). Alias para transferir: {{alias}}.';
 
     const saldoStr = deuda.saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     const dias = deuda.diasSinPagar ?? 0;
+    const club = setting.clubName || setting.storeName || 'nuestro club';
+    const alias = '';
 
     const text = template
       .replace(/\{\{nombre\}\}/g, acreedor.nombre)
       .replace(/\{\{saldo\}\}/g, saldoStr)
-      .replace(/\{\{dias\}\}/g, String(dias));
+      .replace(/\{\{dias\}\}/g, String(dias))
+      .replace(/\{\{club\}\}/g, club)
+      .replace(/\{\{alias\}\}/g, alias);
 
-    const phoneNumber = this.formatPhoneNumber(acreedor.telefono);
+    const phoneNumber = this.notificationsService.normalizePhone(acreedor.telefono);
 
-    return this.whatsappService.sendMessage(phoneNumber, text, 'ACREEDORES', id);
-  }
+    const batchId = `single-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    await this.notificationsService.enqueueBatch(
+      [{ creditorId: id, phoneNumber, text }],
+      batchId,
+    );
 
-  private formatPhoneNumber(tel: string): string {
-    let cleaned = tel.replace(/[^0-9]/g, '');
-    if (!cleaned.startsWith('549')) {
-      if (cleaned.startsWith('54')) {
-        cleaned = '549' + cleaned.slice(2);
-      } else if (cleaned.startsWith('9')) {
-        cleaned = '54' + cleaned;
-      } else {
-        cleaned = '549' + cleaned;
-      }
-    }
-    return cleaned + '@c.us';
+    return { success: true, batchId };
   }
 
   async notificarDeudaBatch(acreedorIds: number[]) {
     const setting = await this.prisma.setting.findFirst();
-    if (!setting?.enableWhatsappModule) {
-      throw new BadRequestException('El módulo de WhatsApp no está habilitado');
-    }
-
-    if (!setting?.openwaApiUrl || !setting?.openwaApiKey) {
-      throw new BadRequestException('OpenWA no está configurado (URL y API Key requeridos)');
+    if (!setting?.enableNotificationsModule) {
+      throw new BadRequestException('El módulo de Notificaciones no está habilitado');
     }
 
     const template =
-      setting.openwaMessageTemplate ||
-      'Hola {{nombre}}, te recordamos que tenés una deuda pendiente de ${{saldo}} con {{dias}} días de antigüedad. Por favor regularizá tu situación a la brevedad. Gracias.';
+      setting.debtReminderTemplate ||
+      'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días). Alias para transferir: {{alias}}.';
+    const club = setting.clubName || setting.storeName || 'nuestro club';
 
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -467,28 +454,18 @@ export class AcreedoresService {
       const acreedor = await this.prisma.acreedor.findUnique({ where: { id } });
       if (!acreedor) {
         details.push({
-          acreedorId: id,
-          nombre: `#${id}`,
-          telefono: null,
-          enviable: false,
-          omitido: true,
-          motivo: 'Acreedor no encontrado',
-          jobId: null,
-          status: 'SKIPPED',
+          acreedorId: id, nombre: `#${id}`, telefono: null,
+          enviable: false, omitido: true, motivo: 'Acreedor no encontrado',
+          jobId: null, status: 'SKIPPED',
         });
         continue;
       }
 
       if (!acreedor.telefono) {
         details.push({
-          acreedorId: id,
-          nombre: acreedor.nombre,
-          telefono: null,
-          enviable: false,
-          omitido: true,
-          motivo: 'Sin teléfono',
-          jobId: null,
-          status: 'SKIPPED',
+          acreedorId: id, nombre: acreedor.nombre, telefono: null,
+          enviable: false, omitido: true, motivo: 'Sin teléfono',
+          jobId: null, status: 'SKIPPED',
         });
         sinTelefono++;
         continue;
@@ -497,14 +474,9 @@ export class AcreedoresService {
       const deuda = await this.getDeuda(id);
       if (deuda.saldoPendiente <= 0) {
         details.push({
-          acreedorId: id,
-          nombre: acreedor.nombre,
-          telefono: acreedor.telefono,
-          enviable: false,
-          omitido: true,
-          motivo: 'Sin deuda pendiente',
-          jobId: null,
-          status: 'SKIPPED',
+          acreedorId: id, nombre: acreedor.nombre, telefono: acreedor.telefono,
+          enviable: false, omitido: true, motivo: 'Sin deuda pendiente',
+          jobId: null, status: 'SKIPPED',
         });
         sinDeuda++;
         continue;
@@ -512,20 +484,11 @@ export class AcreedoresService {
 
       enviables++;
       details.push({
-        acreedorId: id,
-        nombre: acreedor.nombre,
-        telefono: acreedor.telefono,
-        enviable: true,
-        omitido: false,
-        motivo: '',
-        jobId: null,
-        status: 'QUEUED',
+        acreedorId: id, nombre: acreedor.nombre, telefono: acreedor.telefono,
+        enviable: true, omitido: false, motivo: '',
+        jobId: null, status: 'QUEUED',
       });
     }
-
-    const minTime = Math.ceil(enviables * (setting.openwaMinDelay ?? 30) / 60);
-    const maxTime = Math.ceil(enviables * (setting.openwaMaxDelay ?? 120) / 60);
-    const tiempoEstimado = minTime === maxTime ? `${minTime} minutos` : `${minTime} a ${maxTime} minutos`;
 
     if (enviables === 0) {
       throw new BadRequestException('Ninguno de los acreedores seleccionados es enviable');
@@ -541,15 +504,17 @@ export class AcreedoresService {
       const text = template
         .replace(/\{\{nombre\}\}/g, acreedor.nombre)
         .replace(/\{\{saldo\}\}/g, saldoStr)
-        .replace(/\{\{dias\}\}/g, String(dias));
+        .replace(/\{\{dias\}\}/g, String(dias))
+        .replace(/\{\{club\}\}/g, club)
+        .replace(/\{\{alias\}\}/g, '');
       finalJobs.push({
         creditorId: d.acreedorId,
-        phoneNumber: this.formatPhoneNumber(acreedor.telefono!),
+        phoneNumber: this.notificationsService.normalizePhone(acreedor.telefono!),
         text,
       });
     }
 
-    await this.notificationQueueService.enqueueBatch(finalJobs, batchId);
+    await this.notificationsService.enqueueBatch(finalJobs, batchId);
 
     for (let i = 0; i < details.length; i++) {
       if (details[i].enviable) {
@@ -568,13 +533,13 @@ export class AcreedoresService {
       sinTelefono,
       sinDeuda,
       omitidos: sinTelefono + sinDeuda,
-      tiempoEstimado,
+      tiempoEstimado: 'Inmediato (SMS)',
       details,
     };
   }
 
   async getBatchStatus(batchId: string) {
-    return this.notificationQueueService.getBatchStatus(batchId);
+    return this.notificationsService.getBatchStatus(batchId);
   }
 
   async getNotificaciones(acreedorId: number) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, Clock, Eye, Loader, MessageCircle, Pencil, Plus, Slash, X, XCircle } from 'lucide-react';
+import { Check, Clock, Eye, Loader, Megaphone, Pencil, Plus, Slash, X, XCircle } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedores, useAcreedorNotificaciones, useAcreedoresResumen, useNotificarDeudaBatch, useNotificationStatus, useSettings } from '../api/queries';
 import type { Acreedor, JobUpdatedEvent, NotificationJob, NotificationStatusMap, NotificarDeudaBatchResponse } from '../api/types';
@@ -164,7 +164,7 @@ export const AdminAcreedoresPage: React.FC = () => {
         setWsJobStatus({});
         pushToast(`Lote completado: ${data.sent} enviados, ${data.failed} fallidos`, data.failed > 0 ? 'error' : 'success');
         await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
-        await queryClient.invalidateQueries({ queryKey: ['whatsapp-logs'] });
+        await queryClient.invalidateQueries({ queryKey: ['notifications-queue'] });
       }
     } catch {
       setActiveBatchId(null);
@@ -185,11 +185,11 @@ export const AdminAcreedoresPage: React.FC = () => {
     return list;
   }, [acreedores, search, sortMode]);
 
-  const whatsappEnabled = settings?.enableWhatsappModule ?? false;
+  const notificationsEnabled = settings?.enableNotificationsModule ?? false;
 
   const toggleSelectAll = () => {
     const allEligibleIds = filtered
-      .filter((a) => whatsappEnabled && a.telefono && (a.saldo ?? 0) > 0)
+      .filter((a) => notificationsEnabled && a.telefono && (a.saldo ?? 0) > 0)
       .map((a) => a.id);
     if (allEligibleIds.every((id) => selectedIds.has(id))) {
       setSelectedIds(new Set());
@@ -318,12 +318,12 @@ export const AdminAcreedoresPage: React.FC = () => {
   };
 
   const allEligibleCount = useMemo(
-    () => filtered.filter((a) => whatsappEnabled && a.telefono && (a.saldo ?? 0) > 0).length,
-    [filtered, whatsappEnabled],
+    () => filtered.filter((a) => notificationsEnabled && a.telefono && (a.saldo ?? 0) > 0).length,
+    [filtered, notificationsEnabled],
   );
 
   const allSelected = allEligibleCount > 0 && filtered
-    .filter((a) => whatsappEnabled && a.telefono && (a.saldo ?? 0) > 0)
+    .filter((a) => notificationsEnabled && a.telefono && (a.saldo ?? 0) > 0)
     .every((a) => selectedIds.has(a.id));
 
   return (
@@ -403,7 +403,7 @@ export const AdminAcreedoresPage: React.FC = () => {
         <div className="sales-table-wrapper">
           <div className="sales-table">
             <div className="sales-table-head">
-              {whatsappEnabled && (
+              {notificationsEnabled && (
                 <span className="col-action" style={{ flex: '0 0 36px' }}>
                   <input
                     type="checkbox"
@@ -421,7 +421,7 @@ export const AdminAcreedoresPage: React.FC = () => {
               <span className="col-action" style={{ flex: '0 0 130px' }}></span>
             </div>
             {filtered.map((a) => {
-              const isEligible = whatsappEnabled && a.telefono && (a.saldo ?? 0) > 0;
+              const isEligible = notificationsEnabled && a.telefono && (a.saldo ?? 0) > 0;
               const wsInfo = wsJobStatus[a.id] || null;
               const statusInfo = notificationStatus?.[a.id] ?? null;
               const notifIcon = getNotificationIcon(statusInfo, wsInfo);
@@ -433,7 +433,7 @@ export const AdminAcreedoresPage: React.FC = () => {
                   style={{ cursor: 'pointer' }}
                   onClick={() => navigate(`/admin/acreedores/${a.id}`)}
                 >
-                  {whatsappEnabled && (
+                  {notificationsEnabled && (
                     <span
                       className="col-action"
                       style={{ flex: '0 0 36px' }}
@@ -476,14 +476,14 @@ export const AdminAcreedoresPage: React.FC = () => {
                   </span>
                   <span className="col-action" style={{ flex: '0 0 130px', display: 'flex', gap: '0.15rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                     {notifIcon && <span style={{ marginRight: '0.25rem' }}>{notifIcon}</span>}
-                    {whatsappEnabled && a.telefono && (a.saldo ?? 0) > 0 && (
+                    {notificationsEnabled && a.telefono && (a.saldo ?? 0) > 0 && (
                       <button
                         type="button"
                         className="btn-ghost btn-sm"
                         onClick={(e) => { e.stopPropagation(); setHistoryModalAcreedor(a.id); }}
                         title="Ver notificaciones enviadas"
                       >
-                        <MessageCircle size={16} />
+                        <Megaphone size={16} />
                       </button>
                     )}
                     <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); navigate(`/admin/acreedores/${a.id}`); }} title="Ver">{<Eye size={16} />}</button>
@@ -506,7 +506,7 @@ export const AdminAcreedoresPage: React.FC = () => {
         <Plus size={24} />
       </button>
 
-      {whatsappEnabled && selectedIds.size > 0 && (
+      {notificationsEnabled && selectedIds.size > 0 && (
         <div className="bulk-action-bar">
           <span className="bulk-action-count">
             {selectedIds.size} seleccionados · {selectedWithPhone} con notificación

@@ -15,7 +15,8 @@ export type ModuleKey =
   | 'REPORTES'
   | 'CONFIGURACION'
   | 'PATRIMONIO'
-  | 'WHATSAPP';
+  | 'WHATSAPP'
+  | 'NOTIFICACIONES';
 
 export type ModuleAccess = 'HIDDEN' | 'READ' | 'FULL';
 
@@ -186,6 +187,12 @@ export interface Setting {
   openwaMessageTemplate?: string | null;
   openwaMinDelay?: number | null;
   openwaMaxDelay?: number | null;
+  enableNotificationsModule?: boolean | null;
+  httpsmsApiKey?: string | null;
+  httpsmsBaseUrl?: string | null;
+  httpsmsFromNumber?: string | null;
+  httpsmsSigningKey?: string | null;
+  debtReminderTemplate?: string | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -976,9 +983,11 @@ export interface NotificationJob {
   acreedor?: { id: number; nombre: string } | null;
   type: string;
   channel: string;
+  provider?: string | null;
   status: string;
   attempts: number;
   error: string | null;
+  externalMessageId?: string | null;
   createdAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -1072,4 +1081,74 @@ export interface WhatsappQueueResponse {
   isRunning: boolean;
   isPaused: boolean;
   activeBatchId: string | null;
+}
+
+// --- Notifications (httpSMS) ---
+
+export interface NotificationsConfig {
+  enabled: boolean;
+  provider: string;
+  connected: boolean;
+  phoneOnline: boolean;
+  hasApiKey: boolean;
+  hasBaseUrl: boolean;
+  hasFromNumber: boolean;
+  hasSigningKey: boolean;
+  template: string;
+  fromNumber: string;
+}
+
+export interface NotificationHistoryResponse {
+  jobs: NotificationJob[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface NotificationQueueResponse {
+  jobs: NotificationJob[];
+  total: number;
+  page: number;
+  limit: number;
+  counts: Record<string, number>;
+  isRunning: boolean;
+  activeBatchId: string | null;
+}
+
+export interface Conversation {
+  id: number;
+  memberId: number;
+  memberName: string;
+  phoneNumber: string;
+  lastMessageAt: string | null;
+  unreadCount: number;
+  lastMessage: ConversationMessage | null;
+  createdAt: string;
+}
+
+export interface ConversationMessage {
+  id: number;
+  conversationId: number;
+  direction: string;
+  externalMessageId?: string | null;
+  content: string;
+  createdAt: string;
+}
+
+export interface ConversationsResponse {
+  conversations: Conversation[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ConversationMessagesResponse {
+  conversationId: number;
+  memberId?: number;
+  memberName?: string;
+  phoneNumber?: string;
+  messages: ConversationMessage[];
+  total: number;
+  page: number;
+  limit: number;
 }

@@ -118,7 +118,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const { data: deuda, isLoading: deudaLoading } = useAcreedorDeuda(acreedorId);
   const { data: treasuryAccounts = [] } = useTreasuryAccounts();
   const { data: settings } = useSettings();
-  const whatsappEnabled = settings?.enableWhatsappModule ?? false;
+  const notificationsEnabled = settings?.enableNotificationsModule ?? false;
   const autoTreasuryId = treasuryAccounts.length === 1 ? treasuryAccounts[0].id : '';
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
@@ -416,7 +416,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         </>
       )}
 
-      {whatsappEnabled && (
+      {notificationsEnabled && (
         <AcreedorNotificaciones acreedorId={acreedorId!} />
       )}
 

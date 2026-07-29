@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, MessageCircle, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi } from 'lucide-react';
+import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, MessageCircle, Megaphone, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
@@ -23,7 +23,7 @@ interface NavItem {
   to: string;
   icon: ReactNode;
   label: string;
-  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule' | 'enablePatrimonioModule' | 'enableWhatsappModule';
+  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule' | 'enablePatrimonioModule' | 'enableWhatsappModule' | 'enableNotificationsModule';
   permissionModule?: string;
 }
 
@@ -72,6 +72,7 @@ const navCategories: NavCategoryDef[] = [
     children: [
       { to: '/admin/internet',  icon: <Wifi size={iconSize} />,         label: 'Internet',       moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
       { to: '/admin/whatsapp',  icon: <MessageCircle size={iconSize} />, label: 'WhatsApp',       moduleKey: 'enableWhatsappModule', permissionModule: 'WHATSAPP' },
+      { to: '/admin/notificaciones',  icon: <Megaphone size={iconSize} />, label: 'Notificaciones',       moduleKey: 'enableNotificationsModule', permissionModule: 'NOTIFICACIONES' },
       { to: '/admin/users',     icon: <UserCog size={iconSize} />,       label: 'Usuarios',       permissionModule: 'CONFIGURACION' },
       { to: '/admin/settings',  icon: <Settings size={iconSize} />,      label: 'Configuracion',  permissionModule: 'CONFIGURACION' },
     ],

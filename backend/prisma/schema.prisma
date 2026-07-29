@@ -27,6 +27,7 @@ enum ModuleKey {
   PATRIMONIO
   LIGAS
   WHATSAPP
+  NOTIFICACIONES
 }
 
 enum AssetEventType {
@@ -293,6 +294,12 @@ model Setting {
   openwaMessageTemplate       String?
   openwaMinDelay              Int       @default(30)
   openwaMaxDelay              Int       @default(120)
+  enableNotificationsModule   Boolean  @default(false)
+  httpsmsApiKey               String?
+  httpsmsBaseUrl              String?
+  httpsmsFromNumber           String?
+  httpsmsSigningKey           String?
+  debtReminderTemplate        String?
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -982,26 +989,58 @@ model NotificationLog {
 }
 
 model NotificationJob {
-  id           Int       @id @default(autoincrement())
-  creditorId   Int?
-  acreedor     Acreedor? @relation(fields: [creditorId], references: [id])
-  type         String    @default("DEBT_REMINDER")
-  channel      String    @default("WHATSAPP")
-  status       String    @default("QUEUED")
-  attempts     Int       @default(0)
-  maxAttempts  Int       @default(3)
-  scheduledAt  DateTime?
-  startedAt    DateTime?
-  completedAt  DateTime?
-  error        String?
-  payload      Json?
-  batchId      String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  creditorId        Int?
+  acreedor          Acreedor? @relation(fields: [creditorId], references: [id])
+  type              String    @default("DEBT_REMINDER")
+  channel           String    @default("WHATSAPP")
+  provider          String?
+  status            String    @default("QUEUED")
+  attempts          Int       @default(0)
+  maxAttempts       Int       @default(3)
+  scheduledAt       DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  error             String?
+  payload           Json?
+  batchId           String?
+  externalMessageId String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([creditorId])
   @@index([status])
   @@index([type])
   @@index([batchId])
   @@index([createdAt])
+  @@index([externalMessageId])
+}
+
+model Conversation {
+  id            Int                  @id @default(autoincrement())
+  memberId      Int
+  phoneNumber   String
+  lastMessageAt DateTime?
+  unreadCount   Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  messages      ConversationMessage[]
+
+  @@index([memberId])
+  @@index([phoneNumber])
+  @@index([lastMessageAt])
+}
+
+model ConversationMessage {
+  id                 Int          @id @default(autoincrement())
+  conversationId     Int
+  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction          String
+  externalMessageId  String?
+  content            String
+  createdAt          DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@index([externalMessageId])
 }
