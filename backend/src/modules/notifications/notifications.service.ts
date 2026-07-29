@@ -51,7 +51,7 @@ export class NotificationsService {
         const status = await providerInstance.getStatus();
         connected = status.connected;
         phoneOnline = status.phoneOnline;
-        if (connected && phoneOnline) {
+        if (connected) {
           provider = 'httpsms';
         }
       } catch {
@@ -86,12 +86,10 @@ export class NotificationsService {
     try {
       const provider = this.createHttpSmsProvider(apiKey, baseUrl, fromNumber);
       const status = await provider.getStatus();
-      if (status.connected && status.phoneOnline) {
-        return { ok: true, message: 'Conexión exitosa. Teléfono online.' };
-      } else if (status.connected) {
-        return { ok: true, message: 'API Key válida pero el teléfono está offline.' };
+      if (status.connected) {
+        return { ok: true, message: 'Conexión exitosa. API Key válida.' };
       } else {
-        return { ok: false, message: 'No se pudo conectar con httpSMS.' };
+        return { ok: false, message: 'API Key inválida o httpSMS no responde.' };
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error de conexión';

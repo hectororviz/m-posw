@@ -32,7 +32,7 @@ export class HttpSmsProvider implements NotificationProvider {
       this.logger.log(`httpSMS accepted: ${JSON.stringify(data)}`);
       return {
         success: true,
-        externalMessageId: data?.id || data?.messageId || undefined,
+        externalMessageId: data?.data?.id || data?.id || data?.messageId || undefined,
       };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
@@ -42,15 +42,27 @@ export class HttpSmsProvider implements NotificationProvider {
   }
 
   async getStatus(): Promise<{ connected: boolean; phoneOnline: boolean }> {
+    return this.healthCheck();
+  }
+
+  private async healthCheck(): Promise<{ connected: boolean; phoneOnline: boolean }> {
+    const url = `${this.config.baseUrl}/v1/messages/send`;
+    const body = JSON.stringify({
+      content: 'health-check',
+      from: this.config.fromNumber,
+      to: this.config.fromNumber,
+      request_id: `health-${Date.now()}`,
+    });
+
     try {
-      const data = await this.httpGetJson(
-        `${this.config.baseUrl}/v1/messages?limit=1`,
-        this.config.apiKey,
-      );
-      const connected = data !== null && data !== undefined;
-      return { connected, phoneOnline: false };
-    } catch {
-      return { connected: false, phoneOnline: false };
+      await this.httpPost(url, body, this.config.apiKey);
+      return { connected: true, phoneOnline: false };
+    } catch (err) {
+      const msg = (err as Error).message || '';
+      if (msg.includes('401')) {
+        return { connected: false, phoneOnline: false };
+      }
+      return { connected: true, phoneOnline: false };
     }
   }
 
@@ -98,7 +110,7 @@ export class HttpSmsProvider implements NotificationProvider {
                 );
                 reject(
                   new Error(
-                    `httpSMS error ${res.statusCode}: ${parsed.error || parsed.message || data.substring(0, 200)}`,
+                    `httpSMS error ${res.statusCode}: ${JSON.stringify(parsed)}`,
                   ),
                 );
               } else {
@@ -118,49 +130,6 @@ export class HttpSmsProvider implements NotificationProvider {
       });
 
       req.write(body);
-      req.end();
-    });
-  }
-
-  private httpGetJson(urlStr: string, apiKey: string): Promise<any> {
-    const parsed = new URL(urlStr);
-    const isHttps = parsed.protocol === 'https:';
-    const mod = isHttps ? https : http;
-
-    return new Promise((resolve, reject) => {
-      const req = mod.request(
-        {
-          hostname: parsed.hostname,
-          port: parsed.port || (isHttps ? 443 : 80),
-          path: parsed.pathname + parsed.search,
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-          },
-          timeout: 15000,
-          rejectUnauthorized: false,
-        },
-        (res) => {
-          let data = '';
-          res.on('data', (chunk: Buffer) => {
-            data += chunk.toString();
-          });
-          res.on('end', () => {
-            if (res.statusCode && res.statusCode >= 400) {
-              reject(new Error(`httpSMS error ${res.statusCode}`));
-            } else {
-              try {
-                resolve(JSON.parse(data));
-              } catch {
-                resolve(data);
-              }
-            }
-          });
-        },
-      );
-
-      req.on('error', (err) => reject(new Error(`httpSMS request failed: ${err.message}`)));
       req.end();
     });
   }

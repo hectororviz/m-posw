@@ -41,10 +41,10 @@ export const AdminNotificacionesPage: React.FC = () => {
               borderRadius: '999px',
               fontSize: '0.8rem',
               fontWeight: 500,
-              backgroundColor: config.provider === 'httpsms' && config.phoneOnline
+              backgroundColor: config.provider === 'httpsms' && config.connected
                 ? '#d1fae5' : config.provider === 'httpsms'
                 ? '#fef3c7' : '#f3f4f6',
-              color: config.provider === 'httpsms' && config.phoneOnline
+              color: config.provider === 'httpsms' && config.connected
                 ? '#065f46' : config.provider === 'httpsms'
                 ? '#92400e' : '#374151',
             }}>
@@ -54,7 +54,7 @@ export const AdminNotificacionesPage: React.FC = () => {
                   ? '#10b981' : config.provider === 'httpsms'
                   ? '#f59e0b' : '#d1d5db',
               }} />
-              {config.provider === 'httpsms' && config.phoneOnline
+              {config.provider === 'httpsms' && config.connected
                 ? 'httpSMS conectado'
                 : config.provider === 'httpsms'
                 ? 'Teléfono offline'

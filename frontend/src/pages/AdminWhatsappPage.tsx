@@ -98,23 +98,23 @@ export const AdminWhatsappPage: React.FC = () => {
             borderRadius: '999px',
             fontSize: '0.8rem',
             fontWeight: 500,
-            backgroundColor: config.provider === 'httpsms' && config.phoneOnline
+            backgroundColor: config.provider === 'httpsms' && config.connected
               ? '#d1fae5' : config.provider === 'httpsms'
               ? '#fef3c7' : '#f3f4f6',
-            color: config.provider === 'httpsms' && config.phoneOnline
+            color: config.provider === 'httpsms' && config.connected
               ? '#065f46' : config.provider === 'httpsms'
               ? '#92400e' : '#374151',
           }}>
             <span style={{
               width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-              backgroundColor: config.provider === 'httpsms' && config.phoneOnline
+              backgroundColor: config.provider === 'httpsms' && config.connected
                 ? '#10b981' : config.provider === 'httpsms'
                 ? '#f59e0b' : '#d1d5db',
             }} />
-            {config.provider === 'httpsms' && config.phoneOnline
-              ? 'httpSMS conectado — Teléfono online'
+            {config.provider === 'httpsms' && config.connected
+              ? 'httpSMS conectado'
               : config.provider === 'httpsms'
-              ? 'httpSMS configurado — Teléfono offline'
+              ? 'httpSMS sin conexión'
               : !config.enabled
               ? 'Módulo desactivado'
               : 'Modo manual (sin httpSMS)'}
