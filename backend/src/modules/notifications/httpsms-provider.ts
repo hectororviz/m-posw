@@ -44,11 +44,11 @@ export class HttpSmsProvider implements NotificationProvider {
   async getStatus(): Promise<{ connected: boolean; phoneOnline: boolean }> {
     try {
       const data = await this.httpGetJson(
-        `${this.config.baseUrl}/v1/phone`,
+        `${this.config.baseUrl}/v1/messages?limit=1`,
         this.config.apiKey,
       );
-      const connected = data?.phone ? true : false;
-      return { connected, phoneOnline: data?.phone?.online ?? false };
+      const connected = data !== null && data !== undefined;
+      return { connected, phoneOnline: false };
     } catch {
       return { connected: false, phoneOnline: false };
     }
