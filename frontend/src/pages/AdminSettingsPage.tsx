@@ -996,9 +996,9 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de WhatsApp</strong>
+                  <strong>Modulo de SMS (httpSMS)</strong>
                   <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Envío de notificaciones de deuda vía WhatsApp usando OpenWA</small>
+                  <small style={{ color: 'var(--color-text-faint)' }}>Configuración de envío de SMS vía httpSMS. Recordatorios de deuda y mensajería.</small>
                 </span>
               </label>
               <label className="toggle-switch">
