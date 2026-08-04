@@ -56,7 +56,6 @@ export const AdminSettingsPage: React.FC = () => {
     enableLigasModule: false,
     enablePlayersModule: false,
     enablePatrimonioModule: true,
-    enableWhatsappModule: false,
     enableNotificationsModule: false,
     enableAutoJournalPos: true,
     enableAutoJournalAcreedores: true,
@@ -155,7 +154,6 @@ export const AdminSettingsPage: React.FC = () => {
         enableLigasModule: settings.enableLigasModule ?? false,
         enablePlayersModule: settings.enablePlayersModule ?? false,
         enablePatrimonioModule: settings.enablePatrimonioModule ?? true,
-        enableWhatsappModule: settings.enableWhatsappModule ?? false,
         enableNotificationsModule: settings.enableNotificationsModule ?? false,
         enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
         enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
@@ -991,27 +989,14 @@ export const AdminSettingsPage: React.FC = () => {
               <label className="toggle-switch">
                 <input
                   type="checkbox"
-                  checked={form.enableWhatsappModule}
-                  onChange={(e) => setForm({ ...form, enableWhatsappModule: e.target.checked })}
-                />
-                <span className="toggle-switch-track" />
-                <span>
-                  <strong>Modulo de SMS (httpSMS)</strong>
-                  <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Configuración de envío de SMS vía httpSMS. Recordatorios de deuda y mensajería.</small>
-                </span>
-              </label>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
                   checked={form.enableNotificationsModule}
                   onChange={(e) => setForm({ ...form, enableNotificationsModule: e.target.checked })}
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Notificaciones (SMS)</strong>
+                  <strong>Módulo de Notificaciones (WhatsApp)</strong>
                   <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Centro de notificaciones vía SMS usando httpSMS. Envío de recordatorios de deuda.</small>
+                  <small style={{ color: 'var(--color-text-faint)' }}>Envío de recordatorios de deuda a acreedores vía WhatsApp Cloud API.</small>
                 </span>
               </label>
             </div>

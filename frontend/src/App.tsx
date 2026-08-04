@@ -43,7 +43,6 @@ import { TournamentsPage } from './pages/players/TournamentsPage';
 import { PatrimonioPage } from './pages/patrimonio/PatrimonioPage';
 import { BienesPage } from './pages/patrimonio/BienesPage';
 import { ConfigPage } from './pages/patrimonio/ConfigPage';
-import { AdminWhatsappPage } from './pages/AdminWhatsappPage';
 import { AdminNotificacionesPage } from './pages/AdminNotificacionesPage';
 import { useAuth } from './context/AuthContext';
 import type { ModuleKey } from './api/types';
@@ -183,11 +182,6 @@ export const App: React.FC = () => {
         <Route path="internet" element={
           <ModuleRoute module="INTERNET">
             <AdminInternetPage />
-          </ModuleRoute>
-        } />
-        <Route path="whatsapp" element={
-          <ModuleRoute module="WHATSAPP">
-            <AdminWhatsappPage />
           </ModuleRoute>
         } />
         <Route path="notificaciones" element={

@@ -1,0 +1,305 @@
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ModuleKey } from '@prisma/client';
+import { PrismaService } from '../common/prisma.service';
+import { WhatsAppCloudProvider } from './providers/whatsapp-cloud.provider';
+
+@Injectable()
+export class NotificacionesService implements OnModuleInit {
+  private readonly logger = new Logger(NotificacionesService.name);
+  private isProcessing = false;
+  private isPaused = false;
+
+  constructor(
+    private prisma: PrismaService,
+    private whatsappProvider: WhatsAppCloudProvider,
+  ) {}
+
+  onModuleInit() {
+    this.processQueue();
+  }
+
+  async getConfig() {
+    const setting = await this.prisma.setting.findFirst();
+    const isConfigured = !!(setting?.whatsappPhoneNumberId && setting?.whatsappAccessToken);
+
+    return {
+      enabled: setting?.enableNotificationsModule ?? false,
+      provider: this.whatsappProvider.name,
+      isConfigured,
+      phoneNumberId: setting?.whatsappPhoneNumberId || null,
+      businessAccountId: setting?.whatsappBusinessAccountId || null,
+      template: setting?.whatsappMessageTemplate || '',
+      hasPhoneNumberId: !!setting?.whatsappPhoneNumberId,
+      hasAccessToken: !!setting?.whatsappAccessToken,
+      hasBusinessAccountId: !!setting?.whatsappBusinessAccountId,
+      hasWebhookVerifyToken: !!setting?.whatsappWebhookVerifyToken,
+    };
+  }
+
+  async testConnection() {
+    const status = await this.whatsappProvider.getStatus();
+    if (!status.isConfigured) {
+      throw new BadRequestException('WhatsApp Cloud API no está configurada. Ingresá Phone Number ID y Access Token.');
+    }
+    return { ok: true, message: 'WhatsApp Cloud API configurada correctamente', phoneNumberId: status.phoneNumberId };
+  }
+
+  normalizePhone(phone: string): string {
+    let cleaned = phone.replace(/[^0-9]/g, '');
+    if (!cleaned.startsWith('549')) {
+      if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+      if (cleaned.startsWith('15')) cleaned = cleaned.slice(2);
+      cleaned = '549' + cleaned;
+    }
+    return cleaned;
+  }
+
+  async getHistory(page: number, limit: number, filters?: { status?: string; acreedorId?: number }) {
+    const where: any = {};
+    if (filters?.status) where.status = filters.status;
+    if (filters?.acreedorId) where.acreedorId = filters.acreedorId;
+
+    const [jobs, total] = await Promise.all([
+      this.prisma.notificationJob.findMany({
+        where: { ...where, status: { notIn: ['QUEUED', 'PROCESSING'] } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { acreedor: { select: { id: true, nombre: true } } },
+      }),
+      this.prisma.notificationJob.count({ where }),
+    ]);
+
+    return { jobs, total, page, limit };
+  }
+
+  async getQueue(page: number, limit: number, status?: string) {
+    const where: any = {};
+    if (status) where.status = status;
+
+    const [jobs, total, counts] = await Promise.all([
+      this.prisma.notificationJob.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { acreedor: { select: { id: true, nombre: true } } },
+      }),
+      this.prisma.notificationJob.count({ where }),
+      (async () => {
+        const statuses = await this.prisma.notificationJob.groupBy({
+          by: ['status'],
+          _count: true,
+        });
+        const map: Record<string, number> = {};
+        for (const s of statuses) map[s.status] = s._count;
+        return map;
+      })(),
+    ]);
+
+    return {
+      jobs,
+      total,
+      page,
+      limit,
+      counts,
+      isRunning: this.isProcessing,
+      isPaused: this.isPaused,
+      activeBatchId: jobs.find(j => j.status === 'PROCESSING')?.batchId || null,
+    };
+  }
+
+  async cancelAll() {
+    await this.prisma.notificationJob.updateMany({
+      where: { status: 'QUEUED' },
+      data: { status: 'CANCELLED', error: 'Cancelado por el usuario', completedAt: new Date() },
+    });
+    return { cancelled: true };
+  }
+
+  async pause() {
+    this.isPaused = true;
+    return { paused: true };
+  }
+
+  async resume() {
+    this.isPaused = false;
+    this.processQueue();
+    return { resumed: true };
+  }
+
+  async retryFailed(jobIds: number[]) {
+    await this.prisma.notificationJob.updateMany({
+      where: { id: { in: jobIds }, status: 'FAILED' },
+      data: { status: 'QUEUED', attempts: 0, error: null, scheduledAt: null },
+    });
+    this.processQueue();
+    return { retried: true };
+  }
+
+  async enqueueBatch(jobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams?: Record<string, string> }>, batchId: string) {
+    const setting = await this.prisma.setting.findFirst();
+    const templateName = 'debt_reminder';
+    const created = [];
+
+    for (const job of jobs) {
+      const j = await this.prisma.notificationJob.create({
+        data: {
+          recipientName: job.recipientName,
+          phoneNumber: job.phoneNumber,
+          acreedorId: job.acreedorId,
+          channel: 'WHATSAPP',
+          status: 'QUEUED',
+          batchId,
+          templateName,
+          templateParams: job.templateParams || {},
+        },
+      });
+      created.push(j);
+    }
+
+    this.processQueue();
+    return created;
+  }
+
+  async getBatchStatus(batchId: string) {
+    const jobs = await this.prisma.notificationJob.findMany({
+      where: { batchId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        acreedorId: true,
+        status: true,
+        attempts: true,
+        error: true,
+        createdAt: true,
+        startedAt: true,
+        completedAt: true,
+      },
+    });
+
+    const queued = jobs.filter(j => j.status === 'QUEUED').length;
+    const processing = jobs.filter(j => j.status === 'PROCESSING').length;
+    const sent = jobs.filter(j => j.status === 'SENT').length;
+    const failed = jobs.filter(j => j.status === 'FAILED').length;
+    const cancelled = jobs.filter(j => j.status === 'CANCELLED').length;
+
+    return {
+      batchId,
+      total: jobs.length,
+      sent,
+      failed,
+      queued,
+      cancelled,
+      isRunning: queued > 0 || processing > 0,
+      jobs: jobs.map(j => ({
+        id: j.id,
+        creditorId: j.acreedorId,
+        status: j.status,
+        attempts: j.attempts,
+        error: j.error,
+        createdAt: j.createdAt?.toISOString() ?? null,
+        startedAt: j.startedAt?.toISOString() ?? null,
+        completedAt: j.completedAt?.toISOString() ?? null,
+      })),
+    };
+  }
+
+  private async processQueue() {
+    if (this.isProcessing || this.isPaused) return;
+    this.isProcessing = true;
+
+    try {
+      while (!this.isPaused) {
+        const job = await this.prisma.notificationJob.findFirst({
+          where: { status: 'QUEUED' },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        if (!job) break;
+
+        await this.prisma.notificationJob.update({
+          where: { id: job.id },
+          data: { status: 'PROCESSING', startedAt: new Date(), attempts: job.attempts + 1 },
+        });
+
+        const sendText = job.templateParams && typeof job.templateParams === 'object'
+          ? Object.values(job.templateParams as Record<string, string>).join(' - ')
+          : '';
+
+        let result;
+        if (job.templateName) {
+          result = await this.whatsappProvider.sendMessage(
+            job.phoneNumber,
+            job.templateName,
+            (job.templateParams as Record<string, string>) || {},
+          );
+        } else {
+          result = await this.whatsappProvider.sendTextMessage(job.phoneNumber, 'Notificación de m-POSw');
+        }
+
+        const isConfigured = await this.whatsappProvider.getStatus();
+
+        if (result.success) {
+          await this.prisma.notificationJob.update({
+            where: { id: job.id },
+            data: {
+              status: 'SENT',
+              completedAt: new Date(),
+              externalMessageId: result.externalMessageId,
+            },
+          });
+
+          await this.prisma.notificationLog.create({
+            data: {
+              recipient: job.recipientName,
+              phoneNumber: job.phoneNumber,
+              channel: 'WHATSAPP',
+              status: 'SENT',
+              messageText: sendText || 'Template message',
+              templateUsed: job.templateName,
+              externalMessageId: result.externalMessageId,
+              acreedorId: job.acreedorId,
+            },
+          });
+        } else if (!isConfigured.isConfigured) {
+          await this.prisma.notificationJob.update({
+            where: { id: job.id },
+            data: { status: 'FAILED', error: 'WhatsApp Cloud API no configurada', completedAt: new Date() },
+          });
+          this.logger.warn('WhatsApp Cloud API not configured, stopping queue');
+          break;
+        } else {
+          if (job.attempts >= job.maxAttempts) {
+            await this.prisma.notificationJob.update({
+              where: { id: job.id },
+              data: { status: 'FAILED', error: result.error, completedAt: new Date() },
+            });
+
+            await this.prisma.notificationLog.create({
+              data: {
+                recipient: job.recipientName,
+                phoneNumber: job.phoneNumber,
+                channel: 'WHATSAPP',
+                status: 'FAILED',
+                messageText: sendText || 'Template message',
+                templateUsed: job.templateName,
+                errorMessage: result.error,
+                acreedorId: job.acreedorId,
+              },
+            });
+          } else {
+            await this.prisma.notificationJob.update({
+              where: { id: job.id },
+              data: { status: 'QUEUED', error: result.error, scheduledAt: new Date(Date.now() + 30000) },
+            });
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+}

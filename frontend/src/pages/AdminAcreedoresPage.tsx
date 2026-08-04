@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, Eye, Loader, Megaphone, Pencil, Plus, Slash, X, XCircle } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedores, useAcreedorNotificaciones, useAcreedoresResumen, useNotificarDeudaBatch, useNotificationStatus, useSettings } from '../api/queries';
-import type { Acreedor, JobUpdatedEvent, NotificationJob, NotificationStatusMap, NotificarDeudaBatchResponse } from '../api/types';
+import type { Acreedor, NotifJobUpdatedEvent, NotificacionesJob, NotificationStatusMap, NotificarDeudaBatchResponse } from '../api/types';
 import { useSocketContext } from '../socket/SocketProvider';
 import { useToast } from '../components/ToastProvider';
 
@@ -122,11 +122,11 @@ export const AdminAcreedoresPage: React.FC = () => {
 
     socket.emit('notification-batch.subscribe', { batchId: activeBatchId });
 
-    const handler = (payload: JobUpdatedEvent) => {
+    const handler = (payload: NotifJobUpdatedEvent) => {
       if (payload.batchId !== activeBatchId) return;
       setWsJobStatus((prev) => ({
         ...prev,
-        [payload.creditorId]: {
+        [payload.acreedorId]: {
           status: payload.status,
           completedAt: payload.completedAt,
           error: payload.error,
@@ -136,7 +136,7 @@ export const AdminAcreedoresPage: React.FC = () => {
       setBatchResult((prev) => {
         if (!prev) return prev;
         const updated = { ...prev };
-        const detail = updated.details.find((d) => d.acreedorId === payload.creditorId);
+        const detail = updated.details.find((d) => d.acreedorId === payload.acreedorId);
         if (detail) {
           detail.status = payload.status;
         }
@@ -164,7 +164,7 @@ export const AdminAcreedoresPage: React.FC = () => {
         setWsJobStatus({});
         pushToast(`Lote completado: ${data.sent} enviados, ${data.failed} fallidos`, data.failed > 0 ? 'error' : 'success');
         await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
-        await queryClient.invalidateQueries({ queryKey: ['notifications-queue'] });
+        await queryClient.invalidateQueries({ queryKey: ['notificaciones-queue'] });
       }
     } catch {
       setActiveBatchId(null);
@@ -658,9 +658,7 @@ export const AdminAcreedoresPage: React.FC = () => {
                   </div>
 
                   <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
-                    Tiempo estimado: aproximadamente {' '}
-                    {Math.max(1, Math.ceil(selectedWithPhone * (settings?.openwaMinDelay ?? 30) / 60))}{' '}
-                    a {Math.max(1, Math.ceil(selectedWithPhone * (settings?.openwaMaxDelay ?? 120) / 60))} minutos
+                    Las notificaciones se enviarán secuencialmente (1 por segundo aproximadamente).
                   </p>
 
                   <div className="modal-footer" style={{ paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -690,16 +688,6 @@ export const AdminAcreedoresPage: React.FC = () => {
 
 const AcreedorNotificacionesModal: React.FC<{ acreedorId: number; onClose: () => void }> = ({ acreedorId, onClose }) => {
   const { data: notificaciones = [], isLoading } = useAcreedorNotificaciones(acreedorId);
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'DEBT_REMINDER': return 'Recordatorio';
-      case 'RECEIPT': return 'Recibo';
-      case 'WELCOME': return 'Bienvenida';
-      case 'PROMOTION': return 'Promoción';
-      default: return type;
-    }
-  };
 
   const getNotifBadge = (status: string) => {
     switch (status) {
@@ -733,15 +721,15 @@ const AcreedorNotificacionesModal: React.FC<{ acreedorId: number; onClose: () =>
             <div className="sales-table">
               <div className="sales-table-head">
                 <span className="col-date">Fecha</span>
-                <span className="col-method">Tipo</span>
+                <span className="col-method">Canal</span>
                 <span className="col-total" style={{ flex: '0 0 110px' }}>Estado</span>
                 <span className="col-user">Detalle</span>
               </div>
-              {notificaciones.map((job: NotificationJob) => (
+              {notificaciones.map((job: NotificacionesJob) => (
                 <div key={job.id} className="sales-table-row" style={{ cursor: 'default' }}>
                   <span className="col-date">{job.createdAt ? formatDateTime(job.createdAt) : '--'}</span>
                   <span className="col-method">
-                    {getTypeLabel(job.type)}
+                    {job.channel || 'WhatsApp'}
                     {job.attempts > 1 && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)', marginLeft: '0.35rem' }}>
                         (×{job.attempts})

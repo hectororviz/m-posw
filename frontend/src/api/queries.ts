@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, BatchStatus, CashClose, Category, Coach, ConversationsResponse, ConversationMessagesResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotificationHistoryResponse, NotificationQueueResponse, NotificationsConfig, NotificationJob, NotificationStatusMap, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, NotificationLog, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, WhatsappQueueResponse, WhatsappStatus, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -975,26 +975,110 @@ export const useDeleteAssetStatus = () => {
   });
 };
 
-// ─── WhatsApp ───────────────────────────────────────────
+// ─── Notificaciones (WhatsApp Cloud API) ─────────────────
 
-export const useWhatsappStatus = () =>
+export const useNotificacionesConfig = () =>
   useQuery({
-    queryKey: ['whatsapp-status'],
+    queryKey: ['notificaciones-config'],
     queryFn: async () => {
-      const response = await apiClient.get<WhatsappStatus>('/whatsapp/status');
+      const response = await apiClient.get<NotificacionesConfig>('/notificaciones/config');
       return response.data;
     },
-    staleTime: 30000,
+    staleTime: 15000,
   });
 
-export const useWhatsappLogs = () =>
+export const useTestNotificacionesConnection = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post<{ ok: boolean; message: string; phoneNumberId?: string }>('/notificaciones/test');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-config'] });
+    },
+  });
+};
+
+export const useNotificacionesHistory = (page = 1, limit = 50, filters?: { status?: string; acreedorId?: number }) =>
   useQuery({
-    queryKey: ['whatsapp-logs'],
+    queryKey: ['notificaciones-history', page, limit, filters],
     queryFn: async () => {
-      const response = await apiClient.get<NotificationLog[]>('/whatsapp/logs');
+      const params = new URLSearchParams();
+      if (filters?.status) params.set('status', filters.status);
+      if (filters?.acreedorId) params.set('acreedorId', String(filters.acreedorId));
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      const response = await apiClient.get<NotificacionesHistoryResponse>(`/notificaciones/history?${params}`);
       return response.data;
     },
   });
+
+export const useNotificacionesQueue = (status?: string, page = 1, limit = 50) =>
+  useQuery({
+    queryKey: ['notificaciones-queue', status, page, limit],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (status) params.set('status', status);
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      const response = await apiClient.get<NotificacionesQueueResponse>(`/notificaciones/queue?${params}`);
+      return response.data;
+    },
+    refetchInterval: 8000,
+  });
+
+export const useNotificacionesRetry = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (jobIds: number[]) => {
+      const response = await apiClient.post('/notificaciones/queue/retry', { jobIds });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-queue'] });
+    },
+  });
+};
+
+export const useNotificacionesPause = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post('/notificaciones/queue/pause');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-queue'] });
+    },
+  });
+};
+
+export const useNotificacionesResume = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post('/notificaciones/queue/resume');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-queue'] });
+    },
+  });
+};
+
+export const useNotificacionesCancelAll = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await apiClient.post('/notificaciones/queue/cancel-all');
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-queue'] });
+    },
+  });
+};
 
 export const useNotificarDeuda = () => {
   const queryClient = useQueryClient();
@@ -1004,127 +1088,7 @@ export const useNotificarDeuda = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
-    },
-  });
-};
-
-// ─── Notificaciones (httpSMS) ────────────────────────────
-
-export const useNotificationsConfig = () =>
-  useQuery({
-    queryKey: ['notifications-config'],
-    queryFn: async () => {
-      const response = await apiClient.get<NotificationsConfig>('/notifications/config');
-      return response.data;
-    },
-    staleTime: 15000,
-  });
-
-export const useTestConnection = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const response = await apiClient.post<{ ok: boolean; message: string }>('/notifications/test-connection');
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications-config'] });
-    },
-  });
-};
-
-export const useNotificationsHistory = (page = 1, limit = 50, filters?: { status?: string; provider?: string }) =>
-  useQuery({
-    queryKey: ['notifications-history', page, limit, filters],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (filters?.status) params.set('status', filters.status);
-      if (filters?.provider) params.set('provider', filters.provider);
-      params.set('page', String(page));
-      params.set('limit', String(limit));
-      const response = await apiClient.get<NotificationHistoryResponse>(`/notifications/history?${params}`);
-      return response.data;
-    },
-  });
-
-export const useNotificationsQueue = (status?: string, page = 1, limit = 50) =>
-  useQuery({
-    queryKey: ['notifications-queue', status, page, limit],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (status) params.set('status', status);
-      params.set('page', String(page));
-      params.set('limit', String(limit));
-      const response = await apiClient.get<NotificationQueueResponse>(`/notifications/queue?${params}`);
-      return response.data;
-    },
-    refetchInterval: 8000,
-  });
-
-export const useCancelAllNotifications = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const response = await apiClient.post('/notifications/queue/cancel-all');
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications-queue'] });
-    },
-  });
-};
-
-// --- Conversations ---
-
-export const useConversations = (page = 1, limit = 50) =>
-  useQuery({
-    queryKey: ['conversations', page, limit],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('limit', String(limit));
-      const response = await apiClient.get<ConversationsResponse>(`/notifications/conversations?${params}`);
-      return response.data;
-    },
-    refetchInterval: 15000,
-  });
-
-export const useConversationMessages = (conversationId: number, page = 1, limit = 50) =>
-  useQuery({
-    queryKey: ['conversation-messages', conversationId, page, limit],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set('page', String(page));
-      params.set('limit', String(limit));
-      const response = await apiClient.get<ConversationMessagesResponse>(`/notifications/conversations/${conversationId}/messages?${params}`);
-      return response.data;
-    },
-    enabled: Boolean(conversationId),
-  });
-
-export const useMarkConversationRead = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (conversationId: number) => {
-      const response = await apiClient.post(`/notifications/conversations/${conversationId}/read`);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
-    },
-  });
-};
-
-export const useSendConversationMessage = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ conversationId, text }: { conversationId: number; text: string }) => {
-      const response = await apiClient.post(`/notifications/conversations/${conversationId}/send`, { text });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-queue'] });
     },
   });
 };
@@ -1138,7 +1102,7 @@ export const useNotificarDeudaBatch = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['acreedores'] });
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-queue'] });
     },
   });
 };
@@ -1147,7 +1111,7 @@ export const useBatchStatus = (batchId?: string) =>
   useQuery({
     queryKey: ['batch-status', batchId],
     queryFn: async () => {
-      const response = await apiClient.get<BatchStatus>(`/acreedores/batch/${batchId}/status`);
+      const response = await apiClient.get<NotifBatchStatus>(`/acreedores/batch/${batchId}/status`);
       return response.data;
     },
     enabled: Boolean(batchId),
@@ -1158,7 +1122,7 @@ export const useAcreedorNotificaciones = (acreedorId?: number) =>
   useQuery({
     queryKey: ['acreedor-notificaciones', acreedorId],
     queryFn: async () => {
-      const response = await apiClient.get<NotificationJob[]>(`/acreedores/${acreedorId}/notificaciones`);
+      const response = await apiClient.get<NotificacionesJob[]>(`/acreedores/${acreedorId}/notificaciones`);
       return response.data;
     },
     enabled: Boolean(acreedorId),
@@ -1174,69 +1138,3 @@ export const useNotificationStatus = (acreedorIds: number[]) =>
     },
     enabled: acreedorIds.length > 0,
   });
-
-export const useWhatsappQueue = (status?: string, page = 1, limit = 50) =>
-  useQuery({
-    queryKey: ['whatsapp-queue', status, page, limit],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (status) params.set('status', status);
-      params.set('page', String(page));
-      params.set('limit', String(limit));
-      const response = await apiClient.get<WhatsappQueueResponse>(`/whatsapp/queue?${params}`);
-      return response.data;
-    },
-    refetchInterval: 8000,
-  });
-
-export const useRetryJobs = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (jobIds: number[]) => {
-      const response = await apiClient.post('/whatsapp/queue/retry', { jobIds });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
-    },
-  });
-};
-
-export const usePauseQueue = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const response = await apiClient.post('/whatsapp/queue/pause');
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
-    },
-  });
-};
-
-export const useResumeQueue = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const response = await apiClient.post('/whatsapp/queue/resume');
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
-    },
-  });
-};
-
-export const useCancelAllQueued = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async () => {
-      const response = await apiClient.post('/whatsapp/queue/cancel-all');
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-queue'] });
-    },
-  });
-};

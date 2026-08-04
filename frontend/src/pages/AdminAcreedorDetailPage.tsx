@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useSettings, useTreasuryAccounts } from '../api/queries';
-import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificationJob, Sale } from '../api/types';
+import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificacionesJob, Sale } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 const formatCurrency = (value: number) =>
@@ -26,17 +26,7 @@ const getPaymentMethodLabel = (method?: string) => {
 const getMedioPagoLabel = (medio: string) =>
   medio === 'transferencia' ? 'Transferencia' : 'Efectivo';
 
-const getTypeLabel = (type: string) => {
-  switch (type) {
-    case 'DEBT_REMINDER': return 'Recordatorio';
-    case 'RECEIPT': return 'Recibo';
-    case 'WELCOME': return 'Bienvenida';
-    case 'PROMOTION': return 'Promoción';
-    default: return type;
-  }
-};
-
-const getNotifStatusDisplay = (job: NotificationJob) => {
+const getNotifStatusDisplay = (job: NotificacionesJob) => {
   const { status } = job;
   switch (status) {
     case 'SENT':
@@ -85,7 +75,7 @@ const AcreedorNotificaciones: React.FC<{ acreedorId: number }> = ({ acreedorId }
           <div key={job.id} className="sales-table-row" style={{ cursor: 'default' }}>
             <span className="col-date">{job.createdAt ? formatDateTime(job.createdAt) : '--'}</span>
             <span className="col-method" style={{ whiteSpace: 'nowrap', flex: 2 }}>
-              {getTypeLabel(job.type)}
+              {job.channel || 'WhatsApp'}
               {job.attempts > 1 && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)', marginLeft: '0.35rem' }}>
                   (intento {job.attempts})

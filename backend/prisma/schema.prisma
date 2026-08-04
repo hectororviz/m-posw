@@ -26,7 +26,6 @@ enum ModuleKey {
   PLAYERS
   PATRIMONIO
   LIGAS
-  WHATSAPP
   NOTIFICACIONES
 }
 
@@ -287,19 +286,12 @@ model Setting {
   enableLigasModule           Boolean @default(false)
   enablePlayersModule         Boolean @default(false)
   enablePatrimonioModule      Boolean @default(true)
-  enableWhatsappModule        Boolean @default(false)
-  openwaApiUrl                String?
-  openwaApiKey                String?
-  openwaSessionName           String?   @default("mposw")
-  openwaMessageTemplate       String?
-  openwaMinDelay              Int       @default(30)
-  openwaMaxDelay              Int       @default(120)
   enableNotificationsModule   Boolean  @default(false)
-  httpsmsApiKey               String?
-  httpsmsBaseUrl              String?
-  httpsmsFromNumber           String?
-  httpsmsSigningKey           String?
-  debtReminderTemplate        String?
+  whatsappPhoneNumberId       String?
+  whatsappAccessToken         String?
+  whatsappBusinessAccountId   String?
+  whatsappWebhookVerifyToken  String?
+  whatsappMessageTemplate     String?
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -972,17 +964,18 @@ model AssetEvent {
 }
 
 model NotificationLog {
-  id           Int       @id @default(autoincrement())
-  recipient    String
-  phoneNumber  String
-  messageText  String
-  status       String    @default("SENT")
-  errorMessage String?
-  createdAt    DateTime  @default(now())
-  acreedorId   Int?
-  acreedor     Acreedor? @relation(fields: [acreedorId], references: [id])
-  sourceModule String?   @default("ACREEDORES")
-
+  id               Int       @id @default(autoincrement())
+  recipient        String
+  phoneNumber      String
+  channel          String    @default("WHATSAPP")
+  status           String    @default("SENT")
+  messageText      String
+  templateUsed     String?
+  errorMessage     String?
+  externalMessageId String?
+  acreedorId       Int?
+  acreedor         Acreedor? @relation(fields: [acreedorId], references: [id])
+  createdAt        DateTime  @default(now())
   @@index([acreedorId])
   @@index([status])
   @@index([createdAt])
@@ -990,57 +983,26 @@ model NotificationLog {
 
 model NotificationJob {
   id                Int       @id @default(autoincrement())
-  creditorId        Int?
-  acreedor          Acreedor? @relation(fields: [creditorId], references: [id])
-  type              String    @default("DEBT_REMINDER")
+  recipientName     String
+  phoneNumber       String
   channel           String    @default("WHATSAPP")
-  provider          String?
   status            String    @default("QUEUED")
   attempts          Int       @default(0)
   maxAttempts       Int       @default(3)
+  templateName      String?
+  templateParams    Json?
   scheduledAt       DateTime?
   startedAt         DateTime?
   completedAt       DateTime?
   error             String?
-  payload           Json?
-  batchId           String?
   externalMessageId String?
+  acreedorId        Int?
+  acreedor          Acreedor? @relation(fields: [acreedorId], references: [id])
+  batchId           String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-
-  @@index([creditorId])
+  @@index([acreedorId])
   @@index([status])
-  @@index([type])
   @@index([batchId])
   @@index([createdAt])
-  @@index([externalMessageId])
-}
-
-model Conversation {
-  id            Int                  @id @default(autoincrement())
-  memberId      Int
-  phoneNumber   String
-  lastMessageAt DateTime?
-  unreadCount   Int                  @default(0)
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  messages      ConversationMessage[]
-
-  @@index([memberId])
-  @@index([phoneNumber])
-  @@index([lastMessageAt])
-}
-
-model ConversationMessage {
-  id                 Int          @id @default(autoincrement())
-  conversationId     Int
-  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  direction          String
-  externalMessageId  String?
-  content            String
-  createdAt          DateTime     @default(now())
-
-  @@index([conversationId])
-  @@index([createdAt])
-  @@index([externalMessageId])
 }

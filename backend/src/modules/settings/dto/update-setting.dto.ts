@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Matches } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 export class UpdateSettingDto {
   @IsOptional()
@@ -92,55 +92,27 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsBoolean()
-  enableWhatsappModule?: boolean;
-
-  @IsOptional()
-  @IsString()
-  openwaApiUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  openwaApiKey?: string;
-
-  @IsOptional()
-  @IsString()
-  openwaSessionName?: string;
-
-  @IsOptional()
-  @IsString()
-  openwaMessageTemplate?: string;
-
-  @IsOptional()
-  @IsInt()
-  openwaMinDelay?: number;
-
-  @IsOptional()
-  @IsInt()
-  openwaMaxDelay?: number;
-
-  @IsOptional()
-  @IsBoolean()
   enableNotificationsModule?: boolean;
 
   @IsOptional()
   @IsString()
-  httpsmsApiKey?: string;
+  whatsappPhoneNumberId?: string;
 
   @IsOptional()
   @IsString()
-  httpsmsBaseUrl?: string;
+  whatsappAccessToken?: string;
 
   @IsOptional()
   @IsString()
-  httpsmsFromNumber?: string;
+  whatsappBusinessAccountId?: string;
 
   @IsOptional()
   @IsString()
-  httpsmsSigningKey?: string;
+  whatsappWebhookVerifyToken?: string;
 
   @IsOptional()
   @IsString()
-  debtReminderTemplate?: string;
+  whatsappMessageTemplate?: string;
 
   @IsOptional()
   @IsArray()

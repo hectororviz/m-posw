@@ -15,7 +15,6 @@ export type ModuleKey =
   | 'REPORTES'
   | 'CONFIGURACION'
   | 'PATRIMONIO'
-  | 'WHATSAPP'
   | 'NOTIFICACIONES';
 
 export type ModuleAccess = 'HIDDEN' | 'READ' | 'FULL';
@@ -180,19 +179,12 @@ export interface Setting {
   enableLigasModule?: boolean | null;
   enablePlayersModule?: boolean | null;
   enablePatrimonioModule?: boolean | null;
-  enableWhatsappModule?: boolean | null;
-  openwaApiUrl?: string | null;
-  openwaApiKey?: string | null;
-  openwaSessionName?: string | null;
-  openwaMessageTemplate?: string | null;
-  openwaMinDelay?: number | null;
-  openwaMaxDelay?: number | null;
   enableNotificationsModule?: boolean | null;
-  httpsmsApiKey?: string | null;
-  httpsmsBaseUrl?: string | null;
-  httpsmsFromNumber?: string | null;
-  httpsmsSigningKey?: string | null;
-  debtReminderTemplate?: string | null;
+  whatsappPhoneNumberId?: string | null;
+  whatsappAccessToken?: string | null;
+  whatsappBusinessAccountId?: string | null;
+  whatsappWebhookVerifyToken?: string | null;
+  whatsappMessageTemplate?: string | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -965,48 +957,60 @@ export interface PaginatedAssets {
   limit: number;
 }
 
-export interface NotificationLog {
+// ─── Notificaciones (WhatsApp Cloud API) ─────────────────
+
+export interface NotificacionesConfig {
+  enabled: boolean;
+  provider: string;
+  isConfigured: boolean;
+  phoneNumberId: string | null;
+  businessAccountId: string | null;
+  template: string;
+  hasPhoneNumberId: boolean;
+  hasAccessToken: boolean;
+  hasBusinessAccountId: boolean;
+  hasWebhookVerifyToken: boolean;
+}
+
+export interface NotificacionesJob {
   id: number;
-  recipient: string;
+  recipientName: string;
   phoneNumber: string;
-  messageText: string;
-  status: string;
-  errorMessage?: string | null;
-  createdAt: string;
-  acreedorId?: number | null;
-  sourceModule?: string | null;
-}
-
-export interface NotificationJob {
-  id: number;
-  creditorId: number | null;
-  acreedor?: { id: number; nombre: string } | null;
-  type: string;
   channel: string;
-  provider?: string | null;
   status: string;
   attempts: number;
+  maxAttempts: number;
+  templateName: string | null;
+  templateParams: Record<string, string> | null;
   error: string | null;
-  externalMessageId?: string | null;
-  createdAt: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  payload?: Record<string, unknown>;
-  batchId?: string | null;
-}
-
-export interface NotificationJobStatus {
-  id: number;
-  creditorId: number | null;
-  status: string;
-  attempts: number;
-  error: string | null;
+  externalMessageId: string | null;
+  acreedorId: number | null;
+  acreedor?: { id: number; nombre: string } | null;
+  batchId: string | null;
   createdAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
 }
 
-export interface BatchStatus {
+export interface NotificacionesHistoryResponse {
+  jobs: NotificacionesJob[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface NotificacionesQueueResponse {
+  jobs: NotificacionesJob[];
+  total: number;
+  page: number;
+  limit: number;
+  counts: Record<string, number>;
+  isRunning: boolean;
+  isPaused: boolean;
+  activeBatchId: string | null;
+}
+
+export interface NotifBatchStatus {
   batchId: string;
   total: number;
   sent: number;
@@ -1014,7 +1018,16 @@ export interface BatchStatus {
   queued: number;
   cancelled: number;
   isRunning: boolean;
-  jobs: NotificationJobStatus[];
+  jobs: Array<{
+    id: number;
+    creditorId: number | null;
+    status: string;
+    attempts: number;
+    error: string | null;
+    createdAt: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
+  }>;
 }
 
 export interface NotificarDeudaBatchRequest {
@@ -1043,6 +1056,14 @@ export interface NotificarDeudaBatchResponse {
   details: NotificarDeudaBatchDetail[];
 }
 
+export interface NotifJobUpdatedEvent {
+  batchId: string;
+  acreedorId: number;
+  status: string;
+  completedAt?: string | null;
+  error?: string | null;
+}
+
 export interface NotificationStatusMap {
   [acreedorId: number]: {
     status: string;
@@ -1051,104 +1072,4 @@ export interface NotificationStatusMap {
     error: string | null;
     attempts: number;
   } | null;
-}
-
-export interface JobUpdatedEvent {
-  batchId: string;
-  creditorId: number;
-  jobId: number;
-  status: string;
-  completedAt?: string | null;
-  error?: string | null;
-  attempts?: number;
-}
-
-export interface WhatsappStatus {
-  status: string;
-}
-
-export interface WhatsappQrResponse {
-  qrCode?: string;
-  status?: string;
-}
-
-export interface WhatsappQueueResponse {
-  jobs: NotificationJob[];
-  total: number;
-  page: number;
-  limit: number;
-  counts: Record<string, number>;
-  isRunning: boolean;
-  isPaused: boolean;
-  activeBatchId: string | null;
-}
-
-// --- Notifications (httpSMS) ---
-
-export interface NotificationsConfig {
-  enabled: boolean;
-  provider: string;
-  connected: boolean;
-  phoneOnline: boolean;
-  hasApiKey: boolean;
-  hasBaseUrl: boolean;
-  hasFromNumber: boolean;
-  hasSigningKey: boolean;
-  template: string;
-  fromNumber: string;
-}
-
-export interface NotificationHistoryResponse {
-  jobs: NotificationJob[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface NotificationQueueResponse {
-  jobs: NotificationJob[];
-  total: number;
-  page: number;
-  limit: number;
-  counts: Record<string, number>;
-  isRunning: boolean;
-  activeBatchId: string | null;
-}
-
-export interface Conversation {
-  id: number;
-  memberId: number;
-  memberName: string;
-  phoneNumber: string;
-  lastMessageAt: string | null;
-  unreadCount: number;
-  lastMessage: ConversationMessage | null;
-  createdAt: string;
-}
-
-export interface ConversationMessage {
-  id: number;
-  conversationId: number;
-  direction: string;
-  externalMessageId?: string | null;
-  content: string;
-  createdAt: string;
-}
-
-export interface ConversationsResponse {
-  conversations: Conversation[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface ConversationMessagesResponse {
-  conversationId: number;
-  memberId?: number;
-  memberName?: string;
-  phoneNumber?: string;
-  messages: ConversationMessage[];
-  total: number;
-  page: number;
-  limit: number;
 }
