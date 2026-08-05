@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader, Send, MessageSquare } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
@@ -42,12 +42,16 @@ export const AdminNotificacionesPage: React.FC = () => {
     whatsappAccessToken: '',
     whatsappBusinessAccountId: '',
     whatsappWebhookVerifyToken: '',
-    whatsappMessageTemplate: '',
     whatsappTemplateName: '',
     whatsappAppSecret: '',
     clubAlias: '',
     whatsappVariableOrder: {} as Record<string, number>,
   });
+
+  const [phoneInfo, setPhoneInfo] = useState<{ displayName: string; verifiedName: string; qualityRating: string } | null>(null);
+  const [phoneInfoLoading, setPhoneInfoLoading] = useState(false);
+  const [templates, setTemplates] = useState<Array<{ name: string; language: string; status: string }>>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -56,7 +60,6 @@ export const AdminNotificacionesPage: React.FC = () => {
         whatsappAccessToken: settings.whatsappAccessToken ?? '',
         whatsappBusinessAccountId: settings.whatsappBusinessAccountId ?? '',
         whatsappWebhookVerifyToken: settings.whatsappWebhookVerifyToken ?? '',
-        whatsappMessageTemplate: settings.whatsappMessageTemplate ?? 'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).',
         whatsappTemplateName: settings.whatsappTemplateName ?? '',
         whatsappAppSecret: settings.whatsappAppSecret ?? '',
         clubAlias: settings.clubAlias ?? '',
@@ -64,6 +67,57 @@ export const AdminNotificacionesPage: React.FC = () => {
       });
     }
   }, [settings]);
+
+  const handleFetchPhoneInfo = async () => {
+    if (!form.whatsappPhoneNumberId || !form.whatsappAccessToken) {
+      pushToast('Ingresá Phone Number ID y Access Token primero', 'error');
+      return;
+    }
+    try {
+      await apiClient.patch('/settings', {
+        whatsappPhoneNumberId: form.whatsappPhoneNumberId,
+        whatsappAccessToken: form.whatsappAccessToken,
+      });
+    } catch { /* ignore */ }
+
+    setPhoneInfoLoading(true);
+    try {
+      const res = await apiClient.get<{ displayName: string; verifiedName: string; phoneNumber: string; qualityRating: string }>('/notificaciones/phone-info');
+      setPhoneInfo(res.data);
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setPhoneInfoLoading(false);
+    }
+  };
+
+  const handleFetchTemplates = async () => {
+    if (!form.whatsappAccessToken) {
+      pushToast('Ingresá el Access Token primero', 'error');
+      return;
+    }
+    if (!form.whatsappBusinessAccountId) {
+      pushToast('Ingresá el Business Account ID para listar templates', 'error');
+      return;
+    }
+    try {
+      await apiClient.patch('/settings', {
+        whatsappAccessToken: form.whatsappAccessToken,
+        whatsappBusinessAccountId: form.whatsappBusinessAccountId,
+      });
+    } catch { /* ignore */ }
+
+    setTemplatesLoading(true);
+    try {
+      const res = await apiClient.get<Array<{ name: string; language: string; status: string; category: string }>>('/notificaciones/templates');
+      setTemplates(res.data.filter(t => t.status === 'APPROVED'));
+      if (res.data.length === 0) pushToast('No se encontraron templates en esta cuenta', 'error');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -88,15 +142,6 @@ export const AdminNotificacionesPage: React.FC = () => {
       pushToast(normalizeApiError(err), 'error');
     }
   };
-
-  const templatePreview = useCallback(() => {
-    const t = form.whatsappMessageTemplate || '';
-    return t
-      .replace(/\{\{nombre\}\}/g, 'Juan Perez')
-      .replace(/\{\{saldo\}\}/g, '$1.500')
-      .replace(/\{\{dias\}\}/g, '15')
-      .replace(/\{\{club\}\}/g, settings?.clubName || 'nuestro club');
-  }, [form.whatsappMessageTemplate, settings?.clubName]);
 
   // History
   const [historyPage, setHistoryPage] = useState(1);
@@ -139,8 +184,6 @@ export const AdminNotificacionesPage: React.FC = () => {
     }
   };
 
-  const charCount = form.whatsappMessageTemplate ? form.whatsappMessageTemplate.replace(/\{\{[^}]+\}\}/g, 'XXX').length : 0;
-
   return (
     <div className="page-container">
       <div className="treasury-subnav">
@@ -167,40 +210,99 @@ export const AdminNotificacionesPage: React.FC = () => {
                 ) : (
                   <span style={{ color: 'var(--color-warning, #f59e0b)', fontWeight: 600 }}>Sin configurar</span>
                 )}
-                {config.phoneNumberId && <span style={{ marginLeft: '0.75rem', color: 'var(--color-text-faint)', fontSize: '0.85rem' }}>ID: {config.phoneNumberId}</span>}
+                {phoneInfo && (
+                  <span style={{ marginLeft: '0.75rem', color: 'var(--color-text-faint)', fontSize: '0.85rem' }}>
+                    {phoneInfo.displayName} | {phoneInfo.verifiedName} | {phoneInfo.qualityRating}
+                  </span>
+                )}
               </span>
             </div>
           )}
 
           <div className="settings-field">
             <label>Phone Number ID *</label>
-            <input type="text" value={form.whatsappPhoneNumberId} onChange={(e) => setForm({ ...form, whatsappPhoneNumberId: e.target.value })} placeholder="Ej: 123456789012345" />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="text"
+                value={form.whatsappPhoneNumberId}
+                onChange={(e) => setForm({ ...form, whatsappPhoneNumberId: e.target.value })}
+                placeholder="Ej: 123456789012345"
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                onClick={handleFetchPhoneInfo}
+                disabled={phoneInfoLoading || !form.whatsappPhoneNumberId || !form.whatsappAccessToken}
+              >
+                {phoneInfoLoading ? 'Consultando...' : 'Consultar'}
+              </button>
+            </div>
+            {phoneInfo && (
+              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-faint)' }}>
+                {phoneInfo.displayName} | {phoneInfo.verifiedName} | {phoneInfo.qualityRating}
+              </div>
+            )}
             <small style={{ color: 'var(--color-text-faint)' }}>ID del número de teléfono en Meta Business Suite.</small>
           </div>
 
           <div className="settings-field">
             <label>Access Token (permanente) *</label>
-            <input type="password" value={form.whatsappAccessToken} onChange={(e) => setForm({ ...form, whatsappAccessToken: e.target.value })} placeholder="EAA..." />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                type="password"
+                value={form.whatsappAccessToken}
+                onChange={(e) => setForm({ ...form, whatsappAccessToken: e.target.value })}
+                placeholder="EAA..."
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                onClick={handleFetchTemplates}
+                disabled={templatesLoading || !form.whatsappAccessToken}
+              >
+                {templatesLoading ? 'Cargando...' : 'Cargar templates'}
+              </button>
+            </div>
             <small style={{ color: 'var(--color-text-faint)' }}>Token de acceso permanente. Crear en Meta Developers → Herramientas → Generar token → whatsapp_business_messaging.</small>
           </div>
 
           <div className="settings-field">
-            <label>Nombre del Template en Meta *</label>
-            <input type="text" value={form.whatsappTemplateName} onChange={(e) => setForm({ ...form, whatsappTemplateName: e.target.value })} placeholder="Ej: debt_reminder" />
-            <small style={{ color: 'var(--color-text-faint)' }}>Nombre exacto del template aprobado en Meta Business Suite. Se usa para iniciar conversaciones con acreedores.</small>
-          </div>
-
-          <div className="settings-field">
-            <label>Plantilla de mensaje</label>
-            <textarea rows={4} value={form.whatsappMessageTemplate} onChange={(e) => setForm({ ...form, whatsappMessageTemplate: e.target.value })} placeholder="Hola {{nombre}}, tenés un saldo pendiente..." />
-            <small style={{ color: 'var(--color-text-faint)' }}>
-              Variables disponibles: {'{{nombre}}'}, {'{{saldo}}'}, {'{{dias}}'}, {'{{club}}'}. Caracteres efectivos: ~{charCount}.
-            </small>
-            {form.whatsappMessageTemplate && (
-              <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '6px', background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', fontSize: '0.9rem' }}>
-                <strong>Vista previa:</strong><br />
-                {templatePreview()}
-              </div>
+            <label>Nombre del Template *</label>
+            {templates.length > 0 ? (
+              <select
+                value={form.whatsappTemplateName}
+                onChange={(e) => setForm({ ...form, whatsappTemplateName: e.target.value })}
+                style={{
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '6px',
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-bg)',
+                  color: 'var(--color-text)',
+                  fontSize: '0.9rem',
+                  width: '100%',
+                }}
+              >
+                <option value="">Seleccionar template...</option>
+                {templates.map((t) => (
+                  <option key={t.name} value={t.name}>
+                    {t.name} ({t.language}) - APPROVED
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={form.whatsappTemplateName}
+                  onChange={(e) => setForm({ ...form, whatsappTemplateName: e.target.value })}
+                  placeholder="Ej: debt_reminder"
+                />
+                <small style={{ color: 'var(--color-text-faint)' }}>
+                  Cargá los templates con el botón de arriba para seleccionar de una lista, o ingresá el nombre manualmente.
+                </small>
+              </>
             )}
           </div>
 

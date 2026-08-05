@@ -28,7 +28,6 @@ export class NotificacionesService implements OnModuleInit {
       isConfigured,
       phoneNumberId: setting?.whatsappPhoneNumberId || null,
       businessAccountId: setting?.whatsappBusinessAccountId || null,
-      template: setting?.whatsappMessageTemplate || '',
       hasPhoneNumberId: !!setting?.whatsappPhoneNumberId,
       hasAccessToken: !!setting?.whatsappAccessToken,
       hasBusinessAccountId: !!setting?.whatsappBusinessAccountId,

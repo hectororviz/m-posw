@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import type { INotificationProvider, SendResult, ProviderStatus } from './provider.interface';
+import type { INotificationProvider, SendResult, ProviderStatus, PhoneInfo, WhatsAppTemplate } from './provider.interface';
 
 @Injectable()
 export class WhatsAppCloudProvider implements INotificationProvider {
@@ -139,6 +139,52 @@ export class WhatsAppCloudProvider implements INotificationProvider {
       };
     } catch (err: any) {
       return { success: false, error: err.message };
+    }
+  }
+
+  async getPhoneInfo(): Promise<PhoneInfo> {
+    const config = await this.getConfig();
+    if (!config.phoneNumberId || !config.accessToken) {
+      return { displayName: '', verifiedName: '', phoneNumber: '', qualityRating: '' };
+    }
+
+    try {
+      const url = `${this.baseUrl}/${config.phoneNumberId}`;
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${config.accessToken}` },
+      });
+      const data = await response.json();
+      return {
+        displayName: (data as any)?.display_phone_number || '',
+        verifiedName: (data as any)?.verified_name || '',
+        phoneNumber: (data as any)?.display_phone_number || '',
+        qualityRating: (data as any)?.quality_rating || 'UNKNOWN',
+      };
+    } catch {
+      return { displayName: '', verifiedName: '', phoneNumber: '', qualityRating: '' };
+    }
+  }
+
+  async getTemplates(): Promise<WhatsAppTemplate[]> {
+    const config = await this.getConfig();
+    if (!config.businessAccountId || !config.accessToken) {
+      return [];
+    }
+
+    try {
+      const url = `${this.baseUrl}/${config.businessAccountId}/message_templates?limit=100`;
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${config.accessToken}` },
+      });
+      const data = await response.json();
+      return ((data as any)?.data || []).map((t: any) => ({
+        name: t.name,
+        language: t.language,
+        status: t.status,
+        category: t.category,
+      }));
+    } catch {
+      return [];
     }
   }
 

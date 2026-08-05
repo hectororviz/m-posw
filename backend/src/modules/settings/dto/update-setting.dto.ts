@@ -112,10 +112,6 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsString()
-  whatsappMessageTemplate?: string;
-
-  @IsOptional()
-  @IsString()
   whatsappTemplateName?: string;
 
   @IsOptional()

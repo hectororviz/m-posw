@@ -184,7 +184,6 @@ export interface Setting {
   whatsappAccessToken?: string | null;
   whatsappBusinessAccountId?: string | null;
   whatsappWebhookVerifyToken?: string | null;
-  whatsappMessageTemplate?: string | null;
   whatsappTemplateName?: string | null;
   whatsappAppSecret?: string | null;
   clubAlias?: string | null;
@@ -1107,6 +1106,20 @@ export interface ConversationMessagesResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface WhatsAppPhoneInfo {
+  displayName: string;
+  verifiedName: string;
+  phoneNumber: string;
+  qualityRating: string;
+}
+
+export interface WhatsAppTemplateInfo {
+  name: string;
+  language: string;
+  status: string;
+  category: string;
 }
 
 export interface NotificationStatusMap {

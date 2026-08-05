@@ -4,11 +4,15 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
 import { RequireModule } from '../common/module-access.decorator';
 import { NotificacionesService } from './notificaciones.service';
+import { WhatsAppCloudProvider } from './providers/whatsapp-cloud.provider';
 
 @Controller('notificaciones')
 @UseGuards(JwtAuthGuard, ModuleAccessGuard)
 export class NotificacionesController {
-  constructor(private readonly notificacionesService: NotificacionesService) {}
+  constructor(
+    private readonly notificacionesService: NotificacionesService,
+    private readonly whatsappProvider: WhatsAppCloudProvider,
+  ) {}
 
   @Get('config')
   @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
@@ -117,5 +121,17 @@ export class NotificacionesController {
     @Body('text') text: string,
   ) {
     return this.notificacionesService.sendNewConversationMessage(phone, text);
+  }
+
+  @Get('phone-info')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
+  getPhoneInfo() {
+    return this.whatsappProvider.getPhoneInfo();
+  }
+
+  @Get('templates')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
+  getTemplates() {
+    return this.whatsappProvider.getTemplates();
   }
 }

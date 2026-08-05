@@ -291,7 +291,6 @@ model Setting {
   whatsappAccessToken         String?
   whatsappBusinessAccountId   String?
   whatsappWebhookVerifyToken  String?
-  whatsappMessageTemplate     String?
   clubAlias                   String?
   whatsappVariableOrder       Json?
   whatsappTemplateName        String?

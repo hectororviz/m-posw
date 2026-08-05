@@ -424,8 +424,7 @@ export class AcreedoresService {
       throw new BadRequestException('El acreedor no tiene deuda pendiente');
     }
 
-    const template = setting.whatsappMessageTemplate ||
-      'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).';
+    const template = 'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).';
 
     const phoneNumber = this.notificationsService.normalizePhone(acreedor.telefono!);
 
