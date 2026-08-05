@@ -36,6 +36,13 @@
   --color-accent:              #f59e0b;
   --color-accent-ring:         rgba(245, 158, 11, 0.12);
   --color-accent-glow:         rgba(245, 158, 11, 0.06);
+
+  /* ── Primary ──────────────────────────────────────────────────── */
+  --color-primary:             #2563eb;
+  --color-primary-bg:          #eff6ff;
+  --color-primary-border:      #93c5fd;
+  --color-primary-faint:       rgba(37, 99, 235, 0.12);
+  --color-primary-bg-hover:    rgba(37, 99, 235, 0.08);
   --color-primary-contrast:    #ffffff;
 
   /* ── Button-specific ──────────────────────────────────────────── */
@@ -189,6 +196,13 @@
   --color-product-icon:        rgba(255, 255, 255, 0.9);
   --color-toggle-thumb:        #ffffff;
   --color-login-pin-glow:      rgba(245, 158, 11, 0.35);
+
+  /* ── Primary ──────────────────────────────────────────────────── */
+  --color-primary:             #3b82f6;
+  --color-primary-bg:          #1e3a5f;
+  --color-primary-border:      #1e40af;
+  --color-primary-faint:       rgba(59, 130, 246, 0.15);
+  --color-primary-bg-hover:    rgba(59, 130, 246, 0.1);
   --color-primary-contrast:    #ffffff;
 
   --chart-1:  #7dd3fc;  --chart-2:  #fb923c;

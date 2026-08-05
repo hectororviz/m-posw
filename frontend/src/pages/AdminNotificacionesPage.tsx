@@ -446,19 +446,19 @@ export const AdminNotificacionesPage: React.FC = () => {
                           position: 'absolute',
                           top: 4,
                           right: 4,
-                          padding: 2,
+                          padding: 3,
                           border: 'none',
-                          background: 'transparent',
+                          background: 'var(--color-surface)',
                           color: 'var(--color-text-faint)',
                           cursor: 'pointer',
-                          borderRadius: 4,
-                          fontSize: 0,
+                          borderRadius: '50%',
                           lineHeight: 0,
-                          opacity: 0,
+                          opacity: 0.4,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                          transition: 'opacity 0.15s, color 0.15s',
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--color-danger)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.color = 'var(--color-text-faint)'; }}
-                        className="conv-delete-btn"
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; e.currentTarget.style.color = 'var(--color-text-faint)'; }}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -500,11 +500,8 @@ export const AdminNotificacionesPage: React.FC = () => {
                         key={msg.id}
                         style={{
                           display: 'flex',
-                          flexDirection: msg.direction === 'OUTBOUND' ? 'row' : 'row-reverse',
                           justifyContent: msg.direction === 'OUTBOUND' ? 'flex-end' : 'flex-start',
                           marginBottom: '0.5rem',
-                          alignItems: 'center',
-                          gap: '4px',
                         }}
                       >
                         <div
@@ -519,7 +516,33 @@ export const AdminNotificacionesPage: React.FC = () => {
                             wordBreak: 'break-word',
                             position: 'relative',
                           }}
+                          className="chat-bubble"
                         >
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            title="Eliminar mensaje"
+                            style={{
+                              position: 'absolute',
+                              top: -4,
+                              right: msg.direction === 'OUTBOUND' ? -4 : 'auto',
+                              left: msg.direction === 'INBOUND' ? -4 : 'auto',
+                              padding: 3,
+                              border: 'none',
+                              background: 'var(--color-surface)',
+                              color: 'var(--color-text-faint)',
+                              cursor: 'pointer',
+                              borderRadius: '50%',
+                              opacity: msg.id < 0 ? 1 : 0.4,
+                              lineHeight: 0,
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                              transition: 'opacity 0.15s, color 0.15s',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--color-danger)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.opacity = msg.id < 0 ? '1' : '0.4'; e.currentTarget.style.color = 'var(--color-text-faint)'; }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                           <div>{msg.content}</div>
                           <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', opacity: 0.7, textAlign: 'right' }}>
                             {formatTime(msg.createdAt)}
@@ -530,27 +553,6 @@ export const AdminNotificacionesPage: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMessage(msg.id)}
-                          title="Eliminar mensaje"
-                          style={{
-                            padding: 2,
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--color-text-faint)',
-                            cursor: 'pointer',
-                            borderRadius: 4,
-                            opacity: 0,
-                            flexShrink: 0,
-                            lineHeight: 0,
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--color-danger)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.color = 'var(--color-text-faint)'; }}
-                          className="msg-delete-btn"
-                        >
-                          <Trash2 size={14} />
-                        </button>
                       </div>
                     ))}
                     <div ref={messagesEndRef} />
