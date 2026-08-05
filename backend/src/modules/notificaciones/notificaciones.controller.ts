@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
@@ -133,5 +133,20 @@ export class NotificacionesController {
   @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
   getTemplates() {
     return this.whatsappProvider.getTemplates();
+  }
+
+  @Delete('conversations/:id/messages/:msgId')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.FULL)
+  deleteConversationMessage(
+    @Param('id', ParseIntPipe) conversationId: number,
+    @Param('msgId', ParseIntPipe) messageId: number,
+  ) {
+    return this.notificacionesService.deleteConversationMessage(conversationId, messageId);
+  }
+
+  @Delete('conversations/:id')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.FULL)
+  deleteConversation(@Param('id', ParseIntPipe) id: number) {
+    return this.notificacionesService.deleteConversation(id);
   }
 }

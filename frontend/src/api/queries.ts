@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1172,8 +1172,58 @@ export const useSendConversationMessage = () => {
       const response = await apiClient.post(`/notificaciones/conversations/${conversationId}/send`, { text });
       return response.data;
     },
+    onMutate: async ({ conversationId, text }) => {
+      await queryClient.cancelQueries({ queryKey: ['conversation-messages', conversationId] });
+      const previous = queryClient.getQueryData<ConversationMessagesResponse>(['conversation-messages', conversationId]);
+      queryClient.setQueryData<ConversationMessagesResponse>(['conversation-messages', conversationId], (old) => {
+        if (!old) return old;
+        const optimisticMsg: WhatsAppMessage = {
+          id: -(Date.now()),
+          conversationId,
+          direction: 'OUTBOUND',
+          content: text,
+          externalMessageId: null,
+          status: 'sending',
+          createdAt: new Date().toISOString(),
+        };
+        return { ...old, messages: [...old.messages, optimisticMsg], total: old.total + 1 };
+      });
+      return { previous };
+    },
+    onError: (_err, { conversationId }, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['conversation-messages', conversationId], context.previous);
+      }
+    },
+    onSettled: (_data, _err, { conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversationId] });
+    },
+  });
+};
+
+export const useDeleteConversationMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ conversationId, messageId }: { conversationId: number; messageId: number }) => {
+      await apiClient.delete(`/notificaciones/conversations/${conversationId}/messages/${messageId}`);
+    },
+    onSuccess: (_data, { conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-conversations'] });
+    },
+  });
+};
+
+export const useDeleteConversation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (conversationId: number) => {
+      await apiClient.delete(`/notificaciones/conversations/${conversationId}`);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificaciones-conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages'] });
     },
   });
 };

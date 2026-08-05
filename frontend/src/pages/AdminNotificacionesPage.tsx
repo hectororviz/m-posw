@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader, Send, MessageSquare } from 'lucide-react';
+import { Loader, Send, MessageSquare, Trash2 } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useConversationMessages, useConversations, useNotificacionesHistory, useNotificacionesConfig, useSendConversationMessage, useTestNotificacionesConnection, useSettings } from '../api/queries';
+import { useConversationMessages, useConversations, useNotificacionesHistory, useNotificacionesConfig, useSendConversationMessage, useDeleteConversationMessage, useDeleteConversation, useTestNotificacionesConnection, useSettings } from '../api/queries';
 import type { NotificacionesJob, WhatsAppMessage } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -152,8 +152,10 @@ export const AdminNotificacionesPage: React.FC = () => {
   const [selectedConvId, setSelectedConvId] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
-  const { data: convMessages, refetch: refetchMessages } = useConversationMessages(selectedConvId ?? undefined);
+  const { data: convMessages } = useConversationMessages(selectedConvId ?? undefined);
   const sendMutation = useSendConversationMessage();
+  const deleteMsgMutation = useDeleteConversationMessage();
+  const deleteConvMutation = useDeleteConversation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -168,7 +170,6 @@ export const AdminNotificacionesPage: React.FC = () => {
     try {
       await sendMutation.mutateAsync({ conversationId: selectedConvId, text: replyText.trim() });
       setReplyText('');
-      refetchMessages();
       pushToast('Mensaje enviado', 'success');
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
@@ -181,6 +182,29 @@ export const AdminNotificacionesPage: React.FC = () => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendReply();
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: number) => {
+    if (!selectedConvId) return;
+    if (!window.confirm('¿Eliminar este mensaje?')) return;
+    try {
+      await deleteMsgMutation.mutateAsync({ conversationId: selectedConvId, messageId: msgId });
+      pushToast('Mensaje eliminado', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    }
+  };
+
+  const handleDeleteConversation = async (e: React.MouseEvent, convId: number) => {
+    e.stopPropagation();
+    if (!window.confirm('¿Eliminar esta conversación y todos sus mensajes?')) return;
+    try {
+      await deleteConvMutation.mutateAsync(convId);
+      if (selectedConvId === convId) setSelectedConvId(null);
+      pushToast('Conversación eliminada', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
     }
   };
 
@@ -411,8 +435,33 @@ export const AdminNotificacionesPage: React.FC = () => {
                         borderBottom: '1px solid var(--color-border)',
                         background: selectedConvId === conv.id ? 'var(--color-primary-bg)' : 'transparent',
                         transition: 'background 0.15s',
+                        position: 'relative',
                       }}
                     >
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteConversation(e, conv.id)}
+                        title="Eliminar conversación"
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          padding: 2,
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--color-text-faint)',
+                          cursor: 'pointer',
+                          borderRadius: 4,
+                          fontSize: 0,
+                          lineHeight: 0,
+                          opacity: 0,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--color-danger)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.color = 'var(--color-text-faint)'; }}
+                        className="conv-delete-btn"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                         <strong style={{ fontSize: '0.9rem' }}>{conv.acreedor?.nombre || conv.phoneNumber}</strong>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -451,8 +500,11 @@ export const AdminNotificacionesPage: React.FC = () => {
                         key={msg.id}
                         style={{
                           display: 'flex',
+                          flexDirection: msg.direction === 'OUTBOUND' ? 'row' : 'row-reverse',
                           justifyContent: msg.direction === 'OUTBOUND' ? 'flex-end' : 'flex-start',
                           marginBottom: '0.5rem',
+                          alignItems: 'center',
+                          gap: '4px',
                         }}
                       >
                         <div
@@ -465,6 +517,7 @@ export const AdminNotificacionesPage: React.FC = () => {
                             border: msg.direction === 'INBOUND' ? '1px solid var(--color-border)' : 'none',
                             fontSize: '0.9rem',
                             wordBreak: 'break-word',
+                            position: 'relative',
                           }}
                         >
                           <div>{msg.content}</div>
@@ -472,11 +525,32 @@ export const AdminNotificacionesPage: React.FC = () => {
                             {formatTime(msg.createdAt)}
                             {msg.direction === 'OUTBOUND' && msg.status && (
                               <span style={{ marginLeft: '0.3rem' }}>
-                                {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : msg.status === 'sent' ? '✓' : ''}
+                                {msg.status === 'read' ? '✓✓' : msg.status === 'delivered' ? '✓✓' : msg.status === 'sent' ? '✓' : msg.status === 'sending' ? '...' : ''}
                               </span>
                             )}
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMessage(msg.id)}
+                          title="Eliminar mensaje"
+                          style={{
+                            padding: 2,
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--color-text-faint)',
+                            cursor: 'pointer',
+                            borderRadius: 4,
+                            opacity: 0,
+                            flexShrink: 0,
+                            lineHeight: 0,
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--color-danger)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.color = 'var(--color-text-faint)'; }}
+                          className="msg-delete-btn"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     ))}
                     <div ref={messagesEndRef} />

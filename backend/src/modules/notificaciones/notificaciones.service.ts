@@ -414,6 +414,48 @@ export class NotificacionesService implements OnModuleInit {
     return { success: true, externalMessageId: result.externalMessageId };
   }
 
+  async deleteConversationMessage(conversationId: number, messageId: number) {
+    const message = await this.prisma.whatsAppMessage.findFirst({
+      where: { id: messageId, conversationId },
+    });
+    if (!message) throw new BadRequestException('Mensaje no encontrado');
+
+    await this.prisma.whatsAppMessage.delete({ where: { id: messageId } });
+
+    const remaining = await this.prisma.whatsAppMessage.count({ where: { conversationId } });
+    if (remaining === 0) {
+      await this.prisma.whatsAppConversation.delete({ where: { id: conversationId } });
+    } else {
+      const lastMsg = await this.prisma.whatsAppMessage.findFirst({
+        where: { conversationId },
+        orderBy: { createdAt: 'desc' },
+      });
+      const lastIncoming = await this.prisma.whatsAppMessage.findFirst({
+        where: { conversationId, direction: 'INBOUND' },
+        orderBy: { createdAt: 'desc' },
+      });
+      await this.prisma.whatsAppConversation.update({
+        where: { id: conversationId },
+        data: {
+          lastMessageAt: lastMsg?.createdAt ?? null,
+          lastIncomingAt: lastIncoming?.createdAt ?? null,
+        },
+      });
+    }
+
+    return { deleted: true };
+  }
+
+  async deleteConversation(conversationId: number) {
+    const conv = await this.prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conv) throw new BadRequestException('Conversación no encontrada');
+
+    await this.prisma.whatsAppConversation.delete({ where: { id: conversationId } });
+    return { deleted: true };
+  }
+
   async sendNewConversationMessage(phone: string, text: string) {
     if (!text?.trim()) throw new BadRequestException('El mensaje no puede estar vacío');
 
