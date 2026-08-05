@@ -870,7 +870,8 @@ Módulo de notificaciones genérico con WhatsApp Cloud API (Meta) como proveedor
 backend/src/modules/notificaciones/
 ├── notificaciones.module.ts
 ├── notificaciones.controller.ts    # Endpoints: config, test, history, queue
-├── notificaciones.service.ts       # Lógica: cola, envío, rate limiting, logs
+├── notificaciones.service.ts       # Lógica: cola, envío, rate limiting, logs, conversaciones
+├── webhook.controller.ts           # Webhook público: recepción de mensajes entrantes y status updates
 ├── providers/
 │   ├── provider.interface.ts       # INotificationProvider (genérico)
 │   └── whatsapp-cloud.provider.ts  # WhatsApp Cloud API (Graph v21)
@@ -916,6 +917,28 @@ backend/src/modules/notificaciones/
 | `POST` | `/notificaciones/queue/pause` | FULL | Pausar procesamiento de la cola |
 | `POST` | `/notificaciones/queue/resume` | FULL | Reanudar procesamiento de la cola |
 | `POST` | `/notificaciones/queue/cancel-all` | FULL | Cancelar todos los jobs QUEUED |
+| `GET` | `/notificaciones/phone-info` | READ | Info del número de WhatsApp Business (display name, quality) |
+| `GET` | `/notificaciones/templates` | READ | Listar templates aprobados de la WABA |
+
+### Endpoints de Conversaciones / Chat
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/notificaciones/conversations` | READ | Lista de conversaciones paginada (`?page=`, `?limit=`) con último mensaje y ventana 24hs |
+| `GET` | `/notificaciones/conversations/:id/messages` | READ | Mensajes de una conversación (`?page=`, `?limit=`), ordenados cronológicamente |
+| `POST` | `/notificaciones/conversations/:id/send` | FULL | Enviar mensaje de texto en una conversación existente. Body: `{ text }` |
+| `POST` | `/notificaciones/conversations/send` | FULL | Enviar mensaje a un número (crea conversación si no existe). Body: `{ phone, text }` |
+| `DELETE` | `/notificaciones/conversations/:id/messages/:msgId` | FULL | Eliminar un mensaje individual. Si es el último, borra también la conversación |
+| `DELETE` | `/notificaciones/conversations/:id` | FULL | Eliminar una conversación completa con todos sus mensajes (cascade) |
+
+### Webhook de WhatsApp (mensajes entrantes)
+
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/webhooks/whatsapp` | Pública | Verificación de webhook (Meta envía `hub.mode`, `hub.verify_token`, `hub.challenge`) |
+| `POST` | `/webhooks/whatsapp` | Pública | Recepción de mensajes entrantes y actualizaciones de estado (sent/delivered/read) |
+
+El webhook recibe mensajes de texto (`type: text`) de usuarios, los almacena como `WhatsAppMessage` con `direction: INBOUND`, crea o actualiza la `WhatsAppConversation` correspondiente, y hace matching automático con acreedores por número de teléfono. Las actualizaciones de estado (`statuses`) actualizan el campo `status` en `WhatsAppMessage` y `NotificationJob`.
 
 ### Endpoints en Acreedores
 
@@ -927,13 +950,28 @@ backend/src/modules/notificaciones/
 | `GET` | `/acreedores/:id/notificaciones` | READ | Historial de notificaciones del acreedor |
 | `GET` | `/acreedores/notification-status?ids=` | READ | Estado de notificaciones para múltiples acreedores |
 
+### Modelos de Conversaciones (Prisma)
+
+- **WhatsAppConversation**: agrupa mensajes por número de teléfono. Campos: `phoneNumber` (unique), `acreedorId` (nullable, auto-match), `lastMessageAt`, `lastIncomingAt` (para ventana 24hs).
+- **WhatsAppMessage**: mensaje individual dentro de una conversación. Campos: `direction` (INBOUND/OUTBOUND), `content`, `externalMessageId` (wa_id de Meta), `status` (sent/delivered/read/sending).
+
 ### Frontend
 
 ```
 frontend/src/pages/
-├── AdminNotificacionesPage.tsx  # Tabs: Configuración (credenciales, plantilla, test) + Historial (tabla paginada)
-└── AdminAcreedoresPage.tsx     # Botón WhatsApp en fila (solo si módulo activo, tiene teléfono, saldo > 0)
+├── AdminNotificacionesPage.tsx   # 3 tabs: Configuración, Historial, Conversaciones (chat con burbujas estilo WhatsApp)
+└── AdminAcreedoresPage.tsx       # Botón WhatsApp en fila (solo si módulo activo, tiene teléfono, saldo > 0)
 ```
+
+**Tab Conversaciones** en `AdminNotificacionesPage.tsx`:
+- Panel izquierdo: lista de conversaciones con puntito verde si ventana 24hs abierta, botón 🗑 para eliminar conversación completa.
+- Panel derecho: chat con burbujas (OUTBOUND azul a la derecha, INBOUND gris a la izquierda), checkmarks de estado (✓/✓✓), timestamp.
+- Cada burbuja tiene botón 🗑 en la esquina (opacidad 0.4, 1.0 en hover) para eliminar mensaje individual.
+- Input de respuesta habilitado solo si la ventana 24hs está abierta.
+- Optimistic update: el mensaje enviado aparece instantáneamente con `status: 'sending'` y `...`, se reemplaza al confirmar el servidor.
+
+**Hooks de React Query** en `api/queries.ts`:
+- `useConversations`, `useConversationMessages`, `useSendConversationMessage` (optimistic update), `useDeleteConversationMessage`, `useDeleteConversation`
 
 ### Configuración desde la GUI
 
