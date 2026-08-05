@@ -324,6 +324,15 @@ export const AdminNotificacionesPage: React.FC = () => {
             <small style={{ color: 'var(--color-text-faint)' }}>WABA ID de la cuenta de WhatsApp Business para listar templates. Opcional.</small>
           </div>
 
+          <div style={{ marginTop: '1.5rem', padding: '0.75rem', borderRadius: '8px', background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', fontSize: '0.9rem' }}>
+            <strong>URL del Webhook</strong><br />
+            <code style={{ background: 'var(--color-bg)', padding: '0.2rem 0.4rem', borderRadius: '4px', fontSize: '0.85rem' }}>{window.location.origin}/api/webhooks/whatsapp</code>
+            <div style={{ marginTop: '0.5rem', color: 'var(--color-text-faint)', fontSize: '0.8rem' }}>
+              Configurá esta URL en Meta Business Suite → WhatsApp → Configuración → Webhook.<br />
+              El webhook recibe mensajes entrantes y actualizaciones de estado (sent/delivered/read).
+            </div>
+          </div>
+
           <div className="settings-field">
             <label>Webhook Verify Token</label>
             <input type="text" value={form.whatsappWebhookVerifyToken} onChange={(e) => setForm({ ...form, whatsappWebhookVerifyToken: e.target.value })} placeholder="Token personalizado" />
