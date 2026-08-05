@@ -185,6 +185,10 @@ export interface Setting {
   whatsappBusinessAccountId?: string | null;
   whatsappWebhookVerifyToken?: string | null;
   whatsappMessageTemplate?: string | null;
+  whatsappTemplateName?: string | null;
+  whatsappAppSecret?: string | null;
+  clubAlias?: string | null;
+  whatsappVariableOrder?: Record<string, number> | null;
   enableAutoJournalPos?: boolean | null;
   enableAutoJournalAcreedores?: boolean | null;
   enableAutoJournalSocios?: boolean | null;
@@ -966,6 +970,7 @@ export interface NotificacionesConfig {
   phoneNumberId: string | null;
   businessAccountId: string | null;
   template: string;
+  templateName?: string | null;
   hasPhoneNumberId: boolean;
   hasAccessToken: boolean;
   hasBusinessAccountId: boolean;
@@ -1062,6 +1067,46 @@ export interface NotifJobUpdatedEvent {
   status: string;
   completedAt?: string | null;
   error?: string | null;
+}
+
+export interface WhatsAppConversation {
+  id: number;
+  phoneNumber: string;
+  acreedor?: { id: number; nombre: string } | null;
+  lastMessageAt: string | null;
+  lastIncomingAt: string | null;
+  windowOpen: boolean;
+  lastMessage: WhatsAppMessage | null;
+  createdAt: string;
+}
+
+export interface WhatsAppMessage {
+  id: number;
+  conversationId: number;
+  direction: string;
+  content: string;
+  externalMessageId: string | null;
+  status: string | null;
+  createdAt: string;
+}
+
+export interface ConversationsResponse {
+  conversations: WhatsAppConversation[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ConversationMessagesResponse {
+  conversationId: number;
+  acreedorId: number | null;
+  acreedor: { id: number; nombre: string } | null;
+  phoneNumber: string;
+  windowOpen: boolean;
+  messages: WhatsAppMessage[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface NotificationStatusMap {

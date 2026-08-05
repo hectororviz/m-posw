@@ -43,6 +43,7 @@ export const AdminSettingsPage: React.FC = () => {
   const [form, setForm] = useState({
     storeName: '',
     clubName: '',
+    clubAlias: '',
     enableTicketPrinting: false,
     accentColor: '',
     enableCashPayment: true,
@@ -141,6 +142,7 @@ export const AdminSettingsPage: React.FC = () => {
       setForm({
         storeName: settings.storeName ?? '',
         clubName: settings.clubName ?? '',
+        clubAlias: settings.clubAlias ?? '',
         enableTicketPrinting: settings.enableTicketPrinting ?? false,
         accentColor: settings.accentColor ?? '',
         enableCashPayment: settings.enableCashPayment ?? true,
@@ -441,6 +443,17 @@ export const AdminSettingsPage: React.FC = () => {
                 onChange={(e) => setForm({ ...form, clubName: e.target.value })}
                 placeholder="Ej: Club Atletico"
               />
+            </div>
+            <div className="settings-field">
+              <label htmlFor="club-alias">Alias para transf.</label>
+              <input
+                id="club-alias"
+                type="text"
+                value={form.clubAlias}
+                onChange={(e) => setForm({ ...form, clubAlias: e.target.value })}
+                placeholder="Ej: Club Atletico"
+              />
+              <span className="field-hint">Alias del club usado en el envio de notificaciones por WhatsApp. Aparece como variable 'alias' en las plantillas.</span>
             </div>
             <div className="settings-field">
               <label htmlFor="accent-color">Color de personalizacion</label>

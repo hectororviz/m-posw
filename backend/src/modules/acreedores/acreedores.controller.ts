@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
 import { RequireModule } from '../common/module-access.decorator';
 import { LedgerAccountsService } from '../treasury/ledger-accounts.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { AcreedoresService } from './acreedores.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
@@ -16,6 +17,7 @@ export class AcreedoresController {
   constructor(
     private readonly acreedoresService: AcreedoresService,
     private readonly ledgerAccountsService: LedgerAccountsService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   @Get('treasury-accounts')
@@ -61,6 +63,37 @@ export class AcreedoresController {
   @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
   toggleActive(@Param('id', ParseIntPipe) id: number) {
     return this.acreedoresService.toggleActive(id);
+  }
+
+  @Get('notification-status')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
+  getNotificationStatus(@Query('ids') ids: string) {
+    const acreedorIds = ids.split(',').map(Number).filter((n) => !isNaN(n));
+    return this.acreedoresService.getNotificationStatus(acreedorIds);
+  }
+
+  @Get('batch/:batchId/status')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
+  getBatchStatus(@Param('batchId') batchId: string) {
+    return this.acreedoresService.getBatchStatus(batchId);
+  }
+
+  @Post('notificar-deuda-batch')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
+  notificarDeudaBatch(@Body('acreedorIds') acreedorIds: number[]) {
+    return this.acreedoresService.notificarDeudaBatch(acreedorIds);
+  }
+
+  @Get(':id/notificaciones')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
+  getNotificaciones(@Param('id', ParseIntPipe) id: number) {
+    return this.acreedoresService.getNotificaciones(id);
+  }
+
+  @Post(':id/notificar-deuda')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
+  notificarDeuda(@Param('id', ParseIntPipe) id: number) {
+    return this.acreedoresService.notificarDeuda(id);
   }
 
   @Get(':id/deuda')

@@ -292,6 +292,10 @@ model Setting {
   whatsappBusinessAccountId   String?
   whatsappWebhookVerifyToken  String?
   whatsappMessageTemplate     String?
+  clubAlias                   String?
+  whatsappVariableOrder       Json?
+  whatsappTemplateName        String?
+  whatsappAppSecret           String?
   movementInReasons String[] @default([])
   movementOutReasons String[] @default([])
   mpAccessToken   String?
@@ -553,6 +557,7 @@ model Acreedor {
   ajustes     AjusteAcreedor[]
   notifications  NotificationLog[]
   notificationJobs NotificationJob[]
+  whatsappConversations WhatsAppConversation[]
 }
 
 model FiadoVenta {
@@ -1005,4 +1010,32 @@ model NotificationJob {
   @@index([status])
   @@index([batchId])
   @@index([createdAt])
+}
+
+model WhatsAppConversation {
+  id             Int                @id @default(autoincrement())
+  phoneNumber    String             @unique
+  acreedorId     Int?
+  acreedor       Acreedor?          @relation(fields: [acreedorId], references: [id])
+  lastMessageAt  DateTime?
+  lastIncomingAt DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  messages       WhatsAppMessage[]
+  @@index([phoneNumber])
+  @@index([lastMessageAt])
+}
+
+model WhatsAppMessage {
+  id                Int                  @id @default(autoincrement())
+  conversationId    Int
+  conversation      WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction         String
+  content           String
+  externalMessageId String?
+  status            String?
+  createdAt         DateTime             @default(now())
+  @@index([conversationId])
+  @@index([createdAt])
+  @@index([externalMessageId])
 }

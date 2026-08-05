@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
@@ -73,5 +73,49 @@ export class NotificacionesController {
   @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.FULL)
   cancelAll() {
     return this.notificacionesService.cancelAll();
+  }
+
+  @Get('conversations')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
+  getConversations(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificacionesService.getConversations(
+      parseInt(page || '1'),
+      parseInt(limit || '50'),
+    );
+  }
+
+  @Get('conversations/:id/messages')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
+  getConversationMessages(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.notificacionesService.getConversationMessages(
+      id,
+      parseInt(page || '1'),
+      parseInt(limit || '50'),
+    );
+  }
+
+  @Post('conversations/:id/send')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.FULL)
+  sendConversationMessage(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('text') text: string,
+  ) {
+    return this.notificacionesService.sendConversationMessage(id, text);
+  }
+
+  @Post('conversations/send')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.FULL)
+  sendNewConversationMessage(
+    @Body('phone') phone: string,
+    @Body('text') text: string,
+  ) {
+    return this.notificacionesService.sendNewConversationMessage(phone, text);
   }
 }

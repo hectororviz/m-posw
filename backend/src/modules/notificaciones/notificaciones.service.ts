@@ -137,9 +137,9 @@ export class NotificacionesService implements OnModuleInit {
     return { retried: true };
   }
 
-  async enqueueBatch(jobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams?: Record<string, string> }>, batchId: string) {
+  async enqueueBatch(jobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams?: string[] }>, batchId: string) {
     const setting = await this.prisma.setting.findFirst();
-    const templateName = 'debt_reminder';
+    const templateName = setting?.whatsappTemplateName || 'debt_reminder';
     const created = [];
 
     for (const job of jobs) {
@@ -152,7 +152,7 @@ export class NotificacionesService implements OnModuleInit {
           status: 'QUEUED',
           batchId,
           templateName,
-          templateParams: job.templateParams || {},
+          templateParams: job.templateParams || [],
         },
       });
       created.push(j);
@@ -223,16 +223,15 @@ export class NotificacionesService implements OnModuleInit {
           data: { status: 'PROCESSING', startedAt: new Date(), attempts: job.attempts + 1 },
         });
 
-        const sendText = job.templateParams && typeof job.templateParams === 'object'
-          ? Object.values(job.templateParams as Record<string, string>).join(' - ')
-          : '';
+        const templateParams = (job.templateParams as string[]) || [];
+        const sendText = templateParams.length > 0 ? templateParams.join(' - ') : '';
 
         let result;
         if (job.templateName) {
           result = await this.whatsappProvider.sendMessage(
             job.phoneNumber,
             job.templateName,
-            (job.templateParams as Record<string, string>) || {},
+            templateParams,
           );
         } else {
           result = await this.whatsappProvider.sendTextMessage(job.phoneNumber, 'Notificación de m-POSw');
@@ -301,5 +300,135 @@ export class NotificacionesService implements OnModuleInit {
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  async getConversations(page: number, limit: number) {
+    const [conversations, total] = await Promise.all([
+      this.prisma.whatsAppConversation.findMany({
+        orderBy: { lastMessageAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          acreedor: { select: { id: true, nombre: true } },
+          messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        },
+      }),
+      this.prisma.whatsAppConversation.count(),
+    ]);
+
+    const now = Date.now();
+    return {
+      conversations: conversations.map((c) => {
+        const windowOpen = c.lastIncomingAt
+          ? (now - new Date(c.lastIncomingAt).getTime()) < 24 * 60 * 60 * 1000
+          : false;
+        return {
+          id: c.id,
+          phoneNumber: c.phoneNumber,
+          acreedor: c.acreedor,
+          lastMessageAt: c.lastMessageAt?.toISOString() ?? null,
+          lastIncomingAt: c.lastIncomingAt?.toISOString() ?? null,
+          windowOpen,
+          lastMessage: c.messages[0] ?? null,
+          createdAt: c.createdAt.toISOString(),
+        };
+      }),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async getConversationMessages(conversationId: number, page: number, limit: number) {
+    const conv = await this.prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+      include: { acreedor: { select: { id: true, nombre: true } } },
+    });
+    if (!conv) throw new BadRequestException('Conversación no encontrada');
+
+    const now = Date.now();
+    const windowOpen = conv.lastIncomingAt
+      ? (now - new Date(conv.lastIncomingAt).getTime()) < 24 * 60 * 60 * 1000
+      : false;
+
+    const [messages, total] = await Promise.all([
+      this.prisma.whatsAppMessage.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.whatsAppMessage.count({ where: { conversationId } }),
+    ]);
+
+    return {
+      conversationId: conv.id,
+      acreedorId: conv.acreedorId,
+      acreedor: conv.acreedor,
+      phoneNumber: conv.phoneNumber,
+      windowOpen,
+      messages,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  async sendConversationMessage(conversationId: number, text: string) {
+    if (!text?.trim()) throw new BadRequestException('El mensaje no puede estar vacío');
+
+    const conv = await this.prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conv) throw new BadRequestException('Conversación no encontrada');
+
+    const now = Date.now();
+    const windowOpen = conv.lastIncomingAt
+      ? (now - new Date(conv.lastIncomingAt).getTime()) < 24 * 60 * 60 * 1000
+      : false;
+
+    if (!windowOpen) {
+      throw new BadRequestException('La ventana de 24 horas está cerrada. Solo se pueden enviar templates.');
+    }
+
+    const result = await this.whatsappProvider.sendTextMessage(conv.phoneNumber, text);
+
+    if (!result.success) {
+      throw new BadRequestException(result.error || 'Error al enviar mensaje');
+    }
+
+    await this.prisma.whatsAppMessage.create({
+      data: {
+        conversationId: conv.id,
+        direction: 'OUTBOUND',
+        content: text,
+        externalMessageId: result.externalMessageId,
+        status: 'sent',
+      },
+    });
+
+    await this.prisma.whatsAppConversation.update({
+      where: { id: conv.id },
+      data: { lastMessageAt: new Date() },
+    });
+
+    return { success: true, externalMessageId: result.externalMessageId };
+  }
+
+  async sendNewConversationMessage(phone: string, text: string) {
+    if (!text?.trim()) throw new BadRequestException('El mensaje no puede estar vacío');
+
+    const cleanedPhone = phone.replace(/[^0-9]/g, '');
+    let conv = await this.prisma.whatsAppConversation.findUnique({
+      where: { phoneNumber: cleanedPhone },
+    });
+
+    if (!conv) {
+      conv = await this.prisma.whatsAppConversation.create({
+        data: { phoneNumber: cleanedPhone },
+      });
+    }
+
+    return this.sendConversationMessage(conv.id, text);
   }
 }

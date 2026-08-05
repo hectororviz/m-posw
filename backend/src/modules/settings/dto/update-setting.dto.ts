@@ -115,6 +115,21 @@ export class UpdateSettingDto {
   whatsappMessageTemplate?: string;
 
   @IsOptional()
+  @IsString()
+  whatsappTemplateName?: string;
+
+  @IsOptional()
+  @IsString()
+  whatsappAppSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  clubAlias?: string;
+
+  @IsOptional()
+  whatsappVariableOrder?: Record<string, number>;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];

@@ -1,0 +1,2 @@
+ALTER TABLE "Setting" ADD COLUMN IF NOT EXISTS "clubAlias" TEXT;
+ALTER TABLE "Setting" ADD COLUMN IF NOT EXISTS "whatsappVariableOrder" JSONB;

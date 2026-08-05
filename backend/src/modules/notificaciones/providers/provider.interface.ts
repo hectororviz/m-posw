@@ -15,7 +15,7 @@ export interface ProviderStatus {
 export interface INotificationProvider {
   readonly name: string;
   readonly isConfigured: boolean;
-  sendMessage(phone: string, templateName: string, params: Record<string, string>): Promise<SendResult>;
+  sendMessage(phone: string, templateName: string, params: string[]): Promise<SendResult>;
   sendTextMessage(phone: string, text: string): Promise<SendResult>;
   getStatus(): Promise<ProviderStatus>;
   getTemplates?(): Promise<WhatsAppTemplate[]>;
