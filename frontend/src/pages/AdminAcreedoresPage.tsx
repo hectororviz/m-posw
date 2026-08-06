@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Check, Clock, Eye, Loader, Megaphone, Pencil, Plus, Slash, X, XCircle } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedores, useAcreedorNotificaciones, useAcreedoresResumen, useNotificarDeudaBatch, useNotificationStatus, useSettings } from '../api/queries';
-import type { Acreedor, NotifJobUpdatedEvent, NotificacionesJob, NotificationStatusMap, NotificarDeudaBatchResponse } from '../api/types';
+import type { Acreedor, NotifJobUpdatedEvent, NotificacionesJob, NotificationStatusMap } from '../api/types';
 import { useSocketContext } from '../socket/SocketProvider';
 import { useToast } from '../components/ToastProvider';
 
@@ -102,8 +102,6 @@ export const AdminAcreedoresPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('alpha');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [batchModalOpen, setBatchModalOpen] = useState(false);
-  const [batchResult, setBatchResult] = useState<NotificarDeudaBatchResponse | null>(null);
   const [batchSending, setBatchSending] = useState(false);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [wsJobStatus, setWsJobStatus] = useState<Record<number, { status: string; completedAt?: string | null; error?: string | null }>>({});
@@ -132,16 +130,6 @@ export const AdminAcreedoresPage: React.FC = () => {
           error: payload.error,
         },
       }));
-
-      setBatchResult((prev) => {
-        if (!prev) return prev;
-        const updated = { ...prev };
-        const detail = updated.details.find((d) => d.acreedorId === payload.acreedorId);
-        if (detail) {
-          detail.status = payload.status;
-        }
-        return updated;
-      });
     };
 
     socket.on('notification.job_updated', handler);
@@ -215,19 +203,12 @@ export const AdminAcreedoresPage: React.FC = () => {
     [filtered, selectedIds],
   );
 
-  const openBatchModal = () => {
-    setBatchModalOpen(true);
-    setBatchResult(null);
-    setError(null);
-  };
-
   const handleBatchSend = async () => {
     const ids = Array.from(selectedIds);
     setBatchSending(true);
     setError(null);
     try {
       const result = await batchMutation.mutateAsync({ acreedorIds: ids });
-      setBatchResult(result);
       setActiveBatchId(result.batchId);
       setSelectedIds(new Set());
       pushToast(`${result.enviables} notificaciones encoladas`, 'success');
@@ -518,10 +499,10 @@ export const AdminAcreedoresPage: React.FC = () => {
             <button
               type="button"
               className="btn-primary"
-              onClick={openBatchModal}
-              disabled={selectedWithPhone === 0}
+              onClick={handleBatchSend}
+              disabled={selectedWithPhone === 0 || batchSending}
             >
-              Enviar notificaciones ({selectedWithPhone})
+              {batchSending ? 'Encolando...' : `Enviar notificaciones (${selectedWithPhone})`}
             </button>
           </div>
         </div>
@@ -587,98 +568,6 @@ export const AdminAcreedoresPage: React.FC = () => {
         </div>
       )}
 
-      {batchModalOpen && (
-        <div className="modal-backdrop" onClick={() => { setBatchModalOpen(false); setBatchResult(null); setError(null); }}>
-          <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
-            <div className="modal-header">
-              <h3>Enviar notificaciones</h3>
-              <button className="icon-button" onClick={() => { setBatchModalOpen(false); setBatchResult(null); setError(null); }}>{<X size={16} />}</button>
-            </div>
-            <div className="modal-body">
-              {error && <p className="error-text">{error}</p>}
-
-              {batchResult ? (
-                <>
-                  <p style={{ fontWeight: 600, marginBottom: '1rem' }}>
-                    Se {batchResult.enviables > 1 ? 'enviarán' : 'enviará'} {batchResult.enviables} notificación{batchResult.enviables !== 1 ? 'es' : ''}.
-                  </p>
-
-                  <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-                    {batchResult.enviables > 0 && (
-                      <p style={{ color: 'var(--color-success)', margin: '0 0 0.25rem' }}>
-                        ✓ {batchResult.enviables} {batchResult.enviables === 1 ? 'tiene' : 'tienen'} teléfono válido
-                      </p>
-                    )}
-                    {batchResult.sinTelefono > 0 && (
-                      <p style={{ color: 'var(--color-warning, #f59e0b)', margin: '0 0 0.25rem' }}>
-                        ✗ {batchResult.sinTelefono} {batchResult.sinTelefono === 1 ? 'fue omitido' : 'fueron omitidos'} porque no {batchResult.sinTelefono === 1 ? 'tiene' : 'tienen'} teléfono
-                      </p>
-                    )}
-                    {batchResult.sinDeuda > 0 && (
-                      <p style={{ color: 'var(--color-warning, #f59e0b)', margin: '0 0 0.25rem' }}>
-                        ✗ {batchResult.sinDeuda} {batchResult.sinDeuda === 1 ? 'fue omitido' : 'fueron omitidos'} porque no {batchResult.sinDeuda === 1 ? 'tiene' : 'tienen'} deuda
-                      </p>
-                    )}
-                  </div>
-
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
-                    Tiempo estimado: {batchResult.tiempoEstimado}
-                  </p>
-
-                  <div className="modal-footer" style={{ paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      onClick={() => { setBatchModalOpen(false); setBatchResult(null); setError(null); }}
-                    >
-                      Cancelar
-                    </button>
-                    <button type="button" className="btn-primary" onClick={handleBatchSend} disabled={batchSending}>
-                      {batchSending ? 'Encolando...' : 'Enviar'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p style={{ fontWeight: 600, marginBottom: '1rem' }}>
-                    Se {selectedWithPhone > 1 ? 'enviarán' : 'enviará'} {selectedWithPhone} notificación{selectedWithPhone !== 1 ? 'es' : ''}.
-                  </p>
-
-                  <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-                    {selectedWithPhone > 0 && (
-                      <p style={{ color: 'var(--color-success)', margin: '0 0 0.25rem' }}>
-                        ✓ {selectedWithPhone} {selectedWithPhone === 1 ? 'tiene' : 'tienen'} teléfono y deuda
-                      </p>
-                    )}
-                    {selectedIds.size - selectedWithPhone > 0 && (
-                      <p style={{ color: 'var(--color-warning, #f59e0b)', margin: '0 0 0.25rem' }}>
-                        ✗ {selectedIds.size - selectedWithPhone} {selectedIds.size - selectedWithPhone === 1 ? 'fue omitido' : 'fueron omitidos'} (sin teléfono o sin deuda)
-                      </p>
-                    )}
-                  </div>
-
-                  <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
-                    Las notificaciones se enviarán secuencialmente (1 por segundo aproximadamente).
-                  </p>
-
-                  <div className="modal-footer" style={{ paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                    <button
-                      type="button"
-                      className="btn-ghost"
-                      onClick={() => { setBatchModalOpen(false); setBatchResult(null); setError(null); }}
-                    >
-                      Cancelar
-                    </button>
-                    <button type="button" className="btn-primary" onClick={handleBatchSend} disabled={batchSending}>
-                      {batchSending ? 'Encolando...' : 'Enviar'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
       {historyModalAcreedor !== null && (
         <AcreedorNotificacionesModal acreedorId={historyModalAcreedor} onClose={() => setHistoryModalAcreedor(null)} />
       )}
