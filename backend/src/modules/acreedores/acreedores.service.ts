@@ -377,35 +377,37 @@ export class AcreedoresService {
     });
   }
 
-  private buildTemplateParams(deudaData: { saldoPendiente: number; diasSinPagar: number | null }, acreedor: { nombre: string }, setting: any): string[] {
+  private buildTemplateParams(deudaData: { saldoPendiente: number; diasSinPagar: number | null }, acreedor: { nombre: string }, setting: any): { header: string[]; body: string[] } {
     const order = (setting?.whatsappVariableOrder || {}) as Record<string, number>;
-    if (!order || Object.keys(order).length === 0) {
-      const saldoStr = deudaData.saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-      const dias = deudaData.diasSinPagar ?? 0;
-      return [acreedor.nombre, saldoStr, String(dias)];
-    }
-
-    const entries: Array<[string, number]> = Object.entries(order)
-      .filter(([_, pos]) => typeof pos === 'number' && pos > 0)
-      .sort((a, b) => a[1] - b[1]);
-
     const saldoStr = deudaData.saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
     const dias = deudaData.diasSinPagar ?? 0;
     const club = setting?.clubName || setting?.storeName || 'nuestro club';
     const alias = setting?.clubAlias || '';
 
     const valueMap: Record<string, string> = {
-      nombre: acreedor.nombre,
-      alias: alias,
       saldo: saldoStr,
       dias: String(dias),
       club: club,
+      alias: alias,
     };
 
-    return entries.map(([key]) => {
+    const getValue = (key: string) => {
       const value = valueMap[key];
       return (value && value.trim()) ? value : '-';
-    });
+    };
+
+    if (!order || Object.keys(order).length === 0) {
+      return { header: [acreedor.nombre], body: [saldoStr, String(dias)] };
+    }
+
+    const bodyEntries: Array<[string, number]> = Object.entries(order)
+      .filter(([key, pos]) => key !== 'nombre' && typeof pos === 'number' && pos > 0)
+      .sort((a, b) => a[1] - b[1]);
+
+    return {
+      header: [acreedor.nombre],
+      body: bodyEntries.map(([key]) => getValue(key)),
+    };
   }
 
   async notificarDeuda(id: number) {
@@ -496,7 +498,7 @@ export class AcreedoresService {
       throw new BadRequestException('Ninguno de los acreedores seleccionados es enviable');
     }
 
-    const finalJobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams: string[] }> = [];
+    const finalJobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams: { header: string[]; body: string[] } }> = [];
     for (const d of details.filter((d) => d.enviable)) {
       const acreedor = await this.prisma.acreedor.findUnique({ where: { id: d.acreedorId } });
       if (!acreedor) continue;

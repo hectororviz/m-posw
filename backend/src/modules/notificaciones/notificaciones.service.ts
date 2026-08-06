@@ -136,7 +136,7 @@ export class NotificacionesService implements OnModuleInit {
     return { retried: true };
   }
 
-  async enqueueBatch(jobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams?: string[] }>, batchId: string) {
+  async enqueueBatch(jobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams?: { header: string[]; body: string[] } }>, batchId: string) {
     const setting = await this.prisma.setting.findFirst();
     const templateName = setting?.whatsappTemplateName || 'debt_reminder';
     const created = [];
@@ -151,7 +151,7 @@ export class NotificacionesService implements OnModuleInit {
           status: 'QUEUED',
           batchId,
           templateName,
-          templateParams: job.templateParams || [],
+          templateParams: job.templateParams || { header: [], body: [] },
         },
       });
       created.push(j);
@@ -222,15 +222,26 @@ export class NotificacionesService implements OnModuleInit {
           data: { status: 'PROCESSING', startedAt: new Date(), attempts: job.attempts + 1 },
         });
 
-        const templateParams = (job.templateParams as string[]) || [];
-        const sendText = templateParams.length > 0 ? templateParams.join(' - ') : '';
+        const rawParams = job.templateParams;
+        let headerParams: string[] = [];
+        let bodyParams: string[] = [];
+
+        if (Array.isArray(rawParams)) {
+          bodyParams = rawParams as string[];
+        } else if (rawParams && typeof rawParams === 'object') {
+          headerParams = (rawParams as any).header || [];
+          bodyParams = (rawParams as any).body || [];
+        }
+
+        const sendText = [...headerParams, ...bodyParams].join(' - ');
 
         let result;
         if (job.templateName) {
           result = await this.whatsappProvider.sendMessage(
             job.phoneNumber,
             job.templateName,
-            templateParams,
+            headerParams,
+            bodyParams,
           );
         } else {
           result = await this.whatsappProvider.sendTextMessage(job.phoneNumber, 'Notificación de m-POSw');

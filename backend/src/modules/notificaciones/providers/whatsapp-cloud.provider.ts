@@ -29,7 +29,7 @@ export class WhatsAppCloudProvider implements INotificationProvider {
     return !!(config.phoneNumberId && config.accessToken);
   }
 
-  async sendMessage(phone: string, templateName: string, params: string[]): Promise<SendResult> {
+  async sendMessage(phone: string, templateName: string, headerParams: string[], bodyParams: string[]): Promise<SendResult> {
     const config = await this.getConfig();
     if (!config.phoneNumberId || !config.accessToken) {
       return { success: false, error: 'WhatsApp Cloud API no configurada' };
@@ -37,13 +37,27 @@ export class WhatsAppCloudProvider implements INotificationProvider {
 
     const to = phone.replace(/[^0-9]/g, '');
 
-    const components = params.length > 0 ? [{
-      type: 'body',
-      parameters: params.map((value) => ({
-        type: 'text',
-        text: value,
-      })),
-    }] : [];
+    const components: any[] = [];
+
+    if (headerParams.length > 0) {
+      components.push({
+        type: 'header',
+        parameters: headerParams.map((value) => ({
+          type: 'text',
+          text: value,
+        })),
+      });
+    }
+
+    if (bodyParams.length > 0) {
+      components.push({
+        type: 'body',
+        parameters: bodyParams.map((value) => ({
+          type: 'text',
+          text: value,
+        })),
+      });
+    }
 
     const body = {
       messaging_product: 'whatsapp',
