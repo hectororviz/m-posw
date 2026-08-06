@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherListItem, VoucherStats, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1249,3 +1249,26 @@ export const useWhatsAppTemplates = () =>
     enabled: false,
     retry: false,
   });
+
+export const useUnreadCount = () =>
+  useQuery({
+    queryKey: ['whatsapp-unread-count'],
+    queryFn: async () => {
+      const response = await apiClient.get<UnreadCountResponse>('/notificaciones/conversations/unread-count');
+      return response.data;
+    },
+    refetchInterval: 10000,
+  });
+
+export const useMarkAllConversationsRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await apiClient.post('/notificaciones/conversations/read-all');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notificaciones-conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-unread-count'] });
+    },
+  });
+};

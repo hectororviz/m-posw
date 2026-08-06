@@ -66,13 +66,43 @@ export class WhatsAppWebhookController {
   }
 
   private async handleIncomingMessage(phoneNumberId: string, msg: any) {
-    if (msg.type !== 'text') return;
-
     const from = msg.from;
-    const text = msg.text?.body || '';
     const messageId = msg.id;
 
-    this.logger.log(`Incoming WhatsApp from ${from}: "${text}"`);
+    let content = '';
+    let mediaType: string | null = null;
+    let mediaId: string | null = null;
+    let mediaMimeType: string | null = null;
+    let caption: string | null = null;
+
+    switch (msg.type) {
+      case 'text':
+        content = msg.text?.body || '';
+        break;
+      case 'image':
+        mediaType = 'image';
+        mediaId = msg.image?.id ?? null;
+        mediaMimeType = msg.image?.mime_type ?? null;
+        caption = msg.image?.caption || null;
+        content = caption || '[Imagen]';
+        break;
+      case 'audio':
+        mediaType = 'audio';
+        mediaId = msg.audio?.id ?? null;
+        mediaMimeType = msg.audio?.mime_type ?? null;
+        content = '[Audio]';
+        break;
+      case 'sticker':
+        mediaType = 'sticker';
+        mediaId = msg.sticker?.id ?? null;
+        mediaMimeType = msg.sticker?.mime_type ?? null;
+        content = '[Sticker]';
+        break;
+      default:
+        return;
+    }
+
+    this.logger.log(`Incoming WhatsApp ${msg.type} from ${from}: "${content}"`);
 
     let conversation = await this.prisma.whatsAppConversation.findUnique({
       where: { phoneNumber: from },
@@ -106,9 +136,13 @@ export class WhatsAppWebhookController {
       data: {
         conversationId: conversation.id,
         direction: 'INBOUND',
-        content: text,
+        content,
         externalMessageId: messageId,
         status: 'delivered',
+        mediaType,
+        mediaId,
+        mediaMimeType,
+        caption,
       },
     });
   }

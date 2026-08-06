@@ -1074,7 +1074,9 @@ export interface WhatsAppConversation {
   acreedor?: { id: number; nombre: string } | null;
   lastMessageAt: string | null;
   lastIncomingAt: string | null;
+  lastReadAt: string | null;
   windowOpen: boolean;
+  unreadCount: number;
   lastMessage: WhatsAppMessage | null;
   createdAt: string;
 }
@@ -1086,6 +1088,10 @@ export interface WhatsAppMessage {
   content: string;
   externalMessageId: string | null;
   status: string | null;
+  mediaType?: string | null;
+  mediaId?: string | null;
+  mediaMimeType?: string | null;
+  caption?: string | null;
   createdAt: string;
 }
 
@@ -1106,6 +1112,10 @@ export interface ConversationMessagesResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface UnreadCountResponse {
+  total: number;
 }
 
 export interface WhatsAppPhoneInfo {

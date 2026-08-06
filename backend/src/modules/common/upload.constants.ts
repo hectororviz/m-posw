@@ -7,5 +7,7 @@ export const CATEGORY_IMAGE_SUBDIR = 'categories';
 export const PRODUCT_IMAGE_SUBDIR = 'products';
 export const SETTINGS_IMAGE_SUBDIR = 'settings';
 
+export const WHATSAPP_MEDIA_SUBDIR = 'whatsapp-media';
+
 export const IMAGE_MAX_DIMENSION = 768;
 export const IMAGE_QUALITY = 80;

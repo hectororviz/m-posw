@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader, Send, MessageSquare, Trash2 } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useConversationMessages, useConversations, useNotificacionesHistory, useNotificacionesConfig, useSendConversationMessage, useDeleteConversationMessage, useDeleteConversation, useTestNotificacionesConnection, useSettings } from '../api/queries';
+import { useConversationMessages, useConversations, useNotificacionesHistory, useNotificacionesConfig, useSendConversationMessage, useDeleteConversationMessage, useDeleteConversation, useTestNotificacionesConnection, useSettings, useMarkAllConversationsRead } from '../api/queries';
 import type { NotificacionesJob, WhatsAppMessage } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import MediaBubble from './notificaciones/MediaBubble';
+import LightboxModal from './notificaciones/LightboxModal';
 
 const formatDateTime = (value: string | null) =>
   value ? new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--';
@@ -33,9 +36,14 @@ export const AdminNotificacionesPage: React.FC = () => {
   const { data: settings } = useSettings();
   const { data: config } = useNotificacionesConfig();
   const testMutation = useTestNotificacionesConnection();
-  const [tab, setTab] = useState<Tab>('config');
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [tab, setTab] = useState<Tab>(
+    (urlTab === 'config' || urlTab === 'history' || urlTab === 'conversations') ? urlTab : 'config'
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const markReadMutation = useMarkAllConversationsRead();
 
   const [form, setForm] = useState({
     whatsappPhoneNumberId: '',
@@ -158,11 +166,25 @@ export const AdminNotificacionesPage: React.FC = () => {
   const deleteConvMutation = useDeleteConversation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [lightbox, setLightbox] = useState<{ url: string } | null>(null);
+
+  const getMediaUrl = (msg: WhatsAppMessage) => {
+    if (!msg.mediaType) return null;
+    const base = import.meta.env.VITE_API_BASE_URL || '/api';
+    return `${base}/notificaciones/media/${msg.id}`;
+  };
+
   useEffect(() => {
     if (convMessages?.messages && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [convMessages?.messages]);
+
+  useEffect(() => {
+    if (tab === 'conversations') {
+      markReadMutation.mutate();
+    }
+  }, [tab]);
 
   const handleSendReply = async () => {
     if (!replyText.trim() || !selectedConvId) return;
@@ -209,6 +231,7 @@ export const AdminNotificacionesPage: React.FC = () => {
   };
 
   return (
+    <>
     <div className="page-container">
       <div className="treasury-subnav">
         <button type="button" className={`treasury-subnav-link${tab === 'config' ? ' active' : ''}`} onClick={() => setTab('config')}>Configuración</button>
@@ -465,6 +488,17 @@ export const AdminNotificacionesPage: React.FC = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
                         <strong style={{ fontSize: '0.9rem' }}>{conv.acreedor?.nombre || conv.phoneNumber}</strong>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          {conv.unreadCount > 0 && (
+                            <span style={{
+                              background: 'var(--color-primary)',
+                              color: '#fff',
+                              borderRadius: '10px',
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              padding: '1px 6px',
+                              lineHeight: '1.4',
+                            }}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</span>
+                          )}
                           {conv.windowOpen && <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-success)', display: 'inline-block' }} title="Ventana 24hs abierta" />}
                           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)' }}>{conv.lastMessageAt ? formatTime(conv.lastMessageAt) : ''}</span>
                         </div>
@@ -537,13 +571,19 @@ export const AdminNotificacionesPage: React.FC = () => {
                               lineHeight: 0,
                               boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
                               transition: 'opacity 0.15s, color 0.15s',
+                              zIndex: 1,
                             }}
                             onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--color-danger)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.opacity = msg.id < 0 ? '1' : '0.4'; e.currentTarget.style.color = 'var(--color-text-faint)'; }}
                           >
                             <Trash2 size={14} />
                           </button>
-                          <div>{msg.content}</div>
+                          <MediaBubble
+                            msg={msg}
+                            direction={msg.direction as 'INBOUND' | 'OUTBOUND'}
+                            mediaUrl={getMediaUrl(msg)}
+                            onOpenLightbox={(url) => setLightbox({ url })}
+                          />
                           <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', opacity: 0.7, textAlign: 'right' }}>
                             {formatTime(msg.createdAt)}
                             {msg.direction === 'OUTBOUND' && msg.status && (
@@ -592,6 +632,8 @@ export const AdminNotificacionesPage: React.FC = () => {
         </div>
       )}
     </div>
+    {lightbox && <LightboxModal url={lightbox.url} onClose={() => setLightbox(null)} />}
+    </>
   );
 };
 

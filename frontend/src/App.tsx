@@ -44,6 +44,7 @@ import { PatrimonioPage } from './pages/patrimonio/PatrimonioPage';
 import { BienesPage } from './pages/patrimonio/BienesPage';
 import { ConfigPage } from './pages/patrimonio/ConfigPage';
 import { AdminNotificacionesPage } from './pages/AdminNotificacionesPage';
+import WhatsAppBubble from './components/WhatsAppBubble';
 import { useAuth } from './context/AuthContext';
 import type { ModuleKey } from './api/types';
 
@@ -72,6 +73,7 @@ const ModuleRoute: React.FC<{ module: ModuleKey; children: React.ReactNode }> = 
 
 export const App: React.FC = () => {
   return (
+    <>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/oauth-return" element={<OAuthReturnPage />} />
@@ -248,5 +250,7 @@ export const App: React.FC = () => {
       </Route>
       <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
+    <WhatsAppBubble />
+    </>
   );
 };

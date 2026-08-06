@@ -1,10 +1,12 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
 import { RequireModule } from '../common/module-access.decorator';
 import { NotificacionesService } from './notificaciones.service';
 import { WhatsAppCloudProvider } from './providers/whatsapp-cloud.provider';
+import { WhatsAppMediaService } from './whatsapp-media.service';
 
 @Controller('notificaciones')
 @UseGuards(JwtAuthGuard, ModuleAccessGuard)
@@ -12,6 +14,7 @@ export class NotificacionesController {
   constructor(
     private readonly notificacionesService: NotificacionesService,
     private readonly whatsappProvider: WhatsAppCloudProvider,
+    private readonly mediaService: WhatsAppMediaService,
   ) {}
 
   @Get('config')
@@ -79,6 +82,17 @@ export class NotificacionesController {
     return this.notificacionesService.cancelAll();
   }
 
+  @Get('conversations/unread-count')
+  getUnreadCount() {
+    return this.notificacionesService.getUnreadCount();
+  }
+
+  @Post('conversations/read-all')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
+  markAllAsRead() {
+    return this.notificacionesService.markAllConversationsAsRead();
+  }
+
   @Get('conversations')
   @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
   getConversations(
@@ -137,16 +151,32 @@ export class NotificacionesController {
 
   @Delete('conversations/:id/messages/:msgId')
   @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.FULL)
-  deleteConversationMessage(
+  async deleteConversationMessage(
     @Param('id', ParseIntPipe) conversationId: number,
     @Param('msgId', ParseIntPipe) messageId: number,
   ) {
+    await this.mediaService.deleteMediaFile(conversationId, messageId);
     return this.notificacionesService.deleteConversationMessage(conversationId, messageId);
   }
 
   @Delete('conversations/:id')
   @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.FULL)
-  deleteConversation(@Param('id', ParseIntPipe) id: number) {
+  async deleteConversation(@Param('id', ParseIntPipe) id: number) {
+    await this.mediaService.deleteConversationMedia(id);
     return this.notificacionesService.deleteConversation(id);
+  }
+
+  @Get('media/:messageId')
+  @RequireModule(ModuleKey.NOTIFICACIONES, ModuleAccess.READ)
+  async getMedia(
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @Res() res: Response,
+  ) {
+    const result = await this.mediaService.getMediaPath(messageId);
+    if (!result) {
+      return res.status(404).json({ error: 'Media no encontrado' });
+    }
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.sendFile(result.filePath, { headers: { 'Content-Type': result.mimeType } });
   }
 }

@@ -1018,6 +1018,7 @@ model WhatsAppConversation {
   acreedor       Acreedor?          @relation(fields: [acreedorId], references: [id])
   lastMessageAt  DateTime?
   lastIncomingAt DateTime?
+  lastReadAt     DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   messages       WhatsAppMessage[]
@@ -1033,6 +1034,10 @@ model WhatsAppMessage {
   content           String
   externalMessageId String?
   status            String?
+  mediaType         String?
+  mediaId           String?
+  mediaMimeType     String?
+  caption           String?
   createdAt         DateTime             @default(now())
   @@index([conversationId])
   @@index([createdAt])

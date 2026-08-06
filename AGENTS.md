@@ -869,9 +869,10 @@ Módulo de notificaciones genérico con WhatsApp Cloud API (Meta) como proveedor
 ```
 backend/src/modules/notificaciones/
 ├── notificaciones.module.ts
-├── notificaciones.controller.ts    # Endpoints: config, test, history, queue
-├── notificaciones.service.ts       # Lógica: cola, envío, rate limiting, logs, conversaciones
-├── webhook.controller.ts           # Webhook público: recepción de mensajes entrantes y status updates
+├── notificaciones.controller.ts    # Endpoints: config, test, history, queue, conversations, media
+├── notificaciones.service.ts       # Lógica: cola, envío, rate limiting, logs, conversaciones, unread count
+├── whatsapp-media.service.ts       # Descarga lazy + serve de archivos multimedia (Meta API)
+├── webhook.controller.ts           # Webhook público: recepción de mensajes entrantes (text/image/audio/sticker) y status updates
 ├── providers/
 │   ├── provider.interface.ts       # INotificationProvider (genérico)
 │   └── whatsapp-cloud.provider.ts  # WhatsApp Cloud API (Graph v21)
@@ -924,12 +925,15 @@ backend/src/modules/notificaciones/
 
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|
-| `GET` | `/notificaciones/conversations` | READ | Lista de conversaciones paginada (`?page=`, `?limit=`) con último mensaje y ventana 24hs |
+| `GET` | `/notificaciones/conversations` | READ | Lista de conversaciones paginada (`?page=`, `?limit=`) con último mensaje, ventana 24hs y `unreadCount` |
+| `GET` | `/notificaciones/conversations/unread-count` | Público (JWT) | Total de mensajes INBOUND no leídos. Usado por la burbuja flotante. Polling cada 10s |
+| `POST` | `/notificaciones/conversations/read-all` | READ | Marcar todas las conversaciones como leídas (`lastReadAt = now()`) |
 | `GET` | `/notificaciones/conversations/:id/messages` | READ | Mensajes de una conversación (`?page=`, `?limit=`), ordenados cronológicamente |
 | `POST` | `/notificaciones/conversations/:id/send` | FULL | Enviar mensaje de texto en una conversación existente. Body: `{ text }` |
 | `POST` | `/notificaciones/conversations/send` | FULL | Enviar mensaje a un número (crea conversación si no existe). Body: `{ phone, text }` |
-| `DELETE` | `/notificaciones/conversations/:id/messages/:msgId` | FULL | Eliminar un mensaje individual. Si es el último, borra también la conversación |
-| `DELETE` | `/notificaciones/conversations/:id` | FULL | Eliminar una conversación completa con todos sus mensajes (cascade) |
+| `DELETE` | `/notificaciones/conversations/:id/messages/:msgId` | FULL | Eliminar un mensaje individual. Elimina archivo multimedia asociado. Si es el último, borra también la conversación |
+| `DELETE` | `/notificaciones/conversations/:id` | FULL | Eliminar una conversación completa con sus mensajes y archivos multimedia (cascade) |
+| `GET` | `/notificaciones/media/:messageId` | READ | Servir archivo multimedia (imagen/audio/sticker). Descarga lazy desde Meta si no existe en disco |
 
 ### Webhook de WhatsApp (mensajes entrantes)
 
@@ -938,7 +942,14 @@ backend/src/modules/notificaciones/
 | `GET` | `/webhooks/whatsapp` | Pública | Verificación de webhook (Meta envía `hub.mode`, `hub.verify_token`, `hub.challenge`) |
 | `POST` | `/webhooks/whatsapp` | Pública | Recepción de mensajes entrantes y actualizaciones de estado (sent/delivered/read) |
 
-El webhook recibe mensajes de texto (`type: text`) de usuarios, los almacena como `WhatsAppMessage` con `direction: INBOUND`, crea o actualiza la `WhatsAppConversation` correspondiente, y hace matching automático con acreedores por número de teléfono. Las actualizaciones de estado (`statuses`) actualizan el campo `status` en `WhatsAppMessage` y `NotificationJob`.
+El webhook procesa los siguientes tipos de mensajes:
+- **`text`**: almacena `content = msg.text.body`.
+- **`image`**: guarda `mediaType='image'`, `mediaId`, `mediaMimeType`, `caption` opcional.
+- **`audio`**: guarda `mediaType='audio'`, `mediaId`, `mediaMimeType`.
+- **`sticker`**: guarda `mediaType='sticker'`, `mediaId`, `mediaMimeType`.
+- Otros tipos (`video`, `document`, `location`, etc.) se ignoran.
+
+Crea o actualiza la `WhatsAppConversation` correspondiente, hace matching automático con acreedores por número de teléfono. Las actualizaciones de estado (`statuses`) actualizan el campo `status` en `WhatsAppMessage` y `NotificationJob`.
 
 ### Endpoints en Acreedores
 
@@ -952,26 +963,46 @@ El webhook recibe mensajes de texto (`type: text`) de usuarios, los almacena com
 
 ### Modelos de Conversaciones (Prisma)
 
-- **WhatsAppConversation**: agrupa mensajes por número de teléfono. Campos: `phoneNumber` (unique), `acreedorId` (nullable, auto-match), `lastMessageAt`, `lastIncomingAt` (para ventana 24hs).
-- **WhatsAppMessage**: mensaje individual dentro de una conversación. Campos: `direction` (INBOUND/OUTBOUND), `content`, `externalMessageId` (wa_id de Meta), `status` (sent/delivered/read/sending).
+- **WhatsAppConversation**: agrupa mensajes por número de teléfono. Campos: `phoneNumber` (unique), `acreedorId` (nullable, auto-match), `lastMessageAt`, `lastIncomingAt` (para ventana 24hs), `lastReadAt` (para contador de no leídos).
+- **WhatsAppMessage**: mensaje individual dentro de una conversación. Campos: `direction` (INBOUND/OUTBOUND), `content`, `externalMessageId` (wa_id de Meta), `status` (sent/delivered/read/sending), `mediaType` (image/audio/sticker), `mediaId`, `mediaMimeType`, `caption`.
 
 ### Frontend
 
 ```
 frontend/src/pages/
 ├── AdminNotificacionesPage.tsx   # 3 tabs: Configuración, Historial, Conversaciones (chat con burbujas estilo WhatsApp)
+├── notificaciones/
+│   ├── MediaBubble.tsx           # Renderizado condicional de imágenes, stickers y audio
+│   └── LightboxModal.tsx         # Modal de zoom + descarga para imágenes/stickers
 └── AdminAcreedoresPage.tsx       # Botón WhatsApp en fila (solo si módulo activo, tiene teléfono, saldo > 0)
 ```
 
+```
+frontend/src/components/
+└── WhatsAppBubble.tsx             # Burbuja flotante con contador de no leídos (visible en toda la app)
+```
+
 **Tab Conversaciones** en `AdminNotificacionesPage.tsx`:
-- Panel izquierdo: lista de conversaciones con puntito verde si ventana 24hs abierta, botón 🗑 para eliminar conversación completa.
+- Panel izquierdo: lista de conversaciones con badge azul de no leídos, puntito verde si ventana 24hs abierta, botón 🗑 para eliminar conversación completa.
 - Panel derecho: chat con burbujas (OUTBOUND azul a la derecha, INBOUND gris a la izquierda), checkmarks de estado (✓/✓✓), timestamp.
-- Cada burbuja tiene botón 🗑 en la esquina (opacidad 0.4, 1.0 en hover) para eliminar mensaje individual.
+- Renderizado multimedia: imágenes con lightbox + zoom + descarga, stickers sin fondo, audio con player nativo HTML5.
+- Cada burbuja tiene botón 🗑 en la esquina (opacidad 0.4, 1.0 en hover) para eliminar mensaje individual (también elimina archivo multimedia asociado).
 - Input de respuesta habilitado solo si la ventana 24hs está abierta.
 - Optimistic update: el mensaje enviado aparece instantáneamente con `status: 'sending'` y `...`, se reemplaza al confirmar el servidor.
+- Al acceder vía `?tab=conversaciones`, marca automáticamente todas como leídas.
 
 **Hooks de React Query** en `api/queries.ts`:
-- `useConversations`, `useConversationMessages`, `useSendConversationMessage` (optimistic update), `useDeleteConversationMessage`, `useDeleteConversation`
+- `useConversations`, `useConversationMessages`, `useSendConversationMessage` (optimistic update), `useDeleteConversationMessage`, `useDeleteConversation`, `useUnreadCount` (polling 10s), `useMarkAllConversationsRead`
+
+### Burbuja flotante de WhatsApp
+
+Componente `WhatsAppBubble` (en `App.tsx`, presente en toda la app):
+- Botón fijo `bottom: 24px, right: 24px` con ícono `MessageCircle` (lucide-react).
+- Color verde (#25D366) cuando tiene mensajes no leídos, gris cuando no.
+- Badge rojo con contador de no leídos (99+ si excede 99).
+- Visible siempre. Click funcional solo si el usuario tiene acceso al módulo NOTIFICACIONES (`useModuleAccess`).
+- Click → navega a `/admin/notificaciones?tab=conversaciones`.
+- Animación de escala al hover (solo si tiene acceso).
 
 ### Configuración desde la GUI
 

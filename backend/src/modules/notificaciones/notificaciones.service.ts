@@ -301,6 +301,30 @@ export class NotificacionesService implements OnModuleInit {
     }
   }
 
+  async getUnreadCount() {
+    const conversations = await this.prisma.whatsAppConversation.findMany({
+      select: { id: true, lastReadAt: true },
+    });
+
+    const counts = await Promise.all(
+      conversations.map(async (conv) => {
+        const where: any = { conversationId: conv.id, direction: 'INBOUND' };
+        if (conv.lastReadAt) {
+          where.createdAt = { gt: conv.lastReadAt };
+        }
+        return this.prisma.whatsAppMessage.count({ where });
+      }),
+    );
+
+    return { total: counts.reduce((sum, c) => sum + c, 0) };
+  }
+
+  async markAllConversationsAsRead() {
+    await this.prisma.whatsAppConversation.updateMany({
+      data: { lastReadAt: new Date() },
+    });
+  }
+
   async getConversations(page: number, limit: number) {
     const [conversations, total] = await Promise.all([
       this.prisma.whatsAppConversation.findMany({
@@ -316,26 +340,34 @@ export class NotificacionesService implements OnModuleInit {
     ]);
 
     const now = Date.now();
-    return {
-      conversations: conversations.map((c) => {
+    const mapped = await Promise.all(
+      conversations.map(async (c) => {
         const windowOpen = c.lastIncomingAt
           ? (now - new Date(c.lastIncomingAt).getTime()) < 24 * 60 * 60 * 1000
           : false;
+
+        const unreadWhere: any = { conversationId: c.id, direction: 'INBOUND' };
+        if (c.lastReadAt) {
+          unreadWhere.createdAt = { gt: c.lastReadAt };
+        }
+        const unreadCount = await this.prisma.whatsAppMessage.count({ where: unreadWhere });
+
         return {
           id: c.id,
           phoneNumber: c.phoneNumber,
           acreedor: c.acreedor,
           lastMessageAt: c.lastMessageAt?.toISOString() ?? null,
           lastIncomingAt: c.lastIncomingAt?.toISOString() ?? null,
+          lastReadAt: c.lastReadAt?.toISOString() ?? null,
           windowOpen,
+          unreadCount,
           lastMessage: c.messages[0] ?? null,
           createdAt: c.createdAt.toISOString(),
         };
       }),
-      total,
-      page,
-      limit,
-    };
+    );
+
+    return { conversations: mapped, total, page, limit };
   }
 
   async getConversationMessages(conversationId: number, page: number, limit: number) {
