@@ -382,8 +382,7 @@ export class AcreedoresService {
     if (!order || Object.keys(order).length === 0) {
       const saldoStr = deudaData.saldoPendiente.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
       const dias = deudaData.diasSinPagar ?? 0;
-      const club = setting?.clubName || setting?.storeName || 'nuestro club';
-      return [acreedor.nombre, saldoStr, String(dias), club];
+      return [acreedor.nombre, saldoStr, String(dias)];
     }
 
     const entries: Array<[string, number]> = Object.entries(order)
