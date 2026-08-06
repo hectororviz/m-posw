@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { DollarSign, LogOut, Moon, Settings, Sun } from 'lucide-react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { DollarSign, LogOut, MessageCircle, Moon, Settings, Sun } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useUnreadCount } from '../api/queries';
+import { useModuleAccess } from '../hooks/useModuleAccess';
 
 interface AppHeaderProps {
   settings?: Setting;
@@ -29,6 +31,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
   const { user, logout, permissions } = useAuth();
   const { resolved, toggle: toggleTheme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const storeName = settings?.storeName ?? 'm-POSw';
   const logoUrl = buildImageUrl(settings?.logoUrl);
   const [logoError, setLogoError] = useState(false);
@@ -44,6 +47,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
     if (isAdmin) return true;
     return permissions.some((p) => p.access !== 'HIDDEN' && p.module !== 'POS');
   }, [isAdmin, permissions]);
+  const { data: unreadData } = useUnreadCount();
+  const unreadTotal = unreadData?.total ?? 0;
+  const notifAccess = useModuleAccess('NOTIFICACIONES');
+  const notifEnabled = settings?.enableNotificationsModule !== false;
+  const showNotifButton = notifEnabled && notifAccess !== 'HIDDEN';
 
   useEffect(() => {
     setLogoError(false);
@@ -77,6 +85,41 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
           <button type="button" onClick={toggleTheme} className="ghost-button header-toggle-button theme-toggle" aria-label="Cambiar tema" title={resolved === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
             {resolved === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+          {showNotifButton && (
+            <button
+              type="button"
+              onClick={() => navigate('/admin/notificaciones?tab=conversaciones')}
+              className="ghost-button header-toggle-button"
+              aria-label="Notificaciones WhatsApp"
+              title="Conversaciones WhatsApp"
+              style={{ position: 'relative' }}
+            >
+              <MessageCircle size={18} />
+              {unreadTotal > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  minWidth: 16,
+                  height: 16,
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1.5px solid var(--color-surface)',
+                  padding: '0 3px',
+                  lineHeight: 1,
+                  boxSizing: 'border-box',
+                }}>
+                  {unreadTotal > 99 ? '99+' : unreadTotal}
+                </span>
+              )}
+            </button>
+          )}
           {!isAdmin && hasAdminAccess && (
             <NavLink
               to={isAdminScreen || isHomeScreen ? '/pos' : '/home'}

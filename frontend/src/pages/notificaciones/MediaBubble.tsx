@@ -8,7 +8,7 @@ interface MediaBubbleProps {
 }
 
 const bubbleBase: React.CSSProperties = {
-  maxWidth: '70%',
+  maxWidth: '100%',
   padding: '0.5rem 0.75rem',
   borderRadius: '12px',
   fontSize: '0.9rem',

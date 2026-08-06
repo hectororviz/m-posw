@@ -403,7 +403,10 @@ export class AcreedoresService {
       club: club,
     };
 
-    return entries.map(([key]) => valueMap[key] || '');
+    return entries.map(([key]) => {
+      const value = valueMap[key];
+      return (value && value.trim()) ? value : '-';
+    });
   }
 
   async notificarDeuda(id: number) {

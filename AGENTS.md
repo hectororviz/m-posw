@@ -926,7 +926,7 @@ backend/src/modules/notificaciones/
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|
 | `GET` | `/notificaciones/conversations` | READ | Lista de conversaciones paginada (`?page=`, `?limit=`) con último mensaje, ventana 24hs y `unreadCount` |
-| `GET` | `/notificaciones/conversations/unread-count` | Público (JWT) | Total de mensajes INBOUND no leídos. Usado por la burbuja flotante. Polling cada 10s |
+| `GET` | `/notificaciones/conversations/unread-count` | Público (JWT) | Total de mensajes INBOUND no leídos. Usado por el botón de notificaciones en el header. Polling cada 10s |
 | `POST` | `/notificaciones/conversations/read-all` | READ | Marcar todas las conversaciones como leídas (`lastReadAt = now()`) |
 | `GET` | `/notificaciones/conversations/:id/messages` | READ | Mensajes de una conversación (`?page=`, `?limit=`), ordenados cronológicamente |
 | `POST` | `/notificaciones/conversations/:id/send` | FULL | Enviar mensaje de texto en una conversación existente. Body: `{ text }` |
@@ -979,7 +979,9 @@ frontend/src/pages/
 
 ```
 frontend/src/components/
-└── WhatsAppBubble.tsx             # Burbuja flotante con contador de no leídos (visible en toda la app)
+├── AppHeader.tsx                # Header con botón de notificaciones (MessageCircle + badge rojo)
+├── WhatsAppBubble.tsx            # Burbuja flotante (legacy, reemplazada por botón en AppHeader)
+└── ...
 ```
 
 **Tab Conversaciones** en `AdminNotificacionesPage.tsx`:
@@ -994,15 +996,14 @@ frontend/src/components/
 **Hooks de React Query** en `api/queries.ts`:
 - `useConversations`, `useConversationMessages`, `useSendConversationMessage` (optimistic update), `useDeleteConversationMessage`, `useDeleteConversation`, `useUnreadCount` (polling 10s), `useMarkAllConversationsRead`
 
-### Burbuja flotante de WhatsApp
+### Botón de notificaciones en header
 
-Componente `WhatsAppBubble` (en `App.tsx`, presente en toda la app):
-- Botón fijo `bottom: 24px, right: 24px` con ícono `MessageCircle` (lucide-react).
-- Color verde (#25D366) cuando tiene mensajes no leídos, gris cuando no.
-- Badge rojo con contador de no leídos (99+ si excede 99).
-- Visible siempre. Click funcional solo si el usuario tiene acceso al módulo NOTIFICACIONES (`useModuleAccess`).
+Integrado en `AppHeader.tsx` como un botón `header-toggle-button` junto al toggle de tema:
+- Ícono `MessageCircle` (lucide-react), mismo tamaño que los demás botones (18px).
+- Badge rojo arriba-derecha con contador de no leídos (99+ si excede 99).
+- Visible solo si `enableNotificationsModule === true` y el usuario tiene acceso al módulo NOTIFICACIONES.
 - Click → navega a `/admin/notificaciones?tab=conversaciones`.
-- Animación de escala al hover (solo si tiene acceso).
+- Polling cada 10s vía `useUnreadCount()` → `GET /notificaciones/conversations/unread-count`.
 
 ### Configuración desde la GUI
 
