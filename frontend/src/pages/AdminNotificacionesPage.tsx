@@ -171,7 +171,7 @@ export const AdminNotificacionesPage: React.FC = () => {
   const getMediaUrl = (msg: WhatsAppMessage) => {
     if (!msg.mediaType) return null;
     const base = import.meta.env.VITE_API_BASE_URL || '/api';
-    return `${base}/notificaciones/media/${msg.id}`;
+    return `${base}/notificaciones/media-public/${msg.id}`;
   };
 
   useEffect(() => {
