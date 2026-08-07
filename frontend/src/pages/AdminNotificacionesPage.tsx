@@ -28,7 +28,7 @@ const getNotifBadge = (status: string) => {
   }
 };
 
-type Tab = 'config' | 'history' | 'conversations';
+type Tab = 'conversations' | 'history' | 'config';
 
 export const AdminNotificacionesPage: React.FC = () => {
   const { pushToast } = useToast();
@@ -39,7 +39,7 @@ export const AdminNotificacionesPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const urlTab = searchParams.get('tab');
   const [tab, setTab] = useState<Tab>(
-    (urlTab === 'config' || urlTab === 'history' || urlTab === 'conversations') ? urlTab : 'config'
+    (urlTab === 'config' || urlTab === 'history' || urlTab === 'conversations') ? urlTab : 'conversations'
   );
 
   useEffect(() => {
@@ -241,9 +241,9 @@ export const AdminNotificacionesPage: React.FC = () => {
     <>
     <div className="page-container">
       <div className="treasury-subnav">
-        <button type="button" className={`treasury-subnav-link${tab === 'config' ? ' active' : ''}`} onClick={() => setTab('config')}>Configuración</button>
-        <button type="button" className={`treasury-subnav-link${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>Historial</button>
         <button type="button" className={`treasury-subnav-link${tab === 'conversations' ? ' active' : ''}`} onClick={() => setTab('conversations')}>Conversaciones</button>
+        <button type="button" className={`treasury-subnav-link${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>Historial</button>
+        <button type="button" className={`treasury-subnav-link${tab === 'config' ? ' active' : ''}`} onClick={() => setTab('config')}>Configuración</button>
       </div>
 
       {tab === 'config' ? (
