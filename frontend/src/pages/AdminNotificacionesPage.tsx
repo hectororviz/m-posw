@@ -41,6 +41,13 @@ export const AdminNotificacionesPage: React.FC = () => {
   const [tab, setTab] = useState<Tab>(
     (urlTab === 'config' || urlTab === 'history' || urlTab === 'conversations') ? urlTab : 'config'
   );
+
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t === 'config' || t === 'history' || t === 'conversations') {
+      setTab(t);
+    }
+  }, [searchParams]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const markReadMutation = useMarkAllConversationsRead();

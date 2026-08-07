@@ -271,6 +271,34 @@ export class NotificacionesService implements OnModuleInit {
               acreedorId: job.acreedorId,
             },
           });
+
+          const phone = job.phoneNumber.replace(/[^0-9]/g, '');
+          let conv = await this.prisma.whatsAppConversation.findUnique({
+            where: { phoneNumber: phone },
+          });
+          if (!conv) {
+            conv = await this.prisma.whatsAppConversation.create({
+              data: { phoneNumber: phone, acreedorId: job.acreedorId },
+            });
+          } else if (!conv.acreedorId && job.acreedorId) {
+            await this.prisma.whatsAppConversation.update({
+              where: { id: conv.id },
+              data: { acreedorId: job.acreedorId },
+            });
+          }
+          await this.prisma.whatsAppConversation.update({
+            where: { id: conv.id },
+            data: { lastMessageAt: new Date() },
+          });
+          await this.prisma.whatsAppMessage.create({
+            data: {
+              conversationId: conv.id,
+              direction: 'OUTBOUND',
+              content: `-- NOTIFICACIÓN ENVIADA --`,
+              externalMessageId: result.externalMessageId,
+              status: 'sent',
+            },
+          });
         } else if (!isConfigured.isConfigured) {
           await this.prisma.notificationJob.update({
             where: { id: job.id },
