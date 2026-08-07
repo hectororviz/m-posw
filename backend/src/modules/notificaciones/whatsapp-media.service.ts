@@ -83,7 +83,7 @@ export class WhatsAppMediaService {
     filePath: string,
     mimeType: string,
   ): Promise<string | null> {
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     const accessToken = setting?.whatsappAccessToken;
     if (!accessToken) {
       this.logger.error('WhatsApp access token not configured');

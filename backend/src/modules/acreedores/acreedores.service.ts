@@ -292,7 +292,7 @@ export class AcreedoresService {
     }
 
     const [year, month, day] = dto.fecha.split('-').map(Number);
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
 
     if (!setting?.enableAutoJournalAcreedores) {
       return this.prisma.pagoAcreedor.create({
@@ -411,7 +411,7 @@ export class AcreedoresService {
   }
 
   async notificarDeuda(id: number) {
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     if (!setting?.enableNotificationsModule) {
       throw new BadRequestException('El módulo de Notificaciones no está habilitado');
     }
@@ -448,7 +448,7 @@ export class AcreedoresService {
   }
 
   async notificarDeudaBatch(acreedorIds: number[]) {
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     if (!setting?.enableNotificationsModule) {
       throw new BadRequestException('El módulo de Notificaciones no está habilitado');
     }

@@ -19,7 +19,7 @@ export class NotificacionesService implements OnModuleInit {
   }
 
   async getConfig() {
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     const isConfigured = !!(setting?.whatsappPhoneNumberId && setting?.whatsappAccessToken);
 
     return {
@@ -137,7 +137,7 @@ export class NotificacionesService implements OnModuleInit {
   }
 
   async enqueueBatch(jobs: Array<{ acreedorId: number; phoneNumber: string; recipientName: string; templateParams?: { header: string[]; body: string[] } }>, batchId: string) {
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     const templateName = setting?.whatsappTemplateName || 'debt_reminder';
     const created = [];
 

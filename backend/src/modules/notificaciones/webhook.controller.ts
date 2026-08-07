@@ -15,7 +15,7 @@ export class WhatsAppWebhookController {
     @Query('hub.challenge') challenge: string,
     @Res() res: Response,
   ) {
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     const verifyToken = setting?.whatsappWebhookVerifyToken;
 
     if (!verifyToken) {

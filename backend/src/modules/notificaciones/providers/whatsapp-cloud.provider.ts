@@ -15,7 +15,7 @@ export class WhatsAppCloudProvider implements INotificationProvider {
   }
 
   private async getConfig() {
-    const setting = await this.prisma.setting.findFirst();
+    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     return {
       phoneNumberId: setting?.whatsappPhoneNumberId,
       accessToken: setting?.whatsappAccessToken,
