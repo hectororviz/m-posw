@@ -123,6 +123,10 @@ export const AdminNotificacionesPage: React.FC = () => {
 
   const handleTest = async () => {
     try {
+      await apiClient.patch('/settings', {
+        whatsappPhoneNumberId: form.whatsappPhoneNumberId,
+        whatsappAccessToken: form.whatsappAccessToken,
+      });
       const result = await testMutation.mutateAsync();
       pushToast(result.message || 'Conexión exitosa', 'success');
     } catch (err) {
