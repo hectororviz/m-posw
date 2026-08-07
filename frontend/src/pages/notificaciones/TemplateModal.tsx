@@ -14,7 +14,8 @@ interface TemplateModalProps {
   businessAccountId: string;
 }
 
-const BODY_VARIABLES = [
+const ALL_VARIABLES = [
+  { key: 'nombre', label: 'Nombre del acreedor' },
   { key: 'saldo', label: 'Saldo pendiente' },
   { key: 'club', label: 'Nombre del club' },
   { key: 'alias', label: 'Alias del club' },
@@ -66,10 +67,10 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
     onClose();
   };
 
-  const setBodyPos = (key: string, pos: number) => {
+  const setVarPos = (key: string, pos: number) => {
     const next = { ...variableOrder };
     Object.keys(next).forEach((k) => {
-      if (k !== 'nombre' && k !== key && next[k] === pos) {
+      if (k !== key && next[k] === pos && pos > 0) {
         next[k] = 0;
       }
     });
@@ -152,28 +153,12 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                   )}
 
                   <div style={{ marginTop: '1rem' }}>
-                    <h4 style={{ marginBottom: '0.5rem' }}>Orden de variables</h4>
-                    <p style={{ color: 'var(--color-text-faint)', fontSize: '0.8rem', marginBottom: '1rem' }}>
-                      <strong>nombre</strong> → Título la posición 1.<br />
-                      El resto → Cuerpo en las posiciones 1, 2, 3.
+                    <h4 style={{ marginBottom: '0.5rem' }}>Asignar variables a posiciones</h4>
+                    <p style={{ color: 'var(--color-text-faint)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                      El template tiene 1 variable en el título y 3 en el cuerpo. Elegí cuál va en cada posición.
                     </p>
 
-                    <div style={{
-                      padding: '0.75rem',
-                      borderRadius: '8px',
-                      background: 'var(--color-primary-bg)',
-                      border: '1px solid var(--color-primary)',
-                      marginBottom: '0.75rem',
-                      fontSize: '0.85rem',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}>
-                      <span><strong>nombre</strong> → Título (siempre posición 1)</span>
-                      <span className="badge badge-success">✓</span>
-                    </div>
-
-                    {BODY_VARIABLES.map((v) => (
+                    {ALL_VARIABLES.map((v) => (
                       <div
                         key={v.key}
                         style={{
@@ -182,16 +167,18 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                           gap: '0.75rem',
                           padding: '0.5rem 0.75rem',
                           borderRadius: '8px',
-                          background: 'var(--color-surface)',
-                          border: '1px solid var(--color-border)',
+                          background: (variableOrder[v.key] || 0) > 0 ? 'var(--color-primary-bg)' : 'var(--color-surface)',
+                          border: (variableOrder[v.key] || 0) > 0 ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
                           marginBottom: '0.5rem',
                         }}
                       >
-                        <div style={{ flex: 1, fontSize: '0.9rem' }}>{v.key}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-faint)', minWidth: '90px', textAlign: 'right' }}>{v.label}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>{v.key}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)' }}>{v.label}</div>
+                        </div>
                         <select
                           value={variableOrder[v.key] || 0}
-                          onChange={(e) => setBodyPos(v.key, parseInt(e.target.value))}
+                          onChange={(e) => setVarPos(v.key, parseInt(e.target.value))}
                           style={{
                             padding: '0.35rem 0.5rem',
                             borderRadius: '6px',
@@ -199,13 +186,14 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                             background: 'var(--color-bg)',
                             color: 'var(--color-text)',
                             fontSize: '0.85rem',
-                            minWidth: '120px',
+                            minWidth: '140px',
                           }}
                         >
                           <option value={0}>No usar</option>
-                          <option value={1}>Cuerpo posición 1</option>
-                          <option value={2}>Cuerpo posición 2</option>
-                          <option value={3}>Cuerpo posición 3</option>
+                          <option value={1}>Título (pos. 1)</option>
+                          <option value={2}>Cuerpo (pos. 1)</option>
+                          <option value={3}>Cuerpo (pos. 2)</option>
+                          <option value={4}>Cuerpo (pos. 3)</option>
                         </select>
                       </div>
                     ))}

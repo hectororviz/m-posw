@@ -385,6 +385,7 @@ export class AcreedoresService {
     const alias = setting?.clubAlias || '';
 
     const valueMap: Record<string, string> = {
+      nombre: acreedor.nombre,
       saldo: saldoStr,
       dias: String(dias),
       club: club,
@@ -400,13 +401,16 @@ export class AcreedoresService {
       return { header: [acreedor.nombre], body: [saldoStr, String(dias)] };
     }
 
-    const bodyEntries: Array<[string, number]> = Object.entries(order)
-      .filter(([key, pos]) => key !== 'nombre' && typeof pos === 'number' && pos > 0)
+    const entries: Array<[string, number]> = Object.entries(order)
+      .filter(([_, pos]) => typeof pos === 'number' && pos > 0)
       .sort((a, b) => a[1] - b[1]);
 
+    const headerVar = entries.find(([_, pos]) => pos === 1);
+    const bodyVars = entries.filter(([_, pos]) => pos >= 2 && pos <= 4);
+
     return {
-      header: [acreedor.nombre],
-      body: bodyEntries.map(([key]) => getValue(key)),
+      header: headerVar ? [getValue(headerVar[0])] : [acreedor.nombre],
+      body: bodyVars.map(([key]) => getValue(key)),
     };
   }
 
