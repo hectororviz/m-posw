@@ -34,4 +34,6 @@ export interface WhatsAppTemplate {
   language: string;
   status: string;
   category: string;
+  headerText?: string;
+  bodyText?: string;
 }

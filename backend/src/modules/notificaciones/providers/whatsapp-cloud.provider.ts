@@ -191,12 +191,19 @@ export class WhatsAppCloudProvider implements INotificationProvider {
         headers: { 'Authorization': `Bearer ${config.accessToken}` },
       });
       const data = await response.json();
-      return ((data as any)?.data || []).map((t: any) => ({
-        name: t.name,
-        language: t.language,
-        status: t.status,
-        category: t.category,
-      }));
+      return ((data as any)?.data || []).map((t: any) => {
+        const components = t.components || [];
+        const header = components.find((c: any) => c.type === 'HEADER');
+        const body = components.find((c: any) => c.type === 'BODY');
+        return {
+          name: t.name,
+          language: t.language,
+          status: t.status,
+          category: t.category,
+          headerText: header?.text || undefined,
+          bodyText: body?.text || undefined,
+        };
+      });
     } catch {
       return [];
     }

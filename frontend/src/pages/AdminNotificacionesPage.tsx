@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader, Send, MessageSquare, Trash2 } from 'lucide-react';
+import { Loader, Send, MessageSquare, FileText, Trash2 } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useConversationMessages, useConversations, useNotificacionesHistory, useNotificacionesConfig, useSendConversationMessage, useDeleteConversationMessage, useDeleteConversation, useTestNotificacionesConnection, useSettings, useMarkAllConversationsRead } from '../api/queries';
 import type { NotificacionesJob, WhatsAppMessage } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import MediaBubble from './notificaciones/MediaBubble';
 import LightboxModal from './notificaciones/LightboxModal';
+import TemplateModal from './notificaciones/TemplateModal';
 
 const formatDateTime = (value: string | null) =>
   value ? new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--';
@@ -63,10 +64,9 @@ export const AdminNotificacionesPage: React.FC = () => {
     whatsappVariableOrder: {} as Record<string, number>,
   });
 
-  const [phoneInfo, setPhoneInfo] = useState<{ displayName: string; verifiedName: string; qualityRating: string } | null>(null);
+  const [phoneInfo, setPhoneInfo] = useState<{ displayName: string; verifiedName: string; qualityRating: string; phoneNumber: string } | null>(null);
   const [phoneInfoLoading, setPhoneInfoLoading] = useState(false);
-  const [templates, setTemplates] = useState<Array<{ name: string; language: string; status: string }>>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -103,34 +103,6 @@ export const AdminNotificacionesPage: React.FC = () => {
       pushToast(normalizeApiError(err), 'error');
     } finally {
       setPhoneInfoLoading(false);
-    }
-  };
-
-  const handleFetchTemplates = async () => {
-    if (!form.whatsappAccessToken) {
-      pushToast('Ingresá el Access Token primero', 'error');
-      return;
-    }
-    if (!form.whatsappBusinessAccountId) {
-      pushToast('Ingresá el Business Account ID para listar templates', 'error');
-      return;
-    }
-    try {
-      await apiClient.patch('/settings', {
-        whatsappAccessToken: form.whatsappAccessToken,
-        whatsappBusinessAccountId: form.whatsappBusinessAccountId,
-      });
-    } catch { /* ignore */ }
-
-    setTemplatesLoading(true);
-    try {
-      const res = await apiClient.get<Array<{ name: string; language: string; status: string; category: string }>>('/notificaciones/templates');
-      setTemplates(res.data.filter(t => t.status === 'APPROVED'));
-      if (res.data.length === 0) pushToast('No se encontraron templates en esta cuenta', 'error');
-    } catch (err) {
-      pushToast(normalizeApiError(err), 'error');
-    } finally {
-      setTemplatesLoading(false);
     }
   };
 
@@ -248,30 +220,37 @@ export const AdminNotificacionesPage: React.FC = () => {
 
       {tab === 'config' ? (
         <div style={{ maxWidth: '640px', margin: '1.5rem 0' }}>
-          <h3 style={{ marginBottom: '0.5rem' }}>WhatsApp Cloud API (Meta)</h3>
-          <p style={{ color: 'var(--color-text-faint)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Configurá las credenciales de la API oficial de WhatsApp Business para enviar notificaciones a tus acreedores.
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+            <div>
+              <h3 style={{ marginBottom: '0.25rem' }}>WhatsApp Cloud API (Meta)</h3>
+              <p style={{ color: 'var(--color-text-faint)', fontSize: '0.9rem' }}>
+                Configurá las credenciales de la API oficial de WhatsApp Business.
+              </p>
+            </div>
+            {config && (
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <span
+                  className="badge"
+                  style={{
+                    background: config.isConfigured ? 'var(--color-success)' : 'var(--color-warning, #f59e0b)',
+                    color: '#fff',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    padding: '0.25rem 0.75rem',
+                  }}
+                >
+                  {config.isConfigured ? '✓ Configurado' : 'Sin configurar'}
+                </span>
+                {phoneInfo && (
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.8rem', color: 'var(--color-text-faint)' }}>
+                    {phoneInfo.displayName || phoneInfo.phoneNumber}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
-
-          {config && (
-            <div style={{ marginBottom: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-              <span style={{ fontSize: '0.9rem' }}>
-                Estado:{' '}
-                {config.isConfigured ? (
-                  <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Configurado ✓</span>
-                ) : (
-                  <span style={{ color: 'var(--color-warning, #f59e0b)', fontWeight: 600 }}>Sin configurar</span>
-                )}
-                {phoneInfo && (
-                  <span style={{ marginLeft: '0.75rem', color: 'var(--color-text-faint)', fontSize: '0.85rem' }}>
-                    {phoneInfo.displayName} | {phoneInfo.verifiedName} | {phoneInfo.qualityRating}
-                  </span>
-                )}
-              </span>
-            </div>
-          )}
 
           <div className="settings-field">
             <label>Phone Number ID *</label>
@@ -292,84 +271,18 @@ export const AdminNotificacionesPage: React.FC = () => {
                 {phoneInfoLoading ? 'Consultando...' : 'Consultar'}
               </button>
             </div>
-            {phoneInfo && (
-              <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--color-text-faint)' }}>
-                {phoneInfo.displayName} | {phoneInfo.verifiedName} | {phoneInfo.qualityRating}
-              </div>
-            )}
             <small style={{ color: 'var(--color-text-faint)' }}>ID del número de teléfono en Meta Business Suite.</small>
           </div>
 
           <div className="settings-field">
             <label>Access Token (permanente) *</label>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                type="password"
-                value={form.whatsappAccessToken}
-                onChange={(e) => setForm({ ...form, whatsappAccessToken: e.target.value })}
-                placeholder="EAA..."
-                style={{ flex: 1 }}
-              />
-              <button
-                type="button"
-                className="btn-ghost btn-sm"
-                onClick={handleFetchTemplates}
-                disabled={templatesLoading || !form.whatsappAccessToken}
-              >
-                {templatesLoading ? 'Cargando...' : 'Cargar templates'}
-              </button>
-            </div>
-            <small style={{ color: 'var(--color-text-faint)' }}>Token de acceso permanente. Crear en Meta Developers → Herramientas → Generar token → whatsapp_business_messaging.</small>
-          </div>
-
-          <div className="settings-field">
-            <label>Nombre del Template *</label>
-            {templates.length > 0 ? (
-              <select
-                value={form.whatsappTemplateName}
-                onChange={(e) => setForm({ ...form, whatsappTemplateName: e.target.value })}
-                style={{
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '6px',
-                  border: '1px solid var(--color-border)',
-                  background: 'var(--color-bg)',
-                  color: 'var(--color-text)',
-                  fontSize: '0.9rem',
-                  width: '100%',
-                }}
-              >
-                <option value="">Seleccionar template...</option>
-                {templates.map((t) => (
-                  <option key={t.name} value={t.name}>
-                    {t.name} ({t.language}) - APPROVED
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <>
-                <input
-                  type="text"
-                  value={form.whatsappTemplateName}
-                  onChange={(e) => setForm({ ...form, whatsappTemplateName: e.target.value })}
-                  placeholder="Ej: debt_reminder"
-                />
-                <small style={{ color: 'var(--color-text-faint)' }}>
-                  Cargá los templates con el botón de arriba para seleccionar de una lista, o ingresá el nombre manualmente.
-                </small>
-              </>
-            )}
-          </div>
-
-          <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
-            <h4 style={{ marginBottom: '0.25rem' }}>Orden de variables del template</h4>
-            <p style={{ color: 'var(--color-text-faint)', fontSize: '0.85rem', marginBottom: '1rem' }}>
-              Cada variable se mapea a {'{{1}}'}, {'{{2}}'}, etc. en tu template de Meta. Elegi el orden y cuales incluir.
-            </p>
-
-            <VariableOrderEditor
-              value={form.whatsappVariableOrder || {}}
-              onChange={(order) => setForm({ ...form, whatsappVariableOrder: order })}
+            <input
+              type="password"
+              value={form.whatsappAccessToken}
+              onChange={(e) => setForm({ ...form, whatsappAccessToken: e.target.value })}
+              placeholder="EAA..."
             />
+            <small style={{ color: 'var(--color-text-faint)' }}>Token de acceso permanente. Crear en Meta Developers → Herramientas → Generar token → whatsapp_business_messaging.</small>
           </div>
 
           <div className="settings-field">
@@ -378,25 +291,40 @@ export const AdminNotificacionesPage: React.FC = () => {
             <small style={{ color: 'var(--color-text-faint)' }}>WABA ID de la cuenta de WhatsApp Business para listar templates. Opcional.</small>
           </div>
 
-          <div style={{ marginTop: '1.5rem', padding: '0.75rem', borderRadius: '8px', background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', fontSize: '0.9rem' }}>
-            <strong>URL del Webhook</strong><br />
-            <code style={{ background: 'var(--color-bg)', padding: '0.2rem 0.4rem', borderRadius: '4px', fontSize: '0.85rem' }}>{window.location.origin}/api/webhooks/whatsapp</code>
-            <div style={{ marginTop: '0.5rem', color: 'var(--color-text-faint)', fontSize: '0.8rem' }}>
-              Configurá esta URL en Meta Business Suite → WhatsApp → Configuración → Webhook.<br />
-              El webhook recibe mensajes entrantes y actualizaciones de estado (sent/delivered/read).
-            </div>
+          <div className="settings-field">
+            <label>App Secret</label>
+            <input type="password" value={form.whatsappAppSecret} onChange={(e) => setForm({ ...form, whatsappAppSecret: e.target.value })} placeholder="Secreto de la app de Meta" />
+            <small style={{ color: 'var(--color-text-faint)' }}>Secreto de la app de Meta para validar firma de webhooks entrantes (opcional).</small>
           </div>
 
           <div className="settings-field">
             <label>Webhook Verify Token</label>
             <input type="text" value={form.whatsappWebhookVerifyToken} onChange={(e) => setForm({ ...form, whatsappWebhookVerifyToken: e.target.value })} placeholder="Token personalizado" />
-            <small style={{ color: 'var(--color-text-faint)' }}>Token usado por Meta para verificar el webhook. Usá el mismo valor en Meta Business Suite al configurar el webhook.</small>
+            <small style={{ color: 'var(--color-text-faint)' }}>Token usado por Meta para verificar el webhook.</small>
           </div>
 
-          <div className="settings-field">
-            <label>App Secret</label>
-            <input type="password" value={form.whatsappAppSecret} onChange={(e) => setForm({ ...form, whatsappAppSecret: e.target.value })} placeholder="Secreto de la app de Meta" />
-            <small style={{ color: 'var(--color-text-faint)' }}>Secreto de la app de Meta. Se usa para validar la firma de webhooks entrantes (opcional, pero recomendado en producción).</small>
+          <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', fontSize: '0.9rem' }}>
+            <strong>URL del Webhook</strong><br />
+            <code style={{ background: 'var(--color-bg)', padding: '0.2rem 0.4rem', borderRadius: '4px', fontSize: '0.85rem' }}>{window.location.origin}/api/webhooks/whatsapp</code>
+            <div style={{ marginTop: '0.5rem', color: 'var(--color-text-faint)', fontSize: '0.8rem' }}>
+              Configurá esta URL en Meta Business Suite → WhatsApp → Configuración → Webhook.
+            </div>
+          </div>
+
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setTemplateModalOpen(true)}
+            >
+              <FileText size={16} style={{ marginRight: '0.35rem' }} />
+              Template
+            </button>
+            {form.whatsappTemplateName && (
+              <span style={{ fontSize: '0.85rem', color: 'var(--color-text-faint)' }}>
+                Actual: <strong>{form.whatsappTemplateName}</strong>
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
@@ -407,6 +335,21 @@ export const AdminNotificacionesPage: React.FC = () => {
               {testMutation.isPending ? 'Probando...' : 'Probar conexión'}
             </button>
           </div>
+
+          {templateModalOpen && (
+            <TemplateModal
+              formTemplateName={form.whatsappTemplateName}
+              formVariableOrder={form.whatsappVariableOrder || {}}
+              onSave={(templateName, variableOrder) => {
+                setForm({ ...form, whatsappTemplateName: templateName, whatsappVariableOrder: variableOrder });
+              }}
+              onClose={() => setTemplateModalOpen(false)}
+              pushToast={pushToast}
+              phoneNumberId={form.whatsappPhoneNumberId}
+              accessToken={form.whatsappAccessToken}
+              businessAccountId={form.whatsappBusinessAccountId}
+            />
+          )}
         </div>
       ) : tab === 'history' ? (
         <div style={{ margin: '1.5rem 0' }}>
@@ -644,98 +587,3 @@ export const AdminNotificacionesPage: React.FC = () => {
   );
 };
 
-const AVAILABLE_VARIABLES = [
-  { key: 'nombre', label: 'Nombre del acreedor' },
-  { key: 'alias', label: 'Alias del club' },
-  { key: 'saldo', label: 'Saldo pendiente ($)' },
-  { key: 'dias', label: 'Dias de antiguedad' },
-  { key: 'club', label: 'Nombre del club' },
-];
-
-type VariableOrderEditorProps = {
-  value: Record<string, number>;
-  onChange: (order: Record<string, number>) => void;
-};
-
-const VariableOrderEditor: React.FC<VariableOrderEditorProps> = ({ value, onChange }) => {
-  const maxPositions = AVAILABLE_VARIABLES.length;
-  const usedPositions = new Set(
-    Object.values(value).filter((v) => typeof v === 'number' && v > 0) as number[]
-  );
-
-  const handleChange = (key: string, newPos: number) => {
-    const current = { ...value };
-
-    const oldPos = current[key];
-    if (oldPos && oldPos > 0) {
-      usedPositions.delete(oldPos);
-    }
-
-    current[key] = newPos;
-    if (newPos > 0) {
-      usedPositions.add(newPos);
-    }
-
-    onChange(current);
-  };
-
-  const getAvailableOptions = (currentKey: string) => {
-    const currentValue = value[currentKey] || 0;
-    const options: { label: string; value: number }[] = [
-      { label: 'Desactivado', value: 0 },
-    ];
-
-    for (let i = 1; i <= maxPositions; i++) {
-      if (!usedPositions.has(i) || (currentValue === i)) {
-        options.push({ label: `Posicion ${i}`, value: i });
-      }
-    }
-
-    return options;
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      {AVAILABLE_VARIABLES.map((v) => {
-        const currentPos = value[v.key] || 0;
-        const options = getAvailableOptions(v.key);
-        return (
-          <div
-            key={v.key}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '8px',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>{v.key}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-text-faint)' }}>{v.label}</div>
-            </div>
-            <select
-              value={currentPos}
-              onChange={(e) => handleChange(v.key, parseInt(e.target.value))}
-              style={{
-                padding: '0.35rem 0.5rem',
-                borderRadius: '6px',
-                border: '1px solid var(--color-border)',
-                background: 'var(--color-bg)',
-                color: 'var(--color-text)',
-                fontSize: '0.85rem',
-                minWidth: '130px',
-              }}
-            >
-              {options.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        );
-      })}
-    </div>
-  );
-};

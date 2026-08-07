@@ -1130,6 +1130,8 @@ export interface WhatsAppTemplateInfo {
   language: string;
   status: string;
   category: string;
+  headerText?: string;
+  bodyText?: string;
 }
 
 export interface NotificationStatusMap {
