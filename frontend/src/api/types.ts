@@ -180,6 +180,8 @@ export interface Setting {
   enablePlayersModule?: boolean | null;
   enablePatrimonioModule?: boolean | null;
   enableNotificationsModule?: boolean | null;
+  whatsappUseApi?: boolean | null;
+  whatsappWebMessage?: string | null;
   whatsappPhoneNumberId?: string | null;
   whatsappAccessToken?: string | null;
   whatsappBusinessAccountId?: string | null;
@@ -966,6 +968,8 @@ export interface NotificacionesConfig {
   enabled: boolean;
   provider: string;
   isConfigured: boolean;
+  whatsappUseApi?: boolean;
+  whatsappWebMessage?: string | null;
   phoneNumberId: string | null;
   businessAccountId: string | null;
   template: string;

@@ -95,6 +95,14 @@ export class UpdateSettingDto {
   enableNotificationsModule?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  whatsappUseApi?: boolean;
+
+  @IsOptional()
+  @IsString()
+  whatsappWebMessage?: string;
+
+  @IsOptional()
   @IsString()
   whatsappPhoneNumberId?: string;
 

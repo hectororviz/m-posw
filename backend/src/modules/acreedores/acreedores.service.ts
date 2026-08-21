@@ -419,6 +419,9 @@ export class AcreedoresService {
     if (!setting?.enableNotificationsModule) {
       throw new BadRequestException('El módulo de Notificaciones no está habilitado');
     }
+    if (setting.whatsappUseApi === false) {
+      throw new BadRequestException('El envío por WhatsApp API está desactivado. Usá el enlace de WhatsApp Web.');
+    }
 
     const acreedor = await this.findOne(id);
 
@@ -455,6 +458,9 @@ export class AcreedoresService {
     const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
     if (!setting?.enableNotificationsModule) {
       throw new BadRequestException('El módulo de Notificaciones no está habilitado');
+    }
+    if (setting.whatsappUseApi === false) {
+      throw new BadRequestException('El envío por WhatsApp API está desactivado. Usá el enlace de WhatsApp Web.');
     }
 
     const batchId = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

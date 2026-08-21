@@ -26,6 +26,8 @@ export class NotificacionesService implements OnModuleInit {
       enabled: setting?.enableNotificationsModule ?? false,
       provider: this.whatsappProvider.name,
       isConfigured,
+      whatsappUseApi: setting?.whatsappUseApi ?? true,
+      whatsappWebMessage: setting?.whatsappWebMessage || null,
       phoneNumberId: setting?.whatsappPhoneNumberId || null,
       businessAccountId: setting?.whatsappBusinessAccountId || null,
       hasPhoneNumberId: !!setting?.whatsappPhoneNumberId,

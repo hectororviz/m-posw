@@ -287,6 +287,8 @@ model Setting {
   enablePlayersModule         Boolean @default(false)
   enablePatrimonioModule      Boolean @default(true)
   enableNotificationsModule   Boolean  @default(false)
+  whatsappUseApi              Boolean  @default(true)
+  whatsappWebMessage          String?
   whatsappPhoneNumberId       String?
   whatsappAccessToken         String?
   whatsappBusinessAccountId   String?

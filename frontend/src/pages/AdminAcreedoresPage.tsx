@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, Clock, Eye, Loader, Megaphone, Pencil, Plus, Slash, X, XCircle } from 'lucide-react';
+import { Check, Clock, Eye, Loader, Megaphone, Pencil, Plus, Send, Slash, X, XCircle } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedores, useAcreedorNotificaciones, useAcreedoresResumen, useNotificarDeudaBatch, useNotificationStatus, useSettings } from '../api/queries';
 import type { Acreedor, NotifJobUpdatedEvent, NotificacionesJob, NotificationStatusMap } from '../api/types';
 import { useSocketContext } from '../socket/SocketProvider';
 import { useToast } from '../components/ToastProvider';
+import { buildWhatsAppWebLink } from '../utils/whatsappLink';
 
 const formatCurrency = (value: number) =>
   `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 const formatDateTime = (value: string) =>
   new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+
 
 type SortMode = 'alpha' | 'deuda';
 
@@ -174,6 +177,8 @@ export const AdminAcreedoresPage: React.FC = () => {
   }, [acreedores, search, sortMode]);
 
   const notificationsEnabled = settings?.enableNotificationsModule ?? false;
+  const whatsappUseApi = settings?.whatsappUseApi !== false;
+  const clubName = settings?.clubName || settings?.storeName || null;
 
   const toggleSelectAll = () => {
     const allEligibleIds = filtered
@@ -384,7 +389,7 @@ export const AdminAcreedoresPage: React.FC = () => {
         <div className="sales-table-wrapper">
           <div className="sales-table">
             <div className="sales-table-head">
-              {notificationsEnabled && (
+              {notificationsEnabled && whatsappUseApi && (
                 <span className="col-action" style={{ flex: '0 0 36px' }}>
                   <input
                     type="checkbox"
@@ -414,7 +419,7 @@ export const AdminAcreedoresPage: React.FC = () => {
                   style={{ cursor: 'pointer' }}
                   onClick={() => navigate(`/admin/acreedores/${a.id}`)}
                 >
-                  {notificationsEnabled && (
+                  {notificationsEnabled && whatsappUseApi && (
                     <span
                       className="col-action"
                       style={{ flex: '0 0 36px' }}
@@ -456,16 +461,29 @@ export const AdminAcreedoresPage: React.FC = () => {
                     )}
                   </span>
                   <span className="col-action" style={{ flex: '0 0 130px', display: 'flex', gap: '0.15rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                    {notifIcon && <span style={{ marginRight: '0.25rem' }}>{notifIcon}</span>}
+                    {whatsappUseApi && notifIcon && <span style={{ marginRight: '0.25rem' }}>{notifIcon}</span>}
                     {notificationsEnabled && a.telefono && (a.saldo ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        className="btn-ghost btn-sm"
-                        onClick={(e) => { e.stopPropagation(); setHistoryModalAcreedor(a.id); }}
-                        title="Ver notificaciones enviadas"
-                      >
-                        <Megaphone size={16} />
-                      </button>
+                      whatsappUseApi ? (
+                        <button
+                          type="button"
+                          className="btn-ghost btn-sm"
+                          onClick={(e) => { e.stopPropagation(); setHistoryModalAcreedor(a.id); }}
+                          title="Ver notificaciones enviadas"
+                        >
+                          <Megaphone size={16} />
+                        </button>
+                      ) : (
+                        <a
+                          href={buildWhatsAppWebLink({ nombre: a.nombre, telefono: a.telefono || '', saldo: a.saldo, diasSinPagar: a.diasSinPagar, template: settings?.whatsappWebMessage, club: clubName })}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-ghost btn-sm"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Enviar notificación por WhatsApp Web"
+                        >
+                          <Send size={16} />
+                        </a>
+                      )
                     )}
                     <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); navigate(`/admin/acreedores/${a.id}`); }} title="Ver">{<Eye size={16} />}</button>
                     <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(a.id); }} title="Editar">{<Pencil size={16} />}</button>
@@ -487,7 +505,7 @@ export const AdminAcreedoresPage: React.FC = () => {
         <Plus size={24} />
       </button>
 
-      {notificationsEnabled && selectedIds.size > 0 && (
+      {notificationsEnabled && whatsappUseApi && selectedIds.size > 0 && (
         <div className="bulk-action-bar">
           <span className="bulk-action-count">
             {selectedIds.size} seleccionados · {selectedWithPhone} con notificación

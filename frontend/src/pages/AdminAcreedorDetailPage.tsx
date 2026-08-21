@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Send, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useSettings, useTreasuryAccounts } from '../api/queries';
 import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificacionesJob, Sale } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { buildWhatsAppWebLink } from '../utils/whatsappLink';
 
 const formatCurrency = (value: number) =>
   `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -109,6 +110,8 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const { data: treasuryAccounts = [] } = useTreasuryAccounts();
   const { data: settings } = useSettings();
   const notificationsEnabled = settings?.enableNotificationsModule ?? false;
+  const whatsappUseApi = settings?.whatsappUseApi !== false;
+  const clubName = settings?.clubName || settings?.storeName || null;
   const autoTreasuryId = treasuryAccounts.length === 1 ? treasuryAccounts[0].id : '';
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
@@ -277,6 +280,24 @@ export const AdminAcreedorDetailPage: React.FC = () => {
             </p>
             {acreedor.notas && <p className="page-header-subtitle" style={{ marginTop: '0.25rem', fontStyle: 'italic' }}>{acreedor.notas}</p>}
           </div>
+          {notificationsEnabled && !whatsappUseApi && acreedor.telefono && (deuda?.saldoPendiente ?? 0) > 0 && (
+            <a
+              href={buildWhatsAppWebLink({
+                nombre: acreedor.nombre,
+                telefono: acreedor.telefono,
+                saldo: deuda?.saldoPendiente,
+                diasSinPagar: deuda?.diasSinPagar,
+                template: settings?.whatsappWebMessage,
+                club: clubName,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <Send size={16} /> Enviar notificación
+            </a>
+          )}
         </div>
       </div>
 

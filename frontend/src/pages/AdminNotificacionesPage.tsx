@@ -54,6 +54,8 @@ export const AdminNotificacionesPage: React.FC = () => {
   const markReadMutation = useMarkAllConversationsRead();
 
   const [form, setForm] = useState({
+    whatsappUseApi: true,
+    whatsappWebMessage: '',
     whatsappPhoneNumberId: '',
     whatsappAccessToken: '',
     whatsappBusinessAccountId: '',
@@ -71,6 +73,8 @@ export const AdminNotificacionesPage: React.FC = () => {
   useEffect(() => {
     if (settings) {
       setForm({
+        whatsappUseApi: settings.whatsappUseApi ?? true,
+        whatsappWebMessage: settings.whatsappWebMessage ?? '',
         whatsappPhoneNumberId: settings.whatsappPhoneNumberId ?? '',
         whatsappAccessToken: settings.whatsappAccessToken ?? '',
         whatsappBusinessAccountId: settings.whatsappBusinessAccountId ?? '',
@@ -224,6 +228,26 @@ export const AdminNotificacionesPage: React.FC = () => {
 
       {tab === 'config' ? (
         <div style={{ maxWidth: '640px', margin: '1.5rem 0' }}>
+          <div className="settings-field" style={{ marginBottom: '1.25rem' }}>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={form.whatsappUseApi}
+                onChange={(e) => setForm({ ...form, whatsappUseApi: e.target.checked })}
+              />
+              <span className="toggle-switch-track" />
+              <span>
+                <strong>WhatsApp API</strong>
+                <br />
+                <small style={{ color: 'var(--color-text-faint)' }}>Activo: envío por WhatsApp Cloud API. Inactivo: links de WhatsApp Web (wa.me).</small>
+              </span>
+            </label>
+          </div>
+
+          {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
+
+          {form.whatsappUseApi ? (
+          <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
             <div>
               <h3 style={{ marginBottom: '0.25rem' }}>WhatsApp Cloud API (Meta)</h3>
@@ -253,8 +277,6 @@ export const AdminNotificacionesPage: React.FC = () => {
               </div>
             )}
           </div>
-
-          {error && <p className="error-text" style={{ marginBottom: '1rem' }}>{error}</p>}
 
           <div className="settings-field">
             <label>Phone Number ID *</label>
@@ -331,13 +353,31 @@ export const AdminNotificacionesPage: React.FC = () => {
             )}
           </div>
 
+          </>
+          ) : (
+            <div className="settings-field">
+              <label>Mensaje para WhatsApp Web</label>
+              <textarea
+                rows={4}
+                value={form.whatsappWebMessage}
+                onChange={(e) => setForm({ ...form, whatsappWebMessage: e.target.value })}
+                placeholder="Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días)."
+              />
+              <small style={{ color: 'var(--color-text-faint)' }}>
+                Variables disponibles: {'{{nombre}}'}, {'{{saldo}}'}, {'{{dias}}'} y {'{{club}}'}. Se reemplazan por los datos de cada acreedor al abrir el link.
+              </small>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
             <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Guardando...' : 'Guardar configuración'}
             </button>
-            <button type="button" className="btn-ghost" onClick={handleTest} disabled={testMutation.isPending || !form.whatsappPhoneNumberId || !form.whatsappAccessToken}>
-              {testMutation.isPending ? 'Probando...' : 'Probar conexión'}
-            </button>
+            {form.whatsappUseApi && (
+              <button type="button" className="btn-ghost" onClick={handleTest} disabled={testMutation.isPending || !form.whatsappPhoneNumberId || !form.whatsappAccessToken}>
+                {testMutation.isPending ? 'Probando...' : 'Probar conexión'}
+              </button>
+            )}
           </div>
 
           {templateModalOpen && (
