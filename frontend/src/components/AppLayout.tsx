@@ -5,11 +5,13 @@ import { AppHeader } from './AppHeader';
 interface AppLayoutProps {
   title?: string;
   children: React.ReactNode;
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
 }
 
 const DEFAULT_ACCENT_COLOR = 'var(--color-accent)';
 
-export const AppLayout: React.FC<AppLayoutProps> = ({ title, children }) => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ title, children, showMenuButton, onMenuClick }) => {
   const { data: settings, isLoading } = useSettings();
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ title, children }) => {
 
   return (
     <div className="app-shell">
-      <AppHeader settings={settings} isLoading={isLoading} />
+      <AppHeader settings={settings} isLoading={isLoading} showMenuButton={showMenuButton} onMenuClick={onMenuClick} />
       <main className="app-main">
         {title && (
           <div className="page-title">

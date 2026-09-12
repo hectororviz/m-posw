@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, Megaphone, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi } from 'lucide-react';
+import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, Megaphone, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi, X } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
 
 const COLLAPSE_BREAKPOINT = 1200;
+const MOBILE_BREAKPOINT = 768;
 const STORAGE_KEY = 'admin-sidebar-collapsed';
 
 const getInitials = (name?: string | null) => {
@@ -107,10 +108,43 @@ export const AdminLayout: React.FC = () => {
   });
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= MOBILE_BREAKPOINT : false,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     setLogoError(false);
   }, [logoUrl]);
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const onChange = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
+      if (!e.matches) setDrawerOpen(false);
+    };
+    setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDrawerOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [drawerOpen]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -196,10 +230,32 @@ export const AdminLayout: React.FC = () => {
     });
   }, [location.pathname]);
 
+  useEffect(() => {
+    const active = navCategories.find((c) => routeBelongsToCategory(c.label));
+    if (active) {
+      setExpandedCategories((prev) => {
+        if (prev.has(active.label)) return prev;
+        const next = new Set(prev);
+        next.add(active.label);
+        return next;
+      });
+    }
+  }, [routeBelongsToCategory]);
+
+  const openDrawer = useCallback(() => setDrawerOpen(true), []);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+  const collapsedOnDesktop = !isMobile && isCollapsed;
+
   return (
-    <AppLayout title="">
+    <AppLayout title="" showMenuButton onMenuClick={openDrawer}>
       <div className="admin-layout">
-        <nav className={`admin-sidebar${isCollapsed ? ' is-collapsed' : ''}`}>
+        {isMobile && drawerOpen && (
+          <div className="sidebar-backdrop" onClick={closeDrawer} aria-hidden="true" />
+        )}
+        <nav
+          className={`admin-sidebar${collapsedOnDesktop ? ' is-collapsed' : ''}${isMobile && drawerOpen ? ' drawer-open' : ''}`}
+          aria-hidden={isMobile && !drawerOpen ? false : undefined}
+        >
           <div className="sidebar-header">
             <div className="sidebar-brand">
               {showLogo ? (
@@ -214,27 +270,39 @@ export const AdminLayout: React.FC = () => {
                   {initials}
                 </div>
               )}
-              {!isCollapsed && <span className="sidebar-brand-name">{storeName}</span>}
+              {!collapsedOnDesktop && <span className="sidebar-brand-name">{storeName}</span>}
             </div>
-            <button
-              type="button"
-              className="sidebar-toggle"
-              onClick={toggleCollapsed}
-              aria-label={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
-              title={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
-            >
-              {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
+            {isMobile ? (
+              <button
+                type="button"
+                className="sidebar-toggle sidebar-close"
+                onClick={closeDrawer}
+                aria-label="Cerrar menú"
+                title="Cerrar menú"
+              >
+                <X size={16} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="sidebar-toggle"
+                onClick={toggleCollapsed}
+                aria-label={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+                title={isCollapsed ? 'Expandir menú' : 'Colapsar menú'}
+              >
+                {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+              </button>
+            )}
           </div>
 
           {homeVisible && (
             <NavLink
               to="/admin/home"
               className={({ isActive }) => isActive ? 'active' : ''}
-              title={isCollapsed ? 'Home' : undefined}
+              title={collapsedOnDesktop ? 'Home' : undefined}
             >
               {navIcon(<House size={iconSize} />)}
-              {!isCollapsed && 'Home'}
+              {!collapsedOnDesktop && 'Home'}
             </NavLink>
           )}
 
@@ -247,10 +315,10 @@ export const AdminLayout: React.FC = () => {
                   type="button"
                   className={`sidebar-category-header${isActiveCategory ? ' active-category' : ''}`}
                   onClick={() => toggleCategory(cat.label)}
-                  title={isCollapsed ? cat.label : undefined}
+                  title={collapsedOnDesktop ? cat.label : undefined}
                 >
                   {navIcon(cat.icon)}
-                  {!isCollapsed && (
+                  {!collapsedOnDesktop && (
                     <>
                       <span className="sidebar-category-label">{cat.label}</span>
                       <ChevronDown size={14} className={`sidebar-category-chevron${isExpanded ? ' rotated' : ''}`} />
@@ -265,10 +333,10 @@ export const AdminLayout: React.FC = () => {
                         to={item.to}
                         end={item.to === '/pos'}
                         className={({ isActive }) => isActive ? 'active' : ''}
-                        title={isCollapsed ? item.label : undefined}
+                        title={collapsedOnDesktop ? item.label : undefined}
                       >
                         {navIcon(item.icon)}
-                        {!isCollapsed && item.label}
+                        {!collapsedOnDesktop && item.label}
                       </NavLink>
                     ))}
                   </div>

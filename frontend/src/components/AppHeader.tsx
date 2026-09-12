@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { DollarSign, LogOut, MessageCircle, Moon, Settings, Sun } from 'lucide-react';
+import { DollarSign, LogOut, Menu, MessageCircle, Moon, Settings, Sun } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import type { Setting } from '../api/types';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,8 @@ import { useModuleAccess } from '../hooks/useModuleAccess';
 interface AppHeaderProps {
   settings?: Setting;
   isLoading: boolean;
+  showMenuButton?: boolean;
+  onMenuClick?: () => void;
 }
 
 const getInitials = (name?: string | null) => {
@@ -27,7 +29,7 @@ const getInitials = (name?: string | null) => {
   return `${words[0][0]}${words[1][0]}`.toUpperCase();
 };
 
-export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => {
+export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showMenuButton, onMenuClick }) => {
   const { user, logout, permissions } = useAuth();
   const { resolved, toggle: toggleTheme } = useTheme();
   const location = useLocation();
@@ -60,6 +62,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading }) => 
   return (
     <header className="app-header">
       <div className="header-row">
+        {showMenuButton && (
+          <button
+            type="button"
+            className="ghost-button header-toggle-button admin-menu-button"
+            onClick={onMenuClick}
+            aria-label="Abrir menú"
+            title="Abrir menú"
+          >
+            <Menu size={18} />
+          </button>
+        )}
         <div className="brand-block">
           {showLogo ? (
             <img src={logoUrl} alt={storeName} className="brand-logo" onError={() => setLogoError(true)} />
