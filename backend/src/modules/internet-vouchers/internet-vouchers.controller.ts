@@ -1,11 +1,15 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { PrismaService } from '../common/prisma.service';
 import { GenerateVoucherDto } from './dto/generate-voucher.dto';
 import { InternetVouchersService } from './internet-vouchers.service';
 
 @Controller('internet/vouchers')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
+@RequireModule(ModuleKey.INTERNET, ModuleAccess.READ)
 export class InternetVouchersController {
   constructor(
     private readonly vouchersService: InternetVouchersService,
@@ -82,6 +86,7 @@ export class InternetVouchersController {
   }
 
   @Post('generate')
+  @RequireModule(ModuleKey.INTERNET, ModuleAccess.FULL)
   generate(@Body() dto: GenerateVoucherDto) {
     return this.vouchersService.generateVoucher(dto.planId, dto.saleId);
   }
@@ -92,6 +97,7 @@ export class InternetVouchersController {
   }
 
   @Delete('id/:id')
+  @RequireModule(ModuleKey.INTERNET, ModuleAccess.FULL)
   async deactivateById(@Param('id') id: string) {
     const voucher = await this.prisma.saleVoucher.findUnique({ where: { id } });
     if (!voucher) return { error: 'Voucher no encontrado' };
@@ -99,6 +105,7 @@ export class InternetVouchersController {
   }
 
   @Delete(':pin')
+  @RequireModule(ModuleKey.INTERNET, ModuleAccess.FULL)
   deactivate(@Param('pin') pin: string) {
     return this.vouchersService.deactivateVoucher(pin);
   }

@@ -765,6 +765,25 @@ export interface InternetHealth {
   latencyMs: number | null;
 }
 
+export interface StaffVoucher {
+  id: string;
+  pin: string;
+  label: string;
+  notes: string | null;
+  duration: number;
+  active: boolean;
+  createdAt: string;
+  createdBy: string;
+  deactivatedAt: string | null;
+  deactivatedBy: string | null;
+  firstUseAt: string | null;
+  expiresAt: string | null;
+  remainingSeconds: number | null;
+  radiusActive: boolean | null;
+  macAddress: string | null;
+  computedStatus: ComputedVoucherStatus | null;
+}
+
 // ─── Players / Jugadores ─────────────────────────────────
 
 export type Sex = 'M' | 'F';

@@ -100,6 +100,8 @@ model User {
   manualMovements ManualMovement[]
   journalEntries JournalEntry[]
   modulePermissions UserModulePermission[]
+  staffVouchersCreated StaffVoucher[] @relation("StaffVoucherCreatedBy")
+  staffVouchersDeactivated StaffVoucher[] @relation("StaffVoucherDeactivatedBy")
 }
 
 model CashClose {
@@ -646,6 +648,24 @@ model SaleVoucher {
   active     Boolean     @default(true)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
+}
+
+model StaffVoucher {
+  id              String    @id @default(uuid()) @db.Uuid
+  pin             String    @unique
+  label           String
+  notes           String?
+  duration        Int
+  downloadBandwidth String  @default("10M")
+  uploadBandwidth   String  @default("2M")
+  active          Boolean   @default(true)
+  createdById     String    @db.Uuid
+  createdBy       User      @relation("StaffVoucherCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime  @default(now())
+  deactivatedAt   DateTime?
+  deactivatedById String?   @db.Uuid
+  deactivatedBy   User?     @relation("StaffVoucherDeactivatedBy", fields: [deactivatedById], references: [id])
+  updatedAt       DateTime  @updatedAt
 }
 
 // ─── Socios ──────────────────────────────────────────────

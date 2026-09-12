@@ -2,12 +2,22 @@ import { useMemo, useState } from 'react';
 import { Copy, Pencil, Plus, RefreshCw, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useInternetHealth, useInternetPlans, useInternetVoucherDetail, useInternetVouchers, useInternetStats } from '../api/queries';
-import type { ComputedVoucherStatus, InternetPlan, VoucherListItem } from '../api/types';
+import { useInternetHealth, useInternetPlans, useInternetVoucherDetail, useInternetVouchers, useInternetStats, useStaffVouchers } from '../api/queries';
+import type { ComputedVoucherStatus, InternetPlan } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { useModuleAccess } from '../hooks/useModuleAccess';
 
-type TabId = 'vouchers' | 'planes';
+type TabId = 'vouchers' | 'planes' | 'staff';
 type VoucherFilter = 'todos' | ComputedVoucherStatus;
+
+const STAFF_DURATION_PRESETS = [
+  { label: 'Jornada (12 h)', value: 43200 },
+  { label: 'Fin de semana (48 h)', value: 172800 },
+  { label: 'Mensual (30 días)', value: 2592000 },
+  { label: 'Permanente (sin vencimiento práctico)', value: 315360000 },
+];
+
+const isPermanentDuration = (seconds: number) => seconds >= 315360000;
 
 const DURATION_OPTIONS = [
   { label: '1 hora', value: 3600 },
@@ -106,8 +116,30 @@ export const AdminInternetPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<VoucherFilter>('todos');
   const { data: detail, isLoading: detailLoading } = useInternetVoucherDetail(detailPin);
   const { pushToast } = useToast();
+  const access = useModuleAccess('INTERNET');
+  const isFull = access === 'FULL';
+  const { data: staffVouchers, isLoading: staffLoading } = useStaffVouchers(isFull);
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  const [staffLabel, setStaffLabel] = useState('');
+  const [staffNotes, setStaffNotes] = useState('');
+  const [staffDuration, setStaffDuration] = useState<number>(STAFF_DURATION_PRESETS[0].value);
+  const [staffCustomDuration, setStaffCustomDuration] = useState(false);
+  const [savingStaff, setSavingStaff] = useState(false);
+  const [deactivatingStaffId, setDeactivatingStaffId] = useState<string | null>(null);
 
   const selectedVoucher = detailPin ? (vouchers ?? []).find((x) => x.pin === detailPin) ?? null : null;
+  const selectedStaff = detailPin && !selectedVoucher ? (staffVouchers ?? []).find((x) => x.pin === detailPin) ?? null : null;
+
+  const visibleTabs = useMemo(() => {
+    const tabs: { id: TabId; label: string }[] = [{ id: 'vouchers', label: 'Vouchers' }];
+    if (isFull) {
+      tabs.push({ id: 'planes', label: 'Planes' });
+      tabs.push({ id: 'staff', label: 'Personal' });
+    }
+    return tabs;
+  }, [isFull]);
+
+  const effectiveTab: TabId = !isFull ? 'vouchers' : activeTab;
 
   const counts = useMemo(() => {
     const c: Record<ComputedVoucherStatus, number> = { activo: 0, vencido: 0, anulado: 0, sin_uso: 0 };
@@ -158,7 +190,7 @@ export const AdminInternetPage: React.FC = () => {
     await queryClient.invalidateQueries({ queryKey: ['internet-stats'] });
   };
 
-  const renderStatusBadge = (v: VoucherListItem) => {
+  const renderStatusBadge = (v: { computedStatus: ComputedVoucherStatus | null; active: boolean }) => {
     const s = v.computedStatus ?? (v.active ? null : 'anulado');
     if (s === 'activo') return <span className="badge badge-success">Activo</span>;
     if (s === 'vencido') return <span className="badge badge-warning">Vencido</span>;
@@ -245,10 +277,56 @@ export const AdminInternetPage: React.FC = () => {
     return `$${num.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
-  const TABS: { id: TabId; label: string }[] = [
-    { id: 'vouchers', label: 'Vouchers' },
-    { id: 'planes', label: 'Planes' },
-  ];
+  const handleCreateStaff = async () => {
+    setError(null);
+    if (!staffLabel.trim()) { setError('El nombre es obligatorio'); return; }
+    if (!Number.isInteger(staffDuration) || staffDuration <= 0) { setError('Duración inválida'); return; }
+    setSavingStaff(true);
+    try {
+      await apiClient.post('/internet/staff-vouchers', {
+        label: staffLabel.trim(),
+        notes: staffNotes.trim() || undefined,
+        duration: staffDuration,
+      });
+      setShowStaffModal(false);
+      setStaffLabel('');
+      setStaffNotes('');
+      await queryClient.invalidateQueries({ queryKey: ['staff-vouchers'] });
+      pushToast('Pin de personal creado', 'success');
+    } catch (err) { setError(normalizeApiError(err)); } finally { setSavingStaff(false); }
+  };
+
+  const handleDeactivateStaff = async (id: string) => {
+    if (!confirm('¿Anular este pin? Dejará de funcionar.')) return;
+    setDeactivatingStaffId(id);
+    try {
+      await apiClient.delete(`/internet/staff-vouchers/${id}`);
+      await queryClient.invalidateQueries({ queryKey: ['staff-vouchers'] });
+      pushToast('Pin anulado', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setDeactivatingStaffId(null);
+    }
+  };
+
+  const renderMaskedPin = (v: { pin: string; firstUseAt: string | null }) => {
+    if (!v.firstUseAt) {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--color-text-faint)' }}>
+          <span style={{ fontFamily: 'Consolas,monospace', letterSpacing: '0.15rem' }}>••••••</span>
+        </span>
+      );
+    }
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'Consolas,monospace', fontWeight: 600 }}>
+        {v.pin}
+        <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); copyPin(v.pin); }} aria-label={`Copiar PIN ${v.pin}`} style={{ padding: '0.1rem 0.3rem' }}>
+          <Copy size={13} />
+        </button>
+      </span>
+    );
+  };
 
   return (
     <div>
@@ -260,11 +338,11 @@ export const AdminInternetPage: React.FC = () => {
       </div>
 
       <nav className="treasury-subnav" style={{ marginBottom: '1.25rem' }}>
-        {TABS.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={`treasury-subnav-link ${activeTab === tab.id ? 'active' : ''}`}
+            className={`treasury-subnav-link ${effectiveTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -275,7 +353,7 @@ export const AdminInternetPage: React.FC = () => {
       {error && <p className="error-text">{error}</p>}
 
       {/* TAB: Vouchers */}
-      {activeTab === 'vouchers' && (
+      {effectiveTab === 'vouchers' && (
         <>
           {stats && (
             <div className="sales-kpis">
@@ -376,14 +454,9 @@ export const AdminInternetPage: React.FC = () => {
                     <span className="col-type vcol-venta">#{v.saleOrderNumber}</span>
                     <span className="col-user vcol-plan">{v.planName}</span>
                     <span className="col-user vcol-pin">
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'Consolas,monospace', fontWeight: 600 }}>
-                        {v.pin}
-                        <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); copyPin(v.pin); }} aria-label={`Copiar PIN ${v.pin}`} style={{ padding: '0.1rem 0.3rem' }}>
-                          <Copy size={13} />
-                        </button>
-                      </span>
+                      {renderMaskedPin(v)}
                       <br />
-                      <small style={{ color: 'var(--color-text-faint)', fontFamily: 'Consolas,monospace' }}>{v.macAddress ?? '—'}</small>
+                      <small style={{ color: 'var(--color-text-faint)', fontFamily: 'Consolas,monospace' }}>{v.firstUseAt ? (v.macAddress ?? '—') : 'Sin canjear'}</small>
                     </span>
                     <span className="col-user vcol-activacion">{formatOptDateTime(v.firstUseAt, 'Sin usar')}</span>
                     <span className="col-user vcol-vencimiento">{formatOptDateTime(v.expiresAt, v.firstUseAt ? 'Vencido' : 'Al primer uso')}</span>
@@ -398,7 +471,7 @@ export const AdminInternetPage: React.FC = () => {
                       {renderStatusBadge(v)}
                     </span>
                     <span className="col-action" style={{ display: 'flex', gap: '0.25rem' }}>
-                      {v.active && (
+                      {isFull && v.active && (
                         <button
                           type="button"
                           className="btn-ghost btn-sm"
@@ -439,8 +512,32 @@ export const AdminInternetPage: React.FC = () => {
                 <>
                   <div className="settings-field">
                     <label>PIN</label>
-                    <p style={{ margin: 0, fontFamily: 'Consolas,monospace', fontWeight: 700, letterSpacing: '0.1rem' }}>{detail.pin}</p>
+                    {detail.first_use_at ? (
+                      <p style={{ margin: 0, fontFamily: 'Consolas,monospace', fontWeight: 700, letterSpacing: '0.1rem' }}>{detail.pin}</p>
+                    ) : (
+                      <p style={{ margin: 0, fontFamily: 'Consolas,monospace', letterSpacing: '0.15rem', color: 'var(--color-text-faint)' }}>
+                        •••••• <small>(se revela al canjear — ya no se puede reutilizar)</small>
+                      </p>
+                    )}
                   </div>
+                  {selectedStaff && (
+                    <>
+                      <div className="settings-field">
+                        <label>Nombre</label>
+                        <p style={{ margin: 0 }}>{selectedStaff.label}</p>
+                      </div>
+                      {selectedStaff.notes && (
+                        <div className="settings-field">
+                          <label>Notas</label>
+                          <p style={{ margin: 0 }}>{selectedStaff.notes}</p>
+                        </div>
+                      )}
+                      <div className="settings-field">
+                        <label>Creado por</label>
+                        <p style={{ margin: 0 }}>{selectedStaff.createdBy} · {formatDateTime(selectedStaff.createdAt)}</p>
+                      </div>
+                    </>
+                  )}
                   {selectedVoucher && (
                     <>
                       <div className="settings-field">
@@ -456,7 +553,7 @@ export const AdminInternetPage: React.FC = () => {
                   <div className="settings-field">
                     <label>Estado</label>
                     <p style={{ margin: 0 }}>
-                      {selectedVoucher ? renderStatusBadge(selectedVoucher) : (
+                      {selectedVoucher || selectedStaff ? renderStatusBadge((selectedVoucher ?? selectedStaff)!) : (
                         detail.active ? (
                           <span className="badge badge-success">Activo</span>
                         ) : (
@@ -492,7 +589,7 @@ export const AdminInternetPage: React.FC = () => {
       )}
 
       {/* TAB: Planes */}
-      {activeTab === 'planes' && (
+      {effectiveTab === 'planes' && (
         <>
           <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo plan" title="Nuevo plan"><Plus size={24} /></button>
 
@@ -585,6 +682,109 @@ export const AdminInternetPage: React.FC = () => {
                     <span className="col-action" style={{ flex: '0 0 80px', display: 'flex', gap: '0.25rem' }}>
                       <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(plan)} aria-label={`Editar ${plan.name}`}>{<Pencil size={16} />}</button>
                       <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : <X size={16} />}</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* TAB: Personal */}
+      {effectiveTab === 'staff' && (
+        <>
+          <button type="button" className="fab-button-v2" onClick={() => { setError(null); setShowStaffModal(true); }} aria-label="Nuevo pin de personal" title="Nuevo pin de personal"><Plus size={24} /></button>
+
+          {showStaffModal && (
+            <div className="modal-backdrop" onClick={() => setShowStaffModal(false)} role="presentation">
+              <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Nuevo pin de personal</h3>
+                  <button type="button" className="icon-button" onClick={() => setShowStaffModal(false)} aria-label="Cerrar">{<X size={16} />}</button>
+                </div>
+                <div className="modal-body">
+                  <div className="settings-field">
+                    <label htmlFor="staff-label">Nombre</label>
+                    <input id="staff-label" type="text" placeholder="Parrilla, Caja 2..." value={staffLabel} onChange={(e) => setStaffLabel(e.target.value)} />
+                  </div>
+                  <div className="settings-field">
+                    <label htmlFor="staff-notes">Notas (opcional)</label>
+                    <input id="staff-notes" type="text" placeholder="Responsable, turno..." value={staffNotes} onChange={(e) => setStaffNotes(e.target.value)} />
+                  </div>
+                  <div className="settings-field" style={{ marginBottom: 0 }}>
+                    <label htmlFor="staff-duration">Duración</label>
+                    <select
+                      id="staff-duration"
+                      value={staffCustomDuration ? -1 : staffDuration}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (v === -1) { setStaffCustomDuration(true); setStaffDuration(0); }
+                        else { setStaffCustomDuration(false); setStaffDuration(v); }
+                      }}
+                    >
+                      {STAFF_DURATION_PRESETS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
+                      <option value={-1}>Personalizado...</option>
+                    </select>
+                    {staffCustomDuration && <input type="number" min="1" placeholder="Duración en segundos" value={staffDuration || ''} onChange={(e) => setStaffDuration(Number(e.target.value) || 0)} style={{ marginTop: '0.5rem' }} />}
+                  </div>
+                </div>
+                <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                  <button type="button" className="btn-ghost" onClick={() => setShowStaffModal(false)}>Cancelar</button>
+                  <button type="button" className="btn-primary" disabled={savingStaff} onClick={handleCreateStaff}>Crear pin</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {staffLoading ? (
+            <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+              <div className="spinner" aria-hidden="true" />
+              <p style={{ color: 'var(--color-text-faint)', margin: '0.75rem 0 0', fontSize: '0.95rem' }}>Cargando...</p>
+            </div>
+          ) : !staffVouchers || staffVouchers.length === 0 ? (
+            <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+              <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>No hay pines de personal.</p>
+              <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>Creá uno para el personal que trabaja durante las jornadas.</p>
+            </div>
+          ) : (
+            <div className="sales-table-wrapper">
+              <div className="sales-table">
+                <div className="sales-table-head">
+                  <span className="col-date">Nombre</span>
+                  <span className="col-user vcol-pin">PIN / MAC</span>
+                  <span className="col-user vcol-plan">Duración</span>
+                  <span className="col-user vcol-activacion">Activación</span>
+                  <span className="col-user vcol-vencimiento">Vencimiento</span>
+                  <span className="col-method">Estado</span>
+                  <span className="col-action"></span>
+                </div>
+                {staffVouchers.map((s) => (
+                  <div key={s.id} className="sales-table-row voucher-row-clickable" onClick={() => setDetailPin(s.pin)}>
+                    <span className="col-date" style={{ fontWeight: 500 }}>{s.label}</span>
+                    <span className="col-user vcol-pin">
+                      {renderMaskedPin(s)}
+                      <br />
+                      <small style={{ color: 'var(--color-text-faint)', fontFamily: 'Consolas,monospace' }}>{s.firstUseAt ? (s.macAddress ?? '—') : 'Sin canjear'}</small>
+                    </span>
+                    <span className="col-user vcol-plan">{isPermanentDuration(s.duration) ? 'Permanente' : formatDuration(s.duration)}</span>
+                    <span className="col-user vcol-activacion">{formatOptDateTime(s.firstUseAt, 'Sin usar')}</span>
+                    <span className="col-user vcol-vencimiento">
+                      {isPermanentDuration(s.duration) ? 'Sin vencimiento' : formatOptDateTime(s.expiresAt, s.firstUseAt ? 'Vencido' : 'Al primer uso')}
+                    </span>
+                    <span className="col-method">{renderStatusBadge(s)}</span>
+                    <span className="col-action" style={{ display: 'flex', gap: '0.25rem' }}>
+                      {s.active && (
+                        <button
+                          type="button"
+                          className="btn-ghost btn-sm"
+                          style={{ color: 'var(--color-danger-text)' }}
+                          disabled={deactivatingStaffId === s.id}
+                          onClick={(e) => { e.stopPropagation(); handleDeactivateStaff(s.id); }}
+                        >
+                          {deactivatingStaffId === s.id ? '...' : 'Anular'}
+                        </button>
+                      )}
                     </span>
                   </div>
                 ))}

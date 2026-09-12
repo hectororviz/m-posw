@@ -218,6 +218,90 @@ export class InternetVouchersService {
     return result;
   }
 
+  async createStaffVoucher(
+    userId: string,
+    dto: { label: string; notes?: string; duration: number; downloadBandwidth?: string; uploadBandwidth?: string },
+  ) {
+    if (!dto.label?.trim()) throw new Error('El nombre es obligatorio');
+    if (!Number.isInteger(dto.duration) || dto.duration <= 0) throw new Error('Duración inválida');
+
+    const body = JSON.stringify({
+      plan_name: 'STAFF',
+      duration: dto.duration,
+      download: dto.downloadBandwidth || '10M',
+      upload: dto.uploadBandwidth || '2M',
+      idle_timeout: 0,
+      sale_id: null,
+    });
+    const data = await this.httpPost(`${this.apiUrl}/vouchers/generate`, body);
+
+    const created = await this.prisma.staffVoucher.create({
+      data: {
+        pin: data.pin,
+        label: dto.label.trim(),
+        notes: dto.notes?.trim() || null,
+        duration: dto.duration,
+        downloadBandwidth: dto.downloadBandwidth || '10M',
+        uploadBandwidth: dto.uploadBandwidth || '2M',
+        createdById: userId,
+      },
+      include: {
+        createdBy: { select: { username: true } },
+      },
+    });
+    this.logger.log(`Staff voucher creado: ${data.pin} (${dto.label.trim()})`);
+    return created;
+  }
+
+  async listStaffVouchers() {
+    const vouchers = await this.prisma.staffVoucher.findMany({
+      include: {
+        createdBy: { select: { username: true } },
+        deactivatedBy: { select: { username: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    const details = await this.getEnrichedDetails(vouchers.map((v) => v.pin));
+    return vouchers.map((v) => {
+      const detail = details.get(v.pin) ?? null;
+      return {
+        id: v.id,
+        pin: v.pin,
+        label: v.label,
+        notes: v.notes,
+        duration: v.duration,
+        active: v.active,
+        createdAt: v.createdAt,
+        createdBy: v.createdBy.username,
+        deactivatedAt: v.deactivatedAt,
+        deactivatedBy: v.deactivatedBy?.username ?? null,
+        firstUseAt: detail?.first_use_at ?? null,
+        expiresAt: detail?.expires_at ?? null,
+        remainingSeconds: detail?.remaining_seconds ?? null,
+        radiusActive: detail?.active ?? null,
+        macAddress: detail?.mac_address ?? null,
+        computedStatus: this.computeStatus(v.active, detail),
+      };
+    });
+  }
+
+  async deactivateStaffVoucher(id: string, userId: string) {
+    const voucher = await this.prisma.staffVoucher.findUnique({ where: { id } });
+    if (!voucher) throw new Error('Pin no encontrado');
+    if (!voucher.active) return { success: true };
+    try {
+      await this.httpRequest(`${this.apiUrl}/vouchers/${voucher.pin}`, 'DELETE');
+    } catch (err) {
+      this.logger.error(`Error anulando staff voucher ${voucher.pin} en RADIUS: ${err}`);
+      throw err;
+    }
+    return this.prisma.staffVoucher.update({
+      where: { id },
+      data: { active: false, deactivatedAt: new Date(), deactivatedById: userId },
+    });
+  }
+
   async httpGet(urlStr: string): Promise<string> {
     return this.httpRequest(urlStr, 'GET');
   }
