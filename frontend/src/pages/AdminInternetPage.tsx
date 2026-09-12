@@ -107,6 +107,8 @@ export const AdminInternetPage: React.FC = () => {
   const { data: detail, isLoading: detailLoading } = useInternetVoucherDetail(detailPin);
   const { pushToast } = useToast();
 
+  const selectedVoucher = detailPin ? (vouchers ?? []).find((x) => x.pin === detailPin) ?? null : null;
+
   const counts = useMemo(() => {
     const c: Record<ComputedVoucherStatus, number> = { activo: 0, vencido: 0, anulado: 0, sin_uso: 0 };
     for (const v of vouchers ?? []) {
@@ -359,32 +361,32 @@ export const AdminInternetPage: React.FC = () => {
               <div className="sales-table">
                 <div className="sales-table-head">
                   <span className="col-date">Fecha</span>
-                  <span className="col-type">Venta</span>
-                  <span className="col-user">Plan</span>
-                  <span className="col-user">PIN / MAC</span>
-                  <span className="col-user">Activación</span>
-                  <span className="col-user">Vencimiento</span>
+                  <span className="col-type vcol-venta">Venta</span>
+                  <span className="col-user vcol-plan">Plan</span>
+                  <span className="col-user vcol-pin">PIN / MAC</span>
+                  <span className="col-user vcol-activacion">Activación</span>
+                  <span className="col-user vcol-vencimiento">Vencimiento</span>
                   <span className="col-user">Restante</span>
                   <span className="col-method">Estado</span>
                   <span className="col-action"></span>
                 </div>
                 {(visibleVouchers ?? []).map((v) => (
-                  <div key={v.id} className="sales-table-row">
+                  <div key={v.id} className="sales-table-row voucher-row-clickable" onClick={() => setDetailPin(v.pin)}>
                     <span className="col-date">{formatDateTime(v.saleCreatedAt)}</span>
-                    <span className="col-type">#{v.saleOrderNumber}</span>
-                    <span className="col-user">{v.planName}</span>
-                    <span className="col-user">
+                    <span className="col-type vcol-venta">#{v.saleOrderNumber}</span>
+                    <span className="col-user vcol-plan">{v.planName}</span>
+                    <span className="col-user vcol-pin">
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'Consolas,monospace', fontWeight: 600 }}>
                         {v.pin}
-                        <button type="button" className="btn-ghost btn-sm" onClick={() => copyPin(v.pin)} aria-label={`Copiar PIN ${v.pin}`} style={{ padding: '0.1rem 0.3rem' }}>
+                        <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); copyPin(v.pin); }} aria-label={`Copiar PIN ${v.pin}`} style={{ padding: '0.1rem 0.3rem' }}>
                           <Copy size={13} />
                         </button>
                       </span>
                       <br />
                       <small style={{ color: 'var(--color-text-faint)', fontFamily: 'Consolas,monospace' }}>{v.macAddress ?? '—'}</small>
                     </span>
-                    <span className="col-user">{formatOptDateTime(v.firstUseAt, 'Sin usar')}</span>
-                    <span className="col-user">{formatOptDateTime(v.expiresAt, v.firstUseAt ? 'Vencido' : 'Al primer uso')}</span>
+                    <span className="col-user vcol-activacion">{formatOptDateTime(v.firstUseAt, 'Sin usar')}</span>
+                    <span className="col-user vcol-vencimiento">{formatOptDateTime(v.expiresAt, v.firstUseAt ? 'Vencido' : 'Al primer uso')}</span>
                     <span className="col-user">
                       {v.computedStatus === 'activo' && v.remainingSeconds !== null && v.remainingSeconds < 86400 ? (
                         <span className="badge badge-warning">{formatRemaining(v.remainingSeconds)}</span>
@@ -396,20 +398,13 @@ export const AdminInternetPage: React.FC = () => {
                       {renderStatusBadge(v)}
                     </span>
                     <span className="col-action" style={{ display: 'flex', gap: '0.25rem' }}>
-                      <button
-                        type="button"
-                        className="btn-ghost btn-sm"
-                        onClick={() => setDetailPin(v.pin)}
-                      >
-                        Estado
-                      </button>
                       {v.active && (
                         <button
                           type="button"
                           className="btn-ghost btn-sm"
                           style={{ color: 'var(--color-danger-text)' }}
                           disabled={deactivatingId === v.id}
-                          onClick={() => handleDeactivate(v.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDeactivate(v.id); }}
                         >
                           {deactivatingId === v.id ? '...' : 'Anular'}
                         </button>
@@ -446,13 +441,27 @@ export const AdminInternetPage: React.FC = () => {
                     <label>PIN</label>
                     <p style={{ margin: 0, fontFamily: 'Consolas,monospace', fontWeight: 700, letterSpacing: '0.1rem' }}>{detail.pin}</p>
                   </div>
+                  {selectedVoucher && (
+                    <>
+                      <div className="settings-field">
+                        <label>Venta</label>
+                        <p style={{ margin: 0 }}>#{selectedVoucher.saleOrderNumber} · {formatDateTime(selectedVoucher.saleCreatedAt)}</p>
+                      </div>
+                      <div className="settings-field">
+                        <label>Plan</label>
+                        <p style={{ margin: 0 }}>{selectedVoucher.planName} ({formatDuration(selectedVoucher.planDuration)})</p>
+                      </div>
+                    </>
+                  )}
                   <div className="settings-field">
                     <label>Estado</label>
                     <p style={{ margin: 0 }}>
-                      {detail.active ? (
-                        <span className="badge badge-success">Activo</span>
-                      ) : (
-                        <span className="badge badge-neutral">Anulado</span>
+                      {selectedVoucher ? renderStatusBadge(selectedVoucher) : (
+                        detail.active ? (
+                          <span className="badge badge-success">Activo</span>
+                        ) : (
+                          <span className="badge badge-neutral">Anulado</span>
+                        )
                       )}
                     </p>
                   </div>

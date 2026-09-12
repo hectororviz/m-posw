@@ -5298,6 +5298,31 @@ button {
   }
 }
 
+/* ─── Internet vouchers: fila clicable + columnas progresivas ── */
+.voucher-row-clickable {
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .sales-table .vcol-venta { display: none; }
+}
+
+@media (max-width: 950px) {
+  .sales-table .vcol-activacion { display: none; }
+}
+
+@media (max-width: 800px) {
+  .sales-table .vcol-pin { display: none; }
+}
+
+@media (max-width: 640px) {
+  .sales-table .vcol-plan { display: none; }
+}
+
+@media (max-width: 500px) {
+  .sales-table .vcol-vencimiento { display: none; }
+}
+
 /* ─── POS Zoom Control ────────────────────────────────────────── */
 .pos-zoom-control {
   display: flex;
