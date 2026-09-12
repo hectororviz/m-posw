@@ -720,6 +720,8 @@ export interface SaleVoucher {
   createdAt: string;
 }
 
+export type ComputedVoucherStatus = 'anulado' | 'sin_uso' | 'activo' | 'vencido';
+
 export interface VoucherListItem {
   id: string;
   pin: string;
@@ -730,6 +732,11 @@ export interface VoucherListItem {
   createdAt: string;
   saleCreatedAt: string;
   salePaidAt: string | null;
+  firstUseAt: string | null;
+  expiresAt: string | null;
+  remainingSeconds: number | null;
+  radiusActive: boolean | null;
+  computedStatus: ComputedVoucherStatus | null;
 }
 
 export interface VoucherDetail {

@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useInternetPlans, useInternetVoucherDetail, useInternetVouchers, useInternetStats } from '../api/queries';
-import type { InternetPlan } from '../api/types';
+import type { ComputedVoucherStatus, InternetPlan, VoucherListItem } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
 type TabId = 'vouchers' | 'planes';
+type VoucherFilter = 'todos' | ComputedVoucherStatus;
 
 const DURATION_OPTIONS = [
   { label: '1 hora', value: 3600 },
@@ -91,8 +92,42 @@ export const AdminInternetPage: React.FC = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [detailPin, setDetailPin] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<VoucherFilter>('todos');
   const { data: detail, isLoading: detailLoading } = useInternetVoucherDetail(detailPin);
   const { pushToast } = useToast();
+
+  const counts = useMemo(() => {
+    const c: Record<ComputedVoucherStatus, number> = { activo: 0, vencido: 0, anulado: 0, sin_uso: 0 };
+    for (const v of vouchers ?? []) {
+      if (v.computedStatus) c[v.computedStatus] += 1;
+      else if (!v.active) c.anulado += 1;
+    }
+    return c;
+  }, [vouchers]);
+
+  const visibleVouchers = useMemo(() => {
+    if (!vouchers) return vouchers;
+    if (statusFilter === 'todos') return vouchers;
+    return vouchers.filter((v) => {
+      if (v.computedStatus) return v.computedStatus === statusFilter;
+      return statusFilter === 'anulado' && !v.active;
+    });
+  }, [vouchers, statusFilter]);
+
+  const toggleFilter = (f: VoucherFilter) => {
+    setStatusFilter((prev) => (prev === f ? 'todos' : f));
+  };
+
+  const renderStatusBadge = (v: VoucherListItem) => {
+    const s = v.computedStatus ?? (v.active ? null : 'anulado');
+    if (s === 'activo') return <span className="badge badge-success">Activo</span>;
+    if (s === 'vencido') return <span className="badge badge-warning">Vencido</span>;
+    if (s === 'sin_uso') return <span className="badge badge-info">Sin uso</span>;
+    if (s === 'anulado') return <span className="badge badge-neutral">Anulado</span>;
+    return v.active
+      ? <span className="badge badge-success">Activo</span>
+      : <span className="badge badge-neutral">Anulado</span>;
+  };
 
   const openCreate = () => {
     setEditingPlan(null);
@@ -226,26 +261,49 @@ export const AdminInternetPage: React.FC = () => {
               <p style={{ color: 'var(--color-text-faint)', margin: '0.35rem 0 0', fontSize: '0.85rem' }}>Cuando se venda un plan de internet, los vouchers apareceran aca.</p>
             </div>
           ) : (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.9rem' }}>
+                <button type="button" className={`badge ${statusFilter === 'todos' ? 'badge-info' : 'badge-neutral'}`} style={{ cursor: 'pointer', border: 0 }} onClick={() => toggleFilter('todos')}>
+                  Todos ({vouchers.length})
+                </button>
+                <button type="button" className={`badge ${statusFilter === 'activo' ? 'badge-success' : 'badge-neutral'}`} style={{ cursor: 'pointer', border: 0 }} onClick={() => toggleFilter('activo')}>
+                  Activos ({counts.activo})
+                </button>
+                <button type="button" className={`badge ${statusFilter === 'vencido' ? 'badge-warning' : 'badge-neutral'}`} style={{ cursor: 'pointer', border: 0 }} onClick={() => toggleFilter('vencido')}>
+                  Vencidos ({counts.vencido})
+                </button>
+                <button type="button" className={`badge ${statusFilter === 'anulado' ? 'badge-neutral' : 'badge-neutral'}`} style={{ cursor: statusFilter === 'anulado' ? undefined : 'pointer', border: statusFilter === 'anulado' ? '1px solid var(--color-text-secondary)' : 0 }} onClick={() => toggleFilter('anulado')}>
+                  Anulados ({counts.anulado})
+                </button>
+                <button type="button" className={`badge ${statusFilter === 'sin_uso' ? 'badge-info' : 'badge-neutral'}`} style={{ cursor: 'pointer', border: 0 }} onClick={() => toggleFilter('sin_uso')}>
+                  Sin uso ({counts.sin_uso})
+                </button>
+              </div>
+              {visibleVouchers && visibleVouchers.length === 0 ? (
+                <div className="settings-section" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
+                  <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>No hay vouchers con este filtro.</p>
+                </div>
+              ) : (
             <div className="sales-table-wrapper">
               <div className="sales-table">
                 <div className="sales-table-head">
                   <span className="col-date">Fecha</span>
                   <span className="col-type">Venta</span>
                   <span className="col-user">Plan</span>
+                  <span className="col-user">Activación</span>
+                  <span className="col-user">Vencimiento</span>
                   <span className="col-method">Estado</span>
                   <span className="col-action"></span>
                 </div>
-                {vouchers.map((v) => (
+                {(visibleVouchers ?? []).map((v) => (
                   <div key={v.id} className="sales-table-row">
                     <span className="col-date">{formatDateTime(v.saleCreatedAt)}</span>
                     <span className="col-type">#{v.saleOrderNumber}</span>
                     <span className="col-user">{v.planName}</span>
+                    <span className="col-user">{formatOptDateTime(v.firstUseAt, 'Sin usar')}</span>
+                    <span className="col-user">{formatOptDateTime(v.expiresAt, v.firstUseAt ? 'Vencido' : 'Al primer uso')}</span>
                     <span className="col-method">
-                      {v.active ? (
-                        <span className="badge badge-success">Activo</span>
-                      ) : (
-                        <span className="badge badge-neutral">Anulado</span>
-                      )}
+                      {renderStatusBadge(v)}
                     </span>
                     <span className="col-action" style={{ display: 'flex', gap: '0.25rem' }}>
                       <button
@@ -271,6 +329,8 @@ export const AdminInternetPage: React.FC = () => {
                 ))}
               </div>
             </div>
+              )}
+            </>
           )}
         </>
       )}

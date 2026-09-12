@@ -473,15 +473,16 @@ export const useInternetPlans = () =>
     },
   });
 
-export const useInternetVouchers = (saleId?: string) =>
+export const useInternetVouchers = (saleId?: string, enriched = true) =>
   useQuery({
-    queryKey: ['internet-vouchers', saleId],
+    queryKey: ['internet-vouchers', saleId, enriched],
     queryFn: async () => {
       const response = await apiClient.get<VoucherListItem[]>('/internet/vouchers/list', {
-        params: saleId ? { saleId } : undefined,
+        params: { ...(saleId ? { saleId } : {}), ...(enriched ? { enriched: 'true' } : {}) },
       });
       return response.data;
     },
+    staleTime: 30000,
   });
 
 export const useInternetStats = () =>

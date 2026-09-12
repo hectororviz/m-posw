@@ -33,7 +33,7 @@ export class InternetVouchersController {
   }
 
   @Get('list')
-  async listVouchers(@Query('saleId') saleId?: string) {
+  async listVouchers(@Query('saleId') saleId?: string, @Query('enriched') enriched?: string) {
     const vouchers = await this.prisma.saleVoucher.findMany({
       where: saleId ? { saleId } : undefined,
       include: {
@@ -44,17 +44,30 @@ export class InternetVouchersController {
       take: 100,
     });
 
-    return vouchers.map((v) => ({
-      id: v.id,
-      pin: v.pin,
-      saleOrderNumber: v.sale.orderNumber,
-      planName: v.plan.name,
-      planDuration: v.plan.duration,
-      active: v.active,
-      createdAt: v.createdAt,
-      saleCreatedAt: v.sale.createdAt,
-      salePaidAt: v.sale.paidAt,
-    }));
+    const withRadius = enriched === 'true' || enriched === '1';
+    const details = withRadius
+      ? await this.vouchersService.getEnrichedDetails(vouchers.map((v) => v.pin))
+      : null;
+
+    return vouchers.map((v) => {
+      const detail = details?.get(v.pin) ?? null;
+      return {
+        id: v.id,
+        pin: v.pin,
+        saleOrderNumber: v.sale.orderNumber,
+        planName: v.plan.name,
+        planDuration: v.plan.duration,
+        active: v.active,
+        createdAt: v.createdAt,
+        saleCreatedAt: v.sale.createdAt,
+        salePaidAt: v.sale.paidAt,
+        firstUseAt: detail?.first_use_at ?? null,
+        expiresAt: detail?.expires_at ?? null,
+        remainingSeconds: detail?.remaining_seconds ?? null,
+        radiusActive: detail?.active ?? null,
+        computedStatus: withRadius ? this.vouchersService.computeStatus(v.active, detail) : null,
+      };
+    });
   }
 
   @Post('generate')

@@ -11,6 +11,20 @@ interface GenerateResponse {
   bandwidth_up: string;
 }
 
+export interface RadiusVoucherDetail {
+  pin: string;
+  plan_name: string;
+  active: boolean;
+  mac_address: string | null;
+  created_at: string;
+  first_use_at: string | null;
+  expires_at: string | null;
+  remaining_seconds: number | null;
+  sale_id: string | null;
+}
+
+export type ComputedVoucherStatus = 'anulado' | 'sin_uso' | 'activo' | 'vencido';
+
 @Injectable()
 export class InternetVouchersService {
   private readonly logger = new Logger(InternetVouchersService.name);
@@ -173,13 +187,35 @@ export class InternetVouchersService {
     }
   }
 
-  async getVoucher(pin: string) {
+  async getVoucher(pin: string): Promise<RadiusVoucherDetail | null> {
     try {
       const data = await this.httpRequest(`${this.apiUrl}/vouchers/${pin}`, 'GET');
       return JSON.parse(data);
     } catch {
       return null;
     }
+  }
+
+  computeStatus(localActive: boolean, detail: RadiusVoucherDetail | null): ComputedVoucherStatus | null {
+    if (!localActive || (detail && detail.active === false)) return 'anulado';
+    if (!detail) return null;
+    if (!detail.first_use_at) return 'sin_uso';
+    if (detail.remaining_seconds !== null && detail.remaining_seconds !== undefined && detail.remaining_seconds <= 0) return 'vencido';
+    if (detail.expires_at && new Date(detail.expires_at).getTime() <= Date.now()) return 'vencido';
+    return 'activo';
+  }
+
+  async getEnrichedDetails(pins: string[]): Promise<Map<string, RadiusVoucherDetail | null>> {
+    const result = new Map<string, RadiusVoucherDetail | null>();
+    const CONCURRENCY = 10;
+    for (let i = 0; i < pins.length; i += CONCURRENCY) {
+      const chunk = pins.slice(i, i + CONCURRENCY);
+      const settled = await Promise.allSettled(chunk.map((pin) => this.getVoucher(pin)));
+      settled.forEach((s, idx) => {
+        result.set(chunk[idx], s.status === 'fulfilled' ? s.value : null);
+      });
+    }
+    return result;
   }
 
   async httpGet(urlStr: string): Promise<string> {
