@@ -736,6 +736,7 @@ export interface VoucherListItem {
   expiresAt: string | null;
   remainingSeconds: number | null;
   radiusActive: boolean | null;
+  macAddress: string | null;
   computedStatus: ComputedVoucherStatus | null;
 }
 
@@ -756,6 +757,12 @@ export interface VoucherStats {
   active_vouchers: number;
   generated_today: number;
   total_vouchers: number;
+  revenue_today: number;
+}
+
+export interface InternetHealth {
+  online: boolean;
+  latencyMs: number | null;
 }
 
 // ─── Players / Jugadores ─────────────────────────────────

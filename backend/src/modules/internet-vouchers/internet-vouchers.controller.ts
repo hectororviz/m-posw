@@ -19,17 +19,27 @@ export class InternetVouchersController {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const [active, todayCount, total] = await Promise.all([
+    const [active, todayCount, total, todayVouchers] = await Promise.all([
       this.prisma.saleVoucher.count({ where: { active: true } }),
       this.prisma.saleVoucher.count({ where: { createdAt: { gte: today, lt: tomorrow } } }),
       this.prisma.saleVoucher.count(),
+      this.prisma.saleVoucher.findMany({
+        where: { createdAt: { gte: today, lt: tomorrow } },
+        include: { plan: { select: { price: true } } },
+      }),
     ]);
 
     return {
       active_vouchers: active,
       generated_today: todayCount,
       total_vouchers: total,
+      revenue_today: todayVouchers.reduce((sum, v) => sum + Number(v.plan.price), 0),
     };
+  }
+
+  @Get('health')
+  health() {
+    return this.vouchersService.ping();
   }
 
   @Get('list')
@@ -65,6 +75,7 @@ export class InternetVouchersController {
         expiresAt: detail?.expires_at ?? null,
         remainingSeconds: detail?.remaining_seconds ?? null,
         radiusActive: detail?.active ?? null,
+        macAddress: detail?.mac_address ?? null,
         computedStatus: withRadius ? this.vouchersService.computeStatus(v.active, detail) : null,
       };
     });

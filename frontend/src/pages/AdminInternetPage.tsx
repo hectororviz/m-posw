@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Plus, X } from 'lucide-react';
+import { Copy, Pencil, Plus, RefreshCw, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useInternetPlans, useInternetVoucherDetail, useInternetVouchers, useInternetStats } from '../api/queries';
+import { useInternetHealth, useInternetPlans, useInternetVoucherDetail, useInternetVouchers, useInternetStats } from '../api/queries';
 import type { ComputedVoucherStatus, InternetPlan, VoucherListItem } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -78,11 +78,22 @@ const formatOptDateTime = (iso: string | null, emptyLabel: string) => {
   return formatDateTime(iso);
 };
 
+const formatUpdatedAgo = (updatedAt: number) => {
+  if (!updatedAt) return 'nunca';
+  const secs = Math.max(0, Math.round((Date.now() - updatedAt) / 1000));
+  if (secs < 10) return 'ahora mismo';
+  if (secs < 60) return `hace ${secs}s`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `hace ${mins}min`;
+  return `hace ${Math.floor(mins / 60)}h`;
+};
+
 export const AdminInternetPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { data: plans, isLoading: plansLoading } = useInternetPlans();
-  const { data: vouchers, isLoading: vouchersLoading } = useInternetVouchers();
+  const { data: vouchers, isLoading: vouchersLoading, dataUpdatedAt: vouchersUpdatedAt, isFetching: vouchersFetching } = useInternetVouchers();
   const { data: stats } = useInternetStats();
+  const { data: health } = useInternetHealth();
   const [activeTab, setActiveTab] = useState<TabId>('vouchers');
   const [error, setError] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<InternetPlan | null>(null);
@@ -116,6 +127,33 @@ export const AdminInternetPage: React.FC = () => {
 
   const toggleFilter = (f: VoucherFilter) => {
     setStatusFilter((prev) => (prev === f ? 'todos' : f));
+  };
+
+  const vencenHoy = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return (vouchers ?? []).filter((v) => {
+      if (!v.expiresAt || v.computedStatus === 'anulado') return false;
+      const t = new Date(v.expiresAt).getTime();
+      return t >= start.getTime() && t < end.getTime();
+    }).length;
+  }, [vouchers]);
+
+  const copyPin = async (pin: string) => {
+    try {
+      await navigator.clipboard.writeText(pin);
+      pushToast('PIN copiado', 'success');
+    } catch {
+      pushToast('No se pudo copiar el PIN', 'error');
+    }
+  };
+
+  const handleRefresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['internet-vouchers'] });
+    await queryClient.invalidateQueries({ queryKey: ['internet-health'] });
+    await queryClient.invalidateQueries({ queryKey: ['internet-stats'] });
   };
 
   const renderStatusBadge = (v: VoucherListItem) => {
@@ -247,8 +285,41 @@ export const AdminInternetPage: React.FC = () => {
                 <span className="sales-kpi-label">Generados hoy</span>
                 <span className="sales-kpi-value">{stats.generated_today}</span>
               </div>
+              <div className="sales-kpi-card">
+                <span className="sales-kpi-label">Recaudado hoy</span>
+                <span className="sales-kpi-value">{getPriceDisplay(stats.revenue_today ?? 0)}</span>
+              </div>
+              <div className="sales-kpi-card">
+                <span className="sales-kpi-label">Vencen hoy</span>
+                <span className="sales-kpi-value">{vencenHoy}</span>
+              </div>
             </div>
           )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.9rem', fontSize: '0.85rem', color: 'var(--color-text-faint)' }}>
+            <span
+              style={{
+                width: '0.55rem',
+                height: '0.55rem',
+                borderRadius: '50%',
+                background: health ? (health.online ? 'var(--color-success)' : 'var(--color-danger)') : 'var(--color-text-faint)',
+                display: 'inline-block',
+              }}
+            />
+            <span>
+              {health ? (health.online ? 'RADIUS en línea' : 'RADIUS sin conexión — datos locales') : 'Consultando RADIUS...'}
+              {vouchersUpdatedAt ? ` · actualizado ${formatUpdatedAgo(vouchersUpdatedAt)}` : ''}
+            </span>
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              onClick={handleRefresh}
+              disabled={vouchersFetching}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+            >
+              <RefreshCw size={14} /> {vouchersFetching ? 'Actualizando...' : 'Revalidar'}
+            </button>
+          </div>
 
           {vouchersLoading ? (
             <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
@@ -290,8 +361,10 @@ export const AdminInternetPage: React.FC = () => {
                   <span className="col-date">Fecha</span>
                   <span className="col-type">Venta</span>
                   <span className="col-user">Plan</span>
+                  <span className="col-user">PIN / MAC</span>
                   <span className="col-user">Activación</span>
                   <span className="col-user">Vencimiento</span>
+                  <span className="col-user">Restante</span>
                   <span className="col-method">Estado</span>
                   <span className="col-action"></span>
                 </div>
@@ -300,8 +373,25 @@ export const AdminInternetPage: React.FC = () => {
                     <span className="col-date">{formatDateTime(v.saleCreatedAt)}</span>
                     <span className="col-type">#{v.saleOrderNumber}</span>
                     <span className="col-user">{v.planName}</span>
+                    <span className="col-user">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'Consolas,monospace', fontWeight: 600 }}>
+                        {v.pin}
+                        <button type="button" className="btn-ghost btn-sm" onClick={() => copyPin(v.pin)} aria-label={`Copiar PIN ${v.pin}`} style={{ padding: '0.1rem 0.3rem' }}>
+                          <Copy size={13} />
+                        </button>
+                      </span>
+                      <br />
+                      <small style={{ color: 'var(--color-text-faint)', fontFamily: 'Consolas,monospace' }}>{v.macAddress ?? '—'}</small>
+                    </span>
                     <span className="col-user">{formatOptDateTime(v.firstUseAt, 'Sin usar')}</span>
                     <span className="col-user">{formatOptDateTime(v.expiresAt, v.firstUseAt ? 'Vencido' : 'Al primer uso')}</span>
+                    <span className="col-user">
+                      {v.computedStatus === 'activo' && v.remainingSeconds !== null && v.remainingSeconds < 86400 ? (
+                        <span className="badge badge-warning">{formatRemaining(v.remainingSeconds)}</span>
+                      ) : (
+                        formatRemaining(v.remainingSeconds)
+                      )}
+                    </span>
                     <span className="col-method">
                       {renderStatusBadge(v)}
                     </span>

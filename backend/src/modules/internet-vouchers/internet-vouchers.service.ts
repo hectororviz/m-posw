@@ -222,6 +222,32 @@ export class InternetVouchersService {
     return this.httpRequest(urlStr, 'GET');
   }
 
+  async ping(): Promise<{ online: boolean; latencyMs: number | null }> {
+    const started = Date.now();
+    return new Promise((resolve) => {
+      const url = new URL(`${this.apiUrl}/vouchers/__healthcheck__`);
+      const req = http.request(
+        {
+          hostname: url.hostname,
+          port: url.port || 80,
+          path: url.pathname,
+          method: 'GET',
+          timeout: 5000,
+        },
+        (res) => {
+          res.resume();
+          res.on('end', () => resolve({ online: true, latencyMs: Date.now() - started }));
+        },
+      );
+      req.on('error', () => resolve({ online: false, latencyMs: null }));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ online: false, latencyMs: null });
+      });
+      req.end();
+    });
+  }
+
   private httpPost(fullUrl: string, body: string): Promise<GenerateResponse> {
     const parsed = new URL(fullUrl);
     return new Promise((resolve, reject) => {
