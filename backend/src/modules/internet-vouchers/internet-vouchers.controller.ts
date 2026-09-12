@@ -46,6 +46,7 @@ export class InternetVouchersController {
 
     return vouchers.map((v) => ({
       id: v.id,
+      pin: v.pin,
       saleOrderNumber: v.sale.orderNumber,
       planName: v.plan.name,
       planDuration: v.plan.duration,

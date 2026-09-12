@@ -403,7 +403,7 @@ Dos tabs con estilo `treasury-subnav-link` (naranja):
 
 | Tab | Contenido |
 |-----|-----------|
-| **Vouchers** (default) | Tabla de vouchers vendidos: fecha, venta #, plan, estado (badge Activo/Usado). Sin mostrar el PIN. |
+| **Vouchers** (default) | Tabla de vouchers vendidos: fecha, venta #, plan, estado (badge Activo/Anulado), botón Estado (modal con PIN, activación, vencimiento, tiempo restante y MAC en vivo desde api-radius) y Anular. |
 | **Planes** | Tabla de planes configurados: nombre, duración, ancho de banda, precio, activo. FAB "+" para crear. Modal con selects de duración, bandwidth y precio (permite $0). |
 
 ### Comportamiento del módulo

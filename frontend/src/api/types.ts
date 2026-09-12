@@ -722,6 +722,7 @@ export interface SaleVoucher {
 
 export interface VoucherListItem {
   id: string;
+  pin: string;
   saleOrderNumber: number;
   planName: string;
   planDuration: number;
@@ -729,6 +730,19 @@ export interface VoucherListItem {
   createdAt: string;
   saleCreatedAt: string;
   salePaidAt: string | null;
+}
+
+export interface VoucherDetail {
+  pin: string;
+  plan_id: string;
+  plan_name: string;
+  active: boolean;
+  mac_address: string | null;
+  created_at: string;
+  first_use_at: string | null;
+  expires_at: string | null;
+  remaining_seconds: number | null;
+  sale_id: string | null;
 }
 
 export interface VoucherStats {

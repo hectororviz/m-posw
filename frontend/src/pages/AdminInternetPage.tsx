@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useInternetPlans, useInternetVouchers, useInternetStats } from '../api/queries';
+import { useInternetPlans, useInternetVoucherDetail, useInternetVouchers, useInternetStats } from '../api/queries';
 import type { InternetPlan } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -53,6 +53,16 @@ const formatDuration = (seconds: number) => {
   return `${seconds}s`;
 };
 
+const formatRemaining = (seconds: number | null) => {
+  if (seconds === null || seconds === undefined) return '—';
+  if (seconds <= 0) return 'Vencido';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  if (h > 0) return `${h}h ${m}min`;
+  return `${m}min`;
+};
+
 const formatDateTime = (iso: string) => {
   const d = new Date(iso);
   const day = d.getDate().toString().padStart(2, '0');
@@ -60,6 +70,11 @@ const formatDateTime = (iso: string) => {
   const hours = d.getHours().toString().padStart(2, '0');
   const minutes = d.getMinutes().toString().padStart(2, '0');
   return `${day}/${month} ${hours}:${minutes}`;
+};
+
+const formatOptDateTime = (iso: string | null, emptyLabel: string) => {
+  if (!iso) return emptyLabel;
+  return formatDateTime(iso);
 };
 
 export const AdminInternetPage: React.FC = () => {
@@ -75,6 +90,8 @@ export const AdminInternetPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [detailPin, setDetailPin] = useState<string | null>(null);
+  const { data: detail, isLoading: detailLoading } = useInternetVoucherDetail(detailPin);
   const { pushToast } = useToast();
 
   const openCreate = () => {
@@ -227,10 +244,17 @@ export const AdminInternetPage: React.FC = () => {
                       {v.active ? (
                         <span className="badge badge-success">Activo</span>
                       ) : (
-                        <span className="badge badge-neutral">Usado</span>
+                        <span className="badge badge-neutral">Anulado</span>
                       )}
                     </span>
-                    <span className="col-action">
+                    <span className="col-action" style={{ display: 'flex', gap: '0.25rem' }}>
+                      <button
+                        type="button"
+                        className="btn-ghost btn-sm"
+                        onClick={() => setDetailPin(v.pin)}
+                      >
+                        Estado
+                      </button>
                       {v.active && (
                         <button
                           type="button"
@@ -249,6 +273,63 @@ export const AdminInternetPage: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {detailPin && (
+        <div className="modal-backdrop" onClick={() => setDetailPin(null)} role="presentation">
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Estado del voucher</h3>
+              <button type="button" className="icon-button" onClick={() => setDetailPin(null)} aria-label="Cerrar">{<X size={16} />}</button>
+            </div>
+            <div className="modal-body">
+              {detailLoading ? (
+                <div style={{ textAlign: 'center', padding: '1.5rem' }}>
+                  <div className="spinner" aria-hidden="true" />
+                  <p style={{ color: 'var(--color-text-faint)', margin: '0.75rem 0 0', fontSize: '0.9rem' }}>Consultando RADIUS...</p>
+                </div>
+              ) : !detail ? (
+                <p style={{ color: 'var(--color-danger-text)', margin: 0, fontSize: '0.9rem' }}>No se pudo obtener el estado. Verificá que api-radius esté en línea.</p>
+              ) : (
+                <>
+                  <div className="settings-field">
+                    <label>PIN</label>
+                    <p style={{ margin: 0, fontFamily: 'Consolas,monospace', fontWeight: 700, letterSpacing: '0.1rem' }}>{detail.pin}</p>
+                  </div>
+                  <div className="settings-field">
+                    <label>Estado</label>
+                    <p style={{ margin: 0 }}>
+                      {detail.active ? (
+                        <span className="badge badge-success">Activo</span>
+                      ) : (
+                        <span className="badge badge-neutral">Anulado</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="settings-field">
+                    <label>Activación (primer uso)</label>
+                    <p style={{ margin: 0 }}>{formatOptDateTime(detail.first_use_at, 'Sin usar todavía')}</p>
+                  </div>
+                  <div className="settings-field">
+                    <label>Vencimiento</label>
+                    <p style={{ margin: 0 }}>{formatOptDateTime(detail.expires_at, detail.first_use_at ? 'Vencido' : 'Se activa en el primer uso')}</p>
+                  </div>
+                  <div className="settings-field">
+                    <label>Tiempo restante</label>
+                    <p style={{ margin: 0 }}>{formatRemaining(detail.remaining_seconds)}</p>
+                  </div>
+                  <div className="settings-field" style={{ marginBottom: 0 }}>
+                    <label>Dispositivo (MAC)</label>
+                    <p style={{ margin: 0, fontFamily: 'Consolas,monospace' }}>{detail.mac_address || '—'}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" className="btn-ghost" onClick={() => setDetailPin(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* TAB: Planes */}
