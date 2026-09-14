@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
@@ -20,19 +20,24 @@ export class UsersController {
   }
 
   @Get()
+  @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
   list() {
     return this.usersService.list();
   }
 
   @Patch(':id')
   @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
-  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @Req() req: { user: { sub: string } },
+  ) {
+    return this.usersService.update(id, dto, req.user.sub);
   }
 
   @Delete(':id')
   @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(@Param('id') id: string, @Req() req: { user: { sub: string } }) {
+    return this.usersService.remove(id, req.user.sub);
   }
 }

@@ -183,11 +183,11 @@ export interface Setting {
   whatsappUseApi?: boolean | null;
   whatsappWebMessage?: string | null;
   whatsappPhoneNumberId?: string | null;
-  whatsappAccessToken?: string | null;
   whatsappBusinessAccountId?: string | null;
-  whatsappWebhookVerifyToken?: string | null;
   whatsappTemplateName?: string | null;
-  whatsappAppSecret?: string | null;
+  hasAccessToken?: boolean | null;
+  hasAppSecret?: boolean | null;
+  hasWebhookVerifyToken?: boolean | null;
   clubAlias?: string | null;
   whatsappVariableOrder?: Record<string, number> | null;
   enableAutoJournalPos?: boolean | null;

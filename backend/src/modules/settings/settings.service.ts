@@ -13,6 +13,19 @@ const DEFAULT_ERROR_ANIMATION_URL = '/animations/error.json';
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
+  async getPublic() {
+    const settings = await this.prisma.setting.findFirst();
+    return {
+      storeName: settings?.storeName ?? DEFAULT_STORE_NAME,
+      clubName: settings?.clubName ?? DEFAULT_CLUB_NAME,
+      logoUrl: settings?.logoUrl ?? null,
+      faviconUrl: settings?.faviconUrl ?? null,
+      okAnimationUrl: settings?.okAnimationUrl ?? DEFAULT_OK_ANIMATION_URL,
+      errorAnimationUrl: settings?.errorAnimationUrl ?? DEFAULT_ERROR_ANIMATION_URL,
+      accentColor: settings?.accentColor ?? DEFAULT_ACCENT_COLOR,
+    };
+  }
+
   async get() {
     const settings = await this.prisma.setting.upsert({
       where: { id: DEFAULT_SETTING_ID },
@@ -69,13 +82,13 @@ export class SettingsService {
       whatsappUseApi: settings.whatsappUseApi,
       whatsappWebMessage: settings.whatsappWebMessage,
       whatsappPhoneNumberId: settings.whatsappPhoneNumberId,
-      whatsappAccessToken: settings.whatsappAccessToken,
       whatsappBusinessAccountId: settings.whatsappBusinessAccountId,
-      whatsappWebhookVerifyToken: settings.whatsappWebhookVerifyToken,
       clubAlias: settings.clubAlias,
       whatsappVariableOrder: settings.whatsappVariableOrder,
       whatsappTemplateName: settings.whatsappTemplateName,
-      whatsappAppSecret: settings.whatsappAppSecret,
+      hasAccessToken: !!settings.whatsappAccessToken,
+      hasAppSecret: !!settings.whatsappAppSecret,
+      hasWebhookVerifyToken: !!settings.whatsappWebhookVerifyToken,
       enableAutoJournalPos: settings.enableAutoJournalPos,
       enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores,
       enableAutoJournalSocios: settings.enableAutoJournalSocios,
@@ -85,7 +98,18 @@ export class SettingsService {
   }
 
   async update(dto: UpdateSettingDto) {
-    const result = await this.prisma.setting.upsert({
+    const secretFields = [
+      'whatsappAccessToken',
+      'whatsappAppSecret',
+      'whatsappWebhookVerifyToken',
+    ] as const;
+    for (const field of secretFields) {
+      const value = (dto as Record<string, unknown>)[field];
+      if (typeof value === 'string' && value.trim() === '') {
+        delete (dto as Record<string, unknown>)[field];
+      }
+    }
+    await this.prisma.setting.upsert({
       where: { id: DEFAULT_SETTING_ID },
       create: {
         id: DEFAULT_SETTING_ID,
@@ -165,6 +189,6 @@ export class SettingsService {
       });
     }
 
-    return result;
+    return this.get();
   }
 }

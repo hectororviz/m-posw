@@ -54,16 +54,35 @@ export const useRawMaterials = () =>
     },
   });
 
+export const usePublicSettings = () =>
+  useQuery({
+    queryKey: ['settings-public'],
+    queryFn: async () => {
+      const response = await apiClient.get<Setting>('/settings/public');
+      return response.data;
+    },
+    staleTime: sevenMinutes,
+  });
+
 export const useSettings = () => {
   const queryClient = useQueryClient();
   return useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
-      const response = await apiClient.get<Setting>('/settings');
-      return response.data;
+      try {
+        const response = await apiClient.get<Setting>('/settings');
+        return response.data;
+      } catch (err: unknown) {
+        if ((err as { response?: { status?: number } })?.response?.status === 401) {
+          const pub = await apiClient.get<Setting>('/settings/public');
+          return pub.data;
+        }
+        throw err;
+      }
     },
     staleTime: sevenMinutes,
     placeholderData: () => queryClient.getQueryData<Setting>(['settings']),
+    retry: false,
   });
 };
 

@@ -3,6 +3,7 @@ frontend/node_modules/
 backend/dist/
 backend/dist-prisma/
 .env
+.env.bak-*
 m_posw_android/build/
 m_posw_android/.dart_tool/
 m_posw_android/.idea/

@@ -96,7 +96,9 @@ export const App: React.FC = () => {
         path="/category/:id"
         element={
           <ProtectedRoute>
-            <CategoryPage />
+            <ModuleRoute module="POS">
+              <CategoryPage />
+            </ModuleRoute>
           </ProtectedRoute>
         }
       />
@@ -104,7 +106,9 @@ export const App: React.FC = () => {
         path="/checkout/payment"
         element={
           <ProtectedRoute>
-            <CheckoutPaymentPage />
+            <ModuleRoute module="POS">
+              <CheckoutPaymentPage />
+            </ModuleRoute>
           </ProtectedRoute>
         }
       />
@@ -112,7 +116,9 @@ export const App: React.FC = () => {
         path="/checkout/qr/:saleId"
         element={
           <ProtectedRoute>
-            <CheckoutQrPage />
+            <ModuleRoute module="POS">
+              <CheckoutQrPage />
+            </ModuleRoute>
           </ProtectedRoute>
         }
       />
@@ -120,7 +126,9 @@ export const App: React.FC = () => {
         path="/sales"
         element={
           <ProtectedRoute>
-            <SalesPage />
+            <ModuleRoute module="VENTAS">
+              <SalesPage />
+            </ModuleRoute>
           </ProtectedRoute>
         }
       />

@@ -14,10 +14,16 @@ import { UsersModule } from '../users/users.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET'),
-        signOptions: { expiresIn: '12h' },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret = config.get<string>('JWT_SECRET');
+        if (!secret || secret.length < 32) {
+          throw new Error('FATAL: JWT_SECRET no configurado o demasiado corto (mínimo 32 caracteres)');
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: '4h' },
+        };
+      },
     }),
   ],
   controllers: [AuthController],

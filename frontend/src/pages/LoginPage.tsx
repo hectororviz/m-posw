@@ -1,14 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
-import { useSettings } from '../api/queries';
+import { usePublicSettings } from '../api/queries';
 import type { AuthResponse } from '../api/types';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const { data: settings } = useSettings();
+  const { data: settings } = usePublicSettings();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

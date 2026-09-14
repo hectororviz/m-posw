@@ -90,7 +90,7 @@ export class UsersService {
     return result;
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(id: string, dto: UpdateUserDto, requesterId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: { role: true },
@@ -104,6 +104,10 @@ export class UsersService {
       throw new BadRequestException('No se puede modificar al administrador');
     }
 
+    if (requesterId && id === requesterId && dto.active === false) {
+      throw new BadRequestException('No podés desactivar tu propio usuario');
+    }
+
     const data: Record<string, unknown> = {};
     if (dto.username !== undefined) data.username = dto.username;
     if (dto.active !== undefined) data.active = dto.active;
@@ -115,31 +119,38 @@ export class UsersService {
       data.password = await bcrypt.hash(dto.password, 10);
     }
 
-    const result = await this.prisma.user.update({
-      where: { id },
-      data,
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        active: true,
-        homeModule: true,
-        homeSmartphoneModule: true,
-        externalPosId: true,
-        externalStoreId: true,
-      },
-    });
+    try {
+      const result = await this.prisma.user.update({
+        where: { id },
+        data,
+        select: {
+          id: true,
+          username: true,
+          role: true,
+          active: true,
+          homeModule: true,
+          homeSmartphoneModule: true,
+          externalPosId: true,
+          externalStoreId: true,
+        },
+      });
 
-    if (dto.permissions !== undefined) {
-      await this.userPermissionsService.setPermissions(id, dto.permissions);
+      if (dto.permissions !== undefined) {
+        await this.userPermissionsService.setPermissions(id, dto.permissions);
+      }
+
+      const permissions = await this.userPermissionsService.getPermissions(result.id);
+
+      return { ...result, permissions };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new BadRequestException('Usuario ya registrado');
+      }
+      throw error;
     }
-
-    const permissions = await this.userPermissionsService.getPermissions(result.id);
-
-    return { ...result, permissions };
   }
 
-  async remove(id: string) {
+  async remove(id: string, requesterId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: { role: true, username: true },
@@ -151,6 +162,10 @@ export class UsersService {
 
     if (user.role === 'ADMIN') {
       throw new BadRequestException('No se puede eliminar al administrador');
+    }
+
+    if (requesterId && id === requesterId) {
+      throw new BadRequestException('No podés eliminar tu propio usuario');
     }
 
     return this.prisma.user.delete({

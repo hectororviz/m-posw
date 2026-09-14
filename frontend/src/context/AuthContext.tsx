@@ -21,13 +21,22 @@ const storageUserKey = 'authUser';
 const storagePermissionsKey = 'authPermissions';
 const storageHomeModuleKey = 'authHomeModule';
 
+const safeParse = <T,>(raw: string | null, fallback: T): T => {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 const loadAuthState = (): AuthState => {
   const token = localStorage.getItem(storageKey);
   const userRaw = localStorage.getItem(storageUserKey);
   const permissionsRaw = localStorage.getItem(storagePermissionsKey);
   const homeModule = localStorage.getItem(storageHomeModuleKey);
-  const user = userRaw ? (JSON.parse(userRaw) as User) : null;
-  const permissions = permissionsRaw ? (JSON.parse(permissionsRaw) as ModulePermission[]) : [];
+  const user = safeParse<User | null>(userRaw, null);
+  const permissions = safeParse<ModulePermission[]>(permissionsRaw, []);
   return { token, user, permissions, homeModule };
 };
 

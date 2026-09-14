@@ -110,7 +110,13 @@ const animationUploadOptions = {
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  @Get('public')
+  getPublic() {
+    return this.settingsService.getPublic();
+  }
+
   @Get()
+  @UseGuards(JwtAuthGuard)
   get() {
     return this.settingsService.get();
   }

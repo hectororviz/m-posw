@@ -6,7 +6,7 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useConversationMessages, useConversations, useNotificacionesHistory, useNotificacionesConfig, useSendConversationMessage, useDeleteConversationMessage, useDeleteConversation, useTestNotificacionesConnection, useSettings, useMarkAllConversationsRead } from '../api/queries';
 import type { NotificacionesJob, WhatsAppMessage } from '../api/types';
 import { useToast } from '../components/ToastProvider';
-import MediaBubble from './notificaciones/MediaBubble';
+import AuthenticatedMediaBubble from './notificaciones/AuthenticatedMediaBubble';
 import LightboxModal from './notificaciones/LightboxModal';
 import TemplateModal from './notificaciones/TemplateModal';
 
@@ -72,18 +72,18 @@ export const AdminNotificacionesPage: React.FC = () => {
 
   useEffect(() => {
     if (settings) {
-      setForm({
+      setForm((prev) => ({
         whatsappUseApi: settings.whatsappUseApi ?? true,
         whatsappWebMessage: settings.whatsappWebMessage ?? '',
         whatsappPhoneNumberId: settings.whatsappPhoneNumberId ?? '',
-        whatsappAccessToken: settings.whatsappAccessToken ?? '',
+        whatsappAccessToken: prev.whatsappAccessToken ?? '',
         whatsappBusinessAccountId: settings.whatsappBusinessAccountId ?? '',
-        whatsappWebhookVerifyToken: settings.whatsappWebhookVerifyToken ?? '',
+        whatsappWebhookVerifyToken: prev.whatsappWebhookVerifyToken ?? '',
         whatsappTemplateName: settings.whatsappTemplateName ?? '',
-        whatsappAppSecret: settings.whatsappAppSecret ?? '',
+        whatsappAppSecret: prev.whatsappAppSecret ?? '',
         clubAlias: settings.clubAlias ?? '',
         whatsappVariableOrder: settings.whatsappVariableOrder || {},
-      });
+      }));
     }
   }, [settings]);
 
@@ -114,7 +114,11 @@ export const AdminNotificacionesPage: React.FC = () => {
     setSaving(true);
     setError(null);
     try {
-      await apiClient.patch('/settings', form);
+      const payload: Record<string, unknown> = { ...form };
+      if (!payload.whatsappAccessToken) delete payload.whatsappAccessToken;
+      if (!payload.whatsappAppSecret) delete payload.whatsappAppSecret;
+      if (!payload.whatsappWebhookVerifyToken) delete payload.whatsappWebhookVerifyToken;
+      await apiClient.patch('/settings', payload);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       await queryClient.invalidateQueries({ queryKey: ['notificaciones-config'] });
       pushToast('Configuración guardada', 'success');
@@ -155,10 +159,22 @@ export const AdminNotificacionesPage: React.FC = () => {
 
   const [lightbox, setLightbox] = useState<{ url: string } | null>(null);
 
-  const getMediaUrl = (msg: WhatsAppMessage) => {
-    if (!msg.mediaType) return null;
-    const base = import.meta.env.VITE_API_BASE_URL || '/api';
-    return `${base}/notificaciones/media-public/${msg.id}`;
+  const [lightboxBlobUrl, setLightboxBlobUrl] = useState<string | null>(null);
+
+  const handleOpenLightbox = async (msg: WhatsAppMessage, fallbackUrl: string) => {
+    if (msg.mediaType === 'audio') {
+      setLightbox({ url: fallbackUrl });
+      return;
+    }
+    try {
+      const res = await apiClient.get(`/notificaciones/media/${msg.id}`, { responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(res.data);
+      if (lightboxBlobUrl) URL.revokeObjectURL(lightboxBlobUrl);
+      setLightboxBlobUrl(blobUrl);
+      setLightbox({ url: blobUrl });
+    } catch {
+      setLightbox({ url: fallbackUrl });
+    }
   };
 
   useEffect(() => {
@@ -301,12 +317,13 @@ export const AdminNotificacionesPage: React.FC = () => {
           </div>
 
           <div className="settings-field">
-            <label>Access Token (permanente) *</label>
+            <label>Access Token (permanente) * {settings?.hasAccessToken ? '(configurado)' : ''}</label>
             <input
               type="password"
               value={form.whatsappAccessToken}
               onChange={(e) => setForm({ ...form, whatsappAccessToken: e.target.value })}
-              placeholder="EAA..."
+              placeholder={settings?.hasAccessToken ? '•••••••• (dejar vacío para no cambiar)' : 'EAA...'}
+              autoComplete="new-password"
             />
             <small style={{ color: 'var(--color-text-faint)' }}>Token de acceso permanente. Crear en Meta Developers → Herramientas → Generar token → whatsapp_business_messaging.</small>
           </div>
@@ -318,14 +335,14 @@ export const AdminNotificacionesPage: React.FC = () => {
           </div>
 
           <div className="settings-field">
-            <label>App Secret</label>
-            <input type="password" value={form.whatsappAppSecret} onChange={(e) => setForm({ ...form, whatsappAppSecret: e.target.value })} placeholder="Secreto de la app de Meta" />
+            <label>App Secret {settings?.hasAppSecret ? '(configurado)' : ''}</label>
+            <input type="password" value={form.whatsappAppSecret} onChange={(e) => setForm({ ...form, whatsappAppSecret: e.target.value })} placeholder={settings?.hasAppSecret ? '•••••••• (dejar vacío para no cambiar)' : 'Secreto de la app de Meta'} autoComplete="new-password" />
             <small style={{ color: 'var(--color-text-faint)' }}>Secreto de la app de Meta para validar firma de webhooks entrantes (opcional).</small>
           </div>
 
           <div className="settings-field">
-            <label>Webhook Verify Token</label>
-            <input type="text" value={form.whatsappWebhookVerifyToken} onChange={(e) => setForm({ ...form, whatsappWebhookVerifyToken: e.target.value })} placeholder="Token personalizado" />
+            <label>Webhook Verify Token {settings?.hasWebhookVerifyToken ? '(configurado)' : ''}</label>
+            <input type="text" value={form.whatsappWebhookVerifyToken} onChange={(e) => setForm({ ...form, whatsappWebhookVerifyToken: e.target.value })} placeholder={settings?.hasWebhookVerifyToken ? '•••••••• (dejar vacío para no cambiar)' : 'Token personalizado'} autoComplete="off" />
             <small style={{ color: 'var(--color-text-faint)' }}>Token usado por Meta para verificar el webhook.</small>
           </div>
 
@@ -572,11 +589,10 @@ export const AdminNotificacionesPage: React.FC = () => {
                           >
                             <Trash2 size={14} />
                           </button>
-                          <MediaBubble
+                          <AuthenticatedMediaBubble
                             msg={msg}
                             direction={msg.direction as 'INBOUND' | 'OUTBOUND'}
-                            mediaUrl={getMediaUrl(msg)}
-                            onOpenLightbox={(url) => setLightbox({ url })}
+                            onOpenLightbox={(url) => handleOpenLightbox(msg, url)}
                           />
                           <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', opacity: 0.7, textAlign: 'right' }}>
                             {formatTime(msg.createdAt)}
@@ -626,7 +642,7 @@ export const AdminNotificacionesPage: React.FC = () => {
         </div>
       )}
     </div>
-    {lightbox && <LightboxModal url={lightbox.url} onClose={() => setLightbox(null)} />}
+    {lightbox && <LightboxModal url={lightbox.url} onClose={() => { setLightbox(null); if (lightboxBlobUrl) { URL.revokeObjectURL(lightboxBlobUrl); setLightboxBlobUrl(null); } }} />}
     </>
   );
 };

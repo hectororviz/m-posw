@@ -16,7 +16,15 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const port = config.get<number>('PORT') || 3000;
   const corsOrigin = config.get<string>('CORS_ORIGIN');
-  const webhookSecretLength = config.get<string>('MP_WEBHOOK_SECRET')?.length ?? 0;
+  const jwtSecret = config.get<string>('JWT_SECRET');
+
+  if (!jwtSecret || jwtSecret.length < 32) {
+    logger.error(
+      'FATAL: JWT_SECRET no configurado o demasiado corto (mínimo 32 caracteres). ' +
+      'Generá uno con: openssl rand -base64 48',
+    );
+    process.exit(1);
+  }
 
   if (!corsOrigin) {
     logger.error(
@@ -36,14 +44,15 @@ async function bootstrap() {
   
   // Global exception filter to ensure JSON responses
   app.useGlobalFilters(new GlobalExceptionFilter());
-  
+
+  app.getHttpAdapter().getInstance().use('/uploads/whatsapp-media', (_req: unknown, res: { status: (code: number) => { json: (body: unknown) => void } }) => {
+    res.status(403).json({ message: 'Acceso denegado. Usar GET /notificaciones/media/:id autenticado.' });
+  });
   app.useStaticAssets(UPLOADS_DIR, { prefix: '/uploads' });
   app.useStaticAssets(join(process.cwd(), 'public'));
 
   const prismaService = app.get(PrismaService);
   prismaService.enableShutdownHooks(app);
-
-  logger.debug(`MercadoPago webhook secret length: ${webhookSecretLength}`);
 
   await app.listen(port);
 }

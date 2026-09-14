@@ -4,22 +4,31 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
+  const existingAdminRole = await prisma.user.findFirst({ where: { role: Role.ADMIN } });
+  if (!existingAdminRole) {
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminPassword = process.env.ADMIN_PASSWORD;
 
-  const passwordHash = await bcrypt.hash(adminPassword, 10);
-  const adminData = {
-    username: adminUsername,
-    password: passwordHash,
-    role: Role.ADMIN,
-    active: true,
-  };
+    if (!adminUsername || !adminPassword) {
+      throw new Error('FATAL: no existe ningún ADMIN y ADMIN_USERNAME / ADMIN_PASSWORD no están configurados. Sin defaults por seguridad.');
+    }
 
-  await prisma.user.upsert({
-    where: { username: adminUsername },
-    update: adminData,
-    create: adminData,
-  });
+    const existingAdmin = await prisma.user.findUnique({ where: { username: adminUsername } });
+    if (!existingAdmin) {
+      const passwordHash = await bcrypt.hash(adminPassword, 10);
+      await prisma.user.create({
+        data: {
+          username: adminUsername,
+          password: passwordHash,
+          role: Role.ADMIN,
+          active: true,
+        },
+      });
+      console.log(`Admin inicial "${adminUsername}" creado.`);
+    } else if (existingAdmin.role !== Role.ADMIN) {
+      throw new Error(`FATAL: ya existe un usuario "${adminUsername}" que no es ADMIN.`);
+    }
+  }
 
   const setting = await prisma.setting.findFirst();
   if (!setting) {

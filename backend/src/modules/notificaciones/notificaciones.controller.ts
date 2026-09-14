@@ -176,7 +176,9 @@ export class NotificacionesController {
     if (!result) {
       return res.status(404).json({ error: 'Media no encontrado' });
     }
-    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', 'inline');
     return res.sendFile(result.filePath, { headers: { 'Content-Type': result.mimeType } });
   }
 }

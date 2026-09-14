@@ -1,36 +1,44 @@
 import { Body, Controller, Get, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
+import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
+import { ModuleAccessGuard } from '../common/module-access.guard';
+import { RequireModule } from '../common/module-access.decorator';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
 import { SalesService } from './sales.service';
 
 @Controller('sales')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ModuleAccessGuard)
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Post('cash')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   createCash(@Req() req: { user: { sub: string } }, @Body() dto: CreateCashSaleDto) {
     return this.salesService.createCashSale(req.user.sub, dto);
   }
 
   @Post('qr')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   createQr(@Req() req: { user: { sub: string } }, @Body() dto: CreateQrSaleDto) {
     return this.salesService.createQrSale(req.user.sub, dto);
   }
 
   @Post('fiado')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   createFiado(@Req() req: { user: { sub: string } }, @Body() dto: CreateFiadoSaleDto) {
     return this.salesService.createFiadoSale(req.user.sub, dto);
   }
 
   @Get()
+  @RequireModule(ModuleKey.VENTAS, ModuleAccess.READ)
   list() {
     return this.salesService.listSales();
   }
 
   @Post('manual-movements')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   createManualMovement(
     @Req() req: { user: { sub: string } },
     @Body() dto: CreateManualMovementDto,
@@ -39,6 +47,7 @@ export class SalesController {
   }
 
   @Get('manual-movements')
+  @RequireModule(ModuleKey.VENTAS, ModuleAccess.READ)
   listManualMovements() {
     return this.salesService.listManualMovements();
   }
@@ -74,6 +83,7 @@ export class SalesController {
   }
 
   @Post(':id/complete')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   completeSale(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -82,6 +92,7 @@ export class SalesController {
   }
 
   @Post(':id/cancel')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   cancelQrSale(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -90,6 +101,7 @@ export class SalesController {
   }
 
   @Post(':id/ticket-printed')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   markTicketPrinted(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,

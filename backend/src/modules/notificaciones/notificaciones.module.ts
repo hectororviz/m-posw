@@ -6,11 +6,10 @@ import { NotificacionesService } from './notificaciones.service';
 import { WhatsAppCloudProvider } from './providers/whatsapp-cloud.provider';
 import { WhatsAppMediaService } from './whatsapp-media.service';
 import { WhatsAppWebhookController } from './webhook.controller';
-import { MediaPublicController } from './media-public.controller';
 
 @Module({
   imports: [UsersModule],
-  controllers: [NotificacionesController, WhatsAppWebhookController, MediaPublicController],
+  controllers: [NotificacionesController, WhatsAppWebhookController],
   providers: [NotificacionesService, PrismaService, WhatsAppCloudProvider, WhatsAppMediaService],
   exports: [NotificacionesService],
 })
