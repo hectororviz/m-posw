@@ -52,8 +52,11 @@ describe('MercadoPagoWebhookProcessorService', () => {
     const salesService = {
       decrementStockForSale: jest.fn().mockResolvedValue(undefined),
     } as unknown as SalesService;
+    const internetVouchers = {
+      generateVouchersForSale: jest.fn().mockResolvedValue([]),
+    } as any;
 
-    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway, salesService);
+    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway, salesService, internetVouchers);
 
     await processor.processWebhook({
       body: { type: 'payment' },
@@ -116,8 +119,11 @@ describe('MercadoPagoWebhookProcessorService', () => {
     const salesService2 = {
       decrementStockForSale: jest.fn().mockResolvedValue(undefined),
     } as unknown as SalesService;
+    const internetVouchers2 = {
+      generateVouchersForSale: jest.fn().mockResolvedValue([]),
+    } as any;
 
-    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway2, salesService2);
+    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway2, salesService2, internetVouchers2);
 
     await processor.processWebhook({
       body: { type: 'merchant_order', resource: 'https://api.mercadopago.com/merchant_orders/mo-1' },

@@ -52,8 +52,8 @@ export const CartPanel: React.FC<CartPanelProps> = ({ showMovementButton }) => {
   const handleApplyDiscounts = (qrData: any) => {
     const available = qrData.beneficios.filter((b: any) => b.disponible) as any[];
     setSocioData({
-      socioId: qrData.socio.id || 0,
-      uuid: '',
+      socioId: Number(qrData.socio.id) || 0,
+      uuid: qrData.socio.uuid || '',
       nombre: qrData.socio.nombre,
       nroSocio: qrData.socio.nroSocio,
       beneficios: available.map((b: any) => ({

@@ -231,9 +231,11 @@ export class MercadoPagoWebhookProcessorService {
     // Decrementar stock si la venta acaba de ser aprobada
     if (wasNotApproved && resolvedSaleStatus === SaleStatus.APPROVED) {
       await this.salesService.decrementStockForSale(sale.id);
-      this.internetVouchers.generateVouchersForSale(sale.id).catch(err =>
-        this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`),
-      );
+      try {
+        await this.internetVouchers.generateVouchersForSale(sale.id);
+      } catch (err) {
+        this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`);
+      }
     }
 
     this.salesGateway.notifyPaymentStatusChanged({

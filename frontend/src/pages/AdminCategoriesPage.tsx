@@ -63,6 +63,8 @@ export const AdminCategoriesPage: React.FC = () => {
       }
       closeModal();
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err) {
       setError(normalizeApiError(err));
     }
@@ -73,6 +75,8 @@ export const AdminCategoriesPage: React.FC = () => {
     try {
       await apiClient.delete(`/categories/${categoryId}`);
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
+      await queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (err) {
       setError(normalizeApiError(err));
     }
@@ -88,6 +92,7 @@ export const AdminCategoriesPage: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
+      await queryClient.invalidateQueries({ queryKey: ['categories'] });
     } catch (err) {
       setError(normalizeApiError(err));
     }

@@ -65,7 +65,12 @@ export class CashCloseService {
     const salesTransferTotal = sales
       .filter((sale) => sale.paymentMethod === 'TRANSFER')
       .reduce((acc, sale) => acc.add(sale.total), ZERO);
+    const salesFiadoTotal = sales
+      .filter((sale) => sale.paymentMethod === 'FIADO')
+      .reduce((acc, sale) => acc.add(sale.total), ZERO);
+    const salesFiadoCount = sales.filter((sale) => sale.paymentMethod === 'FIADO').length;
     const salesTotal = salesCashTotal.add(salesQrTotal).add(salesTransferTotal);
+    const salesGrossTotal = salesTotal.add(salesFiadoTotal);
 
     const movementsOutTotal = movements
       .filter((movement) => movement.type === MovementType.SALIDA)
@@ -80,7 +85,10 @@ export class CashCloseService {
       salesCashTotal: this.round(salesCashTotal),
       salesQrTotal: this.round(salesQrTotal),
       salesTransferTotal: this.round(salesTransferTotal),
+      salesFiadoTotal: this.round(salesFiadoTotal),
+      salesFiadoCount,
       salesTotal: this.round(salesTotal),
+      salesGrossTotal: this.round(salesGrossTotal),
       salesCount: sales.length,
       movementsOutTotal: this.round(movementsOutTotal),
       movementsInTotal: this.round(movementsInTotal),
@@ -102,6 +110,7 @@ export class CashCloseService {
     const now = new Date();
     const { from, to } = await this.getCurrentPeriodBounds(now);
     const summary = await this.buildSummary(from, to);
+    const { salesFiadoTotal, salesFiadoCount, salesGrossTotal, ...persistable } = summary;
 
     const cashClose = await this.prisma.cashClose.create({
       data: {
@@ -110,7 +119,7 @@ export class CashCloseService {
         closedAt: to,
         closedByUserId: userId,
         note: note?.trim() || null,
-        ...summary,
+        ...persistable,
       },
     });
 

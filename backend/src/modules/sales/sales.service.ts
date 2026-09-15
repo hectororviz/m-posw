@@ -27,8 +27,9 @@ export class SalesService {
   ) {}
 
   async createCashSale(userId: string, dto: CreateCashSaleDto) {
-    const { items, total } = await this.buildSaleItems(dto.items);
-    const roundedTotal = this.roundToCurrency(total);
+    const { items, total: subtotal } = await this.buildSaleItems(dto.items);
+    const validatedDiscount = await this.resolveSocioDiscount(dto.items, dto.socioId, dto.discountTotal, dto.canjes);
+    const roundedTotal = this.roundToCurrency(subtotal - validatedDiscount);
     this.assertTotal(dto.total, roundedTotal);
     const cashReceived = this.roundToCurrency(dto.cashReceived);
     if (cashReceived < roundedTotal) {
@@ -72,8 +73,9 @@ export class SalesService {
   }
 
   async createQrSale(userId: string, dto: CreateQrSaleDto) {
-    const { items, total } = await this.buildSaleItems(dto.items);
-    const roundedTotal = this.roundToCurrency(total);
+    const { items, total: subtotal } = await this.buildSaleItems(dto.items);
+    const validatedDiscount = await this.resolveSocioDiscount(dto.items, dto.socioId, dto.discountTotal, dto.canjes);
+    const roundedTotal = this.roundToCurrency(subtotal - validatedDiscount);
     this.assertTotal(dto.total, roundedTotal);
 
     let sale;
@@ -128,8 +130,9 @@ export class SalesService {
   }
 
   async createFiadoSale(userId: string, dto: CreateFiadoSaleDto) {
-    const { items, total } = await this.buildSaleItems(dto.items);
-    const roundedTotal = this.roundToCurrency(total);
+    const { items, total: subtotal } = await this.buildSaleItems(dto.items);
+    const validatedDiscount = await this.resolveSocioDiscount(dto.items, dto.socioId, dto.discountTotal, dto.canjes);
+    const roundedTotal = this.roundToCurrency(subtotal - validatedDiscount);
     this.assertTotal(dto.total, roundedTotal);
 
     const acreedor = await this.prisma.acreedor.findFirst({
@@ -363,9 +366,19 @@ export class SalesService {
     await this.decrementStockForSale(saleId);
     this.logger.log(`Stock decrementado para venta ${saleId}`);
 
-    this.internetVouchers.generateVouchersForSale(saleId).catch(err => this.logger.error(`Error generando vouchers para sale ${saleId}: ${err}`));
+    try {
+      await this.internetVouchers.generateVouchersForSale(saleId);
+    } catch (err) {
+      this.logger.error(`Error generando vouchers para sale ${saleId}: ${err}`);
+    }
 
-    return updatedSale;
+    return this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        items: { include: { product: { include: { category: true } } } },
+        vouchers: { include: { plan: true } },
+      },
+    });
   }
 
   async markTicketPrinted(saleId: string, requester: { id: string; role: string }) {
@@ -468,6 +481,85 @@ export class SalesService {
         items: { include: { product: { include: { category: true } } } },
       },
     });
+  }
+
+  async resolveSocioDiscount(
+    itemsInput: SaleItemInputDto[],
+    socioId?: number,
+    discountTotal?: number,
+    canjes?: { socioBeneficioId: string; montoDescontado: number }[],
+  ): Promise<number> {
+    const claimed = discountTotal ? this.roundToCurrency(discountTotal) : 0;
+    if (!claimed && !socioId) return 0;
+    if (claimed < 0) throw new BadRequestException('Descuento inválido');
+    if (!socioId) throw new BadRequestException('Descuento sin socio asociado');
+    const socio = await this.prisma.socio.findUnique({ where: { id: socioId } });
+    if (!socio) throw new BadRequestException('Socio no encontrado');
+    if (socio.estado !== 'ACTIVO') throw new BadRequestException('Socio sin beneficios disponibles');
+    const now = new Date();
+    const anioActual = now.getUTCFullYear();
+    const mesActual = now.getUTCMonth() + 1;
+    const atrasadas = await this.prisma.socioCuota.count({
+      where: {
+        socioId,
+        estado: { in: ['PENDIENTE', 'PARCIAL'] },
+        OR: [{ anio: { lt: anioActual } }, { anio: anioActual, mes: { lt: mesActual } }],
+      },
+    });
+    if (atrasadas > 0) throw new BadRequestException('Socio con deuda, sin beneficios');
+    const beneficios = await this.prisma.socioBeneficio.findMany({
+      where: { socioTipoId: socio.socioTipoId, activo: true },
+    });
+    if (!beneficios.length) throw new BadRequestException('Socio sin beneficios configurados');
+    const byId = new Map(beneficios.map((b) => [b.id, b]));
+    for (const c of canjes ?? []) {
+      if (!byId.has(c.socioBeneficioId)) throw new BadRequestException('Beneficio inválido para el socio');
+    }
+    const productIds = itemsInput.map((i) => i.productId);
+    const products = await this.prisma.product.findMany({ where: { id: { in: productIds } } });
+    const prodById = new Map(products.map((p) => [p.id, p]));
+    const hoyInicio = new Date();
+    hoyInicio.setUTCHours(3, 0, 0, 0);
+    let expected = 0;
+    const covered = new Map<string, number>();
+    for (const b of beneficios.filter((x) => x.productoId)) {
+      const item = itemsInput.find((i) => i.productId === b.productoId);
+      if (!item) continue;
+      const canjesHoy = b.limiteDiario
+        ? await this.prisma.socioCanje.count({ where: { socioBeneficioId: b.id, socioId, fecha: { gte: hoyInicio } } })
+        : 0;
+      const remaining = b.limiteDiario ? Math.max(0, b.limiteDiario - canjesHoy) : item.quantity;
+      const units = Math.min(remaining, item.quantity);
+      if (units <= 0) continue;
+      const price = Number(prodById.get(b.productoId!)?.price ?? 0);
+      let desc = (price * units * Number(b.porcentaje)) / 100;
+      if (b.descuentoMaximo != null) desc = Math.min(desc, Number(b.descuentoMaximo));
+      expected += desc;
+      covered.set(b.productoId!, units);
+    }
+    for (const b of beneficios.filter((x) => !x.productoId && x.categoriaProdId)) {
+      let subtotalCat = 0;
+      for (const item of itemsInput) {
+        const prod = prodById.get(item.productId);
+        if (!prod || prod.categoryId !== b.categoriaProdId) continue;
+        const already = covered.get(item.productId) ?? 0;
+        const avail = Math.max(0, item.quantity - already);
+        if (avail > 0) subtotalCat += Number(prod.price) * avail;
+      }
+      if (subtotalCat <= 0) continue;
+      if (b.limiteDiario) {
+        const canjesHoy = await this.prisma.socioCanje.count({ where: { socioBeneficioId: b.id, socioId, fecha: { gte: hoyInicio } } });
+        if (canjesHoy >= b.limiteDiario) continue;
+      }
+      let desc = (subtotalCat * Number(b.porcentaje)) / 100;
+      if (b.descuentoMaximo != null) desc = Math.min(desc, Number(b.descuentoMaximo));
+      expected += desc;
+    }
+    expected = this.roundToCurrency(expected);
+    if (Math.abs(claimed - expected) > 0.05) {
+      throw new BadRequestException(`Descuento inválido: esperado $${expected}, recibido $${claimed}`);
+    }
+    return expected;
   }
 
   private async buildSaleItems(items: SaleItemInputDto[]) {

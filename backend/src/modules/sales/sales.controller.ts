@@ -53,6 +53,7 @@ export class SalesController {
   }
 
   @Get(':id')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   getById(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -61,6 +62,7 @@ export class SalesController {
   }
 
   @Get(':id/status')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   getStatus(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,
@@ -69,6 +71,7 @@ export class SalesController {
   }
 
   @Get(':id/payment-status')
+  @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
   getPaymentStatus(
     @Req() req: { user: { sub: string; role: string } },
     @Param('id') id: string,

@@ -1,4 +1,5 @@
-import { ArrayMinSize, IsArray, IsIn, IsInt, IsNumber, IsString, Min } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class SaleItemInputDto {
   @IsString()
@@ -9,10 +10,36 @@ export class SaleItemInputDto {
   quantity: number;
 }
 
+export class SocioCanjeInputDto {
+  @IsString()
+  socioBeneficioId: string;
+
+  @IsNumber()
+  @Min(0)
+  montoDescontado: number;
+}
+
 export class CreateSaleDto {
   @IsArray()
   @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => SaleItemInputDto)
   items: SaleItemInputDto[];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountTotal?: number;
+
+  @IsOptional()
+  @IsInt()
+  socioId?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SocioCanjeInputDto)
+  canjes?: SocioCanjeInputDto[];
 }
 
 export class CreateCashSaleDto extends CreateSaleDto {

@@ -152,6 +152,7 @@ export class PaymentsService {
     montoEsperado: number,
     userId: string,
     items: { productId: string; quantity: number }[],
+    discount?: { discountTotal?: number; socioId?: number; canjes?: { socioBeneficioId: string; montoDescontado: number }[] },
   ): Promise<{ success: boolean; saleId?: string; orderNumber?: number; message?: string }> {
     // Check if already processed
     const existing = await this.prisma.movimientoMP.findUnique({
@@ -169,8 +170,13 @@ export class PaymentsService {
       };
     }
 
+    const validatedDiscount = await this.salesService.resolveSocioDiscount(
+      items,
+      discount?.socioId,
+      discount?.discountTotal,
+      discount?.canjes,
+    );
     // Create sale with transfer payment method
-    const roundedTotal = Math.round(montoEsperado * 100) / 100;
     const roundedReceived = Math.round(montoRecibido * 100) / 100;
 
     // Build sale items
@@ -184,12 +190,14 @@ export class PaymentsService {
     }
 
     const saleItems = [];
+    let computedSubtotal = 0;
     for (const item of items) {
       const product = products.find((p) => p.id === item.productId);
       if (!product) continue;
-      
+
       const price = Number(product.price);
       const subtotal = Math.round(price * item.quantity * 100) / 100;
+      computedSubtotal += subtotal;
 
       // Get or create counter for this product
       const counter = await this.prisma.productOrderCounter.upsert({
@@ -204,6 +212,10 @@ export class PaymentsService {
         subtotal,
         orderNumber: counter.lastOrderNumber,
       });
+    }
+    const roundedTotal = Math.round((computedSubtotal - validatedDiscount) * 100) / 100;
+    if (Math.abs(roundedTotal - Math.round(montoEsperado * 100) / 100) > 0.05) {
+      throw new Error('El total no coincide con los items y descuentos');
     }
 
     // Create the sale and movimiento in a transaction

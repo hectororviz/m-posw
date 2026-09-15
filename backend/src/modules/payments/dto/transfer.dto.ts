@@ -1,4 +1,4 @@
-import { IsNumber, IsPositive, IsString, IsUUID, IsInt, Min, ValidateNested, IsArray, ArrayMinSize } from 'class-validator';
+import { IsNumber, IsPositive, IsString, IsUUID, IsInt, IsOptional, Min, ValidateNested, IsArray, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ConfirmTransferItemDto {
@@ -39,6 +39,20 @@ export class ConfirmTransferWithItemsDto extends ConfirmTransferDto {
   @ValidateNested({ each: true })
   @Type(() => ConfirmTransferItemDto)
   items: ConfirmTransferItemDto[];
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsOptional()
+  @Type(() => Number)
+  discountTotal?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  socioId?: number;
+
+  @IsArray()
+  @IsOptional()
+  canjes?: { socioBeneficioId: string; montoDescontado: number }[];
 }
 
 export interface PollTransferResponse {

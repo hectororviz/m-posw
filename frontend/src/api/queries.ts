@@ -5,6 +5,7 @@ import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, C
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
 const tenMinutes = 10 * 60 * 1000;
+const posStaleTime = 60 * 1000;
 
 export const useCategories = () =>
   useQuery({
@@ -13,7 +14,7 @@ export const useCategories = () =>
       const response = await apiClient.get<Category[]>('/categories');
       return response.data;
     },
-    staleTime: sevenMinutes,
+    staleTime: posStaleTime,
   });
 
 export const useAdminCategories = () =>
@@ -33,7 +34,7 @@ export const useProductsByCategory = (categoryId?: string) =>
       return response.data;
     },
     enabled: Boolean(categoryId),
-    staleTime: sevenMinutes,
+    staleTime: posStaleTime,
   });
 
 export const useAdminProducts = () =>

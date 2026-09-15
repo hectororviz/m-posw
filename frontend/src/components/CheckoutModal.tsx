@@ -391,8 +391,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         setQrStatus(status);
         if (status === 'APPROVED') {
           clearQrTimers();
-          const saleResponse = await apiClient.get<Sale>(`/sales/${saleId}`);
-          const sale = saleResponse.data;
+          const sale = await fetchSaleWithVouchers(saleId);
           await maybePrintTicket({
             settings,
             saleId,
@@ -450,8 +449,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     if (status === 'APPROVED') {
       clearQrTimers();
       try {
-        const saleResponse = await apiClient.get<Sale>(`/sales/${saleId}`);
-        const sale = saleResponse.data;
+        const sale = await fetchSaleWithVouchers(saleId);
         await maybePrintTicket({
           settings,
           saleId,
@@ -549,6 +547,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
             items: items.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
             total,
             paymentMethod: 'MP_QR' as PaymentMethod,
+            ...discountPayload(),
           },
           { signal: controller.signal },
         );
@@ -659,15 +658,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         monto_recibido: montoRecibido,
         monto_esperado: montoEsperado,
         items: items.map((item) => ({ productId: item.product.id, quantity: item.quantity })),
+        ...discountPayload(),
       });
       
       const data = response.data;
       
       if (data.success && data.saleId) {
-        // Print ticket
-        const saleResponse = await apiClient.get<Sale>(`/sales/${data.saleId}`);
-        const sale = saleResponse.data;
-        
+        // Print ticket (re-fetch con retry para incluir vouchers)
+        const sale = await fetchSaleWithVouchers(data.saleId);
+
         await maybePrintTicket({
           settings,
           saleId: data.saleId,
@@ -706,6 +705,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     }
   };
 
+  const discountPayload = () =>
+    socioData && discounts.length > 0
+      ? {
+          discountTotal: roundToCurrency(discountSum),
+          socioId: socioData.socioId,
+          canjes: discounts.map((d) => ({ socioBeneficioId: d.beneficioId, montoDescontado: d.monto })),
+        }
+      : {};
+
+  const fetchSaleWithVouchers = async (id: string): Promise<Sale> => {
+    let sale = (await apiClient.get<Sale>(`/sales/${id}`)).data;
+    if (!sale.vouchers || sale.vouchers.length === 0) {
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        sale = (await apiClient.get<Sale>(`/sales/${id}`)).data;
+      } catch {
+        // keep first result on retry failure
+      }
+    }
+    return sale;
+  };
+
   const registerCanjes = async (saleId: string) => {
     if (!socioData || discounts.length === 0) return;
     try {
@@ -735,6 +756,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         paymentMethod: 'CASH' as PaymentMethod,
         cashReceived: receivedAmount,
         changeAmount,
+        ...discountPayload(),
       });
       const sale = response.data;
       registerCanjes(sale.id);
@@ -818,6 +840,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         total,
         paymentMethod: 'FIADO' as PaymentMethod,
         acreedorId: selectedAcreedorId,
+        ...discountPayload(),
       });
       const sale = response.data;
       registerCanjes(sale.id);

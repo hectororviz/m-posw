@@ -92,6 +92,7 @@ export class SociosQrService {
 
     return {
       socio: {
+        id: socio.id,
         nombre: `${socio.apellido}, ${socio.nombre}`,
         nroSocio: socio.nroSocio,
         tipo: socio.socioTipo.nombre,
