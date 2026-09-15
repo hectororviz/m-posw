@@ -1,4 +1,5 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateAcreedorDto {
   @IsString()
@@ -11,4 +12,16 @@ export class CreateAcreedorDto {
   @IsOptional()
   @IsString()
   notas?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  limiteDeuda?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  advertenciaDeuda?: number;
 }

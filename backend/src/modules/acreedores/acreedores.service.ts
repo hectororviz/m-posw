@@ -44,6 +44,8 @@ interface AjusteConSaldo {
 
 type DeudaEntry = FiadoVentaConSaldo | AjusteConSaldo;
 
+export type EstadoDeuda = 'OK' | 'ADVERTENCIA' | 'LIMITE';
+
 interface FifoResult {
   deudaMasAntigua: string | null;
   diasSinPagar: number | null;
@@ -192,6 +194,8 @@ export class AcreedoresService {
         a.pagos as unknown as PagoRaw[],
       );
       const saldo = totalFiado + totalAjustes - totalPagado;
+      const limiteDeuda = this.toMontoOrNull(a.limiteDeuda);
+      const advertenciaDeuda = this.toMontoOrNull(a.advertenciaDeuda);
       return {
         id: a.id,
         nombre: a.nombre,
@@ -203,6 +207,9 @@ export class AcreedoresService {
         diasSinPagar: saldo <= 0 ? null : diasSinPagar,
         saldo,
         saldoFavor: saldo < 0 ? Math.abs(saldo) : 0,
+        limiteDeuda,
+        advertenciaDeuda,
+        estadoDeuda: this.estadoDeuda(saldo, limiteDeuda, advertenciaDeuda),
       };
     });
   }
@@ -212,31 +219,127 @@ export class AcreedoresService {
     if (!acreedor) {
       throw new NotFoundException('Acreedor no encontrado');
     }
-    return acreedor;
+    return {
+      ...acreedor,
+      limiteDeuda: this.toMontoOrNull(acreedor.limiteDeuda),
+      advertenciaDeuda: this.toMontoOrNull(acreedor.advertenciaDeuda),
+    };
   }
 
-  create(dto: CreateAcreedorDto) {
-    return this.prisma.acreedor.create({ data: dto });
+  private toMontoOrNull(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    return Number(value);
+  }
+
+  private validarLimites(
+    limiteDeuda: number | null | undefined,
+    advertenciaDeuda: number | null | undefined,
+  ) {
+    if (
+      limiteDeuda != null &&
+      advertenciaDeuda != null &&
+      limiteDeuda < advertenciaDeuda
+    ) {
+      throw new BadRequestException(
+        'El límite de deuda debe ser mayor o igual a la advertencia',
+      );
+    }
+  }
+
+  estadoDeuda(
+    saldo: number,
+    limiteDeuda: number | null,
+    advertenciaDeuda: number | null,
+  ): EstadoDeuda {
+    if (saldo <= 0) return 'OK';
+    if (limiteDeuda != null && saldo > limiteDeuda) return 'LIMITE';
+    if (advertenciaDeuda != null && saldo > advertenciaDeuda)
+      return 'ADVERTENCIA';
+    return 'OK';
+  }
+
+  async getSaldoActual(acreedorId: number): Promise<number> {
+    const [sumFiado, sumAjustes, sumPagos] = await Promise.all([
+      this.prisma.fiadoVenta.aggregate({
+        _sum: { monto: true },
+        where: { acreedorId },
+      }),
+      this.prisma.ajusteAcreedor.aggregate({
+        _sum: { monto: true },
+        where: { acreedorId },
+      }),
+      this.prisma.pagoAcreedor.aggregate({
+        _sum: { monto: true },
+        where: { acreedorId },
+      }),
+    ]);
+    return (
+      Number(sumFiado._sum.monto ?? 0) +
+      Number(sumAjustes._sum.monto ?? 0) -
+      Number(sumPagos._sum.monto ?? 0)
+    );
+  }
+
+  async assertLimiteNoSuperado(acreedorId: number, montoNuevo: number) {
+    const acreedor = await this.findOne(acreedorId);
+    const limite = this.toMontoOrNull(acreedor.limiteDeuda);
+    if (limite == null) return;
+    const saldoActual = await this.getSaldoActual(acreedorId);
+    const proyectado = saldoActual + montoNuevo;
+    if (proyectado > limite + 0.001) {
+      throw new BadRequestException(
+        `Monto máximo superado: la deuda proyectada ($${proyectado.toFixed(2)}) excede el límite ($${limite.toFixed(2)})`,
+      );
+    }
+  }
+
+  async create(dto: CreateAcreedorDto) {
+    this.validarLimites(dto.limiteDeuda, dto.advertenciaDeuda);
+    const acreedor = await this.prisma.acreedor.create({ data: dto });
+    return {
+      ...acreedor,
+      limiteDeuda: this.toMontoOrNull(acreedor.limiteDeuda),
+      advertenciaDeuda: this.toMontoOrNull(acreedor.advertenciaDeuda),
+    };
   }
 
   async update(id: number, dto: UpdateAcreedorDto) {
-    await this.findOne(id);
-    return this.prisma.acreedor.update({
+    const actual = await this.findOne(id);
+    const limite =
+      dto.limiteDeuda !== undefined
+        ? dto.limiteDeuda
+        : this.toMontoOrNull(actual.limiteDeuda);
+    const advertencia =
+      dto.advertenciaDeuda !== undefined
+        ? dto.advertenciaDeuda
+        : this.toMontoOrNull(actual.advertenciaDeuda);
+    this.validarLimites(limite, advertencia);
+    const updated = await this.prisma.acreedor.update({
       where: { id },
       data: dto,
     });
+    return {
+      ...updated,
+      limiteDeuda: this.toMontoOrNull(updated.limiteDeuda),
+      advertenciaDeuda: this.toMontoOrNull(updated.advertenciaDeuda),
+    };
   }
 
   async toggleActive(id: number) {
     const acreedor = await this.findOne(id);
-    return this.prisma.acreedor.update({
+    const updated = await this.prisma.acreedor.update({
       where: { id },
       data: { activo: !acreedor.activo },
     });
+    return {
+      ...updated,
+      limiteDeuda: this.toMontoOrNull(updated.limiteDeuda),
+      advertenciaDeuda: this.toMontoOrNull(updated.advertenciaDeuda),
+    };
   }
 
   async getDeuda(id: number) {
-    await this.findOne(id);
+    const acreedor = await this.findOne(id);
 
     const fiadoVentas = await this.prisma.fiadoVenta.findMany({
       where: { acreedorId: id },
@@ -270,6 +373,9 @@ export class AcreedoresService {
         pagos as unknown as PagoRaw[],
       );
 
+    const limiteDeuda = this.toMontoOrNull(acreedor.limiteDeuda);
+    const advertenciaDeuda = this.toMontoOrNull(acreedor.advertenciaDeuda);
+
     return {
       fiadoVentas: fiadoVentasConSaldo,
       ajustes: ajustesConSaldo,
@@ -281,6 +387,9 @@ export class AcreedoresService {
       deudaMasAntigua: saldoBruto > 0 ? deudaMasAntigua : null,
       diasSinPagar: saldoBruto > 0 ? diasSinPagar : null,
       alertaDeuda: saldoBruto <= 0 ? false : alertaDeuda,
+      limiteDeuda,
+      advertenciaDeuda,
+      estadoDeuda: this.estadoDeuda(saldoBruto, limiteDeuda, advertenciaDeuda),
     };
   }
 
@@ -364,6 +473,8 @@ export class AcreedoresService {
     if (dto.monto <= 0) {
       throw new BadRequestException('El monto debe ser mayor a 0');
     }
+
+    await this.assertLimiteNoSuperado(acreedorId, dto.monto);
 
     const [year, month, day] = dto.fecha.split('-').map(Number);
 

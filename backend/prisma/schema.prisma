@@ -549,11 +549,13 @@ model QuickExpenseButton {
 }
 
 model Acreedor {
-  id          Int              @id @default(autoincrement())
-  nombre      String
-  telefono    String?
-  notas       String?
-  activo      Boolean          @default(true)
+  id               Int              @id @default(autoincrement())
+  nombre           String
+  telefono         String?
+  notas            String?
+  activo           Boolean          @default(true)
+  limiteDeuda      Decimal?         @db.Decimal(10, 2)
+  advertenciaDeuda Decimal?         @db.Decimal(10, 2)
   createdAt   DateTime         @default(now())
   fiadoVentas FiadoVenta[]
   pagos       PagoAcreedor[]

@@ -552,6 +552,8 @@ export interface AccountingSummary {
   }>;
 }
 
+export type EstadoDeuda = 'OK' | 'ADVERTENCIA' | 'LIMITE';
+
 export interface Acreedor {
   id: number;
   nombre: string;
@@ -563,6 +565,9 @@ export interface Acreedor {
   diasSinPagar?: number | null;
   saldo?: number;
   saldoFavor?: number;
+  limiteDeuda?: number | null;
+  advertenciaDeuda?: number | null;
+  estadoDeuda?: EstadoDeuda;
 }
 
 export interface FiadoVentaItem {
@@ -601,6 +606,9 @@ export interface AcreedorDeuda {
   deudaMasAntigua: string | null;
   diasSinPagar: number | null;
   alertaDeuda: boolean;
+  limiteDeuda?: number | null;
+  advertenciaDeuda?: number | null;
+  estadoDeuda?: EstadoDeuda;
 }
 
 export interface AcreedoresResumen {

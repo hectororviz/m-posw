@@ -310,6 +310,20 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         </div>
       )}
 
+      {deuda?.estadoDeuda === 'LIMITE' && (
+        <div className="alerta-deuda-banner" style={{ borderColor: 'var(--color-danger)', background: 'color-mix(in srgb, var(--color-danger) 10%, transparent)' }}>
+          <AlertTriangle size={16} className="alerta-deuda-icon" /> Deuda por encima del límite
+          {deuda.limiteDeuda != null && <> ({formatCurrency(deuda.limiteDeuda)})</>}. No se pueden registrar nuevas ventas fiadas ni ajustes.
+        </div>
+      )}
+
+      {deuda?.estadoDeuda === 'ADVERTENCIA' && (
+        <div className="alerta-deuda-banner" style={{ borderColor: 'var(--color-warning, #f59e0b)', background: 'color-mix(in srgb, var(--color-warning, #f59e0b) 10%, transparent)' }}>
+          <AlertTriangle size={16} className="alerta-deuda-icon" /> Deuda por encima de la advertencia
+          {deuda.advertenciaDeuda != null && <> ({formatCurrency(deuda.advertenciaDeuda)})</>}.
+        </div>
+      )}
+
       {deuda && (
         <div className="sales-kpis" style={{ marginBottom: '1.5rem' }}>
           <div className="sales-kpi-card">
@@ -320,6 +334,16 @@ export const AdminAcreedorDetailPage: React.FC = () => {
             <span className="sales-kpi-label">Total pagado</span>
             <span className="sales-kpi-value">{formatCurrency(deuda.totalPagado)}</span>
           </div>
+          {(deuda.advertenciaDeuda != null || deuda.limiteDeuda != null) && (
+            <div className="sales-kpi-card">
+              <span className="sales-kpi-label">Advertencia / Límite</span>
+              <span className="sales-kpi-value" style={{ fontSize: '1.05rem' }}>
+                {deuda.advertenciaDeuda != null ? formatCurrency(deuda.advertenciaDeuda) : '—'}
+                {' / '}
+                {deuda.limiteDeuda != null ? formatCurrency(deuda.limiteDeuda) : '—'}
+              </span>
+            </div>
+          )}
           {deuda.saldoFavor > 0 ? (
             <div className="sales-kpi-card">
               <span className="sales-kpi-label">Saldo a favor</span>

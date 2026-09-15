@@ -53,7 +53,7 @@ describe('SalesService MercadoPago QR auth', () => {
     };
 
     return {
-      service: new SalesService(prisma as any, config, mpService as any, mpQueryService as any),
+      service: new SalesService(prisma as any, config, mpService as any, mpQueryService as any, undefined as any, undefined as any, undefined as any),
       prisma,
       mpService,
       mpQueryService,

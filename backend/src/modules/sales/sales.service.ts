@@ -8,6 +8,7 @@ import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto, SaleItemInputDt
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 import { InternetVouchersService } from '../internet-vouchers/internet-vouchers.service';
+import { AcreedoresService } from '../acreedores/acreedores.service';
 import {
   mapMpPaymentToPaymentStatus,
 } from './webhooks/mercadopago-webhook.utils';
@@ -24,6 +25,7 @@ export class SalesService {
     private mpQueryService: MercadoPagoQueryService,
     private journalEntriesService: JournalEntriesService,
     private internetVouchers: InternetVouchersService,
+    private acreedoresService: AcreedoresService,
   ) {}
 
   async createCashSale(userId: string, dto: CreateCashSaleDto) {
@@ -256,6 +258,11 @@ export class SalesService {
     if (!acreedor) {
       throw new NotFoundException('Acreedor no encontrado o inactivo');
     }
+
+    await this.acreedoresService.assertLimiteNoSuperado(
+      dto.acreedorId,
+      roundedTotal,
+    );
 
     const setting = await this.prisma.setting.findFirst();
 

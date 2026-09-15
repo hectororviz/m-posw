@@ -99,7 +99,7 @@ export const AdminAcreedoresPage: React.FC = () => {
   const { socket } = useSocketContext();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState({ nombre: '', telefono: '', notas: '', activo: true });
+  const [form, setForm] = useState({ nombre: '', telefono: '', notas: '', activo: true, limiteDeuda: '', advertenciaDeuda: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -225,7 +225,7 @@ export const AdminAcreedoresPage: React.FC = () => {
   };
 
   const resetForm = () => {
-    setForm({ nombre: '', telefono: '', notas: '', activo: true });
+    setForm({ nombre: '', telefono: '', notas: '', activo: true, limiteDeuda: '', advertenciaDeuda: '' });
     setEditingId(null);
     setError(null);
   };
@@ -238,7 +238,14 @@ export const AdminAcreedoresPage: React.FC = () => {
   const openEdit = (id: number) => {
     const a = acreedores.find((ac) => ac.id === id);
     if (!a) return;
-    setForm({ nombre: a.nombre, telefono: a.telefono ?? '', notas: a.notas ?? '', activo: a.activo });
+    setForm({
+      nombre: a.nombre,
+      telefono: a.telefono ?? '',
+      notas: a.notas ?? '',
+      activo: a.activo,
+      limiteDeuda: a.limiteDeuda != null ? String(a.limiteDeuda) : '',
+      advertenciaDeuda: a.advertenciaDeuda != null ? String(a.advertenciaDeuda) : '',
+    });
     setEditingId(id);
     setError(null);
     setModalOpen(true);
@@ -249,6 +256,16 @@ export const AdminAcreedoresPage: React.FC = () => {
       setError('El nombre es obligatorio');
       return;
     }
+    const limite = form.limiteDeuda.trim() === '' ? null : Number(form.limiteDeuda);
+    const advertencia = form.advertenciaDeuda.trim() === '' ? null : Number(form.advertenciaDeuda);
+    if ((limite != null && (isNaN(limite) || limite < 0)) || (advertencia != null && (isNaN(advertencia) || advertencia < 0))) {
+      setError('Advertencia y límite deben ser montos válidos mayor o igual a 0');
+      return;
+    }
+    if (limite != null && advertencia != null && limite < advertencia) {
+      setError('El límite debe ser mayor o igual a la advertencia');
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -257,6 +274,8 @@ export const AdminAcreedoresPage: React.FC = () => {
           nombre: form.nombre,
           telefono: form.telefono || undefined,
           notas: form.notas || undefined,
+          limiteDeuda: limite,
+          advertenciaDeuda: advertencia,
         });
         const acreedor = acreedores.find((a) => a.id === editingId);
         if (acreedor && acreedor.activo !== form.activo) {
@@ -268,6 +287,8 @@ export const AdminAcreedoresPage: React.FC = () => {
           nombre: form.nombre,
           telefono: form.telefono || undefined,
           notas: form.notas || undefined,
+          ...(limite != null ? { limiteDeuda: limite } : {}),
+          ...(advertencia != null ? { advertenciaDeuda: advertencia } : {}),
         });
         pushToast('Acreedor creado', 'success');
       }
@@ -412,11 +433,19 @@ export const AdminAcreedoresPage: React.FC = () => {
               const statusInfo = notificationStatus?.[a.id] ?? null;
               const notifIcon = getNotificationIcon(statusInfo, wsInfo);
 
+              const estadoLimite = a.estadoDeuda ?? 'OK';
               return (
                 <div
                   key={a.id}
                   className="sales-table-row"
-                  style={{ cursor: 'pointer' }}
+                  style={{
+                    cursor: 'pointer',
+                    ...(estadoLimite === 'LIMITE'
+                      ? { background: 'color-mix(in srgb, var(--color-danger) 8%, transparent)' }
+                      : estadoLimite === 'ADVERTENCIA'
+                        ? { background: 'color-mix(in srgb, var(--color-warning, #f59e0b) 8%, transparent)' }
+                        : {}),
+                  }}
                   onClick={() => navigate(`/admin/acreedores/${a.id}`)}
                 >
                   {notificationsEnabled && whatsappUseApi && (
@@ -440,7 +469,15 @@ export const AdminAcreedoresPage: React.FC = () => {
                       )}
                     </span>
                   )}
-                  <span className="col-date" style={{ fontWeight: 500 }}>{a.nombre}</span>
+                  <span className="col-date" style={{ fontWeight: 500 }}>
+                    {a.nombre}
+                    {estadoLimite === 'LIMITE' && (
+                      <span className="badge badge-error" style={{ marginLeft: '0.4rem' }} title={a.limiteDeuda != null ? `Límite: ${formatCurrency(a.limiteDeuda)}` : 'Límite superado'}>LÍMITE</span>
+                    )}
+                    {estadoLimite === 'ADVERTENCIA' && (
+                      <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }} title={a.advertenciaDeuda != null ? `Advertencia: ${formatCurrency(a.advertenciaDeuda)}` : 'Advertencia superada'}>AVISO</span>
+                    )}
+                  </span>
                   <span className="col-user">{a.telefono || '--'}</span>
                   <span className="col-total" style={{ flex: '0 0 110px' }}>{getSaldoDisplay(a)}</span>
                   <span
@@ -561,6 +598,28 @@ export const AdminAcreedoresPage: React.FC = () => {
                   onChange={(e) => setForm({ ...form, notas: e.target.value })}
                   placeholder="Notas adicionales"
                 />
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div className="settings-field" style={{ flex: 1 }}>
+                  <label>Advertencia ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.advertenciaDeuda}
+                    onChange={(e) => setForm({ ...form, advertenciaDeuda: e.target.value })}
+                    placeholder="Sin tope"
+                  />
+                </div>
+                <div className="settings-field" style={{ flex: 1 }}>
+                  <label>Límite ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={form.limiteDeuda}
+                    onChange={(e) => setForm({ ...form, limiteDeuda: e.target.value })}
+                    placeholder="Sin tope"
+                  />
+                </div>
               </div>
               {editingId && (
                 <div className="settings-field">

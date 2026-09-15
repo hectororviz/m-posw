@@ -58,6 +58,15 @@ interface CheckoutModalProps {
   onClose: () => void;
 }
 
+interface FiadoAcreedorOption {
+  id: number;
+  nombre: string;
+  activo: boolean;
+  saldo?: number | null;
+  limiteDeuda?: number | null;
+  advertenciaDeuda?: number | null;
+}
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose }) => {
   const { items, discounts, socioData, clear } = useCart();
   const { pushToast } = useToast();
@@ -85,11 +94,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const [transferResult, setTransferResult] = useState<QrResultType | null>(null);
   const [transferResultMessage, setTransferResultMessage] = useState<string | null>(null);
   
-  const [acreedores, setAcreedores] = useState<Array<{ id: number; nombre: string; activo: boolean }>>([]);
+  const [acreedores, setAcreedores] = useState<FiadoAcreedorOption[]>([]);
   const [selectedAcreedorId, setSelectedAcreedorId] = useState<number | null>(null);
   const [fiadoLoading, setFiadoLoading] = useState(false);
   const [fiadoError, setFiadoError] = useState<string | null>(null);
-  
+  const [fiadoWarnAck, setFiadoWarnAck] = useState(false);
+
   const { showEmbeddedKeyboard } = useEmbeddedKeyboard();
   const { socket } = useSocketContext();
   const qrRequestRef = useRef<AbortController | null>(null);
@@ -108,6 +118,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     () => roundToCurrency(items.reduce((acc, item) => acc + item.product.price * item.quantity, 0) - discountSum),
     [items, discountSum],
   );
+
+  const fiadoEstadoDeuda = (a: FiadoAcreedorOption): 'OK' | 'ADVERTENCIA' | 'LIMITE' => {
+    const proyectado = (a.saldo ?? 0) + total;
+    if (a.limiteDeuda != null && proyectado > a.limiteDeuda) return 'LIMITE';
+    if (a.advertenciaDeuda != null && proyectado > a.advertenciaDeuda) return 'ADVERTENCIA';
+    return 'OK';
+  };
+
+  const selectedAcreedor = acreedores.find((a) => a.id === selectedAcreedorId) ?? null;
+  const selectedFiadoEstado = selectedAcreedor ? fiadoEstadoDeuda(selectedAcreedor) : 'OK';
+  const selectedFiadoProyectado = selectedAcreedor ? (selectedAcreedor.saldo ?? 0) + total : 0;
 
   // Calcular qué métodos de pago están habilitados
   const paymentMethods = useMemo(() => {
@@ -762,10 +783,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setFiadoLoading(true);
     setFiadoError(null);
     try {
-      const response = await apiClient.get<Array<{ id: number; nombre: string; activo: boolean }>>('/acreedores');
+      const response = await apiClient.get<FiadoAcreedorOption[]>('/acreedores');
       const activos = response.data.filter((a) => a.activo);
       setAcreedores(activos);
       setSelectedAcreedorId(null);
+      setFiadoWarnAck(false);
       setStep('FIADO_SELECT');
     } catch (error) {
       setFiadoError(normalizeApiError(error));
@@ -775,7 +797,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   };
 
   const handleFiadoConfirm = async () => {
-    if (!selectedAcreedorId) {
+    if (!selectedAcreedorId || !selectedAcreedor) {
+      return;
+    }
+    if (selectedFiadoEstado === 'LIMITE') {
+      setFiadoError(
+        `Monto máximo superado: la deuda llegaría a ${formatCurrency(selectedFiadoProyectado)} y el límite es ${formatCurrency(selectedAcreedor.limiteDeuda ?? 0)}.`,
+      );
+      return;
+    }
+    if (selectedFiadoEstado === 'ADVERTENCIA' && !fiadoWarnAck) {
+      setFiadoWarnAck(true);
       return;
     }
     setIsSubmitting(true);
@@ -1129,13 +1161,71 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                       <label>Acreedor</label>
                       <select
                         value={selectedAcreedorId ?? ''}
-                        onChange={(e) => setSelectedAcreedorId(e.target.value ? Number(e.target.value) : null)}
+                        onChange={(e) => {
+                          setSelectedAcreedorId(e.target.value ? Number(e.target.value) : null);
+                          setFiadoWarnAck(false);
+                          setFiadoError(null);
+                        }}
                       >
                         <option value="">Seleccionar acreedor...</option>
-                        {acreedores.map((a) => (
-                          <option key={a.id} value={a.id}>{a.nombre}</option>
-                        ))}
+                        {acreedores.map((a) => {
+                          const estado = fiadoEstadoDeuda(a);
+                          const marca = estado === 'LIMITE' ? ' ⛔' : estado === 'ADVERTENCIA' ? ' ⚠' : '';
+                          return (
+                            <option
+                              key={a.id}
+                              value={a.id}
+                              style={estado === 'LIMITE' ? { color: '#dc2626', fontWeight: 700 } : estado === 'ADVERTENCIA' ? { color: '#b45309', fontWeight: 600 } : undefined}
+                            >
+                              {a.nombre}{marca}
+                            </option>
+                          );
+                        })}
                       </select>
+                      <small style={{ color: 'var(--color-text-faint)' }}>⚠ supera advertencia · ⛔ supera límite</small>
+                    </div>
+                  )}
+                  {selectedAcreedor && (
+                    <p style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)', margin: '0.25rem 0 0.5rem' }}>
+                      Deuda actual: <strong>{formatCurrency(selectedAcreedor.saldo ?? 0)}</strong>
+                      {' → '}proyectada: <strong>{formatCurrency(selectedFiadoProyectado)}</strong>
+                      {selectedAcreedor.advertenciaDeuda != null && <> · Adv: {formatCurrency(selectedAcreedor.advertenciaDeuda)}</>}
+                      {selectedAcreedor.limiteDeuda != null && <> · Lím: {formatCurrency(selectedAcreedor.limiteDeuda)}</>}
+                    </p>
+                  )}
+                  {selectedAcreedor && selectedFiadoEstado === 'ADVERTENCIA' && (
+                    <div
+                      role="alert"
+                      style={{
+                        border: '1px solid var(--color-warning, #f59e0b)',
+                        borderRadius: '0.5rem',
+                        padding: '0.6rem 0.75rem',
+                        marginBottom: '0.75rem',
+                        background: 'color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent)',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      ⚠ Esta venta lleva la deuda a <strong>{formatCurrency(selectedFiadoProyectado)}</strong>,
+                      supera la advertencia ({formatCurrency(selectedAcreedor.advertenciaDeuda ?? 0)}).
+                      {fiadoWarnAck ? ' Confirmala de nuevo para continuar.' : ' Tocá Confirmar para revisar.'}
+                    </div>
+                  )}
+                  {selectedAcreedor && selectedFiadoEstado === 'LIMITE' && (
+                    <div
+                      role="alert"
+                      style={{
+                        border: '1px solid var(--color-danger)',
+                        borderRadius: '0.5rem',
+                        padding: '0.6rem 0.75rem',
+                        marginBottom: '0.75rem',
+                        background: 'color-mix(in srgb, var(--color-danger) 12%, transparent)',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      ⛔ <strong>Monto máximo superado.</strong> La deuda llegaría a{' '}
+                      <strong>{formatCurrency(selectedFiadoProyectado)}</strong> y el límite es{' '}
+                      <strong>{formatCurrency(selectedAcreedor.limiteDeuda ?? 0)}</strong>.
+                      No se puede registrar esta venta.
                     </div>
                   )}
                   <div className="checkout-actions">
@@ -1146,9 +1236,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                       type="button"
                       className="primary-button"
                       onClick={handleFiadoConfirm}
-                      disabled={!selectedAcreedorId || isSubmitting}
+                      disabled={!selectedAcreedorId || isSubmitting || selectedFiadoEstado === 'LIMITE'}
+                      title={selectedFiadoEstado === 'LIMITE' ? 'Monto máximo superado' : undefined}
                     >
-                      {isSubmitting ? 'Confirmando...' : 'Confirmar'}
+                      {isSubmitting ? 'Confirmando...' : selectedFiadoEstado === 'ADVERTENCIA' && !fiadoWarnAck ? 'Revisar y confirmar' : selectedFiadoEstado === 'ADVERTENCIA' ? 'Confirmar igual' : 'Confirmar'}
                     </button>
                   </div>
                 </>

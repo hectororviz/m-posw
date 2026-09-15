@@ -593,6 +593,8 @@ Archivo schema: `backend/prisma/schema.prisma`
 | telefono | String? | Teléfono |
 | notas | String? | Notas |
 | activo | Boolean | Activo/inactivo |
+| limiteDeuda | Decimal(10,2)? | Tope de deuda: bloquea fiados/ajustes que lo superen (null = sin tope) |
+| advertenciaDeuda | Decimal(10,2)? | Umbral de aviso visual en POS/admin (null = sin aviso) |
 | alertaDeuda | Boolean | Alerta de deuda |
 | diasSinPagar | Int? | Días sin pagar |
 | saldo | Decimal(10,2) | Saldo pendiente |
