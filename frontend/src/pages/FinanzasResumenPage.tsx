@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useFinanzasSummary } from '../api/queries';
 
 const formatCurrency = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
 
 export const FinanzasResumenPage: React.FC = () => {
+  const navigate = useNavigate();
   const toDate = new Date().toISOString().slice(0, 10);
   const [from, setFrom] = useState(() => {
     const d = new Date();
@@ -15,11 +17,20 @@ export const FinanzasResumenPage: React.FC = () => {
 
   const { data, isLoading } = useFinanzasSummary({ from: from || undefined, to: to || undefined });
 
+  const openRubro = (id: string) =>
+    navigate(`/admin/tesoreria/rubros/${id}?from=${from}&to=${to}`);
+
   const expenses = (data?.byCategory ?? [])
     .filter((c) => c.expense > 0)
     .sort((a, b) => b.expense - a.expense)
     .slice(0, 8);
   const maxExpense = expenses[0]?.expense ?? 1;
+
+  const incomes = (data?.byCategory ?? [])
+    .filter((c) => c.income > 0)
+    .sort((a, b) => b.income - a.income)
+    .slice(0, 8);
+  const maxIncome = incomes[0]?.income ?? 1;
 
   return (
     <>
@@ -67,13 +78,13 @@ export const FinanzasResumenPage: React.FC = () => {
           </div>
 
           <div className="section">
-            <h3>Gastos por categoría</h3>
+            <h3>Gastos por rubro</h3>
             {expenses.length === 0 ? (
               <p className="empty-text">Sin gastos en el período.</p>
             ) : (
               <div className="finanzas-bars">
                 {expenses.map((c) => (
-                  <div key={c.id} className="finanzas-bar-row">
+                  <button key={c.id} className="finanzas-bar-row as-link" onClick={() => openRubro(c.id)}>
                     <span className="finanzas-bar-label">{c.name}</span>
                     <div className="finanzas-bar-track">
                       <div
@@ -82,7 +93,29 @@ export const FinanzasResumenPage: React.FC = () => {
                       />
                     </div>
                     <span className="finanzas-bar-value">{formatCurrency(c.expense)}</span>
-                  </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="section">
+            <h3>Ingresos por rubro</h3>
+            {incomes.length === 0 ? (
+              <p className="empty-text">Sin ingresos en el período.</p>
+            ) : (
+              <div className="finanzas-bars">
+                {incomes.map((c) => (
+                  <button key={c.id} className="finanzas-bar-row as-link" onClick={() => openRubro(c.id)}>
+                    <span className="finanzas-bar-label">{c.name}</span>
+                    <div className="finanzas-bar-track">
+                      <div
+                        className="finanzas-bar-fill finanzas-bar-fill--in"
+                        style={{ width: `${Math.max(4, (c.income / maxIncome) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="finanzas-bar-value">{formatCurrency(c.income)}</span>
+                  </button>
                 ))}
               </div>
             )}

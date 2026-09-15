@@ -22,6 +22,7 @@ import { AdminSociosBeneficiosPage } from './pages/AdminSociosBeneficiosPage';
 import { FinanzasResumenPage } from './pages/FinanzasResumenPage';
 import { FinanzasMovimientosPage } from './pages/FinanzasMovimientosPage';
 import { FinanzasCuentasPage } from './pages/FinanzasCuentasPage';
+import { FinanzasRubroPage } from './pages/FinanzasRubroPage';
 import { TreasuryLayout } from './pages/TreasuryLayout';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
@@ -237,6 +238,7 @@ export const App: React.FC = () => {
           <Route index element={<FinanzasResumenPage />} />
           <Route path="movimientos" element={<FinanzasMovimientosPage />} />
           <Route path="cuentas" element={<FinanzasCuentasPage />} />
+          <Route path="rubros/:categoryId" element={<FinanzasRubroPage />} />
           <Route path="reportes" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
           <Route path="gastos" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
           <Route path="configuracion" element={<Navigate to="/admin/tesoreria/cuentas" replace />} />

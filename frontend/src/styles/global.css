@@ -6999,3 +6999,9 @@ button {
 @media (max-width: 768px) {
   .finanzas-cards .summary-card__value { font-size: 0.92rem; }
 }
+
+/* Rubros: barras clicables + back */
+.finanzas-bar-row.as-link { width: 100%; background: none; border: none; cursor: pointer; text-align: left; color: inherit; font: inherit; padding: 0.15rem 0; border-radius: 0.4rem; }
+.finanzas-bar-row.as-link:hover .finanzas-bar-label { text-decoration: underline; }
+.finanzas-bar-fill--in { background: var(--color-success, #16a34a); }
+.finanzas-back { display: inline-flex; align-items: center; gap: 0.3rem; margin-bottom: 0.5rem; text-decoration: none; }

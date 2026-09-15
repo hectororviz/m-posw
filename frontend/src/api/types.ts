@@ -403,6 +403,12 @@ export interface FinanzasMovementsResponse {
   limit: number;
 }
 
+export interface FinanzasRubroDetail {
+  category: { id: string; name: string; kind: string };
+  totals: { income: number; expense: number; net: number; count: number };
+  movements: FinanzasMovementsResponse;
+}
+
 
 export type EstadoDeuda = 'OK' | 'ADVERTENCIA' | 'LIMITE';
 

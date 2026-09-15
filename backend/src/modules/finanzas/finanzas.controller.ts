@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
@@ -60,6 +60,12 @@ export class FinanzasController {
   @RequireModule(ModuleKey.TESORERIA, ModuleAccess.READ)
   summary(@Query() query: SummaryQueryDto) {
     return this.service.summary(query);
+  }
+
+  @Get('categories/:id/detail')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.READ)
+  categoryDetail(@Param('id', ParseUUIDPipe) id: string, @Query() query: ListMovementsDto) {
+    return this.service.categoryDetail(id, query);
   }
 
   @Get('movements')

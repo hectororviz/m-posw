@@ -22,10 +22,8 @@ const DEFAULT_CATEGORIES: Array<{ name: string; kind: 'INGRESO' | 'EGRESO' | 'AM
   { name: 'Cobro fiado', kind: 'INGRESO', position: 2 },
   { name: 'Compras mercadería', kind: 'EGRESO', position: 3 },
   { name: 'Servicios', kind: 'EGRESO', position: 4 },
-  { name: 'Sueldos', kind: 'EGRESO', position: 5 },
-  { name: 'Alquiler', kind: 'EGRESO', position: 6 },
-  { name: 'Otros ingresos', kind: 'INGRESO', position: 7 },
-  { name: 'Otros gastos', kind: 'EGRESO', position: 8 },
+  { name: 'Otros ingresos', kind: 'INGRESO', position: 5 },
+  { name: 'Otros gastos', kind: 'EGRESO', position: 6 },
 ];
 
 const round = (v: Prisma.Decimal | number | string) =>
@@ -348,9 +346,65 @@ export class FinanzasService {
     };
   }
 
+  private async buildDailyRows(from?: Date, to?: Date, accountId?: string) {
+    const daily = await this.salesByDay(from, to);
+    const cashId = await this.resolveSalesAccountId('CASH');
+    const mpId = await this.resolveSalesAccountId('MP');
+    const accounts = await this.prisma.moneyAccount.findMany();
+    const nameOf = (id: string | null) => accounts.find((a) => a.id === id)?.name ?? '—';
+    return daily
+      .filter((g) => {
+        const aid = g.method === 'CASH' ? cashId : mpId;
+        return accountId ? aid === accountId : true;
+      })
+      .map((g) => {
+        const aid = g.method === 'CASH' ? cashId : mpId;
+        return {
+          id: `venta-${g.date}-${g.method}`,
+          date: new Date(`${g.date}T12:00:00.000Z`),
+          kind: 'INGRESO' as const,
+          description: `Ventas del día ${g.method === 'CASH' ? 'en efectivo' : 'Mercado Pago'} (${g.count})`,
+          categoryId: '',
+          categoryName: 'Ventas mostrador',
+          accountId: aid ?? '',
+          accountName: nameOf(aid),
+          amountIn: Number(g.total.toDecimalPlaces(2)),
+          amountOut: 0,
+          source: 'VENTA_DIARIA' as never,
+          salesCount: g.count,
+          voided: false,
+        };
+      });
+  }
+
+  async categoryDetail(categoryId: string, query: ListMovementsDto) {
+    await this.ensureDefaults();
+    const category = await this.prisma.moneyCategory.findUnique({ where: { id: categoryId } });
+    if (!category) throw new NotFoundException('Rubro no encontrado');
+
+    const sum = await this.summary({ from: query.from, to: query.to });
+    const catSum = sum.byCategory.find((c) => c.id === categoryId);
+
+    const list = await this.movements(
+      { ...query, categoryId },
+      { includeDaily: category.name === 'Ventas mostrador' },
+    );
+
+    return {
+      category: { id: category.id, name: category.name, kind: category.kind },
+      totals: {
+        income: catSum?.income ?? 0,
+        expense: catSum?.expense ?? 0,
+        net: catSum?.net ?? 0,
+        count: list.total,
+      },
+      movements: list,
+    };
+  }
+
   // ─── Listado combinado ────────────────────────────────────
 
-  async movements(query: ListMovementsDto) {
+  async movements(query: ListMovementsDto, opts?: { includeDaily?: boolean }) {
     await this.ensureDefaults();
     const from = parseDayStart(query.from);
     const to = parseDayEnd(query.to);
@@ -393,37 +447,10 @@ export class FinanzasService {
       voided: m.voidedAt !== null,
     }));
 
-    // Ventas diarias como filas virtuales (solo si no hay filtro de categoría manual)
+    // Ventas diarias como filas virtuales (vista general o detalle de Ventas mostrador)
     let dailyRows: typeof items = [];
-    if (!query.categoryId && !query.search) {
-      const daily = await this.salesByDay(from, to);
-      const cashId = await this.resolveSalesAccountId('CASH');
-      const mpId = await this.resolveSalesAccountId('MP');
-      const accounts = await this.prisma.moneyAccount.findMany();
-      const nameOf = (id: string | null) => accounts.find((a) => a.id === id)?.name ?? '—';
-      dailyRows = daily
-        .filter((g) => {
-          const aid = g.method === 'CASH' ? cashId : mpId;
-          return query.accountId ? aid === query.accountId : true;
-        })
-        .map((g) => {
-          const aid = g.method === 'CASH' ? cashId : mpId;
-          return {
-            id: `venta-${g.date}-${g.method}`,
-            date: new Date(`${g.date}T12:00:00.000Z`),
-            kind: 'INGRESO' as const,
-            description: `Ventas del día ${g.method === 'CASH' ? 'en efectivo' : 'Mercado Pago'} (${g.count})`,
-            categoryId: '',
-            categoryName: 'Ventas mostrador',
-            accountId: aid ?? '',
-            accountName: nameOf(aid),
-            amountIn: Number(g.total.toDecimalPlaces(2)),
-            amountOut: 0,
-            source: 'VENTA_DIARIA' as never,
-            salesCount: g.count,
-            voided: false,
-          };
-        });
+    if (!query.search && (!query.categoryId || opts?.includeDaily)) {
+      dailyRows = await this.buildDailyRows(from, to, query.accountId);
     }
 
     const combined = [...items, ...dailyRows].sort(

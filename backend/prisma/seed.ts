@@ -63,10 +63,8 @@ async function seedFinanzas() {
     { name: 'Cobro fiado', kind: 'INGRESO', position: 2 },
     { name: 'Compras mercadería', kind: 'EGRESO', position: 3 },
     { name: 'Servicios', kind: 'EGRESO', position: 4 },
-    { name: 'Sueldos', kind: 'EGRESO', position: 5 },
-    { name: 'Alquiler', kind: 'EGRESO', position: 6 },
-    { name: 'Otros ingresos', kind: 'INGRESO', position: 7 },
-    { name: 'Otros gastos', kind: 'EGRESO', position: 8 },
+    { name: 'Otros ingresos', kind: 'INGRESO', position: 5 },
+    { name: 'Otros gastos', kind: 'EGRESO', position: 6 },
   ];
   for (const c of categories) {
     await prisma.moneyCategory.upsert({
