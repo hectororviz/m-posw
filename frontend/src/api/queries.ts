@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
+import type { AccountingCategory, AccountingMovement, AccountingSummary, Acreedor, AcreedorDeuda, AcreedoresResumen, AvailabilityData, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, IncomeStatementData, InternetPlan, JournalEntry, LedgerAccount, LedgerAccountDetail, LedgerBookRow, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, ManualMovementWithCategory, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, QuickExpenseButton, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, TreasuryAccount, TreasurySummary, TrialBalanceData, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -366,6 +366,56 @@ export const useQuickExpenseButtonsAll = () =>
       return response.data;
     },
     staleTime: fiveMinutes,
+  });
+
+// Finanzas simples (caja por cuentas + categorías)
+
+export const useMoneyAccounts = () =>
+  useQuery({
+    queryKey: ['finanzas-accounts'],
+    queryFn: async () => {
+      const response = await apiClient.get<MoneyAccount[]>('/finanzas/accounts');
+      return response.data;
+    },
+    staleTime: fiveMinutes,
+  });
+
+export const useMoneyCategories = () =>
+  useQuery({
+    queryKey: ['finanzas-categories'],
+    queryFn: async () => {
+      const response = await apiClient.get<MoneyCategory[]>('/finanzas/categories');
+      return response.data;
+    },
+    staleTime: fiveMinutes,
+  });
+
+export const useFinanzasSummary = (params?: { from?: string; to?: string }) =>
+  useQuery({
+    queryKey: ['finanzas-summary', params],
+    queryFn: async () => {
+      const response = await apiClient.get<FinanzasSummary>('/finanzas/summary', { params });
+      return response.data;
+    },
+  });
+
+export const useFinanzasMovements = (params?: {
+  from?: string;
+  to?: string;
+  accountId?: string;
+  categoryId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ['finanzas-movements', params],
+    queryFn: async () => {
+      const response = await apiClient.get<FinanzasMovementsResponse>('/finanzas/movements', {
+        params,
+      });
+      return response.data;
+    },
   });
 
 export const useAcreedores = () =>

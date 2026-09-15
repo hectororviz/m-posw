@@ -19,13 +19,10 @@ import { AdminSociosTiposPage } from './pages/AdminSociosTiposPage';
 import { AdminSociosPage } from './pages/AdminSociosPage';
 import { AdminSociosMatrizPage } from './pages/AdminSociosMatrizPage';
 import { AdminSociosBeneficiosPage } from './pages/AdminSociosBeneficiosPage';
-import { TreasurySummaryPage } from './pages/TreasurySummaryPage';
-import { TreasuryJournalEntriesPage } from './pages/TreasuryJournalEntriesPage';
-import { TreasuryLedgerAccountsPage } from './pages/TreasuryLedgerAccountsPage';
-import { TreasuryReportsPage } from './pages/TreasuryReportsPage';
+import { FinanzasResumenPage } from './pages/FinanzasResumenPage';
+import { FinanzasMovimientosPage } from './pages/FinanzasMovimientosPage';
+import { FinanzasCuentasPage } from './pages/FinanzasCuentasPage';
 import { TreasuryLayout } from './pages/TreasuryLayout';
-import { TreasuryQuickExpensePage } from './pages/TreasuryQuickExpensePage';
-import { TreasuryQuickExpenseConfigPage } from './pages/TreasuryQuickExpenseConfigPage';
 import { CheckoutPaymentPage } from './pages/CheckoutPaymentPage';
 import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { OAuthReturnPage } from './pages/OAuthReturnPage';
@@ -237,12 +234,12 @@ export const App: React.FC = () => {
             <TreasuryLayout />
           </ModuleRoute>
         }>
-          <Route index element={<TreasurySummaryPage />} />
-          <Route path="movimientos" element={<TreasuryJournalEntriesPage />} />
-          <Route path="cuentas" element={<TreasuryLedgerAccountsPage />} />
-          <Route path="reportes" element={<TreasuryReportsPage />} />
-          <Route path="gastos" element={<TreasuryQuickExpensePage />} />
-          <Route path="configuracion" element={<TreasuryQuickExpenseConfigPage />} />
+          <Route index element={<FinanzasResumenPage />} />
+          <Route path="movimientos" element={<FinanzasMovimientosPage />} />
+          <Route path="cuentas" element={<FinanzasCuentasPage />} />
+          <Route path="reportes" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
+          <Route path="gastos" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
+          <Route path="configuracion" element={<Navigate to="/admin/tesoreria/cuentas" replace />} />
         </Route>
         <Route path="patrimonio" element={
           <ModuleRoute module="PATRIMONIO">

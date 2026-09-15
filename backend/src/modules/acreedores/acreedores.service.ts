@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { JournalEntriesService } from '../treasury/journal-entries.service';
+import { FinanzasService } from '../finanzas/finanzas.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -57,11 +58,48 @@ interface FifoResult {
 
 @Injectable()
 export class AcreedoresService {
+  private readonly logger = new Logger(AcreedoresService.name);
   constructor(
     private prisma: PrismaService,
     private journalEntriesService: JournalEntriesService,
     private notificationsService: NotificacionesService,
+    private finanzasService: FinanzasService,
   ) {}
+
+  private async recordFiadoCobroFinanzas(input: {
+    pagoId: number;
+    acreedorNombre: string;
+    monto: number;
+    fecha: Date;
+    medioPago?: string;
+    moneyAccountId?: string;
+    userId: string;
+  }) {
+    try {
+      let accountId = input.moneyAccountId;
+      if (!accountId) {
+        const accounts = await this.prisma.moneyAccount.findMany({ where: { active: true } });
+        accountId =
+          (input.medioPago === 'transferencia'
+            ? accounts.find((a) => a.kind === 'MERCADOPAGO') ?? accounts.find((a) => /mercado/i.test(a.name))
+            : accounts.find((a) => a.kind === 'EFECTIVO') ?? accounts.find((a) => /efectivo|caja/i.test(a.name))
+          )?.id ?? accounts[0]?.id;
+      }
+      if (!accountId) return;
+      await this.finanzasService.recordCobro({
+        accountId,
+        amount: input.monto,
+        date: input.fecha,
+        description: `Cobro fiado - ${input.acreedorNombre} (pago #${input.pagoId})`,
+        source: 'COBRO_FIADO',
+        sourceId: String(input.pagoId),
+        categoryName: 'Cobro fiado',
+        userId: input.userId,
+      });
+    } catch (err) {
+      this.logger.warn(`No se pudo registrar cobro fiado en finanzas: ${(err as Error).message}`);
+    }
+  }
 
   private calculateFifo(
     fiadoVentas: FiadoVentaRaw[],
@@ -404,7 +442,7 @@ export class AcreedoresService {
     const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
 
     if (!setting?.enableAutoJournalAcreedores) {
-      return this.prisma.pagoAcreedor.create({
+      const pago = await this.prisma.pagoAcreedor.create({
         data: {
           acreedorId,
           monto: dto.monto,
@@ -414,6 +452,16 @@ export class AcreedoresService {
           treasuryAccountId: dto.treasuryAccountId,
         },
       });
+      await this.recordFiadoCobroFinanzas({
+        pagoId: pago.id,
+        acreedorNombre: acreedor.nombre,
+        monto: Number(dto.monto),
+        fecha: pago.fecha,
+        medioPago: dto.medioPago,
+        moneyAccountId: dto.moneyAccountId,
+        userId,
+      });
+      return pago;
     }
 
     const treasuryAccount = await this.prisma.ledgerAccount.findUnique({
@@ -462,6 +510,16 @@ export class AcreedoresService {
       });
 
       return pago;
+    });
+
+    await this.recordFiadoCobroFinanzas({
+      pagoId: result.id,
+      acreedorNombre: acreedor.nombre,
+      monto: Number(dto.monto),
+      fecha: result.fecha,
+      medioPago: dto.medioPago,
+      moneyAccountId: dto.moneyAccountId,
+      userId,
     });
 
     return result;

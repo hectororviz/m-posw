@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowLeft, Send, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useSettings, useTreasuryAccounts } from '../api/queries';
+import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useSettings, useTreasuryAccounts, useMoneyAccounts } from '../api/queries';
 import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificacionesJob, Sale } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { buildWhatsAppWebLink } from '../utils/whatsappLink';
@@ -108,6 +108,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   const { data: acreedor } = useAcreedor(acreedorId);
   const { data: deuda, isLoading: deudaLoading } = useAcreedorDeuda(acreedorId);
   const { data: treasuryAccounts = [] } = useTreasuryAccounts();
+  const { data: moneyAccounts = [] } = useMoneyAccounts();
   const { data: settings } = useSettings();
   const notificationsEnabled = settings?.enableNotificationsModule ?? false;
   const whatsappUseApi = settings?.whatsappUseApi !== false;
@@ -122,6 +123,8 @@ export const AdminAcreedorDetailPage: React.FC = () => {
     fecha: new Date().toISOString().slice(0, 10),
     notas: '',
     treasuryAccountId: autoTreasuryId,
+    medioPago: 'efectivo',
+    moneyAccountId: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,10 +189,14 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         fecha: pagoForm.fecha,
         notas: pagoForm.notas || undefined,
         treasuryAccountId: pagoForm.treasuryAccountId,
+        medioPago: pagoForm.medioPago,
+        moneyAccountId: pagoForm.moneyAccountId || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ['acreedor-deuda', acreedorId] });
       await queryClient.invalidateQueries({ queryKey: ['acreedores'] });
       await queryClient.invalidateQueries({ queryKey: ['acreedores-resumen'] });
+      await queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['finanzas-movements'] });
       pushToast('Pago registrado', 'success');
       setPagoModal(false);
       setPagoForm({
@@ -197,6 +204,8 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         fecha: new Date().toISOString().slice(0, 10),
         notas: '',
         treasuryAccountId: autoTreasuryId,
+        medioPago: 'efectivo',
+        moneyAccountId: '',
       });
     } catch (err) {
       setError(normalizeApiError(err));
@@ -495,6 +504,39 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                   ))}
                 </select>
               </div>
+              <div className="settings-field">
+                <label>Medio de pago (caja simple) *</label>
+                <div className="finanzas-chips">
+                  <button
+                    type="button"
+                    className={pagoForm.medioPago === 'efectivo' ? 'chip active' : 'chip'}
+                    onClick={() => setPagoForm({ ...pagoForm, medioPago: 'efectivo', moneyAccountId: '' })}
+                  >
+                    Efectivo
+                  </button>
+                  <button
+                    type="button"
+                    className={pagoForm.medioPago === 'transferencia' ? 'chip active' : 'chip'}
+                    onClick={() => setPagoForm({ ...pagoForm, medioPago: 'transferencia', moneyAccountId: '' })}
+                  >
+                    Mercado Pago
+                  </button>
+                </div>
+              </div>
+              {moneyAccounts.length > 2 && (
+                <div className="settings-field">
+                  <label>Cuenta de caja</label>
+                  <select
+                    value={pagoForm.moneyAccountId}
+                    onChange={(e) => setPagoForm({ ...pagoForm, moneyAccountId: e.target.value })}
+                  >
+                    <option value="">Automática según medio de pago</option>
+                    {moneyAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="settings-field">
                 <label>Notas</label>
                 <textarea

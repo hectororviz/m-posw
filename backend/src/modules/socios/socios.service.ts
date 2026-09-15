@@ -11,6 +11,7 @@ import * as path from 'path';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../common/prisma.service';
 import { JournalEntriesService } from '../treasury/journal-entries.service';
+import { FinanzasService } from '../finanzas/finanzas.service';
 import { CreateSocioTipoDto } from './dto/create-socio-tipo.dto';
 import { UpdateSocioTipoDto } from './dto/update-socio-tipo.dto';
 import { CreateSocioDto } from './dto/create-socio.dto';
@@ -30,7 +31,44 @@ export class SociosService {
   constructor(
     private prisma: PrismaService,
     private journalEntriesService: JournalEntriesService,
+    private finanzasService: FinanzasService,
   ) {}
+
+  private async recordCuotaFinanzas(input: {
+    pagoId: number;
+    socioNombre: string;
+    periodo: string;
+    monto: number;
+    fecha: Date;
+    medioPago?: string;
+    moneyAccountId?: string;
+    userId: string;
+  }) {
+    try {
+      let accountId = input.moneyAccountId;
+      if (!accountId) {
+        const accounts = await this.prisma.moneyAccount.findMany({ where: { active: true } });
+        accountId =
+          (input.medioPago === 'transferencia' || /mercado/i.test(input.medioPago ?? '')
+            ? accounts.find((a) => a.kind === 'MERCADOPAGO') ?? accounts.find((a) => /mercado/i.test(a.name))
+            : accounts.find((a) => a.kind === 'EFECTIVO') ?? accounts.find((a) => /efectivo|caja/i.test(a.name))
+          )?.id ?? accounts[0]?.id;
+      }
+      if (!accountId) return;
+      await this.finanzasService.recordCobro({
+        accountId,
+        amount: input.monto,
+        date: input.fecha,
+        description: `Cuota ${input.periodo} - ${input.socioNombre} (pago #${input.pagoId})`,
+        source: 'CUOTA_SOCIO',
+        sourceId: String(input.pagoId),
+        categoryName: 'Cuotas sociales',
+        userId: input.userId,
+      });
+    } catch (err) {
+      this.logger.warn(`No se pudo registrar cuota en finanzas: ${(err as Error).message}`);
+    }
+  }
 
   // ─── Tipos ───────────────────────────────────────────────
 
@@ -444,6 +482,20 @@ export class SociosService {
         }),
       ]);
 
+      const socioName = cuota.socio
+        ? `${(cuota.socio as { nombre: string }).nombre} ${(cuota.socio as { apellido: string }).apellido}`
+        : `socio #${cuota.socioId}`;
+      await this.recordCuotaFinanzas({
+        pagoId: pago.id,
+        socioNombre: socioName,
+        periodo: `${cuota.mes}/${cuota.anio}`,
+        monto: Number(dto.monto),
+        fecha: pago.fecha,
+        medioPago: dto.medioPago,
+        moneyAccountId: dto.moneyAccountId,
+        userId,
+      });
+
       return { cuota: cuotaActualizada, pago };
     }
 
@@ -512,6 +564,22 @@ export class SociosService {
       });
 
       return { cuota: cuotaActualizada, pago };
+    });
+
+    const socioName2 = result.cuota
+      ? `socio #${cuota.socioId}`
+      : `socio #${cuota.socioId}`;
+    await this.recordCuotaFinanzas({
+      pagoId: result.pago.id,
+      socioNombre: cuota.socio
+        ? `${cuota.socio.nombre} ${cuota.socio.apellido}`
+        : socioName2,
+      periodo: `${cuota.mes}/${cuota.anio}`,
+      monto: Number(dto.monto),
+      fecha: result.pago.fecha,
+      medioPago: dto.medioPago,
+      moneyAccountId: dto.moneyAccountId,
+      userId,
     });
 
     return result;

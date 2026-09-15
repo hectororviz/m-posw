@@ -15,4 +15,12 @@ export class CreateSocioPagoDto {
   @IsUUID()
   @IsNotEmpty()
   treasuryAccountId: string;
+
+  @IsOptional()
+  @IsUUID()
+  moneyAccountId?: string;
+
+  @IsOptional()
+  @IsString()
+  medioPago?: string;
 }

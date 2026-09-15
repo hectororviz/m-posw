@@ -6911,3 +6911,74 @@ button {
     font-size: 1.75rem;
   }
 }
+
+/* ─── Finanzas simples (caja por cuentas) ─────────────────── */
+.finanzas-page { display: flex; flex-direction: column; gap: 1rem; }
+.finanzas-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; }
+.finanzas-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.finanzas-filters .filter-field { min-width: 140px; flex: 1 1 140px; }
+.finanzas-filters select,
+.finanzas-filters input { width: 100%; }
+.finanzas-bars { display: flex; flex-direction: column; gap: 0.5rem; }
+.finanzas-bar-row { display: grid; grid-template-columns: minmax(110px, 1.2fr) 2fr auto; gap: 0.5rem; align-items: center; }
+.finanzas-bar-label { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finanzas-bar-track { height: 10px; border-radius: 999px; background: var(--color-surface-alt, #f1f5f9); overflow: hidden; }
+.finanzas-bar-fill { height: 100%; border-radius: 999px; background: var(--color-danger, #dc2626); }
+.finanzas-bar-value { font-size: 0.85rem; font-weight: 600; text-align: right; }
+.finanzas-table .finanzas-row { display: grid; grid-template-columns: 1fr 1.2fr 0.7fr 1fr; }
+.finanzas-table .num { text-align: right; }
+.finanzas-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.finanzas-card { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 0.9rem; border: 1px solid var(--color-border); border-radius: 0.75rem; background: var(--color-surface); }
+.finanzas-card.is-voided { opacity: 0.6; }
+.finanzas-card-main { display: flex; gap: 0.75rem; min-width: 0; flex: 1; }
+.finanzas-card-date { flex: 0 0 44px; font-size: 0.8rem; color: var(--color-text-muted); padding-top: 0.15rem; }
+.finanzas-card-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.finanzas-card-desc { font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; }
+.finanzas-card-meta { font-size: 0.78rem; color: var(--color-text-muted); }
+.finanzas-card-side { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; flex-shrink: 0; }
+.finanzas-amount { font-weight: 700; font-size: 0.95rem; }
+.finanzas-amount.in { color: var(--color-success, #16a34a); }
+.finanzas-amount.out { color: var(--color-danger, #dc2626); }
+.finanzas-card-badges { display: flex; gap: 0.25rem; }
+.finanzas-void { padding: 0.2rem 0.4rem; opacity: 0.55; }
+.finanzas-void:hover { opacity: 1; }
+.finanzas-pager { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 0.75rem 0; font-size: 0.85rem; color: var(--color-text-muted); }
+.finanzas-fab-btn { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+.finanzas-kind-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+.finanzas-kind-toggle button { padding: 0.7rem; border-radius: 0.6rem; border: 1px solid var(--color-border); background: var(--color-surface); font-weight: 700; cursor: pointer; color: inherit; }
+.finanzas-kind-toggle button.active.out { background: color-mix(in srgb, var(--color-danger, #dc2626) 12%, transparent); border-color: var(--color-danger, #dc2626); }
+.finanzas-kind-toggle button.active.in { background: color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent); border-color: var(--color-success, #16a34a); }
+.finanzas-amount-input { font-size: 1.5rem !important; text-align: center; font-weight: 700; }
+.finanzas-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.finanzas-chips .chip { padding: 0.55rem 0.9rem; border-radius: 999px; border: 1px solid var(--color-border); background: var(--color-surface); cursor: pointer; font-size: 0.88rem; color: inherit; }
+.finanzas-chips .chip.active { border-color: var(--accent-color, #2563eb); background: color-mix(in srgb, var(--accent-color, #2563eb) 12%, transparent); font-weight: 700; }
+.finanzas-modal { width: min(520px, 100%); }
+.finanzas-modal select, .finanzas-modal input[type="text"], .finanzas-modal input[type="date"] { width: 100%; }
+.finanzas-config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.finanzas-simple-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem; }
+.finanzas-simple-row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.55rem 0.75rem; border: 1px solid var(--color-border); border-radius: 0.6rem; background: var(--color-surface); font-size: 0.9rem; }
+.finanzas-simple-row.inactive { opacity: 0.55; }
+.finanzas-simple-row small { color: var(--color-text-muted); }
+.finanzas-row-actions { display: flex; gap: 0.25rem; align-items: center; }
+.finanzas-row-actions .btn-ghost { padding: 0.3rem 0.55rem; font-size: 0.8rem; }
+.finanzas-inline-form { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.finanzas-inline-form input { flex: 2 1 180px; }
+.finanzas-inline-form select { flex: 1 1 120px; }
+
+@media (max-width: 768px) {
+  .finanzas-cards { grid-template-columns: repeat(2, 1fr); }
+  .finanzas-config-grid { grid-template-columns: 1fr; }
+  .finanzas-bar-row { grid-template-columns: 1fr auto; }
+  .finanzas-bar-track { grid-column: 1 / -1; order: 2; }
+  .finanzas-fab-label { display: none; }
+  .finanzas-fab-btn { position: fixed; right: 1rem; bottom: 1.25rem; z-index: 40; width: 56px; height: 56px; border-radius: 50%; justify-content: center; padding: 0; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+  .finanzas-page { padding-bottom: 4.5rem; }
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .finanzas-modal { width: 100%; max-width: 100%; border-radius: 1rem 1rem 0 0; max-height: 92dvh; overflow-y: auto; }
+}
+
+/* Base modal genérico (finanzas y futuros usos) */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-card { background: var(--color-surface); border-radius: 0.9rem; padding: 1.25rem; box-shadow: 0 8px 32px rgba(0,0,0,0.2); display: grid; gap: 0.9rem; }
+.modal-card h3 { margin: 0; font-size: 1.05rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }

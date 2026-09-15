@@ -19,7 +19,7 @@ describe('AcreedoresService limites de deuda', () => {
         aggregate: jest.fn().mockResolvedValue({ _sum: { monto: sums.pagos } }),
       },
     };
-    const service = new AcreedoresService(prisma as any, {} as any, {} as any);
+    const service = new AcreedoresService(prisma as any, {} as any, {} as any, {} as any);
     return { service, prisma };
   };
 

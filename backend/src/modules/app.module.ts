@@ -29,6 +29,7 @@ import { TournamentsModule } from './tournaments/tournaments.module';
 import { PlayersStatsModule } from './players-stats/players-stats.module';
 import { PatrimonioModule } from './patrimonio/patrimonio.module';
 import { CoachesModule } from './coaches/coaches.module';
+import { FinanzasModule } from './finanzas/finanzas.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 
 @Module({
@@ -62,6 +63,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
     PlayersStatsModule,
     PatrimonioModule,
     CoachesModule,
+    FinanzasModule,
     NotificacionesModule,
   ],
   providers: [

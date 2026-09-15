@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Banknote, Eye, Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas, useTreasuryAccounts } from '../api/queries';
+import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas, useTreasuryAccounts, useMoneyAccounts } from '../api/queries';
 import type { Socio, SocioCuotaItem } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -54,6 +54,8 @@ const emptyPagoForm = {
   fecha: new Date().toISOString().slice(0, 10),
   observacion: '',
   treasuryAccountId: '',
+  medioPago: 'efectivo',
+  moneyAccountId: '',
 };
 
 export const AdminSociosPage: React.FC = () => {
@@ -62,6 +64,7 @@ export const AdminSociosPage: React.FC = () => {
   const { data: resumen } = useSociosTesoreriaResumen();
   const { data: tipos = [] } = useSociosTipos();
   const { data: treasuryAccounts = [] } = useTreasuryAccounts();
+  const { data: moneyAccounts = [] } = useMoneyAccounts();
   const autoTreasuryId = treasuryAccounts.length === 1 ? treasuryAccounts[0].id : '';
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
@@ -101,6 +104,7 @@ export const AdminSociosPage: React.FC = () => {
   const [pagoMasivoSaving, setPagoMasivoSaving] = useState(false);
   const [pagoMasivoInputMode, setPagoMasivoInputMode] = useState<'total' | 'check'>('check');
   const [pagoMasivoTreasuryId, setPagoMasivoTreasuryId] = useState(autoTreasuryId);
+  const [pagoMasivoMedio, setPagoMasivoMedio] = useState('efectivo');
   const [pagoMasivoPartialMonth, setPagoMasivoPartialMonth] = useState<{
     cuotaId: number;
     mes: number;
@@ -227,6 +231,8 @@ export const AdminSociosPage: React.FC = () => {
       fecha: new Date().toISOString().slice(0, 10),
       observacion: '',
       treasuryAccountId: autoTreasuryId,
+      medioPago: 'efectivo',
+      moneyAccountId: '',
     });
     setError(null);
     setPagoModal(true);
@@ -251,10 +257,14 @@ export const AdminSociosPage: React.FC = () => {
         fecha: pagoForm.fecha,
         observacion: pagoForm.observacion || undefined,
         treasuryAccountId: pagoForm.treasuryAccountId,
+        medioPago: pagoForm.medioPago,
+        moneyAccountId: pagoForm.moneyAccountId || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ['socio-cuotas', selectedId] });
       await queryClient.invalidateQueries({ queryKey: ['socios'] });
       await queryClient.invalidateQueries({ queryKey: ['socios-tesoreria-resumen'] });
+      await queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ['finanzas-movements'] });
       pushToast('Pago registrado', 'success');
       setPagoModal(false);
       setPagoCuotaId(null);
@@ -395,6 +405,7 @@ export const AdminSociosPage: React.FC = () => {
           monto,
           fecha: pagoMasivoFecha,
           treasuryAccountId: pagoMasivoTreasuryId,
+          medioPago: pagoMasivoMedio,
         });
       } catch (err) {
         setPagoMasivoError(
@@ -408,6 +419,8 @@ export const AdminSociosPage: React.FC = () => {
     await queryClient.invalidateQueries({ queryKey: ['socios'] });
     await queryClient.invalidateQueries({ queryKey: ['socios-tesoreria-resumen'] });
     await queryClient.invalidateQueries({ queryKey: ['socio-cuotas', pagoMasivoSocioId] });
+    await queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
+    await queryClient.invalidateQueries({ queryKey: ['finanzas-movements'] });
     pushToast('Pago registrado correctamente', 'success');
     closeModal();
   };
@@ -845,6 +858,39 @@ export const AdminSociosPage: React.FC = () => {
                 </select>
               </div>
               <div className="settings-field">
+                <label>Medio de pago (caja simple) *</label>
+                <div className="finanzas-chips">
+                  <button
+                    type="button"
+                    className={pagoForm.medioPago === 'efectivo' ? 'chip active' : 'chip'}
+                    onClick={() => setPagoForm({ ...pagoForm, medioPago: 'efectivo', moneyAccountId: '' })}
+                  >
+                    Efectivo
+                  </button>
+                  <button
+                    type="button"
+                    className={pagoForm.medioPago === 'transferencia' ? 'chip active' : 'chip'}
+                    onClick={() => setPagoForm({ ...pagoForm, medioPago: 'transferencia', moneyAccountId: '' })}
+                  >
+                    Mercado Pago
+                  </button>
+                </div>
+              </div>
+              {moneyAccounts.length > 2 && (
+                <div className="settings-field">
+                  <label>Cuenta de caja</label>
+                  <select
+                    value={pagoForm.moneyAccountId}
+                    onChange={(e) => setPagoForm({ ...pagoForm, moneyAccountId: e.target.value })}
+                  >
+                    <option value="">Automática según medio de pago</option>
+                    {moneyAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="settings-field">
                 <label>Observacion</label>
                 <textarea rows={2} value={pagoForm.observacion} onChange={(e) => setPagoForm({ ...pagoForm, observacion: e.target.value })} placeholder="Notas adicionales" />
               </div>
@@ -959,6 +1005,26 @@ export const AdminSociosPage: React.FC = () => {
                           <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                         ))}
                       </select>
+                    </div>
+
+                    <div className="settings-field">
+                      <label>Medio de pago (caja simple) *</label>
+                      <div className="finanzas-chips">
+                        <button
+                          type="button"
+                          className={pagoMasivoMedio === 'efectivo' ? 'chip active' : 'chip'}
+                          onClick={() => setPagoMasivoMedio('efectivo')}
+                        >
+                          Efectivo
+                        </button>
+                        <button
+                          type="button"
+                          className={pagoMasivoMedio === 'transferencia' ? 'chip active' : 'chip'}
+                          onClick={() => setPagoMasivoMedio('transferencia')}
+                        >
+                          Mercado Pago
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}

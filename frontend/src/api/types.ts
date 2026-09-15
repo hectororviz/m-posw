@@ -466,6 +466,56 @@ export interface TreasurySummary {
   lastEntries: JournalEntry[];
 }
 
+export interface MoneyAccount {
+  id: string;
+  name: string;
+  kind: 'EFECTIVO' | 'MERCADOPAGO' | 'BANCO' | 'OTRO';
+  initialBalance: number;
+  active: boolean;
+  position: number;
+}
+
+export interface MoneyCategory {
+  id: string;
+  name: string;
+  kind: 'INGRESO' | 'EGRESO' | 'AMBOS';
+  active: boolean;
+  position: number;
+}
+
+export interface FinanzasSummary {
+  accounts: { id: string; name: string; kind: string; balance: number }[];
+  totalBalance: number;
+  totalIncome: number;
+  totalExpense: number;
+  netResult: number;
+  byCategory: { id: string; name: string; income: number; expense: number; net: number }[];
+  dailySales: { date: string; method: string; accountId: string | null; total: number; count: number }[];
+}
+
+export interface FinanzasMovement {
+  id: string;
+  date: string;
+  kind: 'INGRESO' | 'EGRESO';
+  description: string;
+  categoryId: string;
+  categoryName: string;
+  accountId: string;
+  accountName: string;
+  amountIn: number;
+  amountOut: number;
+  source: 'MANUAL' | 'COBRO_FIADO' | 'CUOTA_SOCIO' | 'AJUSTE' | 'VENTA_DIARIA';
+  salesCount: number;
+  voided: boolean;
+}
+
+export interface FinanzasMovementsResponse {
+  data: FinanzasMovement[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface QuickExpenseButton {
   id: number;
   label: string;
