@@ -10,7 +10,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../common/prisma.service';
-import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { FinanzasService } from '../finanzas/finanzas.service';
 import { CreateSocioTipoDto } from './dto/create-socio-tipo.dto';
 import { UpdateSocioTipoDto } from './dto/update-socio-tipo.dto';
@@ -30,7 +29,6 @@ export class SociosService {
 
   constructor(
     private prisma: PrismaService,
-    private journalEntriesService: JournalEntriesService,
     private finanzasService: FinanzasService,
   ) {}
 
@@ -448,75 +446,9 @@ export class SociosService {
       );
     }
 
-    const setting = await this.prisma.setting.findFirst();
-
-    if (!setting?.enableAutoJournalSocios) {
-      const treasuryAccount = this.prisma.ledgerAccount.findUnique({
-        where: { id: dto.treasuryAccountId },
-      });
-
-      const nuevoMontoPagado = Number(cuota.montoPagado) + dto.monto;
-
-      let nuevoEstado: 'PENDIENTE' | 'PARCIAL' | 'PAGADO' = 'PENDIENTE';
-      if (nuevoMontoPagado >= Number(cuota.montoOriginal) - 0.001) {
-        nuevoEstado = 'PAGADO';
-      } else if (nuevoMontoPagado > 0) {
-        nuevoEstado = 'PARCIAL';
-      }
-
-      const [year, month, day] = dto.fecha.split('-').map(Number);
-
-      const [cuotaActualizada, pago] = await this.prisma.$transaction([
-        this.prisma.socioCuota.update({
-          where: { id: cuotaId },
-          data: { montoPagado: nuevoMontoPagado, estado: nuevoEstado },
-        }),
-        this.prisma.socioPago.create({
-          data: {
-            socioCuotaId: cuotaId,
-            monto: dto.monto,
-            fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
-            observacion: dto.observacion,
-            treasuryAccountId: dto.treasuryAccountId,
-          },
-        }),
-      ]);
-
-      const socioName = cuota.socio
-        ? `${(cuota.socio as { nombre: string }).nombre} ${(cuota.socio as { apellido: string }).apellido}`
-        : `socio #${cuota.socioId}`;
-      await this.recordCuotaFinanzas({
-        pagoId: pago.id,
-        socioNombre: socioName,
-        periodo: `${cuota.mes}/${cuota.anio}`,
-        monto: Number(dto.monto),
-        fecha: pago.fecha,
-        medioPago: dto.medioPago,
-        moneyAccountId: dto.moneyAccountId,
-        userId,
-      });
-
-      return { cuota: cuotaActualizada, pago };
-    }
-
-    const treasuryAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { id: dto.treasuryAccountId },
-    });
-    if (!treasuryAccount) {
-      throw new BadRequestException('Cuenta de tesorería no encontrada');
-    }
-
-    const cuotasAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { code: '4.1.03' },
-    });
-    if (!cuotasAccount) {
-      throw new BadRequestException('Cuenta contable 4.1.03 no encontrada');
-    }
-
     const nuevoMontoPagado = Number(cuota.montoPagado) + dto.monto;
 
     let nuevoEstado: 'PENDIENTE' | 'PARCIAL' | 'PAGADO' = 'PENDIENTE';
-
     if (nuevoMontoPagado >= Number(cuota.montoOriginal) - 0.001) {
       nuevoEstado = 'PAGADO';
     } else if (nuevoMontoPagado > 0) {
@@ -525,64 +457,36 @@ export class SociosService {
 
     const [year, month, day] = dto.fecha.split('-').map(Number);
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const cuotaActualizada = await tx.socioCuota.update({
+    const [cuotaActualizada, pago] = await this.prisma.$transaction([
+      this.prisma.socioCuota.update({
         where: { id: cuotaId },
-        data: {
-          montoPagado: nuevoMontoPagado,
-          estado: nuevoEstado,
-        },
-      });
-
-      const pago = await tx.socioPago.create({
+        data: { montoPagado: nuevoMontoPagado, estado: nuevoEstado },
+      }),
+      this.prisma.socioPago.create({
         data: {
           socioCuotaId: cuotaId,
           monto: dto.monto,
           fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
           observacion: dto.observacion,
         },
-      });
+      }),
+    ]);
 
-      const socioName = cuota.socio
-        ? `${cuota.socio.nombre} ${cuota.socio.apellido}`
-        : `socio #${cuota.socioId}`;
-
-      const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
-        date: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
-        description: `Pago cuota - ${socioName} - ${cuota.mes}/${cuota.anio}`,
-        lines: [
-          { accountId: dto.treasuryAccountId, debit: dto.monto, credit: 0 },
-          { accountId: cuotasAccount.id, debit: 0, credit: dto.monto },
-        ],
-        sourceType: 'SOCIO_PAGO',
-        sourceId: pago.id,
-      });
-
-      await tx.socioPago.update({
-        where: { id: pago.id },
-        data: { journalEntryId: entry.id, treasuryAccountId: dto.treasuryAccountId },
-      });
-
-      return { cuota: cuotaActualizada, pago };
-    });
-
-    const socioName2 = result.cuota
-      ? `socio #${cuota.socioId}`
+    const socioName = cuota.socio
+      ? `${cuota.socio.nombre} ${cuota.socio.apellido}`
       : `socio #${cuota.socioId}`;
     await this.recordCuotaFinanzas({
-      pagoId: result.pago.id,
-      socioNombre: cuota.socio
-        ? `${cuota.socio.nombre} ${cuota.socio.apellido}`
-        : socioName2,
+      pagoId: pago.id,
+      socioNombre: socioName,
       periodo: `${cuota.mes}/${cuota.anio}`,
       monto: Number(dto.monto),
-      fecha: result.pago.fecha,
+      fecha: pago.fecha,
       medioPago: dto.medioPago,
       moneyAccountId: dto.moneyAccountId,
       userId,
     });
 
-    return result;
+    return { cuota: cuotaActualizada, pago };
   }
 
   // ─── Reporte Matriz ──────────────────────────────────────

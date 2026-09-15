@@ -168,9 +168,30 @@ export class UsersService {
       throw new BadRequestException('No podés eliminar tu propio usuario');
     }
 
-    return this.prisma.user.delete({
-      where: { id },
-      select: { id: true, username: true },
-    });
+    const [salesCount, movementsCount, closesCount] = await Promise.all([
+      this.prisma.sale.count({ where: { userId: id } }),
+      this.prisma.manualMovement.count({ where: { userId: id } }),
+      this.prisma.cashClose.count({ where: { closedByUserId: id } }),
+    ]);
+
+    if (salesCount > 0 || movementsCount > 0 || closesCount > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar: el usuario tiene ventas o movimientos asociados. Desactívalo en su lugar.',
+      );
+    }
+
+    try {
+      return await this.prisma.user.delete({
+        where: { id },
+        select: { id: true, username: true },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new BadRequestException(
+          'No se puede eliminar: el usuario tiene registros asociados. Desactívalo en su lugar.',
+        );
+      }
+      throw error;
+    }
   }
 }

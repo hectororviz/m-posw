@@ -140,7 +140,7 @@ function getModuleRoute(moduleKey: string): string | null {
 
 function getSmartphoneRoute(moduleKey: string): string | null {
   const map: Record<string, string> = {
-    TESORERIA: '/admin/tesoreria/gastos',
+    TESORERIA: '/admin/tesoreria/movimientos',
     POS: '/pos',
     VENTAS: '/admin/sales',
   };

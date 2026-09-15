@@ -58,9 +58,6 @@ export const AdminSettingsPage: React.FC = () => {
     enablePlayersModule: false,
     enablePatrimonioModule: true,
     enableNotificationsModule: false,
-    enableAutoJournalPos: true,
-    enableAutoJournalAcreedores: true,
-    enableAutoJournalSocios: true,
     movementInReasons: [] as string[],
     movementOutReasons: [] as string[],
   });
@@ -157,9 +154,6 @@ export const AdminSettingsPage: React.FC = () => {
         enablePlayersModule: settings.enablePlayersModule ?? false,
         enablePatrimonioModule: settings.enablePatrimonioModule ?? true,
         enableNotificationsModule: settings.enableNotificationsModule ?? false,
-        enableAutoJournalPos: settings.enableAutoJournalPos ?? true,
-        enableAutoJournalAcreedores: settings.enableAutoJournalAcreedores ?? true,
-        enableAutoJournalSocios: settings.enableAutoJournalSocios ?? true,
         movementInReasons: settings.movementInReasons ?? [],
         movementOutReasons: settings.movementOutReasons ?? [],
       });
@@ -1014,49 +1008,6 @@ export const AdminSettingsPage: React.FC = () => {
               </label>
             </div>
 
-            <h3 className="settings-section-header" style={{ marginTop: '1.5rem' }}>Asientos contables automaticos</h3>
-            <p className="settings-section-desc">Cuando estan activos, cada operacion genera automaticamente su asiento contable en Tesoreria.</p>
-            <div className="settings-toggle-group">
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={form.enableAutoJournalPos}
-                  onChange={(e) => setForm({ ...form, enableAutoJournalPos: e.target.checked })}
-                />
-                <span className="toggle-switch-track" />
-                <span>
-                  <strong>Ventas del POS</strong>
-                  <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Asientos por ventas en efectivo, QR, transferencia y fiado</small>
-                </span>
-              </label>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={form.enableAutoJournalAcreedores}
-                  onChange={(e) => setForm({ ...form, enableAutoJournalAcreedores: e.target.checked })}
-                />
-                <span className="toggle-switch-track" />
-                <span>
-                  <strong>Pagos de acreedores</strong>
-                  <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Asientos por cada pago registrado a un acreedor</small>
-                </span>
-              </label>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={form.enableAutoJournalSocios}
-                  onChange={(e) => setForm({ ...form, enableAutoJournalSocios: e.target.checked })}
-                />
-                <span className="toggle-switch-track" />
-                <span>
-                  <strong>Pagos de cuotas de socios</strong>
-                  <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Asientos por cada pago de cuota registrado</small>
-                </span>
-              </label>
-            </div>
           </div>
         )}
 

@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
-import { TreasuryModule } from '../treasury/treasury.module';
 import { InternetVouchersModule } from '../internet-vouchers/internet-vouchers.module';
 import { AcreedoresModule } from '../acreedores/acreedores.module';
 import { SalesController } from './sales.controller';
@@ -13,7 +12,7 @@ import { MercadoPagoWebhookProcessorService } from './services/mercadopago-webho
 import { SalesGateway } from './websockets/sales.gateway';
 
 @Module({
-  imports: [TreasuryModule, InternetVouchersModule, AcreedoresModule],
+  imports: [InternetVouchersModule, AcreedoresModule],
   controllers: [SalesController, MercadoPagoWebhookController],
   providers: [
     SalesService,

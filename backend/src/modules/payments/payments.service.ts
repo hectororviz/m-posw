@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
-import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { SalesService } from '../sales/sales.service';
 import { InternetVouchersService } from '../internet-vouchers/internet-vouchers.service';
 import type { PollTransferResponse } from './dto/transfer.dto';
@@ -36,7 +35,6 @@ export class PaymentsService {
     private prisma: PrismaService,
     private mpConfig: MercadoPagoConfigService,
     private salesService: SalesService,
-    private journalEntriesService: JournalEntriesService,
     private internetVouchers: InternetVouchersService,
   ) {}
 
@@ -247,35 +245,6 @@ export class PaymentsService {
           procesado: true,
         },
       });
-
-      const setting = await tx.setting.findFirst();
-
-      if (setting?.enableAutoJournalPos) {
-        const pma = await tx.paymentMethodAccount.findUnique({
-          where: { paymentMethod: 'TRANSFER' },
-        });
-        const ingresosAccount = await tx.ledgerAccount.findUnique({
-          where: { code: '4.1.01' },
-        });
-
-        if (pma && ingresosAccount) {
-          const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
-            date: new Date(),
-            description: `Venta POS - TRANSFER - Venta #${sale.id}`,
-            lines: [
-              { accountId: pma.ledgerAccountId, debit: roundedTotal, credit: 0 },
-              { accountId: ingresosAccount.id, debit: 0, credit: roundedTotal },
-            ],
-            sourceType: 'VENTA_POS',
-            sourceId: sale.orderNumber,
-          });
-
-          await tx.sale.update({
-            where: { id: sale.id },
-            data: { journalEntryId: entry.id },
-          });
-        }
-      }
 
       return sale;
     });

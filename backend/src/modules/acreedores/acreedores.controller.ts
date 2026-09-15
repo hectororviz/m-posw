@@ -3,7 +3,6 @@ import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { ModuleAccessGuard } from '../common/module-access.guard';
 import { RequireModule } from '../common/module-access.decorator';
-import { LedgerAccountsService } from '../treasury/ledger-accounts.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { AcreedoresService } from './acreedores.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
@@ -16,15 +15,8 @@ import { CreateAjusteDto } from './dto/create-ajuste.dto';
 export class AcreedoresController {
   constructor(
     private readonly acreedoresService: AcreedoresService,
-    private readonly ledgerAccountsService: LedgerAccountsService,
     private readonly notificacionesService: NotificacionesService,
   ) {}
-
-  @Get('treasury-accounts')
-  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
-  getTreasuryAccounts() {
-    return this.ledgerAccountsService.getTreasuryAccounts();
-  }
 
   @Get('resumen')
   @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)

@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import { JournalEntriesService } from '../treasury/journal-entries.service';
 import { FinanzasService } from '../finanzas/finanzas.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
@@ -61,7 +60,6 @@ export class AcreedoresService {
   private readonly logger = new Logger(AcreedoresService.name);
   constructor(
     private prisma: PrismaService,
-    private journalEntriesService: JournalEntriesService,
     private notificationsService: NotificacionesService,
     private finanzasService: FinanzasService,
   ) {}
@@ -439,90 +437,28 @@ export class AcreedoresService {
     }
 
     const [year, month, day] = dto.fecha.split('-').map(Number);
-    const setting = await this.prisma.setting.findFirst({ orderBy: { createdAt: 'desc' } });
 
-    if (!setting?.enableAutoJournalAcreedores) {
-      const pago = await this.prisma.pagoAcreedor.create({
-        data: {
-          acreedorId,
-          monto: dto.monto,
-          medioPago: dto.medioPago || '',
-          fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
-          notas: dto.notas,
-          treasuryAccountId: dto.treasuryAccountId,
-        },
-      });
-      await this.recordFiadoCobroFinanzas({
-        pagoId: pago.id,
-        acreedorNombre: acreedor.nombre,
-        monto: Number(dto.monto),
-        fecha: pago.fecha,
-        medioPago: dto.medioPago,
-        moneyAccountId: dto.moneyAccountId,
-        userId,
-      });
-      return pago;
-    }
-
-    const treasuryAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { id: dto.treasuryAccountId },
-    });
-    if (!treasuryAccount) {
-      throw new BadRequestException('Cuenta de tesorería no encontrada');
-    }
-
-    const deudoresFiadosAccount = await this.prisma.ledgerAccount.findUnique({
-      where: { code: '1.2.03' },
-    });
-    if (!deudoresFiadosAccount) {
-      throw new BadRequestException('Cuenta contable 1.2.03 no encontrada');
-    }
-
-    const deuda = await this.getDeuda(acreedorId);
-    const esTotal = deuda.saldoPendiente <= dto.monto + 0.001;
-    const tipoPago = esTotal ? 'Total' : 'Parcial';
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const pago = await tx.pagoAcreedor.create({
-        data: {
-          acreedorId,
-          monto: dto.monto,
-          medioPago: dto.medioPago || '',
-          fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
-          notas: dto.notas,
-        },
-      });
-
-      const entry = await this.journalEntriesService.createAutomatedEntry(tx, userId, {
-        date: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
-        description: `Pago acreedor - ${acreedor.nombre} (acreedor #${acreedor.id}) - ${tipoPago} $${dto.monto.toFixed(2)}`,
-        lines: [
-          { accountId: dto.treasuryAccountId, debit: dto.monto, credit: 0 },
-          { accountId: deudoresFiadosAccount.id, debit: 0, credit: dto.monto },
-        ],
-        sourceType: 'PAGO_ACREEDOR',
-        sourceId: pago.id,
-      });
-
-      await tx.pagoAcreedor.update({
-        where: { id: pago.id },
-        data: { journalEntryId: entry.id, treasuryAccountId: dto.treasuryAccountId },
-      });
-
-      return pago;
+    const pago = await this.prisma.pagoAcreedor.create({
+      data: {
+        acreedorId,
+        monto: dto.monto,
+        medioPago: dto.medioPago || '',
+        fecha: new Date(Date.UTC(year, month - 1, day, 12, 0, 0)),
+        notas: dto.notas,
+      },
     });
 
     await this.recordFiadoCobroFinanzas({
-      pagoId: result.id,
+      pagoId: pago.id,
       acreedorNombre: acreedor.nombre,
       monto: Number(dto.monto),
-      fecha: result.fecha,
+      fecha: pago.fecha,
       medioPago: dto.medioPago,
       moneyAccountId: dto.moneyAccountId,
       userId,
     });
 
-    return result;
+    return pago;
   }
 
   async addAjuste(acreedorId: number, dto: CreateAjusteDto) {

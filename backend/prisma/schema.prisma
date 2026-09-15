@@ -69,11 +69,6 @@ enum MovementType {
   SALIDA
 }
 
-enum AccountingMovementType {
-  INCOME
-  EXPENSE
-}
-
 enum ProductType {
   SIMPLE
   RAW_MATERIAL
@@ -95,10 +90,8 @@ model User {
   updatedAt DateTime @updatedAt
   sales     Sale[]
   cashClosures CashClose[]
-  cashMovements CashMovement[]
   sessions  Session[]
   manualMovements ManualMovement[]
-  journalEntries JournalEntry[]
   modulePermissions UserModulePermission[]
   staffVouchersCreated StaffVoucher[] @relation("StaffVoucherCreatedBy")
   staffVouchersDeactivated StaffVoucher[] @relation("StaffVoucherDeactivatedBy")
@@ -178,7 +171,6 @@ model ManualMovement {
   description String?
   userId      String       @db.Uuid
   user        User         @relation(fields: [userId], references: [id])
-  manualMovementCategory ManualMovementCategory?
 
   @@index([createdAt])
 }
@@ -214,8 +206,6 @@ model Sale {
   mercadoPagoPayments MercadoPagoPayment[]
   movimientosMP MovimientoMP[]
   fiadoVenta       FiadoVenta?
-  journalEntryId   String?        @unique @db.Uuid
-  journalEntry     JournalEntry?  @relation("JournalEntrySale", fields: [journalEntryId], references: [id])
   vouchers         SaleVoucher[]
 }
 
@@ -282,9 +272,6 @@ model Setting {
   enableTreasuryModule Boolean @default(true)
   enableAcreedoresModule Boolean @default(true)
   enableInternetModule        Boolean @default(false)
-  enableAutoJournalPos        Boolean @default(true)
-  enableAutoJournalAcreedores Boolean @default(true)
-  enableAutoJournalSocios     Boolean @default(true)
   enableLigasModule           Boolean @default(false)
   enablePlayersModule         Boolean @default(false)
   enablePatrimonioModule      Boolean @default(true)
@@ -337,38 +324,6 @@ model ProductOrderCounter {
   updatedAt     DateTime @updatedAt
 }
 
-model CashMovement {
-  id        String           @id @default(uuid()) @db.Uuid
-  type      CashMovementType
-  amount    Decimal          @default(0) @db.Decimal(10, 2)
-  reason    String?
-  isVoided  Boolean          @default(false)
-  createdAt DateTime         @default(now())
-  createdByUserId String     @db.Uuid
-  createdBy User             @relation(fields: [createdByUserId], references: [id])
-
-  @@index([createdAt])
-}
-
-enum CashMovementType {
-  INCOME
-  EXPENSE
-}
-
-enum LedgerAccountType {
-  ASSET
-  LIABILITY
-  EQUITY
-  REVENUE
-  EXPENSE
-}
-
-enum JournalEntryStatus {
-  DRAFT
-  POSTED
-  VOIDED
-}
-
 model MovimientoMP {
   id            String   @id @default(uuid()) @db.Uuid
   saleId        String?  @db.Uuid
@@ -405,149 +360,6 @@ model RecipeIngredient {
   @@index([rawMaterialId])
 }
 
-model AccountingCategory {
-  id        String                   @id @default(uuid()) @db.Uuid
-  name      String
-  type      AccountingMovementType
-  active    Boolean                  @default(true)
-  createdAt DateTime                 @default(now())
-  updatedAt DateTime                 @updatedAt
-  movements AccountingMovement[]
-  manualMovementCategories ManualMovementCategory[]
-}
-
-model AccountingMovement {
-  id               String                   @id @default(uuid()) @db.Uuid
-  type             AccountingMovementType
-  amount           Decimal                  @db.Decimal(10, 2)
-  description      String
-  date             DateTime
-  categoryId       String                   @db.Uuid
-  category         AccountingCategory       @relation(fields: [categoryId], references: [id])
-  refMovementId    String?                  @db.Uuid
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-
-  @@index([date])
-  @@index([categoryId])
-  @@index([type])
-}
-
-model ManualMovementCategory {
-  id                String             @id @default(uuid()) @db.Uuid
-  manualMovementId  String             @unique @db.Uuid
-  manualMovement    ManualMovement     @relation(fields: [manualMovementId], references: [id])
-  categoryId        String             @db.Uuid
-  category          AccountingCategory @relation(fields: [categoryId], references: [id])
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-}
-
-model LedgerAccount {
-  id             String            @id @default(uuid()) @db.Uuid
-  code           String            @unique
-  name           String
-  type           LedgerAccountType
-  active         Boolean           @default(true)
-  acceptsEntries Boolean           @default(true)
-
-  parentId       String?           @db.Uuid
-  parent         LedgerAccount?    @relation("LedgerAccountHierarchy", fields: [parentId], references: [id])
-  children       LedgerAccount[]   @relation("LedgerAccountHierarchy")
-
-  lines          JournalEntryLine[]
-  paymentMethodAccounts PaymentMethodAccount[] @relation("PaymentMethodAccountLedger")
-  pagoAcreedores  PagoAcreedor[]   @relation("PagoAcreedorTreasuryAccount")
-  socioPagos      SocioPago[]      @relation("SocioPagoTreasuryAccount")
-  quickExpenseButtonsAsset   QuickExpenseButton[] @relation("QebAsset")
-  quickExpenseButtonsExpense QuickExpenseButton[] @relation("QebExpense")
-
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-
-  @@index([type])
-  @@index([parentId])
-}
-
-model JournalEntry {
-  id              String             @id @default(uuid()) @db.Uuid
-  entryNumber     String             @unique
-  sequenceNumber  Int
-  fiscalYear      Int
-  month           Int
-  date            DateTime
-  description     String
-  notes           String?
-  sourceType      String?   // 'VENTA_POS' | 'FIADO_VENTA' | 'PAGO_ACREEDOR' | 'SOCIO_PAGO'
-  sourceId        Int?
-  status          JournalEntryStatus @default(DRAFT)
-
-  createdById     String             @db.Uuid
-  createdBy       User               @relation(fields: [createdById], references: [id])
-
-  postedAt        DateTime?
-  voidedAt        DateTime?
-  voidReason      String?
-
-  reversalOfId    String?            @unique @db.Uuid
-  reversalOf      JournalEntry?      @relation("JournalEntryReversal", fields: [reversalOfId], references: [id])
-  reversalEntry   JournalEntry?      @relation("JournalEntryReversal")
-
-  lines           JournalEntryLine[]
-  sourceSales             Sale[]           @relation("JournalEntrySale")
-  sourceFiadoVentas       FiadoVenta[]     @relation("JournalEntryFiadoVenta")
-  sourcePagoAcreedores    PagoAcreedor[]   @relation("JournalEntryPagoAcreedor")
-  sourceSocioPagos        SocioPago[]      @relation("JournalEntrySocioPago")
-
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-
-  @@unique([fiscalYear, sequenceNumber])
-  @@index([date])
-  @@index([status])
-  @@index([fiscalYear, sequenceNumber])
-}
-
-model JournalEntryLine {
-  id          String        @id @default(uuid()) @db.Uuid
-  entryId     String        @db.Uuid
-  entry       JournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
-
-  accountId   String        @db.Uuid
-  account     LedgerAccount @relation(fields: [accountId], references: [id])
-
-  debit       Decimal       @default(0) @db.Decimal(12, 2)
-  credit      Decimal       @default(0) @db.Decimal(12, 2)
-  description String?
-
-  createdAt   DateTime      @default(now())
-
-  @@index([entryId])
-  @@index([accountId])
-}
-
-model PaymentMethodAccount {
-  id               Int            @id @default(autoincrement())
-  paymentMethod    PaymentMethod  @unique
-  ledgerAccountId  String         @db.Uuid
-  ledgerAccount    LedgerAccount  @relation("PaymentMethodAccountLedger", fields: [ledgerAccountId], references: [id])
-}
-
-model QuickExpenseButton {
-  id               Int            @id @default(autoincrement())
-  label            String
-  assetAccountId   String         @db.Uuid
-  assetAccount     LedgerAccount  @relation("QebAsset", fields: [assetAccountId], references: [id])
-  expenseAccountId String         @db.Uuid
-  expenseAccount   LedgerAccount  @relation("QebExpense", fields: [expenseAccountId], references: [id])
-  position         Int            @default(0)
-  active           Boolean        @default(true)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-
-  @@map("quick_expense_buttons")
-}
-
 model Acreedor {
   id               Int              @id @default(autoincrement())
   nombre           String
@@ -573,8 +385,6 @@ model FiadoVenta {
   createdAt  DateTime @default(now())
   venta      Sale     @relation(fields: [ventaId], references: [id])
   acreedor   Acreedor @relation(fields: [acreedorId], references: [id])
-  journalEntryId   String?        @unique @db.Uuid
-  journalEntry     JournalEntry?  @relation("JournalEntryFiadoVenta", fields: [journalEntryId], references: [id])
 
   @@index([acreedorId])
   @@index([ventaId])
@@ -589,10 +399,6 @@ model PagoAcreedor {
   notas      String?
   createdAt  DateTime @default(now())
   acreedor        Acreedor        @relation(fields: [acreedorId], references: [id])
-  journalEntryId   String?         @unique @db.Uuid
-  journalEntry     JournalEntry?   @relation("JournalEntryPagoAcreedor", fields: [journalEntryId], references: [id])
-  treasuryAccountId String?        @db.Uuid
-  treasuryAccount  LedgerAccount?  @relation("PagoAcreedorTreasuryAccount", fields: [treasuryAccountId], references: [id])
 
   @@index([acreedorId])
 }
@@ -757,10 +563,6 @@ model SocioPago {
   monto             Decimal         @db.Decimal(10, 2)
   fecha             DateTime
   observacion       String?
-  journalEntryId    String?         @unique @db.Uuid
-  journalEntry      JournalEntry?   @relation("JournalEntrySocioPago", fields: [journalEntryId], references: [id])
-  treasuryAccountId String?         @db.Uuid
-  treasuryAccount   LedgerAccount?  @relation("SocioPagoTreasuryAccount", fields: [treasuryAccountId], references: [id])
   createdAt         DateTime        @default(now())
 
   @@index([socioCuotaId])

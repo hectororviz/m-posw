@@ -23,7 +23,7 @@ const ALL_MODULES: { key: ModuleKey; label: string }[] = [
 const HOME_SMARTPHONE_OPTIONS = [
   { value: '', label: 'Igual que escritorio' },
   { value: 'POS', label: 'POS' },
-  { value: 'TESORERIA', label: 'Gastos rápidos' },
+  { value: 'TESORERIA', label: 'Tesorería · Movimientos' },
   { value: 'VENTAS', label: 'Ventas' },
 ];
 

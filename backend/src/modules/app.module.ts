@@ -2,12 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { AccountingModule } from './accounting/accounting.module';
 import { AcreedoresModule } from './acreedores/acreedores.module';
 import { AuthModule } from './auth/auth.module';
 import { CashCloseModule } from './cash-close/cash-close.module';
 import { CategoriesModule } from './categories/categories.module';
-import { CashMovementsModule } from './cash-movements/cash-movements.module';
 import { IconsModule } from './icons/icons.module';
 import { MercadoPagoOauthModule } from './mercadopago-oauth/mercadopago-oauth.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -19,7 +17,6 @@ import { StatsModule } from './stats/stats.module';
 import { StockModule } from './stock/stock.module';
 import { InternetVouchersModule } from './internet-vouchers/internet-vouchers.module';
 import { SociosModule } from './socios/socios.module';
-import { TreasuryModule } from './treasury/treasury.module';
 import { UsersModule } from './users/users.module';
 import { HomeModule } from './home/home.module';
 import { LigasModule } from './ligas/ligas.module';
@@ -36,14 +33,11 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 60 }]),
-    AccountingModule,
     AcreedoresModule,
-    TreasuryModule,
     AuthModule,
     CashCloseModule,
     UsersModule,
     CategoriesModule,
-    CashMovementsModule,
     IconsModule,
     InternetVouchersModule,
     LigasModule,

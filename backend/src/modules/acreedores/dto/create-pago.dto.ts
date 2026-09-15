@@ -19,9 +19,5 @@ export class CreatePagoDto {
 
   @IsUUID()
   @IsNotEmpty()
-  treasuryAccountId: string;
-
-  @IsOptional()
-  @IsUUID()
-  moneyAccountId?: string;
+  moneyAccountId: string;
 }

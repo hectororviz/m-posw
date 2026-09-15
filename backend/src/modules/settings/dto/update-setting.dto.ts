@@ -68,18 +68,6 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsBoolean()
-  enableAutoJournalPos?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  enableAutoJournalAcreedores?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  enableAutoJournalSocios?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
   enableLigasModule?: boolean;
 
   @IsOptional()
