@@ -59,7 +59,10 @@ function formatPrice(value: number): string {
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { headers: { Accept: 'application/json' } });
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  });
   if (!res.ok) {
     let message = `Error ${res.status}`;
     try {
@@ -101,7 +104,7 @@ export const PublicInternetPage: React.FC = () => {
         if (s.available && !orderId) {
           try {
             const p = await apiGet<PublicPlan[]>('/internet/public/plans');
-            if (active) setPlans(p);
+            if (active) setPlans(p.filter((plan) => plan.price > 0));
           } catch (err) {
             if (active) setPlansError(err instanceof Error ? err.message : 'No se pudieron cargar los planes');
           }

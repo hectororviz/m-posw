@@ -55,7 +55,9 @@ export class InternetPublicService {
     if (!setting.mpLinked || !setting.mpAccessToken) {
       return { available: false, reason: 'MP_NOT_LINKED', storeName, clubName, logoUrl };
     }
-    const activePlans = await this.prisma.internetPlan.count({ where: { active: true } });
+    const activePlans = await this.prisma.internetPlan.count({
+      where: { active: true, price: { gt: 0 } },
+    });
     if (activePlans === 0) {
       return { available: false, reason: 'NO_PLANS', storeName, clubName, logoUrl };
     }
@@ -86,7 +88,7 @@ export class InternetPublicService {
   async listPlans() {
     await this.assertAvailable();
     const plans = await this.prisma.internetPlan.findMany({
-      where: { active: true },
+      where: { active: true, price: { gt: 0 } },
       orderBy: { position: 'asc' },
       select: {
         id: true,
