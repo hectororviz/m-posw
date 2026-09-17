@@ -265,7 +265,7 @@ export const AdminProductsPage: React.FC = () => {
                 <label htmlFor="prod-category">Categoria</label>
                 <select id="prod-category" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
                   <option value="">Seleccionar categoria</option>
-                  {categories?.map((c) => (
+                  {categories?.filter((c) => c.name !== 'Internet').map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>

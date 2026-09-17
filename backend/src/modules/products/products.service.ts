@@ -23,6 +23,9 @@ export class ProductsService {
 
   listAll() {
     return this.prisma.product.findMany({
+      // Los productos vinculados a planes de internet se gestionan
+      // desde Admin → Internet → Planes (única fuente del precio online)
+      where: { internetPlan: { is: null } },
       include: { 
         category: true,
         recipeAsComposite: {
