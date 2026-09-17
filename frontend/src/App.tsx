@@ -41,6 +41,7 @@ import { TournamentsPage } from './pages/players/TournamentsPage';
 import { PatrimonioPage } from './pages/patrimonio/PatrimonioPage';
 import { BienesPage } from './pages/patrimonio/BienesPage';
 import { ConfigPage } from './pages/patrimonio/ConfigPage';
+import { PublicInternetPage } from './pages/PublicInternetPage';
 import { AdminNotificacionesPage } from './pages/AdminNotificacionesPage';
 import { useAuth } from './context/AuthContext';
 import type { ModuleKey } from './api/types';
@@ -72,7 +73,9 @@ export const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/oauth-return" element={<OAuthReturnPage />} />
+        <Route path="/oauth-return" element={<OAuthReturnPage />} />
+        <Route path="/internet" element={<PublicInternetPage />} />
+        <Route path="/internet/retorno" element={<PublicInternetPage />} />
       <Route path="/print/ticket" element={<PrintTicketPage />} />
       <Route path="/printticket" element={<PrintTicketPage />} />
       <Route

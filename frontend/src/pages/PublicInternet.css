@@ -1,0 +1,236 @@
+.pub-internet-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem 3rem;
+  background: var(--color-bg, #f4f6fb);
+}
+
+.pub-internet-card {
+  width: min(880px, 100%);
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.pub-internet-brand {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.pub-internet-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 1rem;
+}
+
+.pub-internet-logo-placeholder {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-color, #0ea5e9);
+  color: #fff;
+  font-weight: 800;
+  border-radius: 1rem;
+  flex-shrink: 0;
+}
+
+.pub-internet-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.pub-internet-subtitle {
+  margin: 0;
+  color: var(--color-text-muted-alt, #64748b);
+}
+
+.pub-internet-tag {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted-alt, #64748b);
+}
+
+.pub-internet-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.pub-internet-unavailable-title,
+.pub-internet-success-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.pub-internet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.pub-internet-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+  text-align: left;
+  background: var(--color-bg, #f8fafc);
+  border: 2px solid var(--color-border, #e5e7eb);
+  border-radius: 1rem;
+  padding: 1.1rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+  color: inherit;
+  font: inherit;
+}
+
+.pub-internet-plan:hover:not(:disabled) {
+  border-color: var(--accent-color, #0ea5e9);
+  transform: translateY(-2px);
+}
+
+.pub-internet-plan:disabled {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+.pub-internet-plan-name {
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.pub-internet-plan-duration {
+  font-size: 0.95rem;
+  color: var(--color-text-muted-alt, #64748b);
+}
+
+.pub-internet-plan-speed {
+  font-size: 0.85rem;
+  color: var(--color-text-muted-alt, #64748b);
+}
+
+.pub-internet-plan-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-top: 0.25rem;
+}
+
+.pub-internet-plan-cta {
+  margin-top: 0.5rem;
+  background: var(--accent-color, #0ea5e9);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  padding: 0.55rem 1rem;
+  width: 100%;
+  text-align: center;
+}
+
+.pub-internet-hint {
+  margin-top: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted-alt, #64748b);
+  text-align: center;
+}
+
+.pub-internet-success {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pub-internet-plan-line {
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-muted-alt, #64748b);
+}
+
+.pub-internet-pin-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  border: 2px dashed var(--accent-color, #0ea5e9);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: var(--color-bg, #f8fafc);
+}
+
+.pub-internet-pin-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted-alt, #64748b);
+}
+
+.pub-internet-pin {
+  font-size: 2.75rem;
+  font-weight: 900;
+  letter-spacing: 0.35rem;
+}
+
+.pub-internet-copy {
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-surface, #fff);
+  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.pub-internet-instructions {
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  padding-top: 1rem;
+}
+
+.pub-internet-instructions h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.pub-internet-instructions ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pub-internet-help {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.pub-internet-back {
+  align-self: center;
+  border: none;
+  background: transparent;
+  color: var(--accent-color, #0ea5e9);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+@media (max-width: 560px) {
+  .pub-internet-card {
+    padding: 1.25rem;
+  }
+  .pub-internet-pin {
+    font-size: 2.25rem;
+  }
+}
