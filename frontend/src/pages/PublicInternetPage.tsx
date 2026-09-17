@@ -312,18 +312,17 @@ const OrderResult: React.FC<{
         <div className="pub-internet-instructions">
           <h2>Cómo conectarte</h2>
           <ol>
-            {order.wifi.ssid && (
-              <li>Conectate a la red WiFi <strong>{order.wifi.ssid}</strong>.</li>
-            )}
-            {!order.wifi.ssid && <li>Conectate a la red WiFi del lugar.</li>}
-            {order.wifi.portalUrl ? (
-              <li>Si no se abre solo, entrá a <strong>{order.wifi.portalUrl}</strong> e ingresá tu PIN.</li>
-            ) : (
-              <li>Cuando te lo pida, ingresá tu PIN.</li>
-            )}
+            <li>Conectate a la red WiFi <strong>{order.wifi.ssid ?? 'soler'}</strong> desde tu celular o computadora.</li>
+            <li>
+              Se va a abrir la página de acceso
+              {order.wifi.portalUrl ? (<> (si no, entrá a <strong>{order.wifi.portalUrl}</strong>)</>) : null}{' '}
+              e ingresá el PIN mostrado arriba.
+            </li>
             {order.duration ? (
-              <li>Tu acceso dura <strong>{formatDuration(order.duration)}</strong> desde el primer uso.</li>
-            ) : null}
+              <li>Tu tiempo contratado ({formatDuration(order.duration)}) empieza a correr desde tu primer ingreso. Una vez agotado, la conexión se corta automáticamente.</li>
+            ) : (
+              <li>Tu acceso queda habilitado desde tu primer ingreso.</li>
+            )}
           </ol>
           {order.wifi.helpText && <p className="pub-internet-help">{order.wifi.helpText}</p>}
           {mpStatus && mpStatus.toLowerCase() !== 'approved' && (

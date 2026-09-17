@@ -203,7 +203,7 @@ export class InternetPublicService {
       duration,
       pin: sale.paymentStatus === 'APPROVED' && sale.status === 'APPROVED' ? voucher?.pin ?? null : null,
       wifi: {
-        ssid: this.config.get<string>('WIFI_SSID') ?? null,
+        ssid: this.config.get<string>('WIFI_SSID') ?? 'soler',
         portalUrl: this.config.get<string>('WIFI_PORTAL_URL') ?? null,
         helpText: this.config.get<string>('WIFI_HELP_TEXT') ?? null,
       },
