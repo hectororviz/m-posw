@@ -306,14 +306,20 @@ export const AdminAcreedoresPage: React.FC = () => {
   const getSaldoDisplay = (a: Acreedor) => {
     const s = a.saldo ?? 0;
     const sf = a.saldoFavor ?? 0;
+    const ti = a.totalIntereses ?? 0;
+    const badge = s > 0 && ti > 0 ? (
+      <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--color-text-faint)', fontWeight: 400 }}>
+        incluye {formatCurrency(ti)} interés
+      </span>
+    ) : null;
     if (sf > 0) {
       return <span className="success-text" style={{ fontWeight: 600 }}>{`A favor: ${formatCurrency(sf)}`}</span>;
     }
     if (s > 0 && a.alertaDeuda) {
-      return <span className="error-text" style={{ fontWeight: 600 }}>{formatCurrency(s)}</span>;
+      return <span className="error-text" style={{ fontWeight: 600 }}>{formatCurrency(s)}{badge}</span>;
     }
     if (s > 0) {
-      return <span className="warning-text">{formatCurrency(s)}</span>;
+      return <span className="warning-text">{formatCurrency(s)}{badge}</span>;
     }
     return <span style={{ color: 'var(--color-text-muted)' }}>$0</span>;
   };

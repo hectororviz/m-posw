@@ -337,6 +337,18 @@ export const AdminAcreedorDetailPage: React.FC = () => {
             <span className="sales-kpi-label">Total pagado</span>
             <span className="sales-kpi-value">{formatCurrency(deuda.totalPagado)}</span>
           </div>
+          {(deuda.totalIntereses ?? 0) > 0 && (
+            <>
+              <div className="sales-kpi-card">
+                <span className="sales-kpi-label">Capital</span>
+                <span className="sales-kpi-value">{formatCurrency(deuda.capitalPendiente ?? 0)}</span>
+              </div>
+              <div className="sales-kpi-card">
+                <span className="sales-kpi-label">Intereses</span>
+                <span className="sales-kpi-value warning-text">{formatCurrency(deuda.totalIntereses ?? 0)}</span>
+              </div>
+            </>
+          )}
           {(deuda.advertenciaDeuda != null || deuda.limiteDeuda != null) && (
             <div className="sales-kpi-card">
               <span className="sales-kpi-label">Advertencia / Límite</span>
@@ -407,8 +419,15 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                     concepto = 'Venta fiada';
                     detalle = `Venta #${entry.data.ventaId.slice(0, 8)}`;
                   } else if (entry.kind === 'ajuste') {
-                    concepto = 'Ajuste';
-                    detalle = entry.data.descripcion || '--';
+                    if (entry.data.esInteres) {
+                      concepto = 'Interés';
+                      detalle = entry.data.periodo
+                        ? `${entry.data.periodo} · ${entry.data.descripcion || ''}`.trim()
+                        : entry.data.descripcion || '--';
+                    } else {
+                      concepto = 'Ajuste';
+                      detalle = entry.data.descripcion || '--';
+                    }
                   } else {
                     concepto = getMedioPagoLabel(entry.data.medioPago);
                     detalle = entry.data.notas || '--';
@@ -436,7 +455,12 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                       >
                         {amountDisplay}
                       </span>
-                      <span className="col-method" style={{ whiteSpace: 'nowrap', paddingLeft: '1.5rem' }}>{concepto}</span>
+                      <span className="col-method" style={{ whiteSpace: 'nowrap', paddingLeft: '1.5rem' }}>
+                        {concepto}
+                        {entry.kind === 'ajuste' && entry.data.esInteres && entry.data.periodo && (
+                          <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }}>{entry.data.periodo}</span>
+                        )}
+                      </span>
                       <span className="col-user" style={{ paddingLeft: '1.5rem' }}>
                         {detalle}
                         {entry.kind === 'venta' && (

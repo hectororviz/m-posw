@@ -175,6 +175,8 @@ export interface Setting {
   enableSociosModule?: boolean | null;
   enableTreasuryModule?: boolean | null;
   enableAcreedoresModule?: boolean | null;
+  interesAcreedoresHabilitado?: boolean | null;
+  tasaInteresMensualAcreedores?: number | null;
   enableInternetModule?: boolean | null;
   enableLigasModule?: boolean | null;
   enablePlayersModule?: boolean | null;
@@ -423,6 +425,8 @@ export interface Acreedor {
   diasSinPagar?: number | null;
   saldo?: number;
   saldoFavor?: number;
+  capitalPendiente?: number;
+  totalIntereses?: number;
   limiteDeuda?: number | null;
   advertenciaDeuda?: number | null;
   estadoDeuda?: EstadoDeuda;
@@ -451,6 +455,8 @@ export interface AjusteAcreedorItem {
   descripcion: string | null;
   saldoRestante?: number;
   esAjuste: true;
+  esInteres?: boolean;
+  periodo?: string | null;
 }
 
 export interface AcreedorDeuda {
@@ -461,6 +467,8 @@ export interface AcreedorDeuda {
   totalPagado: number;
   saldoPendiente: number;
   saldoFavor: number;
+  capitalPendiente?: number;
+  totalIntereses?: number;
   deudaMasAntigua: string | null;
   diasSinPagar: number | null;
   alertaDeuda: boolean;

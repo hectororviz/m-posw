@@ -53,6 +53,8 @@ export const AdminSettingsPage: React.FC = () => {
     enableSociosModule: true,
     enableTreasuryModule: true,
     enableAcreedoresModule: true,
+    interesAcreedoresHabilitado: false,
+    tasaInteresMensualAcreedores: '',
     enableInternetModule: false,
     enableLigasModule: false,
     enablePlayersModule: false,
@@ -65,6 +67,7 @@ export const AdminSettingsPage: React.FC = () => {
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [aboutContent, setAboutContent] = useState('');
   const [showMovementReasonsModal, setShowMovementReasonsModal] = useState(false);
+  const [showInteresesModal, setShowInteresesModal] = useState(false);
   const [newInReason, setNewInReason] = useState('');
   const [newOutReason, setNewOutReason] = useState('');
   const [mpConnecting, setMpConnecting] = useState(false);
@@ -149,6 +152,8 @@ export const AdminSettingsPage: React.FC = () => {
         enableSociosModule: settings.enableSociosModule ?? true,
         enableTreasuryModule: settings.enableTreasuryModule ?? true,
         enableAcreedoresModule: settings.enableAcreedoresModule ?? true,
+        interesAcreedoresHabilitado: settings.interesAcreedoresHabilitado ?? false,
+        tasaInteresMensualAcreedores: settings.tasaInteresMensualAcreedores != null ? String(settings.tasaInteresMensualAcreedores) : '',
         enableInternetModule: settings.enableInternetModule ?? false,
         enableLigasModule: settings.enableLigasModule ?? false,
         enablePlayersModule: settings.enablePlayersModule ?? false,
@@ -202,7 +207,11 @@ export const AdminSettingsPage: React.FC = () => {
     const validatedForm = validatePaymentMethods(form);
     setForm(validatedForm);
     try {
-      const response = await apiClient.patch<Setting>('/settings', validatedForm);
+      const tasa = parseTasaInteres(validatedForm.tasaInteresMensualAcreedores);
+      const response = await apiClient.patch<Setting>('/settings', {
+        ...validatedForm,
+        tasaInteresMensualAcreedores: tasa === undefined ? validatedForm.tasaInteresMensualAcreedores : tasa,
+      });
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       pushToast('Configuracion actualizada', 'success');
@@ -210,6 +219,32 @@ export const AdminSettingsPage: React.FC = () => {
       setError(normalizeApiError(err));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const parseTasaInteres = (raw: unknown): number | null | undefined => {
+    if (raw === '' || raw == null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
+
+  const handleSaveIntereses = async () => {
+    const tasa = parseTasaInteres(form.tasaInteresMensualAcreedores);
+    if (tasa === undefined) {
+      pushToast('La tasa debe ser un número mayor o igual a 0', 'error');
+      return;
+    }
+    try {
+      const response = await apiClient.patch<Setting>('/settings', {
+        interesAcreedoresHabilitado: form.interesAcreedoresHabilitado,
+        tasaInteresMensualAcreedores: tasa,
+      });
+      queryClient.setQueryData(['settings'], response.data);
+      await queryClient.invalidateQueries({ queryKey: ['settings'] });
+      pushToast('Intereses guardados correctamente', 'success');
+      setShowInteresesModal(false);
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
     }
   };
 
@@ -941,6 +976,16 @@ export const AdminSettingsPage: React.FC = () => {
                   <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu, la opcion Fiado del checkout y el toggle de Fiado en Ventas</small>
                 </span>
               </label>
+              {form.enableAcreedoresModule && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  onClick={() => setShowInteresesModal(true)}
+                  style={{ alignSelf: 'flex-start', marginTop: '0.35rem' }}
+                >
+                  Configurar intereses{form.interesAcreedoresHabilitado && form.tasaInteresMensualAcreedores !== '' ? ` (${form.tasaInteresMensualAcreedores}% mensual)` : ''}
+                </button>
+              )}
               <label className="toggle-switch">
                 <input
                   type="checkbox"
@@ -1074,6 +1119,67 @@ export const AdminSettingsPage: React.FC = () => {
             </div>
             <div className="modal-body about-modal-body">
               <div className="about-content-markdown" dangerouslySetInnerHTML={{ __html: aboutHtml }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Intereses de Acreedores */}
+      {showInteresesModal && (
+        <div className="modal-backdrop" onClick={() => setShowInteresesModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Intereses de acreedores</h3>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setShowInteresesModal(false)}
+                aria-label="Cerrar"
+              >
+                {<X size={16} />}
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.interesAcreedoresHabilitado}
+                  onChange={(e) => setForm({ ...form, interesAcreedoresHabilitado: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Cobrar interés semanal automático</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Cada lunes se aplica interés solo sobre deuda vencida hace más de 7 días</small>
+                </span>
+              </label>
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  Tasa mensual (%)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  placeholder="Ej: 5"
+                  value={form.tasaInteresMensualAcreedores}
+                  onChange={(e) => setForm({ ...form, tasaInteresMensualAcreedores: e.target.value })}
+                  style={{ width: '12rem' }}
+                />
+                <p style={{ color: 'var(--color-text-faint)', fontSize: '0.85rem', marginTop: '0.75rem', lineHeight: 1.5 }}>
+                  Cada lunes 09:30 se debita una semana (tasa mensual × 7 ÷ 30) sobre el capital
+                  vencido hace más de 7 días. Las compras recientes no generan interés, los pagos
+                  alivian primero lo más viejo y los intereses previos no generan nuevo interés.
+                  Cada aplicación queda registrada en el historial del acreedor con su período
+                  (año-semana), tasa y base de cálculo.
+                </p>
+              </div>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="primary-button" onClick={handleSaveIntereses}>
+                  Guardar intereses
+                </button>
+              </div>
             </div>
           </div>
         </div>
