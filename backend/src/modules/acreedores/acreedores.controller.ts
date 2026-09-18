@@ -5,6 +5,7 @@ import { ModuleAccessGuard } from '../common/module-access.guard';
 import { RequireModule } from '../common/module-access.decorator';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { AcreedoresService } from './acreedores.service';
+import { AcreedoresInteresesService } from './acreedores-intereses.service';
 import { CreateAcreedorDto } from './dto/create-acreedor.dto';
 import { UpdateAcreedorDto } from './dto/update-acreedor.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
@@ -16,6 +17,7 @@ export class AcreedoresController {
   constructor(
     private readonly acreedoresService: AcreedoresService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly interesesService: AcreedoresInteresesService,
   ) {}
 
   @Get('resumen')
@@ -28,6 +30,18 @@ export class AcreedoresController {
   @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
   findAll() {
     return this.acreedoresService.findAll();
+  }
+
+  @Get('intereses/preview')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.READ)
+  previewIntereses(@Query('fecha') fecha?: string) {
+    return this.interesesService.preview(fecha ? new Date(`${fecha}T12:00:00Z`) : undefined);
+  }
+
+  @Post('intereses/aplicar')
+  @RequireModule(ModuleKey.ACREEDORES, ModuleAccess.FULL)
+  aplicarIntereses(@Body() body: { fecha?: string }) {
+    return this.interesesService.aplicar(body?.fecha ? new Date(`${body.fecha}T12:00:00Z`) : undefined);
   }
 
   @Get(':id')

@@ -25,4 +25,10 @@ export class UpdateAcreedorDto {
   @Min(0)
   @Type(() => Number)
   advertenciaDeuda?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  tasaInteresMensual?: number | null;
 }

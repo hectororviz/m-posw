@@ -222,7 +222,11 @@ export class AcreedoresService {
 
     return acreedores.map((a) => {
       const totalFiado = a.fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
-      const totalAjustes = a.ajustes.reduce((sum, aj) => sum + Number(aj.monto), 0);
+      const ajustes = a.ajustes as unknown as Array<{ monto: unknown; esInteres?: boolean }>;
+      const totalAjustes = ajustes.reduce((sum, aj) => sum + Number(aj.monto), 0);
+      const totalIntereses = ajustes
+        .filter((aj) => aj.esInteres)
+        .reduce((sum, aj) => sum + Number(aj.monto), 0);
       const totalPagado = a.pagos.reduce((sum, p) => sum + Number(p.monto), 0);
       const { alertaDeuda, diasSinPagar, saldoFavor } = this.calculateFifo(
         a.fiadoVentas as unknown as FiadoVentaRaw[],
@@ -242,9 +246,14 @@ export class AcreedoresService {
         alertaDeuda: saldo <= 0 ? false : alertaDeuda,
         diasSinPagar: saldo <= 0 ? null : diasSinPagar,
         saldo,
+        capitalPendiente: saldo > 0 ? parseFloat((saldo - totalIntereses).toFixed(2)) : 0,
+        totalIntereses: parseFloat(totalIntereses.toFixed(2)),
         saldoFavor: saldo < 0 ? Math.abs(saldo) : 0,
         limiteDeuda,
         advertenciaDeuda,
+        tasaInteresMensual: this.toMontoOrNull(
+          (a as unknown as { tasaInteresMensual?: unknown }).tasaInteresMensual ?? null,
+        ),
         estadoDeuda: this.estadoDeuda(saldo, limiteDeuda, advertenciaDeuda),
       };
     });
@@ -259,6 +268,9 @@ export class AcreedoresService {
       ...acreedor,
       limiteDeuda: this.toMontoOrNull(acreedor.limiteDeuda),
       advertenciaDeuda: this.toMontoOrNull(acreedor.advertenciaDeuda),
+      tasaInteresMensual: this.toMontoOrNull(
+        (acreedor as unknown as { tasaInteresMensual?: unknown }).tasaInteresMensual ?? null,
+      ),
     };
   }
 
@@ -279,6 +291,13 @@ export class AcreedoresService {
       throw new BadRequestException(
         'El límite de deuda debe ser mayor o igual a la advertencia',
       );
+    }
+  }
+
+  private validarTasa(tasa: number | null | undefined) {
+    if (tasa == null) return;
+    if (tasa < 0 || tasa > 100) {
+      throw new BadRequestException('La tasa de interés mensual debe estar entre 0 y 100');
     }
   }
 
@@ -331,11 +350,15 @@ export class AcreedoresService {
 
   async create(dto: CreateAcreedorDto) {
     this.validarLimites(dto.limiteDeuda, dto.advertenciaDeuda);
+    this.validarTasa(dto.tasaInteresMensual);
     const acreedor = await this.prisma.acreedor.create({ data: dto });
     return {
       ...acreedor,
       limiteDeuda: this.toMontoOrNull(acreedor.limiteDeuda),
       advertenciaDeuda: this.toMontoOrNull(acreedor.advertenciaDeuda),
+      tasaInteresMensual: this.toMontoOrNull(
+        (acreedor as unknown as { tasaInteresMensual?: unknown }).tasaInteresMensual ?? null,
+      ),
     };
   }
 
@@ -350,6 +373,13 @@ export class AcreedoresService {
         ? dto.advertenciaDeuda
         : this.toMontoOrNull(actual.advertenciaDeuda);
     this.validarLimites(limite, advertencia);
+    this.validarTasa(
+      dto.tasaInteresMensual !== undefined
+        ? (dto.tasaInteresMensual ?? null)
+        : this.toMontoOrNull(
+            (actual as unknown as { tasaInteresMensual?: unknown }).tasaInteresMensual ?? null,
+          ),
+    );
     const updated = await this.prisma.acreedor.update({
       where: { id },
       data: dto,
@@ -358,6 +388,9 @@ export class AcreedoresService {
       ...updated,
       limiteDeuda: this.toMontoOrNull(updated.limiteDeuda),
       advertenciaDeuda: this.toMontoOrNull(updated.advertenciaDeuda),
+      tasaInteresMensual: this.toMontoOrNull(
+        (updated as unknown as { tasaInteresMensual?: unknown }).tasaInteresMensual ?? null,
+      ),
     };
   }
 
@@ -396,7 +429,11 @@ export class AcreedoresService {
     });
 
     const totalFiado = fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);
-    const totalAjustes = ajustes.reduce((sum, a) => sum + Number(a.monto), 0);
+    const ajustesConFlag = ajustes as unknown as Array<{ monto: unknown; esInteres?: boolean }>;
+    const totalAjustes = ajustesConFlag.reduce((sum, a) => sum + Number(a.monto), 0);
+    const totalIntereses = ajustesConFlag
+      .filter((a) => a.esInteres)
+      .reduce((sum, a) => sum + Number(a.monto), 0);
     const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0);
     const saldoBruto = totalFiado + totalAjustes - totalPagado;
     const saldoPendiente = saldoBruto > 0 ? parseFloat(saldoBruto.toFixed(2)) : 0;
@@ -417,6 +454,8 @@ export class AcreedoresService {
       ajustes: ajustesConSaldo,
       pagos,
       totalFiado: totalFiado + totalAjustes,
+      totalIntereses: parseFloat(totalIntereses.toFixed(2)),
+      capitalPendiente: saldoBruto > 0 ? parseFloat((saldoBruto - totalIntereses).toFixed(2)) : 0,
       totalPagado,
       saldoPendiente,
       saldoFavor,

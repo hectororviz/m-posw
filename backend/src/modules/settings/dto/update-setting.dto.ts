@@ -1,4 +1,5 @@
-import { IsArray, IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateSettingDto {
   @IsOptional()
@@ -120,6 +121,16 @@ export class UpdateSettingDto {
 
   @IsOptional()
   whatsappVariableOrder?: Record<string, number>;
+
+  @IsOptional()
+  @IsBoolean()
+  interesAcreedoresHabilitado?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  tasaInteresMensualAcreedores?: number | null;
 
   @IsOptional()
   @IsArray()

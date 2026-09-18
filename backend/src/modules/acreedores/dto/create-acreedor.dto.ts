@@ -24,4 +24,10 @@ export class CreateAcreedorDto {
   @Min(0)
   @Type(() => Number)
   advertenciaDeuda?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  tasaInteresMensual?: number;
 }

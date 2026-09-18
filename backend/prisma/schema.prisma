@@ -271,6 +271,8 @@ model Setting {
   enableSociosModule Boolean @default(true)
   enableTreasuryModule Boolean @default(true)
   enableAcreedoresModule Boolean @default(true)
+  interesAcreedoresHabilitado Boolean @default(false)
+  tasaInteresMensualAcreedores Decimal? @db.Decimal(5, 2)
   enableInternetModule        Boolean @default(false)
   enableLigasModule           Boolean @default(false)
   enablePlayersModule         Boolean @default(false)
@@ -368,6 +370,7 @@ model Acreedor {
   activo           Boolean          @default(true)
   limiteDeuda      Decimal?         @db.Decimal(10, 2)
   advertenciaDeuda Decimal?         @db.Decimal(10, 2)
+  tasaInteresMensual Decimal?       @db.Decimal(5, 2)
   createdAt   DateTime         @default(now())
   fiadoVentas FiadoVenta[]
   pagos       PagoAcreedor[]
@@ -411,8 +414,15 @@ model AjusteAcreedor {
   fecha       DateTime
   createdAt   DateTime @default(now())
   acreedor    Acreedor @relation(fields: [acreedorId], references: [id])
+  // Interés semanal auditable (reusa el ajuste como comprobante).
+  // Los ajustes con esInteres=true NO generan nuevo interés (sin anatocismo).
+  esInteres           Boolean  @default(false)
+  periodo             String?
+  tasaMensualAplicada Decimal? @db.Decimal(5, 2)
+  baseCalculo         Decimal? @db.Decimal(10, 2)
 
   @@index([acreedorId])
+  @@index([acreedorId, periodo])
 }
 
 model MpCityMapping {
