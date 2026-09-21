@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true">
@@ -11,49 +10,20 @@
         android:layout_height="wrap_content"
         android:padding="20dp">
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardHeader"
+        <TextView android:id="@+id/tvFechaHora"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutline">
+            android:gravity="end"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-            <LinearLayout
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="14dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <ImageView android:id="@+id/ivEscudo"
-                    android:layout_width="64dp"
-                    android:layout_height="64dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_shield"
-                    android:contentDescription="Logo del club" />
-
-                <LinearLayout
-                    android:orientation="vertical"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="14dp">
-
-                    <TextView android:id="@+id/tvClub"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textAppearance="?attr/textAppearanceTitleLarge" />
-
-                    <TextView android:id="@+id/tvFechaHora"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:textAppearance="?attr/textAppearanceBodyMedium" />
-                </LinearLayout>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        <ImageView android:id="@+id/ivEscudo"
+            android:layout_width="128dp"
+            android:layout_height="128dp"
+            android:layout_gravity="center"
+            android:layout_marginTop="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_shield"
+            android:contentDescription="Logo del club" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -88,6 +58,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:checkable="true"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="@string/sector_local" />
 
             <com.google.android.material.button.MaterialButton
@@ -97,6 +69,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:checkable="true"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="@string/sector_visitante" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
@@ -162,7 +136,9 @@
                 style="@style/Widget.Entradas.Button.Ghost"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/quitar_socio" />
+                android:minWidth="48dp"
+                android:visibility="gone"
+                android:text="✕" />
         </LinearLayout>
 
         <LinearLayout
@@ -192,10 +168,17 @@
                 android:text="@string/pagar_qr" />
         </LinearLayout>
 
-        <TextView android:id="@+id/tvStatus"
+        <TextView android:id="@+id/tvContadores"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
+            android:textAlignment="center"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+        <TextView android:id="@+id/tvStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
             android:textAppearance="?attr/textAppearanceBodyMedium" />
 
         <com.google.android.material.button.MaterialButton
@@ -204,6 +187,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:layout_marginBottom="16dp"
             android:text="@string/reimprimir" />
     </LinearLayout>
 </ScrollView>

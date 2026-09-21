@@ -65,6 +65,7 @@ class ConfigFragment : Fragment() {
             refreshVersions()
         }
         b.btnTest.setOnClickListener { probar() }
+        b.btnVolver.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
     }
 
     private fun refreshVersions() {

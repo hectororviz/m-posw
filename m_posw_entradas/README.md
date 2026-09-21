@@ -14,15 +14,17 @@ Contrato válido: `docs/contrato-pos-entradas.txt` del repo principal.
 4. `401 DEVICE_REVOKED` → se borra el token y pide re-pairing.
 
 ## Uso
-- Venta: elige partido (spinner solo si hay >1), sector L/V, cantidad 1–10 con +/−, opcional Botón Socio (escanea credencial → `GET socios/:uuid`, exige `AL_DIA`; el descuento lo confirma el servidor en el intent).
+- Venta: elige partido (spinner solo si hay >1), sector con nombres de clubes (LOCAL = `clubName`, VISITANTE = rival del fixture), cantidad 1–10 con +/−, opcional Botón Socio (escanea credencial → `GET socios/:uuid`, exige `AL_DIA`; la ✕ para quitarlo aparece solo con socio aplicado). Debajo del cobro hay contador de vendidas por sector; Reimprimir queda último. Al aprobarse (CASH o QR) se muestra un diálogo de éxito con animación nativa + códigos y total.
 - Efectivo: `POST intent CASH` → `APPROVED` → imprime N tickets (`L-001`/`V-001`).
 - QR: `POST intent MP_QR` → muestra la imagen **estática** `qrImageUrl` del POS dedicado → polling `GET status` cada 2.5s hasta 5 min → al `APPROVED` imprime. Cancelar libera la orden.
 - Template + escudo se descargan al probar conexión y cuando `templateVersion/logoVersion` cambian (nunca por venta). Ancho fijo 32 cols, 58mm.
 - Sin papel: la venta queda en Room (`approved_sales`) y se reimprime con “Reimprimir última”.
-- Branding: el header muestra escudo + nombre del club y tiñe el header y los
-  botones de cobro con `Setting.accentColor`. Todo llega en
-  `GET /entradas/ticket-assets/escudo` (cacheado por versión) al pulsar
-  “Probar conexión” o en cada venta; sin color válido queda el tema genérico.
+- Branding: el header muestra solo el escudo a 128dp centrado + fecha arriba a la
+  derecha (sin nombre ni fondo de color); los botones de cobro se tiñen con
+  `Setting.accentColor`. Todo llega en `GET /entradas/ticket-assets/escudo`
+  (cacheado por versión) al pulsar “Probar conexión” o en cada venta; sin color
+  válido queda el tema genérico. La navegación a Config es un engranaje fijo
+  abajo a la derecha (Config tiene botón Volver).
   Tema Material 3 propio en claro y oscuro.
 
 ## Build

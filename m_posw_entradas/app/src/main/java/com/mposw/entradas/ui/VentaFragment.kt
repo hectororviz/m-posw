@@ -61,10 +61,19 @@ class VentaFragment : Fragment() {
         b.btnSocio.setOnClickListener {
             scanSocio.launch(ScanOptions().setPrompt("Escaneá la credencial del socio").setBeepEnabled(true))
         }
-        b.btnQuitarSocio.setOnClickListener { socioUuid = null; b.tvSocio.text = "" }
+        b.btnQuitarSocio.setOnClickListener {
+            socioUuid = null
+            b.tvSocio.text = ""
+            b.btnQuitarSocio.visibility = View.GONE
+        }
         b.btnCash.setOnClickListener { cobrar("CASH") }
         b.btnQr.setOnClickListener { cobrar("MP_QR") }
         b.btnReprint.setOnClickListener { reimprimir() }
+        parentFragmentManager.setFragmentResultListener("qr_aprobado", this) { _, bundle ->
+            val fixtureId = bundle.getString("fixtureId") ?: return@setFragmentResultListener
+            val sec = bundle.getString("sector") ?: return@setFragmentResultListener
+            registrarVentaLocal(fixtureId, sec, bundle.getInt("cantidad", 0))
+        }
 
         refreshSector()
         bindHeader()
@@ -100,13 +109,12 @@ class VentaFragment : Fragment() {
         } else {
             showFallbackLogo(oneBit)
         }
-        b.tvClub.text = session.clubName.ifBlank { "Entradas" }
         val fmt = java.text.SimpleDateFormat("EEE dd/MM · HH:mm", java.util.Locale("es", "AR"))
         b.tvFechaHora.text = fmt.format(java.util.Date())
         BrandApplier.apply(
             session.brandColor,
-            b.cardHeader,
-            listOf(b.tvClub, b.tvFechaHora),
+            null,
+            emptyList(),
             listOf(b.btnCash, b.btnQr),
         )
     }
@@ -138,7 +146,38 @@ class VentaFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        _b?.let { bindHeader() }
+        _b?.let {
+            bindHeader()
+            actualizarSectores()
+            actualizarContadores()
+        }
+    }
+
+    private fun actualizarSectores() {
+        val f = current()
+        b.btnLocal.text = session.clubName.ifBlank { "Local" }
+        b.btnVisitante.text = f?.rival?.ifBlank { "Visitante" } ?: "Visitante"
+    }
+
+    private fun actualizarContadores() {
+        val f = current()
+        if (f == null) {
+            b.tvContadores.text = ""
+            return
+        }
+        val club = session.clubName.ifBlank { "Local" }
+        val rival = f.rival.ifBlank { "Visitante" }
+        b.tvContadores.text = "$club: ${f.vendidosL} · $rival: ${f.vendidosV}"
+    }
+
+    private fun registrarVentaLocal(fixtureId: String, sec: String, cant: Int) {
+        if (cant <= 0) return
+        fixtures = fixtures.map { fx ->
+            if (fx.fixtureId != fixtureId) fx
+            else if (sec == "LOCAL") fx.copy(vendidosL = fx.vendidosL + cant)
+            else fx.copy(vendidosV = fx.vendidosV + cant)
+        }
+        _b?.let { actualizarContadores() }
     }
 
     private fun current(): FixtureVigente? {
@@ -163,6 +202,8 @@ class VentaFragment : Fragment() {
                     b.tvStatus.text = getString(com.mposw.entradas.R.string.sin_partidos)
                     b.spFixture.adapter = null
                     b.tvFixtureInfo.text = ""
+                    actualizarSectores()
+                    actualizarContadores()
                 } else {
                     b.spFixture.adapter = ArrayAdapter(
                         requireContext(),
@@ -178,9 +219,13 @@ class VentaFragment : Fragment() {
                             val fx = fixtures[pos]
                             b.tvFixtureInfo.text = "${fx.torneo} vs ${fx.rival} · $${fx.precio}"
                             refreshTotal()
+                            actualizarSectores()
+                            actualizarContadores()
                         }
                         override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
                     }
+                    actualizarSectores()
+                    actualizarContadores()
                 }
                 refreshTotal()
             } catch (e: Exception) {
@@ -210,10 +255,12 @@ class VentaFragment : Fragment() {
                     b.tvStatus.text = "Socio ${r.socio?.nombre ?: ""}: estado ${r.estado}. Sin descuento."
                     socioUuid = null
                     b.tvSocio.text = ""
+                    b.btnQuitarSocio.visibility = View.GONE
                 } else {
                     socioUuid = uuid
                     b.tvSocio.text = "${r.socio?.nombre} · ${r.socio?.nroSocio} · AL DÍA"
                     b.tvStatus.text = "Socio aplicado. El descuento lo confirma el servidor."
+                    b.btnQuitarSocio.visibility = View.VISIBLE
                 }
             } catch (e: Exception) {
                 b.tvStatus.text = "Socio: ${ApiClient.parseError(e)}"
@@ -237,8 +284,14 @@ class VentaFragment : Fragment() {
                 if (method == "CASH") {
                     if (payload.status == "APPROVED") {
                         guardarEImprimir(payload)
+                        registrarVentaLocal(f.fixtureId, sector, cantidad)
                         socioUuid = null
                         b.tvSocio.text = ""
+                        b.btnQuitarSocio.visibility = View.GONE
+                        PagoExitosoDialogFragment.new(
+                            payload.codigos.joinToString(", "),
+                            payload.total,
+                        ).show(parentFragmentManager, "ok")
                     } else {
                         b.tvStatus.text = "Estado inesperado: ${payload.status}"
                     }
@@ -247,7 +300,7 @@ class VentaFragment : Fragment() {
                     if (payload.saleId == null || qrUrl.isNullOrBlank()) {
                         b.tvStatus.text = "QR no configurado en el servidor (qrImageUrl vacío)."
                     } else {
-                        QrPagoFragment.new(payload.saleId, qrUrl, payload.total)
+                        QrPagoFragment.new(payload.saleId, qrUrl, payload.total, f.fixtureId, sector, cantidad)
                             .show(parentFragmentManager, "qr")
                     }
                 }

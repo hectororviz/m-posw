@@ -28,6 +28,9 @@ class QrPagoFragment : DialogFragment() {
     private val saleId: String get() = requireArguments().getString("saleId") ?: ""
     private val qrUrl: String get() = requireArguments().getString("qrUrl") ?: ""
     private val total: String get() = requireArguments().getString("total") ?: ""
+    private val fixtureId: String get() = requireArguments().getString("fixtureId") ?: ""
+    private val sector: String get() = requireArguments().getString("sector") ?: ""
+    private val cantidad: Int get() = requireArguments().getInt("cantidad", 0)
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _b = FragmentQrPagoBinding.inflate(inflater, container, false)
@@ -64,7 +67,17 @@ class QrPagoFragment : DialogFragment() {
                             val elements = TicketRenderer.parseTemplate(session.templateJson)
                             val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
                             SunmiPrinter.printSale(requireContext(), p, elements, escudo)
+                            parentFragmentManager.setFragmentResult(
+                                "qr_aprobado",
+                                androidx.core.os.bundleOf(
+                                    "fixtureId" to fixtureId,
+                                    "sector" to sector,
+                                    "cantidad" to (if (cantidad > 0) cantidad else p.cantidad),
+                                ),
+                            )
                             dismissAllowingStateLoss()
+                            PagoExitosoDialogFragment.new(p.codigos.joinToString(", "), p.total)
+                                .show(parentFragmentManager, "ok")
                             return@launch
                         }
                         "EXPIRED", "REJECTED", "CANCELLED" -> {
@@ -98,12 +111,22 @@ class QrPagoFragment : DialogFragment() {
     }
 
     companion object {
-        fun new(saleId: String, qrUrl: String, total: String): QrPagoFragment {
+        fun new(
+            saleId: String,
+            qrUrl: String,
+            total: String,
+            fixtureId: String = "",
+            sector: String = "",
+            cantidad: Int = 0,
+        ): QrPagoFragment {
             val f = QrPagoFragment()
             f.arguments = Bundle().apply {
                 putString("saleId", saleId)
                 putString("qrUrl", qrUrl)
                 putString("total", total)
+                putString("fixtureId", fixtureId)
+                putString("sector", sector)
+                putInt("cantidad", cantidad)
             }
             return f
         }

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <ImageView android:id="@+id/ivOkCheck"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:src="@drawable/ic_check"
+        android:contentDescription="Pago aprobado" />
+
+    <TextView android:id="@+id/tvOkTitulo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/pago_aprobado"
+        android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+    <TextView android:id="@+id/tvOkCodigos"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textAlignment="center"
+        android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+    <TextView android:id="@+id/tvOkTotal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOkCerrar"
+        style="@style/Widget.Entradas.Button.Neutral"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="@string/aceptar" />
+</LinearLayout>
