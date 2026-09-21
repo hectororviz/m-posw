@@ -72,14 +72,16 @@ export class EntradasAdminController {
     return this.admin.listFixtures(from, to);
   }
 
+  // Fixtures (calendario) operables con READ: el personal de puerta
+  // programa partidos y ventanas sin tocar ABM/diseño/dispositivos.
   @Post('fixtures')
-  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
   createFixture(@Body() dto: CreateFixtureDto) {
     return this.admin.createFixture(dto);
   }
 
   @Patch('fixtures/:id')
-  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
   updateFixture(@Param('id') id: string, @Body() dto: UpdateFixtureDto) {
     return this.admin.updateFixture(id, dto);
   }

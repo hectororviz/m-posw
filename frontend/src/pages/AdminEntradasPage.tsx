@@ -44,28 +44,32 @@ const fmtFecha = (iso: string) => {
 export const AdminEntradasPage: React.FC = () => {
   const access = useModuleAccess('ENTRADAS');
   const canWrite = access === 'FULL';
+  // READ: solo Ventas y Calendario (con control total ahí).
+  // ABM, Diseño y Configuración son FULL.
+  const visibleTabs = TABS.filter((t) => canWrite || t.id === 'ventas' || t.id === 'calendario');
   const [tab, setTab] = useState<TabId>('ventas');
+  const activeTab: TabId = visibleTabs.some((t) => t.id === tab) ? tab : 'ventas';
 
   return (
     <div className="treasury-page">
       <nav className="treasury-subnav">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={tab === t.id ? 'treasury-subnav-link active' : 'treasury-subnav-link'}
+            className={activeTab === t.id ? 'treasury-subnav-link active' : 'treasury-subnav-link'}
           >
             {t.label}
           </button>
         ))}
       </nav>
       <div className="treasury-content">
-        {tab === 'ventas' && <VentasTab canWrite={canWrite} />}
-        {tab === 'calendario' && <CalendarioTab canWrite={canWrite} />}
-        {tab === 'abm' && <AbmTab canWrite={canWrite} />}
-        {tab === 'diseno' && <DisenoTab canWrite={canWrite} />}
-        {tab === 'config' && <ConfigTab canWrite={canWrite} />}
+        {activeTab === 'ventas' && <VentasTab canWrite={canWrite} />}
+        {activeTab === 'calendario' && <CalendarioTab canWrite />}
+        {activeTab === 'abm' && <AbmTab canWrite={canWrite} />}
+        {activeTab === 'diseno' && <DisenoTab canWrite={canWrite} />}
+        {activeTab === 'config' && <ConfigTab canWrite={canWrite} />}
       </div>
     </div>
   );

@@ -1097,7 +1097,7 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 | `GET` | `/entradas/rivales` | READ | ABM rivales |
 | `POST` / `PATCH` | `/entradas/rivales[/:id]` | FULL | Crear/editar (nombre) |
 | `GET` | `/entradas/fixtures?from=&to=` | READ | Calendario |
-| `POST` / `PATCH` | `/entradas/fixtures[/:id]` | FULL | Crear (ventana default) / editar ventana |
+| `POST` / `PATCH` | `/entradas/fixtures[/:id]` | READ | Crear (ventana default) / editar ventana. Calendario operable con READ |
 | `GET` | `/entradas/devices` | READ | Listar terminales (sin token) |
 | `POST` | `/entradas/devices` | FULL | Generar token (respuesta única) |
 | `POST` | `/entradas/devices/:id/revoke` | FULL | Revocar |
@@ -1124,7 +1124,7 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 `MercadoPagoWebhookProcessorService` deriva `externalReference` con prefijo `ticket-` a `EntradasSalesService` (vía `ModuleRef` lazy, sin ciclo de módulos): aprueba y genera `L-/V-`, registra `SocioCanje` si hubo descuento. `normalizeSaleId` no se tocó (solo `sale-`).
 
 ### Permisos
-- `ModuleKey.ENTRADAS`: ADMIN = FULL implícito; USER default HIDDEN (solo aparece en `AdminUsersPage` para otorgar).
+- `ModuleKey.ENTRADAS`: ADMIN = FULL implícito; USER default HIDDEN (solo aparece en `AdminUsersPage` para otorgar). Con READ: solo tabs Ventas y Calendario (control total ahí, fixtures operables); ABM/Diseño/Configuración ocultas (FULL).
 - `Setting.enableEntradasModule` (default `false`): toggle en Configuración → Módulos + sidebar condicionado + `assertModuleEnabled()` en device service.
 
 ### Frontend
