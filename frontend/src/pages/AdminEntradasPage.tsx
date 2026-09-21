@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import QRCode from 'react-qr-code';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Eye, EyeOff, MonitorSmartphone, Pencil, Plus, RefreshCw, Ticket, Trash2, Upload, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
@@ -932,7 +933,15 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
           <div className="settings-field" style={{ background: 'var(--color-surface-alt)', padding: '0.75rem', borderRadius: 8 }}>
             <strong>Token (se muestra una sola vez):</strong>
             <code style={{ display: 'block', wordBreak: 'break-all', margin: '0.5rem 0' }}>{newToken.token}</code>
-            <small>Pairing: <code style={{ wordBreak: 'break-all' }}>{JSON.stringify(newToken.pairing)}</code></small>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+              <div style={{ background: '#fff', padding: '0.5rem', borderRadius: 8 }}>
+                <QRCode value={JSON.stringify(newToken.pairing)} size={200} />
+              </div>
+              <div style={{ flex: '1 1 220px' }}>
+                <small>Escaneá este QR desde la app del POS para vincularlo.</small>
+                <small style={{ display: 'block', marginTop: '0.25rem' }}>Pairing: <code style={{ wordBreak: 'break-all' }}>{JSON.stringify(newToken.pairing)}</code></small>
+              </div>
+            </div>
           </div>
         )}
         <div className="sales-table-wrapper">
