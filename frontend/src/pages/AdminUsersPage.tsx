@@ -119,7 +119,13 @@ export const AdminUsersPage: React.FC = () => {
       closeModal();
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch (err) {
-      setError(normalizeApiError(err));
+      const msg = normalizeApiError(err);
+      setError(msg);
+      // El usuario pudo borrarse en otra sesión: refrescar para no mostrar fantasmas
+      if (/no encontrado/i.test(msg)) {
+        closeModal();
+        await queryClient.invalidateQueries({ queryKey: ['users'] });
+      }
     }
   };
 
