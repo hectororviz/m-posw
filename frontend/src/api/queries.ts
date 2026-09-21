@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, FichadoPlayer, InternetPlan, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
+import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, InternetPlan, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1164,3 +1164,104 @@ export const useMarkAllConversationsRead = () => {
     },
   });
 };
+
+export const useEntradaTorneos = () =>
+  useQuery({
+    queryKey: ['entradas-torneos'],
+    queryFn: async () => {
+      const response = await apiClient.get<EntradaTorneo[]>('/entradas/torneos');
+      return response.data;
+    },
+  });
+
+export const useEntradaRivales = () =>
+  useQuery({
+    queryKey: ['entradas-rivales'],
+    queryFn: async () => {
+      const response = await apiClient.get<EntradaRival[]>('/entradas/rivales');
+      return response.data;
+    },
+  });
+
+export const useEntradaFixtures = (from?: string, to?: string) =>
+  useQuery({
+    queryKey: ['entradas-fixtures', from, to],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      const response = await apiClient.get<EntradaFixture[]>(`/entradas/fixtures${qs ? `?${qs}` : ''}`);
+      return response.data;
+    },
+  });
+
+export const usePosDevices = () =>
+  useQuery({
+    queryKey: ['entradas-devices'],
+    queryFn: async () => {
+      const response = await apiClient.get<PosDevice[]>('/entradas/devices');
+      return response.data;
+    },
+  });
+
+export const useTicketSales = (fixtureId?: string) =>
+  useQuery({
+    queryKey: ['entradas-sales', fixtureId],
+    queryFn: async () => {
+      const qs = fixtureId ? `?fixtureId=${fixtureId}` : '';
+      const response = await apiClient.get<TicketSale[]>(`/entradas/sales${qs}`);
+      return response.data;
+    },
+  });
+
+export const useEntradasSalesSummary = (fixtureId?: string) =>
+  useQuery({
+    queryKey: ['entradas-sales-summary', fixtureId],
+    queryFn: async () => {
+      const response = await apiClient.get<EntradasSalesSummary>(`/entradas/sales/summary?fixtureId=${fixtureId}`);
+      return response.data;
+    },
+    enabled: Boolean(fixtureId),
+  });
+
+export const useEntradaTicketTemplate = () =>
+  useQuery({
+    queryKey: ['entradas-ticket-template'],
+    queryFn: async () => {
+      const response = await apiClient.get<EntradaTicketTemplate>('/entradas/ticket-template');
+      return response.data;
+    },
+  });
+
+export const useEntradaEscudoInfo = () =>
+  useQuery({
+    queryKey: ['entradas-escudo'],
+    queryFn: async () => {
+      const response = await apiClient.get<EntradaTicketAssetInfo>('/entradas/ticket-assets/escudo-info');
+      return response.data;
+    },
+  });
+
+export const useInvalidateEntradas = () => {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ['entradas-torneos'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-rivales'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-fixtures'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-devices'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-sales'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-sales-summary'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-ticket-template'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-escudo'] });
+  };
+};
+
+export const useEntradasMpPos = () =>
+  useQuery({
+    queryKey: ['entradas-mp-pos'],
+    queryFn: async () => {
+      const response = await apiClient.get<EntradasMpPosStatus>('/entradas/mp-pos');
+      return response.data;
+    },
+  });

@@ -51,6 +51,7 @@ Ver `.env.example` para el listado completo. Las críticas:
 | `MP_DEFAULT_EXTERNAL_STORE_ID` / `MP_DEFAULT_EXTERNAL_POS_ID` | IDs de Store/POS en MP (opcionales si usás OAuth) |
 | `MP_WEBHOOK_SECRET` | Validación de webhooks de MP |
 | `INSTANCE_SUBDOMAIN` | Subdominio usado para construir URL de webhook dinámica |
+| `CADDY_HOST` | Host público de la instancia para Caddy (`docker-compose.yml` label). El POS externo pega a `https://${CADDY_HOST}/api/entradas/...` |
 | `MP_CLIENT_ID` / `MP_CLIENT_SECRET` | Credenciales para OAuth Mercado Pago |
 | `MP_OAUTH_REDIRECT_URI` | URI de callback para OAuth |
 | `MP_INTEGRATOR_ID` | Integrator ID opcional (header X-Integrator-Id) |
@@ -85,6 +86,7 @@ Login unificado por `username` + `password`. El endpoint `POST /auth/login` devu
 | Stock | `STOCK` | HIDDEN, READ, FULL |
 | Reportes | `REPORTES` | HIDDEN, READ, FULL |
 | Configuración | `CONFIGURACION` | HIDDEN, READ, FULL |
+| Entradas | `ENTRADAS` | HIDDEN, READ, FULL |
 
 - **HIDDEN**: no aparece en sidebar, no accesible vía URL
 - **READ**: visible, datos cargados, sin botones de crear/editar/eliminar
@@ -357,6 +359,7 @@ Solapa "Módulos" en Configuración (entre Usuarios y Sistema) para habilitar/de
 | `enablePlayersModule` | false | Activa el módulo de Jugadores. Agrega "Jugadores" al menú (sección Deportes). Gestión de jugadores, categorías por edad, torneos con fichaje |
 | `enablePatrimonioModule` | true | Activa el módulo de Patrimonio. Agrega "Patrimonio" al menú (sección Administración). Registro y gestión de bienes/activos con historial de eventos |
 | `enableNotificationsModule` | false | Activa el módulo de Notificaciones. Agrega "Notificaciones" al menú (sección Sistema). Envío de recordatorios de deuda a acreedores vía WhatsApp Cloud API (Meta) |
+| `enableEntradasModule` | false | Activa el módulo de Entradas. Agrega "Entradas" al menú (sección Ventas). Venta de entradas desde POS Android externo con impresora térmica |
 
 Los toggles se persisten en la tabla `Setting` y se aplican en tiempo real sin recargar.
 
@@ -1049,6 +1052,88 @@ Para agregar un nuevo canal (SMS, email, etc.), implementar `INotificationProvid
 Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).
 ```
 
+## Entradas / POS Externo Module
+
+Módulo de venta de entradas desde terminal POS Android con impresora térmica (Sunmi V2s, 58mm). El POS opera **fuera del VPS** por HTTPS (`https://${CADDY_HOST}/api/entradas/...` vía Caddy → nginx `/api/` → backend). Contrato congelado en `docs/contrato-pos-entradas.txt`.
+
+### Estructura
+```
+backend/src/modules/entradas/
+├── entradas.module.ts            # imports: Users, Sales (MP), Socios (QR/descuentos)
+├── entradas-admin.controller.ts  # CRUD web (JWT + RequireModule ENTRADAS)
+├── entradas-device.controller.ts # API del terminal (EntradasDeviceGuard, Bearer ent_...)
+├── entradas-shared.controller.ts # GET ticket-template + escudo (FlexibleGuard: JWT o device)
+├── entradas-admin.service.ts     # ABMs, devices, template, escudo, defaultWindowFor()
+├── entradas-sales.service.ts     # vigentes, intent, status, cancel, approveSale, webhook apply
+├── device.guard.ts               # EntradasDeviceGuard (tokenHash SHA256, lastSeenAt)
+├── entradas-flexible.guard.ts    # Acepta JWT (READ+) o token device
+├── device-token.util.ts          # generate/hash/ent_ + Bearer parsing
+├── ticket-template.const.ts      # Layout default 32 cols
+└── dto/
+```
+
+### Modelos
+```
+EntradaTorneo ──1:N──> EntradaFixture <──N:1── EntradaRival
+EntradaFixture ──1:N──> TicketSale ──1:N──> TicketUnit
+EntradaFixture ──1:N──> EntradaContador (uno por sector)
+PosDevice ──1:N──> TicketSale
+SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; futuro)
+```
+
+- **EntradaTorneo**: solo `nombre` + `precio` (precio único, sin L/V).
+- **EntradaRival**: solo `nombre`.
+- **EntradaFixture**: `fecha` + `torneoId` + `rivalId` + `ventanaDesde/Hasta` (default 06:00 → 05:59+1, editable). `@@unique(fecha, torneoId, rivalId)`.
+- **PosDevice**: `tokenHash` SHA256 (el token `ent_...` se muestra una sola vez + pairing `{baseUrl, token}` para QR). Revocable/rotatable.
+- **TicketSale**: `sector` informativo (mismo precio), `cantidad` 1-10, `CASH` aprueba directo, `MP_QR` crea orden Instore con `externalReference=ticket-<id>` en el **POS dedicado** (`Setting.mpEntradas*`, QR **estático** `mpEntradasQrData`, monto en 1 línea `quantity=1`). `requestId` único = idempotencia.
+- **TicketUnit / EntradaContador**: numeración por partido y sector (`L-001`, `V-001`, series independientes, contador atómico + `updateMany` condicional anti-doble-aprobación).
+- **EntradaTicketTemplate** (singleton `default`, versionado) + **EntradaTicketAsset** (singleton `escudo`, PNG 1-bit ≤120KB base64). El POS los cachea por versión.
+
+### Endpoints
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| `GET` | `/entradas/torneos` | READ | ABM torneos |
+| `POST` / `PATCH` | `/entradas/torneos[/:id]` | FULL | Crear/editar (nombre+precio) |
+| `GET` | `/entradas/rivales` | READ | ABM rivales |
+| `POST` / `PATCH` | `/entradas/rivales[/:id]` | FULL | Crear/editar (nombre) |
+| `GET` | `/entradas/fixtures?from=&to=` | READ | Calendario |
+| `POST` / `PATCH` | `/entradas/fixtures[/:id]` | FULL | Crear (ventana default) / editar ventana |
+| `GET` | `/entradas/devices` | READ | Listar terminales (sin token) |
+| `POST` | `/entradas/devices` | FULL | Generar token (respuesta única) |
+| `POST` | `/entradas/devices/:id/revoke` | FULL | Revocar |
+| `POST` | `/entradas/devices/:id/rotate` | FULL | Rotar token |
+| `GET` | `/entradas/mp-pos` | READ | Estado del POS MP dedicado (linked, QR) |
+| `GET` | `/entradas/mp-pos/detect-stores` | READ | Listar tiendas/POS de la cuenta OAuth (siempre lista completa) |
+| `POST` | `/entradas/mp-pos/select` | FULL | Vincular POS existente → solo `mpEntradas*` |
+| `POST` | `/entradas/mp-pos/setup` | FULL | Crear tienda+caja en MP → solo `mpEntradas*` |
+| `POST` | `/entradas/mp-pos/disconnect` | FULL | Desvincular (principal intacto) |
+| `GET` | `/entradas/sales?fixtureId=` | READ | Ventas con unidades |
+| `GET` | `/entradas/sales/summary?fixtureId=` | READ | Conteos L/V + recaudado |
+| `GET` | `/entradas/ticket-template` | JWT o device | Layout JSON (cache por `version`) |
+| `GET` | `/entradas/ticket-assets/escudo` | JWT o device | PNG base64 (cache por `version`) |
+| `GET` | `/entradas/ticket-assets/escudo-info` | READ | Versión sin imagen (admin) |
+| `PATCH` | `/entradas/ticket-template` | FULL | Guardar diseño (1-40 bloques) |
+| `POST` | `/entradas/ticket-assets/escudo` | FULL | Subir PNG → 1-bit (multipart) |
+| `GET` | `/entradas/fixtures/vigentes` (alias `/hoy`) | device | Fixtures en ventana actual |
+| `POST` | `/entradas/sales/intent` | device | Crear venta (`X-Request-Id` idempotente). CASH→APPROVED, MP_QR→PENDING+`qrImageUrl` |
+| `GET` | `/entradas/sales/:id/status` | device | Polling + payload impresión (`datos`, `codigos`, versiones) |
+| `POST` | `/entradas/sales/:id/cancel` | device | Cancelar PENDING (+ `deleteOrder` MP) |
+| `GET` | `/entradas/socios/:uuid` | device | Socio + beneficios (futuro, sin uso en prueba) |
+
+### Webhook MP
+`MercadoPagoWebhookProcessorService` deriva `externalReference` con prefijo `ticket-` a `EntradasSalesService` (vía `ModuleRef` lazy, sin ciclo de módulos): aprueba y genera `L-/V-`, registra `SocioCanje` si hubo descuento. `normalizeSaleId` no se tocó (solo `sale-`).
+
+### Permisos
+- `ModuleKey.ENTRADAS`: ADMIN = FULL implícito; USER default HIDDEN (solo aparece en `AdminUsersPage` para otorgar).
+- `Setting.enableEntradasModule` (default `false`): toggle en Configuración → Módulos + sidebar condicionado + `assertModuleEnabled()` en device service.
+
+### Frontend
+`frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Configuración` (subnav `treasury-subnav-link`). Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
+
+### Límites conocidos (v1)
+- Una sola orden QR activa por POS de MP: con el POS dedicado, web y terminal usan cada uno el suyo y no se pisan. Con N terminales concurrentes se necesita 1 POS MP por terminal.
+- `SocioCanje.usuarioId` ahora nullable (`posId` = deviceId) para canjes POS.
+
 ## Important Constraints
 
 - **Migraciones**: Se aplican automáticamente al iniciar el contenedor backend. No ejecutar manualmente en producción a menos que sepas lo que hacés.
@@ -1092,6 +1177,7 @@ m-posw/
 │   │       ├── cash-movements/    # Movimientos de caja
 │   │       ├── categories/        # Categorías de productos
 │   │       ├── common/            # Prisma, MP config, guards, uploads
+│   │       ├── entradas/          # Entradas POS externo (device guard, fixtures, L/V, template)
 │   │       ├── icons/             # Listado de iconos
 │   │       ├── internet-vouchers/  # Vouchers WiFi (integración api-radius)
 │   │       ├── ligas/            # Ligas Deportivas (tablas + partidos vía Supabase)

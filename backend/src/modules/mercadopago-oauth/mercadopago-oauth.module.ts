@@ -11,6 +11,6 @@ import { AuthModule } from '../auth/auth.module';
   imports: [AuthModule, ScheduleModule.forRoot(), UsersModule],
   controllers: [MercadoPagoOauthController],
   providers: [MercadoPagoOauthService, MercadoPagoConfigService, PrismaService],
-  exports: [MercadoPagoConfigService],
+  exports: [MercadoPagoConfigService, MercadoPagoOauthService],
 })
 export class MercadoPagoOauthModule {}

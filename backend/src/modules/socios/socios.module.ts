@@ -19,6 +19,6 @@ import { SociosBeneficiosService } from './socios-beneficios.service';
     SociosController,
   ],
   providers: [SociosService, SociosQrService, SociosBeneficiosService, PrismaService],
-  exports: [SociosService, SociosBeneficiosService],
+  exports: [SociosService, SociosBeneficiosService, SociosQrService],
 })
 export class SociosModule {}

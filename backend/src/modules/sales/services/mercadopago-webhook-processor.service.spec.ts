@@ -1,3 +1,4 @@
+import { ModuleRef } from '@nestjs/core';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from './mercadopago-query.service';
 import { MercadoPagoWebhookProcessorService } from './mercadopago-webhook-processor.service';
@@ -56,7 +57,9 @@ describe('MercadoPagoWebhookProcessorService', () => {
       generateVouchersForSale: jest.fn().mockResolvedValue([]),
     } as any;
 
-    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway, salesService, internetVouchers);
+    const moduleRef = { get: jest.fn().mockReturnValue(null) } as unknown as ModuleRef;
+
+    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway, salesService, internetVouchers, moduleRef);
 
     await processor.processWebhook({
       body: { type: 'payment' },
@@ -123,7 +126,9 @@ describe('MercadoPagoWebhookProcessorService', () => {
       generateVouchersForSale: jest.fn().mockResolvedValue([]),
     } as any;
 
-    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway2, salesService2, internetVouchers2);
+    const moduleRef2 = { get: jest.fn().mockReturnValue(null) } as unknown as ModuleRef;
+
+    const processor = new MercadoPagoWebhookProcessorService(prisma, mpService, salesGateway2, salesService2, internetVouchers2, moduleRef2);
 
     await processor.processWebhook({
       body: { type: 'merchant_order', resource: 'https://api.mercadopago.com/merchant_orders/mo-1' },

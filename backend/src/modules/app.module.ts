@@ -28,6 +28,7 @@ import { PatrimonioModule } from './patrimonio/patrimonio.module';
 import { CoachesModule } from './coaches/coaches.module';
 import { FinanzasModule } from './finanzas/finanzas.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
+import { EntradasModule } from './entradas/entradas.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
     CoachesModule,
     FinanzasModule,
     NotificacionesModule,
+    EntradasModule,
   ],
   providers: [
     {

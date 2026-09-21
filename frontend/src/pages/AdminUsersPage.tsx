@@ -17,6 +17,7 @@ const ALL_MODULES: { key: ModuleKey; label: string }[] = [
   { key: 'LIGAS', label: 'Ligas' },
   { key: 'PLAYERS', label: 'Jugadores' },
   { key: 'INTERNET', label: 'Internet' },
+  { key: 'ENTRADAS', label: 'Entradas' },
   { key: 'CONFIGURACION', label: 'Usuarios / Configuración' },
 ];
 

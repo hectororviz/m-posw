@@ -18,6 +18,44 @@ function normalizeStateName(name: string): string {
   return ML_TO_MP_STATE[name] || name;
 }
 
+export type MpPosTarget = 'principal' | 'entradas';
+
+interface MpPosPersist {
+  storeId: string;
+  posId: string;
+  storeName: string;
+  posName: string;
+  qrData: string;
+  externalPosId: string;
+  externalStoreId: string;
+}
+
+// Mapeo destino -> columnas de Setting. El principal NUNCA se toca
+// desde el módulo Entradas: solo target='entradas' escribe mpEntradas*.
+const POS_COLUMNS: Record<
+  MpPosTarget,
+  { storeId: 'mpStoreId' | 'mpEntradasStoreId'; posId: 'mpPosId' | 'mpEntradasPosId'; storeName: 'mpStoreName' | 'mpEntradasStoreName'; posName: 'mpPosName' | 'mpEntradasPosName'; qrData: 'mpQrData' | 'mpEntradasQrData'; externalPosId: 'mpExternalPosId' | 'mpEntradasExternalPosId'; externalStoreId: 'mpExternalStoreId' | 'mpEntradasExternalStoreId' }
+> = {
+  principal: {
+    storeId: 'mpStoreId',
+    posId: 'mpPosId',
+    storeName: 'mpStoreName',
+    posName: 'mpPosName',
+    qrData: 'mpQrData',
+    externalPosId: 'mpExternalPosId',
+    externalStoreId: 'mpExternalStoreId',
+  },
+  entradas: {
+    storeId: 'mpEntradasStoreId',
+    posId: 'mpEntradasPosId',
+    storeName: 'mpEntradasStoreName',
+    posName: 'mpEntradasPosName',
+    qrData: 'mpEntradasQrData',
+    externalPosId: 'mpEntradasExternalPosId',
+    externalStoreId: 'mpEntradasExternalStoreId',
+  },
+};
+
 @Injectable()
 export class MercadoPagoOauthService {
   private readonly logger = new Logger(MercadoPagoOauthService.name);
@@ -256,6 +294,46 @@ export class MercadoPagoOauthService {
       mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
     }
 
+    const stores = await this.fetchMpStores(mpHeaders);
+    if (!stores || stores.length === 0) {
+      return { status: 'no_stores' };
+    }
+
+    return { status: 'found_stores', stores };
+  }
+
+  /**
+   * Lista completa de tiendas/POS de la cuenta MP, sin importar si el
+   * POS principal ya está configurado. Para el selector del POS de entradas.
+   */
+  async listMpStores(): Promise<{
+    stores: Array<{
+      id: string;
+      name: string;
+      address: string;
+      pos: Array<{ id: string; name: string; qrUrl: string }>;
+    }>;
+  }> {
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) {
+      throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    const mpHeaders: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+    if (process.env.MP_INTEGRATOR_ID) {
+      mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+    }
+    return { stores: (await this.fetchMpStores(mpHeaders)) ?? [] };
+  }
+
+  private async fetchMpStores(mpHeaders: Record<string, string>): Promise<Array<{
+    id: string;
+    name: string;
+    address: string;
+    pos: Array<{ id: string; name: string; qrUrl: string }>;
+  }> | null> {
     type MpPos = {
       id: number;
       name: string;
@@ -274,7 +352,7 @@ export class MercadoPagoOauthService {
 
       if (!posRes.ok) {
         this.logger.error(`MP detect stores - pos list failed: HTTP ${posRes.status}`);
-        return { status: 'no_stores' };
+        return null;
       }
 
       const data = await posRes.json();
@@ -284,11 +362,11 @@ export class MercadoPagoOauthService {
       }
     } catch (error) {
       this.logger.error(`MP detect stores - pos list network error: ${error}`);
-      return { status: 'no_stores' };
+      return null;
     }
 
     if (!posList || posList.length === 0) {
-      return { status: 'no_stores' };
+      return null;
     }
 
     const storeMap = new Map<
@@ -318,12 +396,40 @@ export class MercadoPagoOauthService {
       });
     }
 
-    return { status: 'found_stores', stores: Array.from(storeMap.values()) };
+    return Array.from(storeMap.values());
+  }
+
+  private async persistPos(target: MpPosTarget, data: MpPosPersist): Promise<void> {
+    const cols = POS_COLUMNS[target];
+    await this.prisma.setting.upsert({
+      where: { id: DEFAULT_SETTING_ID },
+      create: {
+        id: DEFAULT_SETTING_ID,
+        storeName: 'MiBPS Demo',
+        [cols.storeId]: String(data.storeId),
+        [cols.posId]: String(data.posId),
+        [cols.storeName]: data.storeName,
+        [cols.posName]: data.posName,
+        [cols.qrData]: data.qrData,
+        [cols.externalPosId]: data.externalPosId,
+        [cols.externalStoreId]: data.externalStoreId,
+      },
+      update: {
+        [cols.storeId]: String(data.storeId),
+        [cols.posId]: String(data.posId),
+        [cols.storeName]: data.storeName,
+        [cols.posName]: data.posName,
+        [cols.qrData]: data.qrData,
+        [cols.externalPosId]: data.externalPosId,
+        [cols.externalStoreId]: data.externalStoreId,
+      },
+    });
   }
 
   async selectStore(
     storeId: string,
     posId: string,
+    target: MpPosTarget = 'principal',
   ): Promise<{ ok: boolean; qrUrl: string }> {
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
@@ -370,34 +476,20 @@ export class MercadoPagoOauthService {
       throw new HttpException('Error de red al obtener el POS de MP', HttpStatus.BAD_GATEWAY);
     }
 
-    await this.prisma.setting.upsert({
-      where: { id: DEFAULT_SETTING_ID },
-      create: {
-        id: DEFAULT_SETTING_ID,
-        storeName: 'MiBPS Demo',
-        mpStoreId: String(storeId),
-        mpPosId: String(posId),
-        mpStoreName: `Tienda ${storeId}`,
-        mpPosName: posName,
-        mpQrData: qrData,
-        mpExternalPosId: externalPosId,
-        mpExternalStoreId: externalStoreId,
-      },
-      update: {
-        mpStoreId: String(storeId),
-        mpPosId: String(posId),
-        mpStoreName: `Tienda ${storeId}`,
-        mpPosName: posName,
-        mpQrData: qrData,
-        mpExternalPosId: externalPosId,
-        mpExternalStoreId: externalStoreId,
-      },
-    });
+      await this.persistPos(target, {
+        storeId: String(storeId),
+        posId: String(posId),
+        storeName: `Tienda ${storeId}`,
+        posName,
+        qrData,
+        externalPosId,
+        externalStoreId,
+      });
 
-    this.logger.log(`MP store/pos seleccionados: storeId=${storeId}, posId=${posId}`);
+      this.logger.log(`MP store/pos seleccionados [${target}]: storeId=${storeId}, posId=${posId}`);
 
-    return { ok: true, qrUrl: qrData };
-  }
+      return { ok: true, qrUrl: qrData };
+    }
 
   async setupPos(
     storeName: string,
@@ -409,6 +501,7 @@ export class MercadoPagoOauthService {
     zipCode: string,
     latitude?: number,
     longitude?: number,
+    target: MpPosTarget = 'principal',
   ): Promise<{ ok: boolean; qrUrl: string }> {
     let resolvedCityName = cityName;
     let resolvedStateName = stateName;
@@ -446,9 +539,10 @@ export class MercadoPagoOauthService {
       throw new HttpException('Sin collectorId de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
-    const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9]/g, '');
-    const externalPosId = `${safeSubdomain}pos${Math.floor(Date.now() / 1000)}`;
+      const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
+      const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9]/g, '');
+      const prefix = target === 'entradas' ? `${safeSubdomain}entradaspos` : `${safeSubdomain}pos`;
+      const externalPosId = `${prefix}${Math.floor(Date.now() / 1000)}`;
     this.logger.log(`[MpSetup] Generando POS con external_id: ${externalPosId}`);
 
     const mpHeaders: Record<string, string> = {
@@ -545,33 +639,61 @@ export class MercadoPagoOauthService {
       throw new HttpException('Error de red al crear el POS en MP', HttpStatus.BAD_GATEWAY);
     }
 
-    await this.prisma.setting.upsert({
-      where: { id: DEFAULT_SETTING_ID },
-      create: {
-        id: DEFAULT_SETTING_ID,
-        storeName: 'MiBPS Demo',
-        mpStoreId: String(storeId),
-        mpPosId: String(posId),
-        mpStoreName: storeName,
-        mpPosName: posName,
-        mpQrData: qrData,
-        mpExternalPosId: externalPosId,
-        mpExternalStoreId: String(storeId),
-      },
-      update: {
-        mpStoreId: String(storeId),
-        mpPosId: String(posId),
-        mpStoreName: storeName,
-        mpPosName: posName,
-        mpQrData: qrData,
-        mpExternalPosId: externalPosId,
-        mpExternalStoreId: storeId,
-      },
+    await this.persistPos(target, {
+      storeId: String(storeId),
+      posId: String(posId),
+      storeName,
+      posName,
+      qrData,
+      externalPosId,
+      externalStoreId: String(storeId),
     });
 
-    this.logger.log(`MP POS configurado: storeId=${storeId}, posId=${posId}`);
+    this.logger.log(`MP POS configurado [${target}]: storeId=${storeId}, posId=${posId}`);
 
     return { ok: true, qrUrl: qrData };
+  }
+
+  async getEntradasPosStatus(): Promise<{
+    linked: boolean;
+    storeName: string | null;
+    posName: string | null;
+    hasQr: boolean;
+  }> {
+    const setting = await this.prisma.setting.findUnique({
+      where: { id: DEFAULT_SETTING_ID },
+      select: {
+        mpEntradasStoreId: true,
+        mpEntradasPosId: true,
+        mpEntradasStoreName: true,
+        mpEntradasPosName: true,
+        mpEntradasQrData: true,
+      },
+    });
+    return {
+      linked: !!(setting?.mpEntradasStoreId && setting?.mpEntradasPosId),
+      storeName: setting?.mpEntradasStoreName ?? null,
+      posName: setting?.mpEntradasPosName ?? null,
+      hasQr: !!setting?.mpEntradasQrData,
+    };
+  }
+
+  async deleteEntradasPosSetup(): Promise<{ ok: boolean }> {
+    await this.prisma.setting.upsert({
+      where: { id: DEFAULT_SETTING_ID },
+      create: { id: DEFAULT_SETTING_ID, storeName: 'MiBPS Demo' },
+      update: {
+        mpEntradasStoreId: null,
+        mpEntradasPosId: null,
+        mpEntradasStoreName: null,
+        mpEntradasPosName: null,
+        mpEntradasQrData: null,
+        mpEntradasExternalPosId: null,
+        mpEntradasExternalStoreId: null,
+      },
+    });
+    this.logger.log('MP POS de entradas desvinculado (principal intacto)');
+    return { ok: true };
   }
 
   async getQr(): Promise<{ qrUrl: string }> {

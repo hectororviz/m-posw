@@ -1,0 +1,150 @@
+================================================================
+CONTRATO API POS ENTRADAS - m-posw (v1, primera prueba)
+================================================================
+Estado: implementado en backend. No usar en produccion hasta aviso.
+
+1. URL BASE Y RED
+-----------------
+Produccion por instancia (TLS lo termina Caddy):
+  https://CLIENTE.mposw.com.ar/api/
+Ejemplo: https://pos.csdsoler.com.ar/api/
+
+Camino: Caddy -> frontend nginx:80 (/api/ -> backend:3000/) -> NestJS.
+El backend NO se expone directo. La app nativa NO necesita CORS
+(solo aplica a navegadores).
+Timeouts sugeridos: connect 8s, read 20s (QR), resto 15s.
+
+2. AUTH DISPOSITIVO (Bearer, sin JWT de usuarios)
+-------------------------------------------------
+Header en TODAS las llamadas:
+  Authorization: Bearer ent_<token>
+  Content-Type: application/json
+  X-Request-Id: <uuid v4 por intent> (idempotencia; si reintentas
+    el POST intent por timeout, manda el MISMO id)
+
+Provisioning (una vez, online):
+  Admin (web) genera device -> muestra token UNA vez + pairing:
+    {"baseUrl":"https://CLIENTE.mposw.com.ar/api","token":"ent_..."}
+  El POS escanea el QR de pairing (o carga manual en prueba),
+  guarda el token en secure storage. Nunca loguearlo ni imprimirlo.
+  401 {"code":"DEVICE_REVOKED"} -> borrar token y pedir re-pairing.
+
+3. ENDPOINTS (prefijo /entradas)
+--------------------------------
+3.1 GET /entradas/fixtures/vigentes  (alias: /entradas/fixtures/hoy)
+  Backend filtra por ventana de venta (default 06:00 del dia del
+  partido hasta 05:59:59 del dia siguiente, editable por fixture).
+  200 {"now":"...","fixtures":[
+    {"fixtureId":"uuid","fecha":"2026-09-25","torneo":"Femenino",
+     "torneoId":"uuid","rival":"Mundialito","rivalId":"uuid",
+     "precio":"1500.00","vendidosL":12,"vendidosV":3,
+     "ventanaDesde":"...","ventanaHasta":"..."}]}
+  0 fixtures = "sin partidos". 1 = NO mostrar selector (el POS
+  usa el unico). N = lista y elige el vendedor. Cache 60s.
+
+3.2 POST /entradas/sales/intent
+  Headers: X-Request-Id recomendado.
+  Body: {"fixtureId":"uuid","sector":"LOCAL|VISITANTE",
+         "cantidad":1-10,"paymentMethod":"CASH|MP_QR",
+         "socioUuid":null}
+  (socioUuid reservado futuro, mandar null en la prueba)
+  201 CASH (aprobado directo):
+    {"saleId":"uuid","status":"APPROVED","codigos":["L-013"],
+     "cantidad":1,"precioUnit":"1500.00","descuento":"0",
+     "total":"1500.00","paymentMethod":"CASH",...,
+     "datos":{...},"templateVersion":7,"logoVersion":3}
+  201 MP_QR (pendiente):
+    {"saleId":"uuid","status":"PENDING",
+     "qrImageUrl":"https://.../qr.png (o null si no configurado)",
+     "templateVersion":7,"logoVersion":3}
+    IMPORTANTE: el QR Instore es ESTATICO por POS (la misma imagen
+    para todas las ventas). Entradas usa su PROPIO POS de Mercado
+    Pago (se vincula en web: Entradas -> Configuracion -> POS
+    Mercado Pago de entradas, con la misma cuenta OAuth, sin tocar
+    el POS principal). El intent (PUT order) asocia el MONTO de esta
+    venta a esa orden; el cliente escanea el QR fijo y paga el
+    monto. El POS descarga la imagen UNA vez y la reutiliza.
+    Solo puede haber UNA orden QR activa por POS a la vez: con el
+    POS dedicado, la web y el terminal ya no se pisan (cada uno usa
+    el suyo). Si a futuro hay N terminales concurrentes, se necesita
+    1 POS MP por terminal.
+    El monto se cobra en UNA sola linea (quantity 1): total =
+    precio x cantidad - descuento.
+  Errores: 409 SIN_STOCK / 410 FUERA_DE_VENTANA / 400 validacion
+    403 ENTRADAS_DISABLED / 429 RATE_LIMIT (10 intents/min/device).
+
+3.3 GET /entradas/sales/:id/status (polling QR cada 2-3s, tope 5min)
+  {"status":"PENDING|APPROVED|REJECTED|EXPIRED|CANCELLED",
+   "codigos":["L-013"],"cantidad":1,...,
+   "datos":{"club":"...","torneo":"Femenino","rival":"Mundialito",
+     "fecha":"2026-09-25","sector":"LOCAL","precioUnit":"1500.00",
+     "ventaId":"uuid","fechaPago":"...","footer":"Ticket no fiscal",
+     "qrImageUrl":"<misma imagen QR fija>"},
+   "templateVersion":7,"logoVersion":3}
+  APPROVED -> componer e imprimir (punto 4). EXPIRED/REJECTED ->
+  liberar y ofrecer reintentar (nuevo intent, nuevo X-Request-Id).
+
+3.4 POST /entradas/sales/:id/cancel -> 200 {"status":"CANCELLED"}
+  Cancela la orden MP y libera. Solo PENDING, mismo device.
+
+3.5 GET /entradas/ticket-template
+  {"id":"default","version":7,"widthCols":32,
+   "layout":{"widthCols":32,"elements":[...]}} (2-4KB, cachear por
+  version, refetchear solo si templateVersion cambia).
+
+3.6 GET /entradas/ticket-assets/escudo
+  {"id":"escudo","version":3,"pngBase64":"iVBOR...","widthPx":256}
+  (<20KB, PNG monocromatico 1-bit listo para sunmi_printer_plus.
+  Cachear por version, JAMAS pedirlo por venta.)
+
+3.7 GET /entradas/socios/:uuid -> FUTURO, en prueba no llamar.
+
+4. TICKET 58mm / SUNMI V2s (32 columnas)
+------------------------------------------
+Template DSL versionado, ej:
+  {"version":7,"widthCols":32,"elements":[
+   {"type":"logo","value":"{{escudo}}","align":"center"},
+   {"type":"text","value":"{{club}}","size":"L","align":"center","bold":true},
+   {"type":"text","value":"{{torneo}} vs {{rival}}","size":"M","align":"center"},
+   {"type":"text","value":"{{fecha}}  {{sector}}","size":"M","align":"center"},
+   {"type":"text","value":"{{codigo}}","size":"XL","align":"center","bold":true},
+   {"type":"qr","value":"{{codigo}}","align":"center"},
+   {"type":"text","value":"${{precioUnit}} x{{cantidad}} = ${{total}}","size":"M","align":"center"},
+   {"type":"text","value":"{{footer}}","size":"S","align":"center"}]}
+Tipos: text | qr | logo | line | spacer (con enabled:true/false).
+Vars: club, torneo, rival, fecha, sector, codigo/codigos,
+precioUnit, cantidad, total, descuento, subtotal, ventaId,
+fechaPago, footer, escudo.
+Reglas POS:
+ - Descargar template+escudo al arranque y cuando
+   templateVersion/logoVersion cambien. Nunca por venta.
+ - Una venta de N entradas = N tickets (iterar codigos).
+   Numeracion por partido y sector: L-001... / V-001...
+   independientes, reinician en cada fixture.
+ - Sunmi V2s: sunmi_printer_plus (printText/printQR/printImage,
+   lineWrap 2 + cut). Si se queda sin papel -> guardar APPROVED e
+   indicar "reimprimir" (NO reintentar el cobro).
+
+5. ERRORES Y REINTENTOS
+-----------------------
+Formato Nest: {"statusCode":N,"message":"..."} o
+{"code":"...","message":"..."}. Cods propios: DEVICE_REVOKED(401),
+DEVICE_TOKEN_MISSING(401), ENTRADAS_DISABLED(403),
+FIXTURE_NO_DISPONIBLE(404), VENTA_NO_ENCONTRADA(404),
+FUERA_DE_VENTANA(410), SIN_BENEFICIO/SOCIO_NO_AL_DIA(400 futuro),
+RATE_LIMIT, NO_CANCELABLE, NO_APROBABLE.
+Polling: 2-3s hasta 5min, luego cancel + nuevo intent.
+MP en produccion con el mismo Store/POS ya configurado
+(OAuth/.env); externalReference=ticket-<saleId>.
+
+6. CHECKLIST PRIMERA PRUEBA (1 terminal Sunmi V2s)
+--------------------------------------------------
+[ ] HTTPS a /api/ responde (GET vigentes con token)
+[ ] Pairing guarda token en el equipo
+[ ] Fixtures vigentes aparecen en su ventana 06:00-05:59
+[ ] Venta CASH 1x LOCAL imprime L-001 con escudo
+[ ] Venta MP_QR muestra QR, pago con telefono, poll aprueba
+[ ] Cancel libera PENDING; EXPIRED a los ~10min sin pago
+================================================================
+Dudas al backend: mandar X-Request-Id + hora del POS + code.
+================================================================

@@ -27,6 +27,7 @@ enum ModuleKey {
   PATRIMONIO
   LIGAS
   NOTIFICACIONES
+  ENTRADAS
 }
 
 enum AssetEventType {
@@ -278,6 +279,14 @@ model Setting {
   enablePlayersModule         Boolean @default(false)
   enablePatrimonioModule      Boolean @default(true)
   enableNotificationsModule   Boolean  @default(false)
+  enableEntradasModule        Boolean  @default(false)
+  mpEntradasStoreId       String?
+  mpEntradasPosId         String?
+  mpEntradasStoreName     String?
+  mpEntradasPosName       String?
+  mpEntradasQrData        String?
+  mpEntradasExternalStoreId String?
+  mpEntradasExternalPosId String?
   whatsappUseApi              Boolean  @default(true)
   whatsappWebMessage          String?
   whatsappPhoneNumberId       String?
@@ -586,6 +595,8 @@ model SocioBeneficio {
   categoria       Category?     @relation(fields: [categoriaProdId], references: [id])
   productoId      String?       @db.Uuid
   producto        Product?      @relation(fields: [productoId], references: [id])
+  entradaTorneoId String?       @db.Uuid
+  entradaTorneo   EntradaTorneo? @relation(fields: [entradaTorneoId], references: [id])
   porcentaje      Decimal       @db.Decimal(5, 2)
   descuentoMaximo Decimal?      @db.Decimal(10, 2)
   limiteDiario    Int?
@@ -596,9 +607,11 @@ model SocioBeneficio {
 
   @@unique([socioTipoId, categoriaProdId])
   @@unique([socioTipoId, productoId])
+  @@unique([socioTipoId, entradaTorneoId])
   @@index([socioTipoId])
   @@index([categoriaProdId])
   @@index([productoId])
+  @@index([entradaTorneoId])
 }
 
 model SocioCanje {
@@ -610,7 +623,7 @@ model SocioCanje {
   ventaId           String?        @db.Uuid
   montoDescontado   Decimal        @db.Decimal(10, 2)
   fecha             DateTime       @default(now())
-  usuarioId         String         @db.Uuid
+  usuarioId         String?        @db.Uuid
   posId             String?
   createdAt         DateTime       @default(now())
 
@@ -956,4 +969,157 @@ model MoneyMovement {
   @@index([accountId])
   @@index([categoryId])
   @@index([source, sourceId])
+}
+
+// ─── Entradas (POS externo + térmica) ────────────────────────
+
+enum EntradaSector {
+  LOCAL
+  VISITANTE
+}
+
+enum EntradaPayMethod {
+  CASH
+  MP_QR
+}
+
+enum EntradaSaleStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+model EntradaTorneo {
+  id        String   @id @default(uuid()) @db.Uuid
+  nombre    String   @unique
+  precio    Decimal  @db.Decimal(10, 2)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  fixtures  EntradaFixture[]
+  beneficios SocioBeneficio[]
+
+  @@index([activo])
+}
+
+model EntradaRival {
+  id        String   @id @default(uuid()) @db.Uuid
+  nombre    String   @unique
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  fixtures  EntradaFixture[]
+
+  @@index([activo])
+}
+
+model EntradaFixture {
+  id           String       @id @default(uuid()) @db.Uuid
+  fecha        DateTime     @db.Date
+  torneoId     String       @db.Uuid
+  torneo       EntradaTorneo @relation(fields: [torneoId], references: [id])
+  rivalId      String       @db.Uuid
+  rival        EntradaRival  @relation(fields: [rivalId], references: [id])
+  ventanaDesde DateTime
+  ventanaHasta DateTime
+  activo       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  sales        TicketSale[]
+  units        TicketUnit[]
+  contadores   EntradaContador[]
+
+  @@unique([fecha, torneoId, rivalId])
+  @@index([torneoId])
+  @@index([rivalId])
+  @@index([activo])
+  @@index([ventanaDesde, ventanaHasta])
+}
+
+model PosDevice {
+  id         String    @id @default(uuid()) @db.Uuid
+  nombre     String
+  tokenHash  String    @unique
+  activo     Boolean   @default(true)
+  revokedAt  DateTime?
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  sales      TicketSale[]
+
+  @@index([activo])
+}
+
+model TicketSale {
+  id                  String            @id @default(uuid()) @db.Uuid
+  fixtureId           String            @db.Uuid
+  fixture             EntradaFixture    @relation(fields: [fixtureId], references: [id])
+  sector              EntradaSector
+  cantidad            Int
+  precioUnit          Decimal           @db.Decimal(10, 2)
+  descuento           Decimal           @default(0) @db.Decimal(10, 2)
+  total               Decimal           @db.Decimal(10, 2)
+  paymentMethod       EntradaPayMethod
+  status              EntradaSaleStatus @default(PENDING)
+  mpExternalReference String?           @unique
+  mpOrderId           String?
+  deviceId            String            @db.Uuid
+  device              PosDevice         @relation(fields: [deviceId], references: [id])
+  socioId             Int?
+  beneficioId         String?           @db.Uuid
+  requestId           String?           @unique
+  paidAt              DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  units               TicketUnit[]
+
+  @@index([fixtureId])
+  @@index([deviceId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TicketUnit {
+  id        String         @id @default(uuid()) @db.Uuid
+  saleId    String         @db.Uuid
+  sale      TicketSale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  fixtureId String         @db.Uuid
+  fixture   EntradaFixture @relation(fields: [fixtureId], references: [id])
+  sector    EntradaSector
+  nro       Int
+  codigo    String
+  createdAt DateTime       @default(now())
+
+  @@unique([fixtureId, sector, nro])
+  @@unique([fixtureId, codigo])
+  @@index([saleId])
+  @@index([fixtureId])
+}
+
+model EntradaContador {
+  fixtureId String         @db.Uuid
+  fixture   EntradaFixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  sector    EntradaSector
+  ultimoNro Int            @default(0)
+  updatedAt DateTime       @updatedAt
+
+  @@id([fixtureId, sector])
+}
+
+model EntradaTicketTemplate {
+  id        String   @id @default("default")
+  version   Int      @default(1)
+  widthCols Int      @default(32)
+  layout    Json
+  updatedAt DateTime @updatedAt
+}
+
+model EntradaTicketAsset {
+  id        String   @id @default("escudo")
+  version   Int      @default(1)
+  pngBase64 String?  @db.Text
+  widthPx   Int      @default(256)
+  updatedAt DateTime @updatedAt
 }

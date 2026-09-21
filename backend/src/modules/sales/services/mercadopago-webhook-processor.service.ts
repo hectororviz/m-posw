@@ -1,5 +1,7 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
+import { EntradasSalesService } from '../../entradas/entradas-sales.service';
 import { PrismaService } from '../../common/prisma.service';
 import { MercadoPagoQueryService } from './mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
@@ -34,7 +36,17 @@ export class MercadoPagoWebhookProcessorService {
     private salesGateway: SalesGateway,
     private salesService: SalesService,
     private internetVouchers: InternetVouchersService,
+    private moduleRef: ModuleRef,
   ) {}
+
+  private entradasService(): EntradasSalesService | null {
+    try {
+      // Lazy para evitar ciclo SalesModule <-> EntradasModule
+      return this.moduleRef.get(EntradasSalesService, { strict: false });
+    } catch {
+      return null;
+    }
+  }
 
   async processWebhook(payload: WebhookPayload) {
     const { topic, resourceId, requestId } = payload;
@@ -85,6 +97,16 @@ export class MercadoPagoWebhookProcessorService {
         `WEBHOOK_MP_MERCHANT_ORDER_FETCHED merchantOrderId=${merchantOrderId} payments_len=${payments.length} requestId=${requestId ?? 'unknown'}`,
       );
 
+      if (externalReference?.startsWith('ticket-')) {
+        await this.processTicketMerchantOrder(
+          merchantOrderId,
+          externalReference,
+          paymentIdValue,
+          requestId,
+        );
+        return;
+      }
+
       if (!paymentIdValue) {
         await this.handleMerchantOrderWithoutPayments(
           merchantOrderId,
@@ -122,6 +144,94 @@ export class MercadoPagoWebhookProcessorService {
     }
   }
 
+  private async processTicketMerchantOrder(
+    merchantOrderId: string,
+    externalReference: string,
+    paymentIdValue: string | null,
+    requestId?: string,
+  ) {
+    const entradas = this.entradasService();
+    if (!entradas) {
+      this.logger.warn(`WEBHOOK_TICKET_NO_MODULE merchantOrderId=${merchantOrderId} — omito`);
+      return;
+    }
+    const sale = await entradas.findTicketSale(externalReference, merchantOrderId, paymentIdValue);
+    if (!sale) {
+      this.logger.warn(
+        `WEBHOOK_TICKET_SALE_NOT_FOUND externalReference=${externalReference} merchantOrderId=${merchantOrderId}`,
+      );
+      return;
+    }
+    if (!paymentIdValue) {
+      this.logger.log(`WEBHOOK_TICKET_PENDING saleId=${sale.id} merchantOrderId=${merchantOrderId}`);
+      return;
+    }
+    await this.applyTicketPaymentFromMp(entradas, sale.id, paymentIdValue, merchantOrderId, requestId, 'merchant_order');
+  }
+
+  private async processTicketPayment(
+    paymentId: string,
+    externalReference: string,
+    merchantOrderId: string | null,
+    requestId?: string,
+  ) {
+    const entradas = this.entradasService();
+    if (!entradas) {
+      this.logger.warn(`WEBHOOK_TICKET_NO_MODULE paymentId=${paymentId} — omito`);
+      return;
+    }
+    const sale = await entradas.findTicketSale(externalReference, merchantOrderId, paymentId);
+    if (!sale) {
+      this.logger.warn(
+        `WEBHOOK_TICKET_SALE_NOT_FOUND externalReference=${externalReference} paymentId=${paymentId}`,
+      );
+      return;
+    }
+    await this.applyTicketPaymentFromMp(entradas, sale.id, paymentId, merchantOrderId, requestId, 'payment');
+  }
+
+  private async applyTicketPaymentFromMp(
+    entradas: EntradasSalesService,
+    saleId: string,
+    paymentId: string,
+    merchantOrderId: string | null,
+    requestId: string | undefined,
+    topic: 'payment' | 'merchant_order',
+  ) {
+    let mpData: unknown;
+    try {
+      mpData = await this.mpQueryService.getPayment(paymentId);
+    } catch (error) {
+      if (this.isPaymentNotFoundError(error)) {
+        this.logger.warn(
+          `WEBHOOK_TICKET_IGNORED_PAYMENT_NOT_FOUND topic=${topic} paymentId=${paymentId} saleId=${saleId}`,
+        );
+        return;
+      }
+      throw error;
+    }
+    const mpPayload = isRecord(mpData) ? mpData : null;
+    const mpStatus = typeof mpPayload?.status === 'string' ? mpPayload.status : null;
+    const mpStatusDetail = typeof mpPayload?.status_detail === 'string' ? mpPayload.status_detail : null;
+    const approvedAt = typeof mpPayload?.date_approved === 'string' ? new Date(mpPayload.date_approved) : null;
+    const next = mapMpPaymentToPaymentStatus(mpStatus, mpStatusDetail, (s, d) => {
+      this.logger.warn(`WEBHOOK_TICKET_STATUS_UNKNOWN saleId=${saleId} status=${s ?? 'unknown'} detail=${d ?? 'unknown'}`);
+    });
+    const ticketStatus =
+      next === PaymentStatus.APPROVED
+        ? ('APPROVED' as const)
+        : next === PaymentStatus.REJECTED
+          ? ('REJECTED' as const)
+          : next === PaymentStatus.EXPIRED
+            ? ('EXPIRED' as const)
+            : ('PENDING' as const);
+    const orderId = merchantOrderId ?? extractMerchantOrderId(mpPayload);
+    await entradas.applyTicketPayment({ saleId, status: ticketStatus, paymentId, merchantOrderId: orderId, paidAt: approvedAt });
+    this.logger.log(
+      `WEBHOOK_TICKET_STATUS_UPDATED topic=${topic} saleId=${saleId} paymentId=${paymentId} status=${ticketStatus} requestId=${requestId ?? 'unknown'}`,
+    );
+  }
+
   private async processPayment(
     paymentId: string,
     requestId?: string,
@@ -150,6 +260,12 @@ export class MercadoPagoWebhookProcessorService {
 
     const mpPayload = isRecord(mpData) ? mpData : null;
     const externalReference = extractExternalReference(mpPayload);
+
+    if (externalReference?.startsWith('ticket-')) {
+      await this.processTicketPayment(paymentId, externalReference, merchantOrderId ?? null, requestId);
+      return;
+    }
+
     const sale =
       saleOverride ||
       (externalReference

@@ -76,7 +76,7 @@ services:
       - caddy_net
 
     labels:
-      caddy: pos.csdsoler.com.ar
+      caddy: ${CADDY_HOST:-pos.csdsoler.com.ar}
       caddy.reverse_proxy: "{{upstreams 80}}"
 
 volumes:

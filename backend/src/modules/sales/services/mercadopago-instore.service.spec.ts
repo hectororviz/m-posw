@@ -49,6 +49,39 @@ describe('MercadoPagoInstoreService', () => {
     );
   });
 
+  it('buildTicketPayload cobra el total en una sola línea (sin multiplicar)', () => {
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
+
+    // 2 entradas de $1500 = $3000 ya totalizado por el módulo Entradas
+    const payload = service.buildTicketPayload({
+      externalReference: 'ticket-abc-123',
+      title: 'Entradas Femenino vs Mundialito',
+      description: 'Entradas LOCAL x2 Femenino',
+      totalAmount: 3000,
+    });
+
+    expect(payload.total_amount).toBe(3000);
+    expect(payload.external_reference).toBe('ticket-abc-123');
+    expect(payload.items).toHaveLength(1);
+    expect(payload.items[0].quantity).toBe(1);
+    expect(payload.items[0].unit_price).toBe(3000);
+    expect(payload.items[0].total_amount).toBe(3000);
+    expect(payload.items[0].category).toBe('ENTRADAS');
+  });
+
+  it('buildTicketPayload rechaza totales inválidos', () => {
+    const service = new MercadoPagoInstoreService(config, mpConfig, prisma);
+
+    expect(() =>
+      service.buildTicketPayload({
+        externalReference: 'ticket-x',
+        title: 'T',
+        description: 'D',
+        totalAmount: 0,
+      }),
+    ).toThrow();
+  });
+
   it('envía la orden con el token y la URL correcta', async () => {
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,

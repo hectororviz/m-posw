@@ -15,7 +15,8 @@ export type ModuleKey =
   | 'REPORTES'
   | 'CONFIGURACION'
   | 'PATRIMONIO'
-  | 'NOTIFICACIONES';
+  | 'NOTIFICACIONES'
+  | 'ENTRADAS';
 
 export type ModuleAccess = 'HIDDEN' | 'READ' | 'FULL';
 
@@ -182,6 +183,7 @@ export interface Setting {
   enablePlayersModule?: boolean | null;
   enablePatrimonioModule?: boolean | null;
   enableNotificationsModule?: boolean | null;
+  enableEntradasModule?: boolean | null;
   whatsappUseApi?: boolean | null;
   whatsappWebMessage?: string | null;
   whatsappPhoneNumberId?: string | null;
@@ -1067,4 +1069,113 @@ export interface NotificationStatusMap {
     error: string | null;
     attempts: number;
   } | null;
+}
+
+export type EntradaSector = 'LOCAL' | 'VISITANTE';
+export type EntradaPayMethod = 'CASH' | 'MP_QR';
+export type EntradaSaleStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+
+export interface EntradaTorneo {
+  id: string;
+  nombre: string;
+  precio: string;
+  activo: boolean;
+}
+
+export interface EntradaRival {
+  id: string;
+  nombre: string;
+  activo: boolean;
+}
+
+export interface EntradaFixture {
+  id: string;
+  fecha: string;
+  torneoId: string;
+  torneo: EntradaTorneo;
+  rivalId: string;
+  rival: EntradaRival;
+  ventanaDesde: string;
+  ventanaHasta: string;
+  activo: boolean;
+}
+
+export interface PosDevice {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  revokedAt: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+}
+
+export interface PosDeviceCreated extends PosDevice {
+  token: string;
+  pairing: { baseUrl: string; token: string };
+}
+
+export interface TicketUnit {
+  id: string;
+  codigo: string;
+  nro: number;
+  sector: EntradaSector;
+}
+
+export interface TicketSale {
+  id: string;
+  fixtureId: string;
+  fixture: EntradaFixture;
+  sector: EntradaSector;
+  cantidad: number;
+  precioUnit: string;
+  descuento: string;
+  total: string;
+  paymentMethod: EntradaPayMethod;
+  status: EntradaSaleStatus;
+  device: { id: string; nombre: string };
+  units: TicketUnit[];
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface EntradasSalesSummary {
+  local: number;
+  visitante: number;
+  totalEntradas: number;
+  recaudado: string;
+}
+
+export interface EntradaTicketTemplate {
+  id: string;
+  version: number;
+  widthCols: number;
+  layout: { version?: number; widthCols?: number; elements: Array<Record<string, unknown>> };
+  updatedAt: string;
+}
+
+export interface EntradaTicketAssetInfo {
+  version: number;
+  widthPx: number;
+  hasImage: boolean;
+  updatedAt: string;
+}
+
+export interface EntradasMpPosStatus {
+  linked: boolean;
+  storeName: string | null;
+  posName: string | null;
+  hasQr: boolean;
+}
+
+export interface MpDetectedPos {
+  id: string;
+  name: string;
+  qrUrl: string;
+}
+
+export interface MpDetectedStore {
+  id: string;
+  name: string;
+  address: string;
+  pos: MpDetectedPos[];
 }

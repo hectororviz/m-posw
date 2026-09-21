@@ -60,6 +60,7 @@ export const AdminSettingsPage: React.FC = () => {
     enablePlayersModule: false,
     enablePatrimonioModule: true,
     enableNotificationsModule: false,
+    enableEntradasModule: false,
     movementInReasons: [] as string[],
     movementOutReasons: [] as string[],
   });
@@ -159,6 +160,7 @@ export const AdminSettingsPage: React.FC = () => {
         enablePlayersModule: settings.enablePlayersModule ?? false,
         enablePatrimonioModule: settings.enablePatrimonioModule ?? true,
         enableNotificationsModule: settings.enableNotificationsModule ?? false,
+        enableEntradasModule: settings.enableEntradasModule ?? false,
         movementInReasons: settings.movementInReasons ?? [],
         movementOutReasons: settings.movementOutReasons ?? [],
       });
@@ -1049,6 +1051,19 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Módulo de Notificaciones (WhatsApp)</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Envío de recordatorios de deuda a acreedores vía WhatsApp Cloud API.</small>
+                </span>
+              </label>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={form.enableEntradasModule}
+                  onChange={(e) => setForm({ ...form, enableEntradasModule: e.target.checked })}
+                />
+                <span className="toggle-switch-track" />
+                <span>
+                  <strong>Módulo de Entradas</strong>
+                  <br />
+                  <small style={{ color: 'var(--color-text-faint)' }}>Venta de entradas desde POS externo con impresora térmica (torneos, rivales y calendario).</small>
                 </span>
               </label>
             </div>

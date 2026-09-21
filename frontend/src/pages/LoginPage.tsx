@@ -134,6 +134,7 @@ function getModuleRoute(moduleKey: string): string | null {
     REPORTES: '/admin/stats',
     CONFIGURACION: '/admin/settings',
     NOTIFICACIONES: '/admin/notificaciones',
+    ENTRADAS: '/admin/entradas',
   };
   return map[moduleKey] ?? null;
 }

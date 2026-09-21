@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, Megaphone, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi, X } from 'lucide-react';
+import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, Megaphone, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Ticket, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi, X } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
@@ -24,7 +24,7 @@ interface NavItem {
   to: string;
   icon: ReactNode;
   label: string;
-  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule' | 'enablePatrimonioModule' | 'enableNotificationsModule';
+  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule' | 'enablePatrimonioModule' | 'enableNotificationsModule' | 'enableEntradasModule';
   permissionModule?: string;
 }
 
@@ -43,6 +43,7 @@ const navCategories: NavCategoryDef[] = [
     children: [
       { to: '/pos',              icon: <ShoppingCart size={iconSize} />, label: 'POS',            permissionModule: 'POS' },
       { to: '/admin/sales',      icon: <Receipt size={iconSize} />,      label: 'Ventas',         permissionModule: 'VENTAS' },
+      { to: '/admin/entradas',   icon: <Ticket size={iconSize} />,       label: 'Entradas',       moduleKey: 'enableEntradasModule', permissionModule: 'ENTRADAS' },
       { to: '/admin/stats',      icon: <BarChart2 size={iconSize} />,    label: 'Estadisticas',   permissionModule: 'REPORTES' },
       { to: '/admin/categories', icon: <Tag size={iconSize} />,          label: 'Categorias',     permissionModule: 'PRODUCTOS' },
       { to: '/admin/products',   icon: <Package size={iconSize} />,      label: 'Productos',      permissionModule: 'PRODUCTOS' },

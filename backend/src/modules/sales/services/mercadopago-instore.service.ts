@@ -63,8 +63,69 @@ export class MercadoPagoInstoreService {
     await this.request('PUT', url, payload);
   }
 
-  async deleteOrder() {
-    const { externalPosId } = await this.getPosConfig();
+  /**
+   * Orden QR para una venta de entradas (módulo Entradas).
+   * Se distingue por external_reference con prefijo `ticket-`.
+   * El monto va en UNA sola línea (quantity 1): el total ya incluye
+   * cantidad × precio − descuento.
+   */
+  buildTicketPayload(input: {
+    externalReference: string;
+    title: string;
+    description: string;
+    totalAmount: number;
+  }): MercadoPagoOrderPayload {
+    const totalAmount = this.roundToCurrency(Number(input.totalAmount));
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      throw new HttpException('Total inválido en la venta de entradas', HttpStatus.BAD_REQUEST);
+    }
+    const currencyId = this.getCurrencyId();
+    const title = this.ensureNonEmptyText(input.title, 'title');
+    const description = this.ensureNonEmptyText(input.description, 'description');
+    const skuNumber = String(input.externalReference).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32) || 'ticket';
+    return {
+      external_reference: input.externalReference,
+      title,
+      description,
+      total_amount: totalAmount,
+      items: [
+        {
+          sku_number: skuNumber,
+          category: 'ENTRADAS',
+          title,
+          description,
+          quantity: 1,
+          unit_price: totalAmount,
+          unit_measure: 'unit',
+          currency_id: currencyId,
+          total_amount: totalAmount,
+        },
+      ],
+      notification_url: this.getNotificationUrl(),
+    };
+  }
+
+  async putTicketOrder(
+    input: {
+      externalReference: string;
+      title: string;
+      description: string;
+      totalAmount: number;
+    },
+    origen: 'default' | 'entradas' = 'entradas',
+  ) {
+    const { externalStoreId, externalPosId } = await this.getPosConfig(origen);
+    const collectorId = await this.getCollectorId();
+    const url = this.buildOrdersUrl(collectorId, externalStoreId, externalPosId);
+    const payload = this.buildTicketPayload(input);
+    this.logger.debug(
+      `Mercado Pago ticket order: PUT ${url} external_reference=${input.externalReference} total=${payload.total_amount}`,
+    );
+    await this.request('PUT', url, payload);
+  }
+
+  async deleteOrder(origen: 'default' | 'entradas' = 'default') {
+    const { externalPosId } = await this.getPosConfig(origen);
     const collectorId = await this.getCollectorId();
     const url = this.buildPosOrdersUrl(collectorId, externalPosId);
     this.logger.debug(
@@ -158,7 +219,8 @@ export class MercadoPagoInstoreService {
     return `${this.baseUrl}/instore/qr/seller/collectors/${collectorId}/pos/${posId}/orders`;
   }
 
-  private async getPosConfig() {
+  private async getPosConfig(origen: 'default' | 'entradas' = 'default') {
+    const useEntradas = origen === 'entradas';
     const setting = await this.prisma.setting.findFirst({
       where: { id: DEFAULT_SETTING_ID },
       select: {
@@ -166,36 +228,51 @@ export class MercadoPagoInstoreService {
         mpPosId: true,
         mpExternalPosId: true,
         mpExternalStoreId: true,
+        mpEntradasStoreId: true,
+        mpEntradasPosId: true,
+        mpEntradasExternalPosId: true,
+        mpEntradasExternalStoreId: true,
       },
     });
 
-    if (!setting?.mpStoreId || !setting?.mpPosId) {
+    const storeId = useEntradas ? setting?.mpEntradasStoreId : setting?.mpStoreId;
+    const posId = useEntradas ? setting?.mpEntradasPosId : setting?.mpPosId;
+    let externalPosId = useEntradas ? setting?.mpEntradasExternalPosId : setting?.mpExternalPosId;
+    let externalStoreId = useEntradas ? setting?.mpEntradasExternalStoreId : setting?.mpExternalStoreId;
+
+    if (!storeId || !posId) {
       throw new HttpException(
-        'Punto de venta QR no configurado. Configuralo en Settings.',
+        useEntradas
+          ? 'POS de entradas no configurado. Vinculalo en Entradas → Configuración.'
+          : 'Punto de venta QR no configurado. Configuralo en Settings.',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    if (!setting.mpExternalPosId) {
-      this.logger.log(`Auto-migrating external IDs for posId=${setting.mpPosId}`);
-      const posData = await this.tryFetchPosInfo(setting.mpPosId);
+    const persistColumns = useEntradas
+      ? { externalPosId: 'mpEntradasExternalPosId', externalStoreId: 'mpEntradasExternalStoreId' }
+      : { externalPosId: 'mpExternalPosId', externalStoreId: 'mpExternalStoreId' };
+
+    if (!externalPosId) {
+      this.logger.log(`Auto-migrating external IDs for posId=${posId} [${origen}]`);
+      const posData = await this.tryFetchPosInfo(posId);
 
       if (posData) {
-        const externalPosId = posData.external_id ?? setting.mpPosId;
-        const externalStoreId =
-          posData.external_store_id ?? setting.mpExternalStoreId ?? setting.mpStoreId;
+        externalPosId = posData.external_id ?? posId;
+        externalStoreId =
+          posData.external_store_id ?? externalStoreId ?? storeId;
 
         await this.prisma.setting.upsert({
           where: { id: DEFAULT_SETTING_ID },
           create: {
             id: DEFAULT_SETTING_ID,
             storeName: 'MiBPS Demo',
-            mpExternalPosId: externalPosId,
-            mpExternalStoreId: externalStoreId,
+            [persistColumns.externalPosId]: externalPosId,
+            [persistColumns.externalStoreId]: externalStoreId,
           },
           update: {
-            mpExternalPosId: externalPosId,
-            mpExternalStoreId: externalStoreId,
+            [persistColumns.externalPosId]: externalPosId,
+            [persistColumns.externalStoreId]: externalStoreId,
           },
         });
 
@@ -207,13 +284,12 @@ export class MercadoPagoInstoreService {
       }
 
       this.logger.warn(
-        `Auto-migration failed: could not fetch POS ${setting.mpPosId}, using numeric IDs as fallback`,
+        `Auto-migration failed: could not fetch POS ${posId}, using numeric IDs as fallback`,
       );
     }
 
-    const externalPosId = setting.mpExternalPosId ?? setting.mpPosId;
-    const externalStoreId =
-      setting.mpExternalStoreId ?? setting.mpStoreId;
+    externalPosId = externalPosId ?? posId;
+    externalStoreId = externalStoreId ?? storeId;
 
     return { externalStoreId, externalPosId };
   }

@@ -85,6 +85,10 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsBoolean()
+  enableEntradasModule?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   whatsappUseApi?: boolean;
 
   @IsOptional()
