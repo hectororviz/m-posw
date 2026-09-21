@@ -52,8 +52,10 @@ class VentaFragment : Fragment() {
         repo = EntradasRepo(session)
         cameraPerm.launch(Manifest.permission.CAMERA)
 
-        b.btnLocal.setOnClickListener { sector = "LOCAL"; refreshSector() }
-        b.btnVisitante.setOnClickListener { sector = "VISITANTE"; refreshSector() }
+        b.tgSector.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            sector = if (checkedId == b.btnLocal.id) "LOCAL" else "VISITANTE"
+        }
         b.btnMinus.setOnClickListener { if (cantidad > 1) cantidad--; refreshTotal() }
         b.btnPlus.setOnClickListener { if (cantidad < 10) cantidad++; refreshTotal() }
         b.btnSocio.setOnClickListener {
@@ -65,6 +67,7 @@ class VentaFragment : Fragment() {
         b.btnReprint.setOnClickListener { reimprimir() }
 
         refreshSector()
+        bindHeader()
         if (!session.isPaired) {
             b.tvStatus.text = "Sin vincular: andá a Config y escaneá el QR de pairing."
         } else {
@@ -73,10 +76,27 @@ class VentaFragment : Fragment() {
     }
 
     private fun refreshSector() {
-        b.btnLocal.isSelected = sector == "LOCAL"
-        b.btnVisitante.isSelected = sector == "VISITANTE"
-        b.btnLocal.alpha = if (sector == "LOCAL") 1f else 0.6f
-        b.btnVisitante.alpha = if (sector == "VISITANTE") 1f else 0.6f
+        b.tgSector.check(if (sector == "LOCAL") b.btnLocal.id else b.btnVisitante.id)
+    }
+
+    private fun bindHeader() {
+        val bmp = SunmiPrinter.escudoBitmap(session.escudoBase64)
+        if (bmp != null) b.ivEscudo.setImageBitmap(bmp)
+        else b.ivEscudo.setImageResource(com.mposw.entradas.R.drawable.ic_shield)
+        b.tvClub.text = session.clubName.ifBlank { "Entradas" }
+        val fmt = java.text.SimpleDateFormat("EEE dd/MM · HH:mm", java.util.Locale("es", "AR"))
+        b.tvFechaHora.text = fmt.format(java.util.Date())
+        BrandApplier.apply(
+            session.brandColor,
+            b.cardHeader,
+            listOf(b.tvClub, b.tvFechaHora),
+            listOf(b.btnCash, b.btnQr),
+        )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        _b?.let { bindHeader() }
     }
 
     private fun current(): FixtureVigente? {

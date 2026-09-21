@@ -1,0 +1,28 @@
+<resources>
+    <!-- Tema oscuro: mismos roles, valores nocturnos M3 -->
+    <color name="primary">#4ADE80</color>
+    <color name="on_primary">#052E16</color>
+    <color name="primary_container">#166534</color>
+    <color name="on_primary_container">#BBF7D0</color>
+    <color name="secondary">#94A3B8</color>
+    <color name="on_secondary">#0F172A</color>
+    <color name="secondary_container">#334155</color>
+    <color name="on_secondary_container">#E2E8F0</color>
+    <color name="tertiary">#FBBF24</color>
+    <color name="on_tertiary">#451A03</color>
+    <color name="tertiary_container">#92400E</color>
+    <color name="on_tertiary_container">#FDE68A</color>
+    <color name="error">#F2B8B5</color>
+    <color name="on_error">#601410</color>
+    <color name="error_container">#8C1D18</color>
+    <color name="on_error_container">#F9DEDC</color>
+    <color name="background">#0F172A</color>
+    <color name="on_background">#F1F5F9</color>
+    <color name="surface">#0F172A</color>
+    <color name="on_surface">#F1F5F9</color>
+    <color name="surface_variant">#1E293B</color>
+    <color name="on_surface_variant">#CBD5E1</color>
+    <color name="outline">#475569</color>
+    <color name="surface_alt">#1E293B</color>
+    <color name="cobro_on">#052E16</color>
+</resources>

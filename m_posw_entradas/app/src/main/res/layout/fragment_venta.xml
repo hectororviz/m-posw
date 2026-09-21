@@ -1,81 +1,131 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp">
+    android:fillViewport="true">
 
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:padding="20dp">
 
-        <TextView android:id="@+id/tvFiesta"
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?attr/colorOutline">
+
+            <LinearLayout
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="14dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <ImageView android:id="@+id/ivEscudo"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/ic_shield"
+                    android:contentDescription="Escudo del club" />
+
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="14dp">
+
+                    <TextView android:id="@+id/tvClub"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+                    <TextView android:id="@+id/tvFechaHora"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:text="Partido" />
+            android:layout_marginTop="20dp"
+            android:text="Partido"
+            android:textAppearance="?attr/textAppearanceTitleMedium" />
 
         <Spinner android:id="@+id/spFixture"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:layout_marginTop="8dp" />
 
         <TextView android:id="@+id/tvFixtureInfo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:textSize="16sp" />
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
 
-        <LinearLayout
-            android:orientation="horizontal"
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/tgSector"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp">
+            android:layout_marginTop="16dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
 
-            <Button android:id="@+id/btnLocal"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnLocal"
+                style="@style/Widget.Entradas.Button.Sector"
                 android:layout_width="0dp"
-                android:layout_height="64dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/sector_local"
-                android:textSize="22sp" />
+                android:checkable="true"
+                android:text="@string/sector_local" />
 
-            <Space android:layout_width="12dp" android:layout_height="wrap_content" />
-
-            <Button android:id="@+id/btnVisitante"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVisitante"
+                style="@style/Widget.Entradas.Button.Sector"
                 android:layout_width="0dp"
-                android:layout_height="64dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/sector_visitante"
-                android:textSize="22sp" />
-        </LinearLayout>
+                android:checkable="true"
+                android:text="@string/sector_visitante" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:layout_marginTop="16dp">
+            android:layout_marginTop="20dp">
 
-            <Button android:id="@+id/btnMinus"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:text="−"
-                android:textSize="28sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnMinus"
+                style="@style/Widget.Entradas.Button.Stepper"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="−" />
 
             <TextView android:id="@+id/tvCantidad"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="24dp"
+                android:layout_marginHorizontal="28dp"
                 android:text="1"
-                android:textSize="32sp"
-                android:textStyle="bold" />
+                android:textAppearance="?attr/textAppearanceDisplaySmall" />
 
-            <Button android:id="@+id/btnPlus"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:text="+"
-                android:textSize="28sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPlus"
+                style="@style/Widget.Entradas.Button.Stepper"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+" />
         </LinearLayout>
 
         <TextView android:id="@+id/tvTotal"
@@ -83,17 +133,18 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:layout_marginTop="8dp"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="16dp"
             android:gravity="center_vertical">
 
-            <Button android:id="@+id/btnSocio"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSocio"
+                style="@style/Widget.Entradas.Button.Neutral"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/btn_socio" />
@@ -102,10 +153,12 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:textSize="14sp" />
+                android:layout_marginStart="10dp"
+                android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-            <Button android:id="@+id/btnQuitarSocio"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnQuitarSocio"
+                style="@style/Widget.Entradas.Button.Ghost"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/quitar_socio" />
@@ -117,18 +170,24 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp">
 
-            <Button android:id="@+id/btnCash"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCash"
+                style="@style/Widget.Entradas.Button.Cobro"
                 android:layout_width="0dp"
-                android:layout_height="64dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
+                app:icon="@drawable/ic_cash"
                 android:text="@string/pagar_efectivo" />
 
             <Space android:layout_width="12dp" android:layout_height="wrap_content" />
 
-            <Button android:id="@+id/btnQr"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnQr"
+                style="@style/Widget.Entradas.Button.Cobro"
                 android:layout_width="0dp"
-                android:layout_height="64dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
+                app:icon="@drawable/ic_qr"
                 android:text="@string/pagar_qr" />
         </LinearLayout>
 
@@ -136,9 +195,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:textSize="14sp" />
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-        <Button android:id="@+id/btnReprint"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReprint"
+            style="@style/Widget.Entradas.Button.Ghost"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"

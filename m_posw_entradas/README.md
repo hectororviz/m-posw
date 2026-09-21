@@ -19,6 +19,11 @@ Contrato válido: `docs/contrato-pos-entradas.txt` del repo principal.
 - QR: `POST intent MP_QR` → muestra la imagen **estática** `qrImageUrl` del POS dedicado → polling `GET status` cada 2.5s hasta 5 min → al `APPROVED` imprime. Cancelar libera la orden.
 - Template + escudo se descargan al probar conexión y cuando `templateVersion/logoVersion` cambian (nunca por venta). Ancho fijo 32 cols, 58mm.
 - Sin papel: la venta queda en Room (`approved_sales`) y se reimprime con “Reimprimir última”.
+- Branding: el header muestra escudo + nombre del club y tiñe el header y los
+  botones de cobro con `Setting.accentColor`. Todo llega en
+  `GET /entradas/ticket-assets/escudo` (cacheado por versión) al pulsar
+  “Probar conexión” o en cada venta; sin color válido queda el tema genérico.
+  Tema Material 3 propio en claro y oscuro.
 
 ## Build
 Requiere **Java 17** (Gradle 8.7 no corre en Java 26 ni en Java 8) y Android SDK con

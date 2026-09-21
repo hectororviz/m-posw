@@ -85,6 +85,8 @@ data class EscudoResponse(
     val version: Int,
     val pngBase64: String?,
     val widthPx: Int = 256,
+    val accentColor: String?,
+    val clubName: String?,
 )
 
 data class SocioLookupResponse(

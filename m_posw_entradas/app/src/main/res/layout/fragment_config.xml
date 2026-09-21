@@ -36,7 +36,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp">
 
-            <Button android:id="@+id/btnScanPairing"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnScanPairing"
+                style="@style/Widget.Entradas.Button.Neutral"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -44,14 +46,18 @@
 
             <Space android:layout_width="8dp" android:layout_height="wrap_content" />
 
-            <Button android:id="@+id/btnSave"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSave"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:minHeight="52dp"
                 android:text="Guardar" />
         </LinearLayout>
 
-        <Button android:id="@+id/btnTest"
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnTest"
+            style="@style/Widget.Entradas.Button.Ghost"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"

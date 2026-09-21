@@ -38,6 +38,8 @@ class EntradasRepo(private val session: SessionManager) {
             val e = api.escudo()
             session.escudoBase64 = e.pngBase64 ?: ""
             session.logoVersion = e.version
+            session.brandColor = e.accentColor ?: ""
+            session.clubName = e.clubName ?: ""
         }
     }
 
@@ -48,6 +50,8 @@ class EntradasRepo(private val session: SessionManager) {
         val e = api.escudo()
         session.escudoBase64 = e.pngBase64 ?: ""
         session.logoVersion = e.version
+        session.brandColor = e.accentColor ?: ""
+        session.clubName = e.clubName ?: ""
     }
 
     suspend fun downloadBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {

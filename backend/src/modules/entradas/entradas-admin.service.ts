@@ -333,11 +333,21 @@ export class EntradasAdminService {
     });
   }
 
-  // ── Escudo monocromático ─────────────────────────────────
+  // ── Escudo monocromático + branding del club ───────────────
+  // El POS cachea por version; accentColor/clubName viajan acá para
+  // que la app aplique el color de personalización junto al escudo.
   async getEscudo() {
-    const row = await this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } });
-    if (row) return row;
-    return this.prisma.entradaTicketAsset.create({ data: { id: 'escudo', version: 1, widthPx: 256 } });
+    const [row, branding] = await Promise.all([
+      this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } }),
+      this.prisma.setting.findFirst({ select: { accentColor: true, clubName: true } }),
+    ]);
+    const asset = row
+      ?? await this.prisma.entradaTicketAsset.create({ data: { id: 'escudo', version: 1, widthPx: 256 } });
+    return {
+      ...asset,
+      accentColor: branding?.accentColor ?? '#0ea5e9',
+      clubName: branding?.clubName ?? '',
+    };
   }
 
   async uploadEscudo(file: Express.Multer.File, widthPx = 256) {

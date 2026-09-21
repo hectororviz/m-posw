@@ -93,9 +93,14 @@ Provisioning (una vez, online):
   version, refetchear solo si templateVersion cambia).
 
 3.6 GET /entradas/ticket-assets/escudo
-  {"id":"escudo","version":3,"pngBase64":"iVBOR...","widthPx":256}
+  {"id":"escudo","version":3,"pngBase64":"iVBOR...","widthPx":256,
+   "accentColor":"#0ea5e9","clubName":"Club Ejemplo"}
   (<20KB, PNG monocromatico 1-bit listo para sunmi_printer_plus.
-  Cachear por version, JAMAS pedirlo por venta.)
+  Cachear por version, JAMAS pedirlo por venta.
+  accentColor = color de personalizacion de la app principal
+  (Setting.accentColor); clubName = nombre del club. Ambos viajan
+  para que el POS muestre escudo + nombre y aplique el color a su
+  tema. Cambiar cualquiera de los dos incrementa version.)
 
 3.7 GET /entradas/socios/:uuid -> FUTURO, en prueba no llamar.
 

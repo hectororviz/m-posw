@@ -45,6 +45,14 @@ class SessionManager(context: Context) {
         get() = prefs.getString("escudoBase64", "") ?: ""
         set(v) = prefs.edit().putString("escudoBase64", v).apply()
 
+    var brandColor: String
+        get() = prefs.getString("brandColor", "") ?: ""
+        set(v) = prefs.edit().putString("brandColor", v.trim()).apply()
+
+    var clubName: String
+        get() = prefs.getString("clubName", "") ?: ""
+        set(v) = prefs.edit().putString("clubName", v.trim()).apply()
+
     fun clearToken() {
         prefs.edit().remove("token").apply()
     }

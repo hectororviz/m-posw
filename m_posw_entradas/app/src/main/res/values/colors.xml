@@ -1,10 +1,28 @@
 <resources>
-    <color name="bg">#F5F5F5</color>
-    <color name="card">#FFFFFF</color>
-    <color name="accent">#0EA5E9</color>
-    <color name="ok">#16A34A</color>
-    <color name="warn">#D97706</color>
-    <color name="err">#DC2626</color>
-    <color name="ink">#111827</color>
-    <color name="muted">#6B7280</color>
+    <!-- Tema claro: primario verde cobro, secundario neutro pizarra -->
+    <color name="primary">#15803D</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#BBF7D0</color>
+    <color name="on_primary_container">#052E16</color>
+    <color name="secondary">#475569</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="secondary_container">#E2E8F0</color>
+    <color name="on_secondary_container">#0F172A</color>
+    <color name="tertiary">#B45309</color>
+    <color name="on_tertiary">#FFFFFF</color>
+    <color name="tertiary_container">#FDE68A</color>
+    <color name="on_tertiary_container">#451A03</color>
+    <color name="error">#B3261E</color>
+    <color name="on_error">#FFFFFF</color>
+    <color name="error_container">#F9DEDC</color>
+    <color name="on_error_container">#410E0B</color>
+    <color name="background">#F8FAFC</color>
+    <color name="on_background">#0F172A</color>
+    <color name="surface">#F8FAFC</color>
+    <color name="on_surface">#0F172A</color>
+    <color name="surface_variant">#E2E8F0</color>
+    <color name="on_surface_variant">#475569</color>
+    <color name="outline">#94A3B8</color>
+    <color name="surface_alt">#FFFFFF</color>
+    <color name="cobro_on">#FFFFFF</color>
 </resources>
