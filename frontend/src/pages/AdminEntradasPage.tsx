@@ -109,10 +109,20 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
       </div>
 
       {summary && fixtureId && (
-        <div className="stats-grid" style={{ marginBottom: '1rem' }}>
-          <div className="stat-card"><span className="stat-label">Local</span><span className="stat-value">{summary.local}</span></div>
-          <div className="stat-card"><span className="stat-label">Visitante</span><span className="stat-value">{summary.visitante}</span></div>
-          <div className="stat-card"><span className="stat-label">Recaudado</span><span className="stat-value">${summary.recaudado}</span></div>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {[
+            { label: 'Entradas locales', value: `${summary.local} entrada${summary.local === 1 ? '' : 's'}` },
+            { label: 'Entradas visitantes', value: `${summary.visitante} entrada${summary.visitante === 1 ? '' : 's'}` },
+            {
+              label: 'Recaudado',
+              value: `$${Number(summary.recaudado || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            },
+          ].map((s) => (
+            <div key={s.label} style={{ background: 'var(--color-surface-alt)', borderRadius: 8, padding: '0.6rem 1rem', minWidth: 150 }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>{s.label}</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{s.value}</div>
+            </div>
+          ))}
         </div>
       )}
 
