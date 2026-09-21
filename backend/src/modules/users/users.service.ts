@@ -90,6 +90,33 @@ export class UsersService {
     return result;
   }
 
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        role: true,
+        active: true,
+        homeModule: true,
+        homeSmartphoneModule: true,
+        externalPosId: true,
+        externalStoreId: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Usuario no encontrado');
+    }
+
+    const permissions = user.role === 'ADMIN'
+      ? []
+      : await this.userPermissionsService.getPermissions(user.id);
+    return { ...user, permissions };
+  }
+
   async update(id: string, dto: UpdateUserDto, requesterId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },

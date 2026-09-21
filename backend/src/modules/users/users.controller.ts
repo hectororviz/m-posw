@@ -25,6 +25,12 @@ export class UsersController {
     return this.usersService.list();
   }
 
+  @Get(':id')
+  @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
+  findOne(@Param('id') id: string) {
+    return this.usersService.findOne(id);
+  }
+
   @Patch(':id')
   @RequireModule(ModuleKey.CONFIGURACION, ModuleAccess.FULL)
   update(
