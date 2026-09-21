@@ -348,7 +348,7 @@ class VentaFragment : Fragment() {
             val elements = TicketRenderer.parseTemplate(session.templateJson)
             val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
             val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
-            b.tvStatus.text = if (res.isSuccess) "Reimpresa ${payload.codigos.joinToString(", ")}"
+            b.tvStatus.text = if (res.isSuccess) "Reimpresa ${(payload.codigos ?: emptyList()).joinToString(", ")}"
             else "No se pudo imprimir. Revisá papel/impresora."
         }
     }
