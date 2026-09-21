@@ -1,0 +1,59 @@
+package com.mposw.entradas.data
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
+
+class SessionManager(context: Context) {
+    private val prefs: SharedPreferences by lazy {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            "entradas_secure",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+        )
+    }
+
+    var baseUrl: String
+        get() = prefs.getString("baseUrl", "")?.trimEnd('/')?.plus("/") ?: ""
+        set(v) = prefs.edit().putString("baseUrl", v.trim().trimEnd('/') + "/").apply()
+
+    var token: String
+        get() = prefs.getString("token", "")?.trim() ?: ""
+        set(v) = prefs.edit().putString("token", v.trim()).apply()
+
+    val isPaired: Boolean get() = baseUrl.isNotBlank() && token.startsWith("ent_")
+
+    var templateVersion: Int
+        get() = prefs.getInt("templateVersion", -1)
+        set(v) = prefs.edit().putInt("templateVersion", v).apply()
+
+    var logoVersion: Int
+        get() = prefs.getInt("logoVersion", -1)
+        set(v) = prefs.edit().putInt("logoVersion", v).apply()
+
+    var templateJson: String
+        get() = prefs.getString("templateJson", "") ?: ""
+        set(v) = prefs.edit().putString("templateJson", v).apply()
+
+    var escudoBase64: String
+        get() = prefs.getString("escudoBase64", "") ?: ""
+        set(v) = prefs.edit().putString("escudoBase64", v).apply()
+
+    fun clearToken() {
+        prefs.edit().remove("token").apply()
+    }
+
+    companion object {
+        fun normalizeBaseUrl(raw: String): String {
+            var u = raw.trim().trimEnd('/')
+            if (!u.endsWith("/api")) u += "/api"
+            return "$u/"
+        }
+    }
+}

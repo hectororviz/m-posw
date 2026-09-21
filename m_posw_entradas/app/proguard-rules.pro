@@ -1,0 +1,3 @@
+-keep class com.mposw.entradas.data.** { *; }
+-keep class com.sunmi.** { *; }
+-dontwarn com.sunmi.**

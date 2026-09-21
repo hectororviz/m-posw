@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Entradas POS</string>
+    <string name="tab_venta">Venta</string>
+    <string name="tab_config">Config</string>
+    <string name="sin_partidos">Sin partidos vigentes</string>
+    <string name="sector_local">L (Local)</string>
+    <string name="sector_visitante">V (Visitante)</string>
+    <string name="pagar_efectivo">Efectivo</string>
+    <string name="pagar_qr">Cobrar QR</string>
+    <string name="btn_socio">Socio</string>
+    <string name="quitar_socio">Quitar</string>
+    <string name="cancelar_qr">Cancelar cobro</string>
+    <string name="reimprimir">Reimprimir última</string>
+    <string name="probar_conexion">Probar conexión</string>
+    <string name="escanear_qr">Escanear QR</string>
+</resources>
