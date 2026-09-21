@@ -739,6 +739,8 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const { data: template } = useEntradaTicketTemplate();
   const [elements, setElements] = useState<Array<Record<string, unknown>> | null>(null);
   const [escudoWidth, setEscudoWidth] = useState('256');
+  const [escudoFile, setEscudoFile] = useState<File | null>(null);
+  const [escudoDims, setEscudoDims] = useState<{ w: number; h: number } | null>(null);
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
 
   const currentElements = elements ?? (template?.layout.elements as Array<Record<string, unknown>> | undefined) ?? [];
@@ -768,14 +770,39 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     setElements(next);
   };
 
-  const uploadEscudo = async (file: File | undefined) => {
+  // V2s 58mm a 203dpi ≈ 8px por mm. El backend redimensiona por ancho
+  // preservando proporción (128–576px).
+  const escudoPrintSize = (() => {
+    const w = Math.min(576, Math.max(128, Number(escudoWidth) || 256));
+    if (!escudoDims) return null;
+    const h = Math.round((w * escudoDims.h) / escudoDims.w);
+    return { w, h, mmW: (w / 8).toFixed(0), mmH: (h / 8).toFixed(0) };
+  })();
+
+  const onPickEscudo = (file: File | undefined) => {
+    setEscudoFile(file ?? null);
+    setEscudoDims(null);
     if (!file) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      setEscudoDims({ w: img.naturalWidth, h: img.naturalHeight });
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  };
+
+  const uploadEscudo = async () => {
+    if (!escudoFile || !escudoPrintSize) return;
     try {
       const fd = new FormData();
-      fd.append('file', file);
-      fd.append('widthPx', escudoWidth);
+      fd.append('file', escudoFile);
+      fd.append('widthPx', String(escudoPrintSize.w));
       await apiClient.post('/entradas/ticket-assets/escudo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      pushToast('Escudo actualizado', 'success');
+      pushToast(`Escudo actualizado (~${escudoPrintSize.mmW}×${escudoPrintSize.mmH}mm)`, 'success');
+      setEscudoFile(null);
+      setEscudoDims(null);
       invalidate();
       queryClient.invalidateQueries({ queryKey: ['entradas-escudo-full'] });
       queryClient.invalidateQueries({ queryKey: ['entradas-escudo'] });
@@ -874,15 +901,19 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
           <h3><Upload size={16} /> Escudo del club (monocromático)</h3>
           <p><small>Versión actual: v{escudoFull?.version ?? 1} · {escudoFull?.pngBase64 ? `imagen cargada (${escudoFull.widthPx}px)` : 'sin imagen'} · El POS la descarga una sola vez.</small></p>
           {canWrite && (
-            <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
-              <div><label>Ancho (px)</label>
-                <select value={escudoWidth} onChange={(e) => setEscudoWidth(e.target.value)}>
-                  <option value="256">256 (58mm)</option>
-                  <option value="384">384 (80mm)</option>
-                </select>
+            <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', flexWrap: 'wrap' }}>
+              <div><label>Ancho (px, 128–576)</label>
+                <input type="number" min={128} max={576} value={escudoWidth} onChange={(e) => setEscudoWidth(e.target.value)} style={{ width: 90 }} />
+                <div><small>384px = ancho completo 58mm · 8px ≈ 1mm</small></div>
               </div>
-              <div><label>PNG (se convierte a 1-bit)</label>
-                <input type="file" accept="image/png,image/jpeg" onChange={(e) => uploadEscudo(e.target.files?.[0])} />
+              <div><label>PNG o JPG (se convierte a 1-bit)</label>
+                <input type="file" accept="image/png,image/jpeg" onChange={(e) => onPickEscudo(e.target.files?.[0])} />
+                {escudoDims && escudoPrintSize && (
+                  <div><small>Original {escudoDims.w}×{escudoDims.h} → impreso ~{escudoPrintSize.w}×{escudoPrintSize.h}px ≈ {escudoPrintSize.mmW}×{escudoPrintSize.mmH}mm</small></div>
+                )}
+              </div>
+              <div><label>&nbsp;</label>
+                <button type="button" className="btn-primary btn-sm" onClick={uploadEscudo} disabled={!escudoFile}><Upload size={14} /> Subir</button>
               </div>
             </div>
           )}

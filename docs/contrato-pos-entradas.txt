@@ -105,7 +105,11 @@ Provisioning (una vez, online):
   accentColor = color de personalizacion de la app principal
   (Setting.accentColor); clubName = nombre del club. Ambos viajan
   para que el POS muestre escudo + nombre y aplique el color a su
-  tema. Cambiar cualquiera de los dos incrementa version.)
+  tema. Cambiar cualquiera de los dos incrementa version.
+  Regla de tamaño (V2s 58mm a 203dpi ≈ 8px por mm, max 384px de
+  ancho): para ~20mm de alto con imagen 2420x2667, subir con ancho
+  144px -> impreso ~145x160px ≈ 18x20mm. El admin muestra el calculo
+  px->mm antes de subir.)
 
 3.7 GET /entradas/socios/:uuid -> FUTURO, en prueba no llamar.
 
