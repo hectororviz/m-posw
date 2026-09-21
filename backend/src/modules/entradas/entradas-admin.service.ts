@@ -232,7 +232,9 @@ export class EntradasAdminService {
 
   // ── Dispositivos ─────────────────────────────────────────
   listDevices() {
+    // Los revocados no se listan (baja lógica: TicketSale.deviceId impide borrar físicamente)
     return this.prisma.posDevice.findMany({
+      where: { revokedAt: null },
       orderBy: { createdAt: 'desc' },
       select: { id: true, nombre: true, activo: true, revokedAt: true, lastSeenAt: true, createdAt: true },
     });
