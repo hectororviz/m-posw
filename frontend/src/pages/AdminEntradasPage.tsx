@@ -73,24 +73,40 @@ export const AdminEntradasPage: React.FC = () => {
 // ── Ventas ───────────────────────────────────────────────────
 const VentasTab: React.FC<{ canWrite: boolean }> = () => {
   const [fixtureId, setFixtureId] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const { data: fixtures } = useEntradaFixtures();
   const { data: sales, isLoading } = useTicketSales(fixtureId || undefined);
   const { data: summary } = useEntradasSalesSummary(fixtureId || undefined);
 
   const options = useMemo(() => (fixtures ?? []).slice(-60), [fixtures]);
+  const rows = useMemo(
+    () => (sales ?? []).filter((s) => !statusFilter || s.status === statusFilter),
+    [sales, statusFilter],
+  );
 
   return (
     <div>
-      <div className="settings-field" style={{ maxWidth: 420 }}>
-        <label>Partido</label>
-        <select value={fixtureId} onChange={(e) => setFixtureId(e.target.value)}>
-          <option value="">Todos (últimas 500)</option>
-          {options.map((f) => (
-            <option key={f.id} value={f.id}>
-              {fmtFecha(f.fecha)} · {f.torneo.nombre} vs {f.rival.nombre}
-            </option>
-          ))}
-        </select>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <div className="settings-field" style={{ minWidth: 280, margin: 0 }}>
+          <label>Partido</label>
+          <select value={fixtureId} onChange={(e) => setFixtureId(e.target.value)}>
+            <option value="">Todos (últimas 500)</option>
+            {options.map((f) => (
+              <option key={f.id} value={f.id}>
+                {fmtFecha(f.fecha)} · {f.torneo.nombre} vs {f.rival.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="settings-field" style={{ minWidth: 160, margin: 0 }}>
+          <label>Estado</label>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">Todos</option>
+            {['APPROVED', 'PENDING', 'REJECTED', 'EXPIRED', 'CANCELLED'].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
       </div>
       {summary && fixtureId && (
         <div className="stats-grid" style={{ marginBottom: '1rem' }}>
@@ -105,14 +121,17 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
             <tr><th>Fecha</th><th>Partido</th><th>Sector</th><th>Cant</th><th>Códigos</th><th>Total</th><th>Estado</th><th>POS</th></tr>
           </thead>
           <tbody>
-            {(sales ?? []).map((s) => (
+            {rows.length === 0 && (
+              <tr><td colSpan={8} style={{ textAlign: 'center', opacity: 0.6 }}>Sin ventas para este filtro</td></tr>
+            )}
+            {rows.map((s) => (
               <tr key={s.id}>
-                <td>{fmtDateTime(s.createdAt)}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(s.createdAt)}</td>
                 <td>{s.fixture.torneo.nombre} vs {s.fixture.rival.nombre}</td>
                 <td>{s.sector}</td>
-                <td>{s.cantidad}</td>
+                <td style={{ textAlign: 'center' }}>{s.cantidad}</td>
                 <td style={{ fontFamily: 'monospace' }}>{s.units.map((u) => u.codigo).join(', ')}</td>
-                <td>${s.total}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>${s.total}</td>
                 <td><StatusBadge status={s.status} /></td>
                 <td>{s.device.nombre}</td>
               </tr>
@@ -136,6 +155,27 @@ const StatusBadge: React.FC<{ status: EntradaSaleStatus }> = ({ status }) => {
 };
 
 // ── Calendario ───────────────────────────────────────────────
+type FixtureEstado = 'EN_CURSO' | 'PROGRAMADO' | 'JUGADO';
+
+const fixtureEstado = (f: EntradaFixture, now: number): FixtureEstado => {
+  const desde = new Date(f.ventanaDesde).getTime();
+  const hasta = new Date(f.ventanaHasta).getTime();
+  if (now >= desde && now <= hasta) return 'EN_CURSO';
+  if (now < desde) return 'PROGRAMADO';
+  return 'JUGADO';
+};
+
+const fmtHora = (iso: string) => {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+};
+
+const toLocalInput = (iso: string) => {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
 const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const { pushToast } = useToast();
   const invalidate = useInvalidateEntradas();
@@ -146,12 +186,26 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const { data: fixtures, isLoading } = useEntradaFixtures(from, to);
   const { data: torneos } = useEntradaTorneos();
   const { data: rivales } = useEntradaRivales();
-  const [showForm, setShowForm] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ fecha: todayISO(), torneoId: '', rivalId: '' });
   const [editing, setEditing] = useState<EntradaFixture | null>(null);
   const [ventana, setVentana] = useState({ desde: '', hasta: '' });
 
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
+  const now = Date.now();
+
+  const ordenados = useMemo(() => {
+    const arr = [...(fixtures ?? [])];
+    const rank = (f: EntradaFixture) => (fixtureEstado(f, now) === 'EN_CURSO' ? 0 : fixtureEstado(f, now) === 'PROGRAMADO' ? 1 : 2);
+    arr.sort((a, b) => {
+      const r = rank(a) - rank(b);
+      if (r !== 0) return r;
+      const fa = new Date(a.ventanaDesde).getTime();
+      const fb = new Date(b.ventanaDesde).getTime();
+      return rank(a) === 2 ? fb - fa : fa - fb;
+    });
+    return arr;
+  }, [fixtures, now]);
 
   const submitCreate = async () => {
     if (!form.fecha || !form.torneoId || !form.rivalId) {
@@ -161,19 +215,15 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     try {
       await apiClient.post('/entradas/fixtures', form);
       pushToast('Partido agregado (ventana default 06:00 → 05:59+1)', 'success');
-      setShowForm(false);
+      setShowCreate(false);
+      setForm({ fecha: todayISO(), torneoId: '', rivalId: '' });
       invalidate();
     } catch (e) { err(e); }
   };
 
   const openEdit = (f: EntradaFixture) => {
     setEditing(f);
-    const toLocal = (iso: string) => {
-      const d = new Date(iso);
-      const p = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-    };
-    setVentana({ desde: toLocal(f.ventanaDesde), hasta: toLocal(f.ventanaHasta) });
+    setVentana({ desde: toLocalInput(f.ventanaDesde), hasta: toLocalInput(f.ventanaHasta) });
   };
 
   const submitEdit = async () => {
@@ -200,56 +250,72 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     <div>
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
-        {canWrite && (
-          <button type="button" className="btn-primary btn-sm" onClick={() => setShowForm((v) => !v)}>
-            <Plus size={14} /> Partido
-          </button>
-        )}
       </div>
-      {showForm && canWrite && (
-        <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'end', marginBottom: '1rem' }}>
-          <div><label>Fecha</label><input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} /></div>
-          <div><label>Torneo</label>
-            <select value={form.torneoId} onChange={(e) => setForm({ ...form, torneoId: e.target.value })}>
-              <option value="">Seleccionar</option>
-              {(torneos ?? []).filter((t) => t.activo).map((t) => <option key={t.id} value={t.id}>{t.nombre} (${t.precio})</option>)}
-            </select>
-          </div>
-          <div><label>Rival</label>
-            <select value={form.rivalId} onChange={(e) => setForm({ ...form, rivalId: e.target.value })}>
-              <option value="">Seleccionar</option>
-              {(rivales ?? []).filter((r) => r.activo).map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-            </select>
-          </div>
-          <button type="button" className="btn-primary btn-sm" onClick={submitCreate}>Guardar</button>
-        </div>
-      )}
       {isLoading ? <div className="spinner" /> : (
         <table className="sales-table">
-          <thead><tr><th>Fecha</th><th>Torneo</th><th>Rival</th><th>Ventana venta</th><th>Activo</th>{canWrite && <th />}</tr></thead>
+          <thead><tr><th>Fecha</th><th>Torneo</th><th>Rival</th><th>Horario</th><th>Estado</th>{canWrite && <th />}</tr></thead>
           <tbody>
-            {(fixtures ?? []).map((f) => (
-              <tr key={f.id}>
-                <td>{fmtFecha(f.fecha)}</td>
-                <td>{f.torneo.nombre} (${f.torneo.precio})</td>
-                <td>{f.rival.nombre}</td>
-                <td>{fmtDateTime(f.ventanaDesde)} → {fmtDateTime(f.ventanaHasta)}</td>
-                <td>{f.activo ? 'Sí' : 'No'}</td>
-                {canWrite && (
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => openEdit(f)}>Ventana</button>{' '}
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => toggleActive(f)}>{f.activo ? 'Desactivar' : 'Activar'}</button>
-                  </td>
-                )}
-              </tr>
-            ))}
+            {ordenados.length === 0 && (
+              <tr><td colSpan={canWrite ? 6 : 5} style={{ textAlign: 'center', opacity: 0.6 }}>Sin partidos este mes</td></tr>
+            )}
+            {ordenados.map((f) => {
+              const estado = fixtureEstado(f, now);
+              const jugado = estado === 'JUGADO';
+              return (
+                <tr key={f.id} style={jugado ? { opacity: 0.55 } : undefined}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtFecha(f.fecha)}</td>
+                  <td>{f.torneo.nombre} <small style={{ opacity: 0.7 }}>(${f.torneo.precio})</small></td>
+                  <td>{f.rival.nombre}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtHora(f.ventanaDesde)} → {fmtHora(f.ventanaHasta)}</td>
+                  <td><FixtureBadge estado={estado} /></td>
+                  {canWrite && (
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button type="button" className="btn-secondary btn-sm" disabled={jugado} onClick={() => openEdit(f)}>Editar</button>{' '}
+                      <button type="button" className="btn-secondary btn-sm" disabled={jugado} onClick={() => toggleActive(f)}>{f.activo ? 'Desactivar' : 'Activar'}</button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      )}
+      {canWrite && (
+        <button type="button" className="fab-button-v2" onClick={() => setShowCreate(true)} aria-label="Nuevo partido" title="Nuevo partido">
+          <Plus size={24} />
+        </button>
+      )}
+      {showCreate && canWrite && (
+        <div className="ligas-modal-overlay" onClick={() => setShowCreate(false)}>
+          <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ligas-modal-header"><strong>Nuevo partido</strong>
+              <button type="button" className="ligas-modal-close" onClick={() => setShowCreate(false)}><X size={16} /></button>
+            </div>
+            <div className="ligas-modal-body">
+              <div className="settings-field"><label>Fecha</label>
+                <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+              </div>
+              <div className="settings-field"><label>Torneo</label>
+                <select value={form.torneoId} onChange={(e) => setForm({ ...form, torneoId: e.target.value })}>
+                  <option value="">Seleccionar</option>
+                  {(torneos ?? []).filter((t) => t.activo).map((t) => <option key={t.id} value={t.id}>{t.nombre} (${t.precio})</option>)}
+                </select>
+              </div>
+              <div className="settings-field"><label>Rival</label>
+                <select value={form.rivalId} onChange={(e) => setForm({ ...form, rivalId: e.target.value })}>
+                  <option value="">Seleccionar</option>
+                  {(rivales ?? []).filter((r) => r.activo).map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                </select>
+              </div>
+              <button type="button" className="btn-primary btn-sm" onClick={submitCreate}>Guardar</button>
+            </div>
+          </div>
+        </div>
       )}
       {editing && (
         <div className="ligas-modal-overlay" onClick={() => setEditing(null)}>
           <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ligas-modal-header"><strong>Ventana de venta</strong>
+            <div className="ligas-modal-header"><strong>Editar partido</strong>
               <button type="button" className="ligas-modal-close" onClick={() => setEditing(null)}><X size={16} /></button>
             </div>
             <div className="ligas-modal-body">
@@ -269,81 +335,164 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   );
 };
 
+const FixtureBadge: React.FC<{ estado: FixtureEstado }> = ({ estado }) => {
+  const colors: Record<FixtureEstado, string> = {
+    EN_CURSO: 'var(--color-success)',
+    PROGRAMADO: 'var(--color-warning)',
+    JUGADO: 'var(--color-text-faint)',
+  };
+  return <span style={{ color: colors[estado], fontWeight: 600 }}>{estado === 'EN_CURSO' ? 'EN CURSO' : estado}</span>;
+};
+
 // ── ABM ──────────────────────────────────────────────────────
 const AbmTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const { pushToast } = useToast();
   const invalidate = useInvalidateEntradas();
   const { data: torneos } = useEntradaTorneos();
   const { data: rivales } = useEntradaRivales();
-  const [torneoForm, setTorneoForm] = useState({ nombre: '', precio: '' });
-  const [rivalForm, setRivalForm] = useState({ nombre: '' });
+  const [torneoModal, setTorneoModal] = useState<null | { id?: string; nombre: string; precio: string }>(null);
+  const [rivalModal, setRivalModal] = useState<null | { id?: string; nombre: string }>(null);
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
 
+  const saveTorneo = async () => {
+    if (!torneoModal || !torneoModal.nombre.trim() || !torneoModal.precio) {
+      pushToast('Completá nombre y precio', 'error');
+      return;
+    }
+    try {
+      if (torneoModal.id) {
+        await apiClient.patch(`/entradas/torneos/${torneoModal.id}`, { nombre: torneoModal.nombre.trim(), precio: Number(torneoModal.precio) });
+        pushToast('Torneo actualizado', 'success');
+      } else {
+        await apiClient.post('/entradas/torneos', { nombre: torneoModal.nombre.trim(), precio: Number(torneoModal.precio) });
+        pushToast('Torneo creado', 'success');
+      }
+      setTorneoModal(null);
+      invalidate();
+    } catch (e) { err(e); }
+  };
+
+  const saveRival = async () => {
+    if (!rivalModal || !rivalModal.nombre.trim()) {
+      pushToast('Completá el nombre', 'error');
+      return;
+    }
+    try {
+      if (rivalModal.id) {
+        await apiClient.patch(`/entradas/rivales/${rivalModal.id}`, { nombre: rivalModal.nombre.trim() });
+        pushToast('Rival actualizado', 'success');
+      } else {
+        await apiClient.post('/entradas/rivales', { nombre: rivalModal.nombre.trim() });
+        pushToast('Rival creado', 'success');
+      }
+      setRivalModal(null);
+      invalidate();
+    } catch (e) { err(e); }
+  };
+
+  const toggleTorneo = async (id: string, activo: boolean) => {
+    try { await apiClient.patch(`/entradas/torneos/${id}`, { activo: !activo }); invalidate(); } catch (e) { err(e); }
+  };
+
+  const toggleRival = async (id: string, activo: boolean) => {
+    try { await apiClient.patch(`/entradas/rivales/${id}`, { activo: !activo }); invalidate(); } catch (e) { err(e); }
+  };
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-      <div>
-        <h3>Torneos (nombre + precio)</h3>
-        {canWrite && (
-          <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
-            <div><label>Nombre</label><input value={torneoForm.nombre} onChange={(e) => setTorneoForm({ ...torneoForm, nombre: e.target.value })} placeholder="Femenino" /></div>
-            <div><label>Precio</label><input value={torneoForm.precio} onChange={(e) => setTorneoForm({ ...torneoForm, precio: e.target.value })} placeholder="1500" inputMode="decimal" /></div>
-            <button type="button" className="btn-primary btn-sm" onClick={async () => {
-              try {
-                await apiClient.post('/entradas/torneos', { nombre: torneoForm.nombre, precio: Number(torneoForm.precio) });
-                setTorneoForm({ nombre: '', precio: '' });
-                pushToast('Torneo creado', 'success');
-                invalidate();
-              } catch (e) { err(e); }
-            }}><Plus size={14} /></button>
-          </div>
-        )}
+    <div style={{ display: 'grid', gap: '1.5rem' }}>
+      <section>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 style={{ margin: 0 }}>Torneos</h3>
+          {canWrite && (
+            <button type="button" className="btn-primary btn-sm" onClick={() => setTorneoModal({ nombre: '', precio: '' })} aria-label="Nuevo torneo">
+              <Plus size={14} />
+            </button>
+          )}
+        </div>
         <table className="sales-table">
           <thead><tr><th>Nombre</th><th>Precio</th><th>Activo</th>{canWrite && <th />}</tr></thead>
           <tbody>
+            {(torneos ?? []).length === 0 && (
+              <tr><td colSpan={canWrite ? 4 : 3} style={{ textAlign: 'center', opacity: 0.6 }}>Sin torneos</td></tr>
+            )}
             {(torneos ?? []).map((t) => (
               <tr key={t.id}>
-                <td>{t.nombre}</td><td>${t.precio}</td><td>{t.activo ? 'Sí' : 'No'}</td>
+                <td>{t.nombre}</td><td style={{ whiteSpace: 'nowrap' }}>${t.precio}</td><td>{t.activo ? 'Sí' : 'No'}</td>
                 {canWrite && (
-                  <td><button type="button" className="btn-secondary btn-sm" onClick={async () => {
-                    try { await apiClient.patch(`/entradas/torneos/${t.id}`, { activo: !t.activo }); invalidate(); } catch (e) { err(e); }
-                  }}>{t.activo ? 'Desactivar' : 'Activar'}</button></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => setTorneoModal({ id: t.id, nombre: t.nombre, precio: String(t.precio) })}>Editar</button>{' '}
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => toggleTorneo(t.id, t.activo)}>{t.activo ? 'Desactivar' : 'Activar'}</button>
+                  </td>
                 )}
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-      <div>
-        <h3>Rivales (solo nombre)</h3>
-        {canWrite && (
-          <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
-            <div><label>Nombre</label><input value={rivalForm.nombre} onChange={(e) => setRivalForm({ nombre: e.target.value })} placeholder="Mundialito" /></div>
-            <button type="button" className="btn-primary btn-sm" onClick={async () => {
-              try {
-                await apiClient.post('/entradas/rivales', { nombre: rivalForm.nombre });
-                setRivalForm({ nombre: '' });
-                pushToast('Rival creado', 'success');
-                invalidate();
-              } catch (e) { err(e); }
-            }}><Plus size={14} /></button>
-          </div>
-        )}
+      </section>
+
+      <section>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 style={{ margin: 0 }}>Rivales</h3>
+          {canWrite && (
+            <button type="button" className="btn-primary btn-sm" onClick={() => setRivalModal({ nombre: '' })} aria-label="Nuevo rival">
+              <Plus size={14} />
+            </button>
+          )}
+        </div>
         <table className="sales-table">
           <thead><tr><th>Nombre</th><th>Activo</th>{canWrite && <th />}</tr></thead>
           <tbody>
+            {(rivales ?? []).length === 0 && (
+              <tr><td colSpan={canWrite ? 3 : 2} style={{ textAlign: 'center', opacity: 0.6 }}>Sin rivales</td></tr>
+            )}
             {(rivales ?? []).map((r) => (
               <tr key={r.id}>
                 <td>{r.nombre}</td><td>{r.activo ? 'Sí' : 'No'}</td>
                 {canWrite && (
-                  <td><button type="button" className="btn-secondary btn-sm" onClick={async () => {
-                    try { await apiClient.patch(`/entradas/rivales/${r.id}`, { activo: !r.activo }); invalidate(); } catch (e) { err(e); }
-                  }}>{r.activo ? 'Desactivar' : 'Activar'}</button></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => setRivalModal({ id: r.id, nombre: r.nombre })}>Editar</button>{' '}
+                    <button type="button" className="btn-secondary btn-sm" onClick={() => toggleRival(r.id, r.activo)}>{r.activo ? 'Desactivar' : 'Activar'}</button>
+                  </td>
                 )}
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </section>
+
+      {torneoModal && canWrite && (
+        <div className="ligas-modal-overlay" onClick={() => setTorneoModal(null)}>
+          <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ligas-modal-header"><strong>{torneoModal.id ? 'Editar torneo' : 'Nuevo torneo'}</strong>
+              <button type="button" className="ligas-modal-close" onClick={() => setTorneoModal(null)}><X size={16} /></button>
+            </div>
+            <div className="ligas-modal-body">
+              <div className="settings-field"><label>Nombre</label>
+                <input value={torneoModal.nombre} onChange={(e) => setTorneoModal({ ...torneoModal, nombre: e.target.value })} placeholder="Femenino" />
+              </div>
+              <div className="settings-field"><label>Precio de la entrada</label>
+                <input value={torneoModal.precio} onChange={(e) => setTorneoModal({ ...torneoModal, precio: e.target.value })} placeholder="1500" inputMode="decimal" />
+              </div>
+              <button type="button" className="btn-primary btn-sm" onClick={saveTorneo}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {rivalModal && canWrite && (
+        <div className="ligas-modal-overlay" onClick={() => setRivalModal(null)}>
+          <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ligas-modal-header"><strong>{rivalModal.id ? 'Editar rival' : 'Nuevo rival'}</strong>
+              <button type="button" className="ligas-modal-close" onClick={() => setRivalModal(null)}><X size={16} /></button>
+            </div>
+            <div className="ligas-modal-body">
+              <div className="settings-field"><label>Nombre</label>
+                <input value={rivalModal.nombre} onChange={(e) => setRivalModal({ ...rivalModal, nombre: e.target.value })} placeholder="Mundialito" />
+              </div>
+              <button type="button" className="btn-primary btn-sm" onClick={saveRival}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -575,55 +724,87 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
       <div style={{ display: 'grid', gap: '1.5rem' }}>
         <section>
           <h3><Ticket size={16} /> Diseño del ticket (32 columnas)</h3>
-          <p><small>Variables: {'{{club}} {{torneo}} {{rival}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}}'}</small></p>
-          {currentElements.map((el, i) => (
-            <div key={i} className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', flexWrap: 'wrap' }}>
-              <strong style={{ minWidth: 60 }}>{String(el.type ?? '?')}</strong>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="checkbox" checked={el.enabled !== false} disabled={!canWrite}
-                  onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], enabled: e.target.checked }; setElements(n); }} /> on
-              </label>
-              {typeof el.value === 'string' && (
-                <div style={{ flex: 1, minWidth: 200 }}><label>Texto</label>
-                  <input value={el.value} disabled={!canWrite}
-                    onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], value: e.target.value }; setElements(n); }} />
-                </div>
-              )}
-              {el.type === 'text' && (
-                <>
-                  <div><label>Tamaño</label>
-                    <select value={String(el.size ?? 'M')} disabled={!canWrite}
-                      onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], size: e.target.value }; setElements(n); }}>
-                      {['S', 'M', 'L', 'XL'].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div><label>Alineación</label>
-                    <select value={String(el.align ?? 'center')} disabled={!canWrite}
-                      onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], align: e.target.value }; setElements(n); }}>
-                      {['left', 'center', 'right'].map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input type="checkbox" checked={el.bold === true} disabled={!canWrite}
-                      onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], bold: e.target.checked }; setElements(n); }} /> Negrita
-                  </label>
-                </>
-              )}
-              {canWrite && (
-                <>
-                  <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, -1)}><ArrowUp size={12} /></button>
-                  <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, 1)}><ArrowDown size={12} /></button>
-                  <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(currentElements.filter((_, j) => j !== i))}><X size={12} /></button>
-                </>
-              )}
-            </div>
-          ))}
+          <table className="sales-table">
+            <thead><tr><th style={{ width: 90 }}>Bloque</th><th>Contenido</th><th style={{ width: 140 }}>Formato</th><th style={{ width: 44 }}>On</th>{canWrite && <th style={{ width: 110 }} />}</tr></thead>
+            <tbody>
+              {currentElements.map((el, i) => (
+                <tr key={i} style={el.enabled === false ? { opacity: 0.5 } : undefined}>
+                  <td><strong>{String(el.type ?? '?')}</strong></td>
+                  <td>
+                    {typeof el.value === 'string' ? (
+                      <input value={el.value} disabled={!canWrite} style={{ width: '100%' }}
+                        onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], value: e.target.value }; setElements(n); }} />
+                    ) : (
+                      <span style={{ opacity: 0.6 }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    {el.type === 'text' ? (
+                      <span style={{ display: 'inline-flex', gap: 4 }}>
+                        <select value={String(el.size ?? 'M')} disabled={!canWrite} title="Tamaño"
+                          onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], size: e.target.value }; setElements(n); }}>
+                          {['S', 'M', 'L', 'XL'].map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <select value={String(el.align ?? 'center')} disabled={!canWrite} title="Alineación"
+                          onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], align: e.target.value }; setElements(n); }}>
+                          <option value="left">Izq</option>
+                          <option value="center">Cen</option>
+                          <option value="right">Der</option>
+                        </select>
+                        <button
+                          type="button" className="btn-secondary btn-sm" disabled={!canWrite} title="Negrita"
+                          style={el.bold ? { fontWeight: 800 } : undefined}
+                          onClick={() => { const n = [...currentElements]; n[i] = { ...n[i], bold: !(n[i].bold === true) }; setElements(n); }}
+                        >B</button>
+                      </span>
+                    ) : (
+                      <span style={{ opacity: 0.6 }}>—</span>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <input type="checkbox" checked={el.enabled !== false} disabled={!canWrite}
+                      onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], enabled: e.target.checked }; setElements(n); }} />
+                  </td>
+                  {canWrite && (
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, -1)}><ArrowUp size={12} /></button>{' '}
+                      <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, 1)}><ArrowDown size={12} /></button>{' '}
+                      <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(currentElements.filter((_, j) => j !== i))}><X size={12} /></button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
           {canWrite && (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <button type="button" className="btn-primary btn-sm" onClick={saveTemplate}>Guardar diseño (v{(template?.version ?? 1) + (elements ? 1 : 0)})</button>
-              <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(null)}>Descartar cambios</button>
+              <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(null)}>Descartar</button>
+              <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', marginLeft: 'auto' }}>
+                <select id="new-block-type" defaultValue="text" style={{ maxWidth: 130 }}>
+                  <option value="text">Texto</option>
+                  <option value="line">Línea</option>
+                  <option value="spacer">Espacio</option>
+                  <option value="qr">QR</option>
+                  <option value="logo">Escudo</option>
+                </select>
+                <button
+                  type="button" className="btn-secondary btn-sm"
+                  disabled={currentElements.length >= 40}
+                  onClick={() => {
+                    const sel = document.getElementById('new-block-type') as HTMLSelectElement | null;
+                    const type = sel?.value ?? 'text';
+                    const base: Record<string, unknown> = { type, enabled: true };
+                    if (type === 'text') Object.assign(base, { value: 'Nuevo texto', size: 'M', align: 'center' });
+                    if (type === 'qr') Object.assign(base, { value: '{{codigo}}', align: 'center' });
+                    if (type === 'logo') Object.assign(base, { value: '{{escudo}}', align: 'center' });
+                    setElements([...currentElements, base]);
+                  }}
+                ><Plus size={14} /> Bloque</button>
+              </span>
             </div>
           )}
+          <p><small>{currentElements.length}/40 bloques · Variables: {'{{club}} {{torneo}} {{rival}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}}'}</small></p>
         </section>
 
         <section>
