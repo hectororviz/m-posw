@@ -168,17 +168,18 @@ export class EntradasSalesService {
     // imagen fija del POS dedicado a entradas); el PUT anterior asocia
     // el monto a esa orden. El POS muestra siempre la misma imagen
     // mientras haya una sola orden activa en ese POS.
-    const [template, asset, mpSetting] = await Promise.all([
-      this.prisma.entradaTicketTemplate.findUnique({ where: { id: 'default' } }),
-      this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } }),
-      this.prisma.setting.findUnique({ where: { id: SETTING_ID }, select: { mpEntradasQrData: true } }),
-    ]);
+    const mpSetting = await this.prisma.setting.findUnique({
+      where: { id: SETTING_ID },
+      select: { mpEntradasQrData: true },
+    });
+    const pending = await this.prisma.ticketSale.findUnique({
+      where: { id: sale.id },
+      include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } } },
+    });
+    const payload = await this.toStatusPayload(pending!);
     return {
-      saleId: sale.id,
-      status: 'PENDING' as const,
-      qrImageUrl: mpSetting?.mpEntradasQrData ?? null,
-      templateVersion: template?.version ?? 1,
-      logoVersion: asset?.version ?? 1,
+      ...payload,
+      qrImageUrl: mpSetting?.mpEntradasQrData ?? payload.datos.qrImageUrl ?? null,
     };
   }
 

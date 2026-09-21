@@ -46,7 +46,7 @@ class PagoExitosoDialogFragment : DialogFragment() {
     }
 
     companion object {
-        fun new(codigos: String, total: String): PagoExitosoDialogFragment {
+        fun new(codigos: String?, total: String?): PagoExitosoDialogFragment {
             val f = PagoExitosoDialogFragment()
             f.arguments = Bundle().apply {
                 putString("codigos", codigos)

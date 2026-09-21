@@ -300,7 +300,7 @@ class VentaFragment : Fragment() {
                         b.tvSocio.text = ""
                         b.btnQuitarSocio.visibility = View.GONE
                         PagoExitosoDialogFragment.new(
-                            payload.codigos.joinToString(", "),
+                            (payload.codigos ?: emptyList()).joinToString(", "),
                             payload.total,
                         ).show(parentFragmentManager, "ok")
                     } else {
@@ -311,7 +311,8 @@ class VentaFragment : Fragment() {
                     if (payload.saleId == null || qrUrl.isNullOrBlank()) {
                         b.tvStatus.text = "QR no configurado en el servidor (qrImageUrl vacío)."
                     } else {
-                        QrPagoFragment.new(payload.saleId, qrUrl, payload.total, f.fixtureId, sector, cantidad)
+                        val total = payload.total ?: totalFmt.format(f.precioDouble * cantidad)
+                        QrPagoFragment.new(payload.saleId, qrUrl, total, f.fixtureId, sector, cantidad)
                             .show(parentFragmentManager, "qr")
                     }
                 }
@@ -330,9 +331,9 @@ class VentaFragment : Fragment() {
         val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
         val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
         b.tvStatus.text = if (res.isSuccess) {
-            "APROBADA ${payload.codigos.joinToString(", ")} · $${payload.total}"
+            "APROBADA ${(payload.codigos ?: emptyList()).joinToString(", ")} · $${payload.total}"
         } else {
-            "APROBADA pero sin imprimir. Usá Reimprimir. ${payload.codigos.joinToString(", ")}"
+            "APROBADA pero sin imprimir. Usá Reimprimir. ${(payload.codigos ?: emptyList()).joinToString(", ")}"
         }
     }
 

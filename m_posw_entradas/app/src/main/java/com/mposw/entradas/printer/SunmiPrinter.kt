@@ -100,7 +100,7 @@ object SunmiPrinter {
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val printer = requireService()
-            val codigos = payload.codigos.ifEmpty { listOf("") }
+            val codigos = (payload.codigos ?: emptyList()).ifEmpty { listOf("") }
             for ((idx, codigo) in codigos.withIndex()) {
                 val vars = TicketRenderer.varsFor(payload, codigo)
                 for (el in elements) {

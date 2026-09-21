@@ -76,7 +76,7 @@ class QrPagoFragment : DialogFragment() {
                                 ),
                             )
                             dismissAllowingStateLoss()
-                            PagoExitosoDialogFragment.new(p.codigos.joinToString(", "), p.total)
+                            PagoExitosoDialogFragment.new((p.codigos ?: emptyList()).joinToString(", "), p.total)
                                 .show(parentFragmentManager, "ok")
                             return@launch
                         }
@@ -112,9 +112,9 @@ class QrPagoFragment : DialogFragment() {
 
     companion object {
         fun new(
-            saleId: String,
-            qrUrl: String,
-            total: String,
+            saleId: String?,
+            qrUrl: String?,
+            total: String?,
             fixtureId: String = "",
             sector: String = "",
             cantidad: Int = 0,
