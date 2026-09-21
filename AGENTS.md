@@ -1098,6 +1098,7 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 | `POST` / `PATCH` | `/entradas/rivales[/:id]` | FULL | Crear/editar (nombre) |
 | `GET` | `/entradas/fixtures?from=&to=` | READ | Calendario |
 | `POST` / `PATCH` | `/entradas/fixtures[/:id]` | READ | Crear (ventana default) / editar ventana. Calendario operable con READ |
+| `DELETE` | `/entradas/fixtures/:id` | READ | Eliminar solo si no tiene ventas (409 `FIXTURE_CON_VENTAS`) |
 | `GET` | `/entradas/devices` | READ | Listar terminales (sin token) |
 | `POST` | `/entradas/devices` | FULL | Generar token (respuesta única) |
 | `POST` | `/entradas/devices/:id/revoke` | FULL | Revocar |

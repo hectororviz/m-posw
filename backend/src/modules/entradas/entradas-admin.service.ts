@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Express } from 'express';
 import { promises as fs } from 'fs';
@@ -228,6 +228,26 @@ export class EntradasAdminService {
       }
       throw error;
     }
+  }
+
+  async deleteFixture(id: string) {
+    const fixture = await this.prisma.entradaFixture.findUnique({ where: { id } });
+    if (!fixture) throw new NotFoundException('Partido no encontrado');
+    const [sales, units] = await Promise.all([
+      this.prisma.ticketSale.count({ where: { fixtureId: id } }),
+      this.prisma.ticketUnit.count({ where: { fixtureId: id } }),
+    ]);
+    if (sales > 0 || units > 0) {
+      throw new ConflictException({
+        code: 'FIXTURE_CON_VENTAS',
+        message: 'No se puede eliminar: el partido ya tiene ventas registradas',
+      });
+    }
+    await this.prisma.$transaction([
+      this.prisma.entradaContador.deleteMany({ where: { fixtureId: id } }),
+      this.prisma.entradaFixture.delete({ where: { id } }),
+    ]);
+    return { id, deleted: true };
   }
 
   // ── Dispositivos ─────────────────────────────────────────

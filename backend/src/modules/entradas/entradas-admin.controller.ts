@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -84,6 +85,12 @@ export class EntradasAdminController {
   @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
   updateFixture(@Param('id') id: string, @Body() dto: UpdateFixtureDto) {
     return this.admin.updateFixture(id, dto);
+  }
+
+  @Delete('fixtures/:id')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
+  deleteFixture(@Param('id') id: string) {
+    return this.admin.deleteFixture(id);
   }
 
   // ── Dispositivos ──

@@ -312,6 +312,14 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
                     <span className="col-action" style={{ flex: '0 0 120px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
                       <button className="btn-ghost" disabled={jugado} onClick={() => openEdit(f)} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
                       <button className="btn-ghost" disabled={jugado} onClick={() => toggleActive(f)} title={f.activo ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>{f.activo ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                      <button className="btn-ghost" onClick={async () => {
+                        if (!confirm(`Eliminar ${f.torneo.nombre} vs ${f.rival.nombre} (${fmtFecha(f.fecha)})? Solo se puede si aún no tiene ventas.`)) return;
+                        try {
+                          await apiClient.delete(`/entradas/fixtures/${f.id}`);
+                          pushToast('Partido eliminado', 'success');
+                          invalidate();
+                        } catch (e) { err(e); }
+                      }} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
                     </span>
                   )}
                 </div>
