@@ -11,6 +11,10 @@ m_posw_android/android/.gradle/
 m_posw_android/android/build/
 m_posw_android/android/app/build/
 m_posw_android/pubspec.lock
+m_posw_entradas/.gradle/
+m_posw_entradas/build/
+m_posw_entradas/app/build/
+m_posw_entradas/local.properties
 
 # Archivos APK (binarios grandes, se generan en build)
 *.apk
