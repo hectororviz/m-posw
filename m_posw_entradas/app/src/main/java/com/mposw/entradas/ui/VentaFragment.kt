@@ -214,7 +214,6 @@ class VentaFragment : Fragment() {
                 if (fixtures.isEmpty()) {
                     b.tvStatus.text = getString(com.mposw.entradas.R.string.sin_partidos)
                     b.spFixture.adapter = null
-                    b.tvFixtureInfo.text = ""
                     actualizarTorneo()
                     actualizarSectores()
                     actualizarContadores()
@@ -224,14 +223,10 @@ class VentaFragment : Fragment() {
                         android.R.layout.simple_spinner_dropdown_item,
                         fixtures,
                     )
-                    val f = fixtures[0]
-                    b.tvFixtureInfo.text = "vs ${f.rival} · $${f.precio}"
                     b.spFixture.visibility = if (fixtures.size == 1) View.GONE else View.VISIBLE
                     b.tvStatus.text = ""
                     b.spFixture.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
                         override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                            val fx = fixtures[pos]
-                            b.tvFixtureInfo.text = "vs ${fx.rival} · $${fx.precio}"
                             refreshTotal()
                             actualizarTorneo()
                             actualizarSectores()

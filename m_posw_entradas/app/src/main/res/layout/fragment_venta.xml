@@ -34,23 +34,10 @@
             android:textStyle="bold"
             android:textAppearance="?attr/textAppearanceTitleLarge" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Partido"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
-
         <Spinner android:id="@+id/spFixture"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_marginTop="8dp" />
-
-        <TextView android:id="@+id/tvFixtureInfo"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
+            android:layout_marginTop="20dp" />
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/tgSector"
