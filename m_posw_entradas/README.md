@@ -21,12 +21,20 @@ Contrato válido: `docs/contrato-pos-entradas.txt` del repo principal.
 - Sin papel: la venta queda en Room (`approved_sales`) y se reimprime con “Reimprimir última”.
 
 ## Build
+Requiere **Java 17** (Gradle 8.7 no corre en Java 26 ni en Java 8) y Android SDK con
+plataforma 34. El wrapper (`gradlew` + `gradle/wrapper/gradle-wrapper.jar`) viene
+commiteado: no hace falta instalar Gradle.
 ```bash
 cd m_posw_entradas
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk   # o donde esté tu JDK 17
+export ANDROID_HOME=/opt/android-sdk            # o creá local.properties con sdk.dir=
 ./gradlew :app:assembleDebug
 # o desde Android Studio: Open → m_posw_entradas
 ```
-Requiere Android SDK 34, Kotlin 1.9.24. Probado en Sunmi V2s (minSdk 25).
+El APK sale en `app/build/outputs/apk/debug/`. Probado en Sunmi V2s
+(Android 11, minSdk 25). La impresión usa la API AIDL
+`com.sunmi.peripheral.printer.*` del `printerlibrary:1.0.15` (ese AAR no trae
+`SunmiPrintHelper`; no intentar usarlo).
 
 ## Checklist primera prueba
 - [ ] GET vigentes con token responde por HTTPS

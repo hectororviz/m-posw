@@ -16,3 +16,9 @@ m_posw_android/pubspec.lock
 *.apk
 frontend/dist/app.apk
 frontend/public/app.apk
+
+# App nativa Android (m_posw_entradas)
+m_posw_entradas/.gradle/
+m_posw_entradas/build/
+m_posw_entradas/app/build/
+m_posw_entradas/local.properties
