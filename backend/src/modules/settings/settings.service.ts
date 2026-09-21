@@ -188,9 +188,9 @@ export class SettingsService {
       });
     }
 
-    // El branding (accentColor/clubName) viaja en GET /entradas/ticket-assets/escudo,
+    // El branding (accentColor/clubName/logoUrl) viaja en GET /entradas/ticket-assets/escudo,
     // cacheado por version en el POS: si cambió, forzar re-descarga.
-    if (dto.accentColor !== undefined || dto.clubName !== undefined) {
+    if (dto.accentColor !== undefined || dto.clubName !== undefined || dto.logoUrl !== undefined) {
       await this.prisma.entradaTicketAsset.updateMany({
         where: { id: 'escudo' },
         data: { version: { increment: 1 } },

@@ -53,6 +53,25 @@ class SessionManager(context: Context) {
         get() = prefs.getString("clubName", "") ?: ""
         set(v) = prefs.edit().putString("clubName", v.trim()).apply()
 
+    var logoPath: String
+        get() = prefs.getString("logoPath", "") ?: ""
+        set(v) = prefs.edit().putString("logoPath", v.trim()).apply()
+
+    var logoCacheVersion: Int
+        get() = prefs.getInt("logoCacheVersion", -1)
+        set(v) = prefs.edit().putInt("logoCacheVersion", v).apply()
+
+    /** Origen https sin el /api final, para resolver uploads relativos. */
+    fun apiRoot(): String = baseUrl.removeSuffix("api/")
+
+    /** URL absoluta del logo del sistema, o null si no hay. */
+    fun logoAbsoluteUrl(): String? {
+        val p = logoPath.trim()
+        if (p.isBlank()) return null
+        if (p.startsWith("http")) return p
+        return apiRoot() + p.trimStart('/')
+    }
+
     fun clearToken() {
         prefs.edit().remove("token").apply()
     }

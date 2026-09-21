@@ -341,7 +341,7 @@ export class EntradasAdminService {
   async getEscudo() {
     const [row, branding] = await Promise.all([
       this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } }),
-      this.prisma.setting.findFirst({ select: { accentColor: true, clubName: true } }),
+      this.prisma.setting.findFirst({ select: { accentColor: true, clubName: true, logoUrl: true } }),
     ]);
     const asset = row
       ?? await this.prisma.entradaTicketAsset.create({ data: { id: 'escudo', version: 1, widthPx: 256 } });
@@ -349,6 +349,7 @@ export class EntradasAdminService {
       ...asset,
       accentColor: branding?.accentColor ?? '#0ea5e9',
       clubName: branding?.clubName ?? '',
+      logoUrl: branding?.logoUrl ?? null,
     };
   }
 

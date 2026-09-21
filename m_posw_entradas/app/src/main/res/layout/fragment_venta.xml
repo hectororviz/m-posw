@@ -30,8 +30,9 @@
                 <ImageView android:id="@+id/ivEscudo"
                     android:layout_width="64dp"
                     android:layout_height="64dp"
+                    android:scaleType="centerCrop"
                     android:src="@drawable/ic_shield"
-                    android:contentDescription="Escudo del club" />
+                    android:contentDescription="Logo del club" />
 
                 <LinearLayout
                     android:orientation="vertical"

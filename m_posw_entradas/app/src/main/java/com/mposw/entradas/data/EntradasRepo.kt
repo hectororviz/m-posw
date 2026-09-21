@@ -40,6 +40,7 @@ class EntradasRepo(private val session: SessionManager) {
             session.logoVersion = e.version
             session.brandColor = e.accentColor ?: ""
             session.clubName = e.clubName ?: ""
+            session.logoPath = e.logoUrl ?: ""
         }
     }
 
@@ -52,6 +53,7 @@ class EntradasRepo(private val session: SessionManager) {
         session.logoVersion = e.version
         session.brandColor = e.accentColor ?: ""
         session.clubName = e.clubName ?: ""
+        session.logoPath = e.logoUrl ?: ""
     }
 
     suspend fun downloadBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {

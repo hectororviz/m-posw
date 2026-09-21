@@ -94,7 +94,12 @@ Provisioning (una vez, online):
 
 3.6 GET /entradas/ticket-assets/escudo
   {"id":"escudo","version":3,"pngBase64":"iVBOR...","widthPx":256,
-   "accentColor":"#0ea5e9","clubName":"Club Ejemplo"}
+   "accentColor":"#0ea5e9","clubName":"Club Ejemplo",
+   "logoUrl":"/uploads/settings/xxx.webp (o null)"}
+  logoUrl = logo del sistema (Setting.logoUrl, a color) SOLO para mostrar
+  en pantalla del POS (header). Si es relativo, resolver contra el origen:
+  baseUrl sin el "/api" final + path. La impresora termica sigue usando
+  pngBase64 (1-bit). Cambiar logoUrl tambien incrementa version.
   (<20KB, PNG monocromatico 1-bit listo para sunmi_printer_plus.
   Cachear por version, JAMAS pedirlo por venta.
   accentColor = color de personalizacion de la app principal

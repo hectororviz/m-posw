@@ -79,10 +79,27 @@ class VentaFragment : Fragment() {
         b.tgSector.check(if (sector == "LOCAL") b.btnLocal.id else b.btnVisitante.id)
     }
 
-    private fun bindHeader() {
-        val bmp = SunmiPrinter.escudoBitmap(session.escudoBase64)
-        if (bmp != null) b.ivEscudo.setImageBitmap(bmp)
+    private fun clubLogoFile() = java.io.File(requireContext().filesDir, "club_logo.png")
+
+    private fun showFallbackLogo(oneBit: android.graphics.Bitmap?) {
+        if (oneBit != null) b.ivEscudo.setImageBitmap(oneBit)
         else b.ivEscudo.setImageResource(com.mposw.entradas.R.drawable.ic_shield)
+    }
+
+    private fun bindHeader() {
+        // Prioridad: 1) logo del sistema (a color) 2) escudo 1-bit 3) placeholder
+        val oneBit = SunmiPrinter.escudoBitmap(session.escudoBase64)
+        val logoFile = clubLogoFile()
+        val logoUrl = session.logoAbsoluteUrl()
+        if (logoUrl != null && (session.logoCacheVersion != session.logoVersion || !logoFile.exists())) {
+            showFallbackLogo(oneBit)
+            lifecycleScope.launch { refreshClubLogo(logoFile, logoUrl, oneBit) }
+        } else if (logoUrl != null && logoFile.exists()) {
+            val bmp = android.graphics.BitmapFactory.decodeFile(logoFile.absolutePath)
+            if (bmp != null) b.ivEscudo.setImageBitmap(bmp) else showFallbackLogo(oneBit)
+        } else {
+            showFallbackLogo(oneBit)
+        }
         b.tvClub.text = session.clubName.ifBlank { "Entradas" }
         val fmt = java.text.SimpleDateFormat("EEE dd/MM · HH:mm", java.util.Locale("es", "AR"))
         b.tvFechaHora.text = fmt.format(java.util.Date())
@@ -92,6 +109,31 @@ class VentaFragment : Fragment() {
             listOf(b.tvClub, b.tvFechaHora),
             listOf(b.btnCash, b.btnQr),
         )
+    }
+
+    private suspend fun refreshClubLogo(
+        file: java.io.File,
+        url: String,
+        fallback: android.graphics.Bitmap?,
+    ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val bmp = repo.downloadBitmap(url)
+            if (bmp != null) {
+                java.io.FileOutputStream(file).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                session.logoCacheVersion = session.logoVersion
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    _b?.ivEscudo?.setImageBitmap(bmp)
+                }
+            } else {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    _b?.let { showFallbackLogo(fallback) }
+                }
+            }
+        } catch (_: Exception) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                _b?.let { showFallbackLogo(fallback) }
+            }
+        }
     }
 
     override fun onResume() {
