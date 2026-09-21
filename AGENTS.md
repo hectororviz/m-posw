@@ -1128,7 +1128,7 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 - `Setting.enableEntradasModule` (default `false`): toggle en Configuración → Módulos + sidebar condicionado + `assertModuleEnabled()` en device service.
 
 ### Frontend
-`frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Configuración` (subnav `treasury-subnav-link`). Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
+`frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Diseño | Configuración` (subnav `treasury-subnav-link`). Tab Diseño con editor de bloques + preview en vivo (datos ejemplo, 32 cols, escudo real) y upload de escudo 1-bit. Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`, `useEntradasMpPos`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
 
 ### Límites conocidos (v1)
 - Una sola orden QR activa por POS de MP: con el POS dedicado, web y terminal usan cada uno el suyo y no se pisan. Con N terminales concurrentes se necesita 1 POS MP por terminal.

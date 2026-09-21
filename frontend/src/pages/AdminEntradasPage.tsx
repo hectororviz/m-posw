@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, MonitorSmartphone, Plus, RefreshCw, Ticket, Trash2, Upload, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import {
-  useEntradaEscudoInfo,
   useEntradaFixtures,
   useEntradaRivales,
   useEntradaTicketTemplate,
@@ -18,12 +17,13 @@ import type { EntradaFixture, EntradaSaleStatus, MpDetectedStore, PosDeviceCreat
 import { useToast } from '../components/ToastProvider';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 
-type TabId = 'ventas' | 'calendario' | 'abm' | 'config';
+type TabId = 'ventas' | 'calendario' | 'abm' | 'diseno' | 'config';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'ventas', label: 'Ventas' },
   { id: 'calendario', label: 'Calendario' },
   { id: 'abm', label: 'ABM' },
+  { id: 'diseno', label: 'Diseño' },
   { id: 'config', label: 'Configuración' },
 ];
 
@@ -63,6 +63,7 @@ export const AdminEntradasPage: React.FC = () => {
         {tab === 'ventas' && <VentasTab canWrite={canWrite} />}
         {tab === 'calendario' && <CalendarioTab canWrite={canWrite} />}
         {tab === 'abm' && <AbmTab canWrite={canWrite} />}
+        {tab === 'diseno' && <DisenoTab canWrite={canWrite} />}
         {tab === 'config' && <ConfigTab canWrite={canWrite} />}
       </div>
     </div>
@@ -455,31 +456,88 @@ const MpPosSection: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   );
 };
 
-// ── Configuración ────────────────────────────────────────────
-const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
+// ── Diseño (editor + preview en vivo) ──────────────────────────
+const PREVIEW_SAMPLE: Record<string, string> = {
+  club: 'Club Atlético Soler',
+  torneo: 'Femenino',
+  rival: 'Mundialito',
+  fecha: '25/09 21:00',
+  sector: 'LOCAL',
+  codigo: 'L-013',
+  codigos: 'L-013',
+  precioUnit: '1500.00',
+  cantidad: '1',
+  total: '1500.00',
+  descuento: '0',
+  subtotal: '1500.00',
+  ventaId: 'abc-123',
+  fechaPago: '25/09 20:58',
+  footer: 'Ticket no fiscal',
+  escudo: '',
+};
+
+const substituteVars = (value: string) =>
+  value.replace(/\{\{(\w+)\}\}/g, (_, key: string) => PREVIEW_SAMPLE[key] ?? `{{${key}}}`);
+
+const PREVIEW_FONT_SIZE: Record<string, number> = { S: 11, M: 14, L: 18, XL: 26 };
+
+const TicketPreview: React.FC<{ elements: Array<Record<string, unknown>>; escudoBase64: string | null }> = ({ elements, escudoBase64 }) => (
+  <div style={{ background: '#fff', color: '#000', width: 300, padding: '12px 10px', fontFamily: 'monospace, monospace', borderRadius: 4, boxShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
+    {elements.filter((el) => el.enabled !== false).map((el, i) => {
+      const type = String(el.type ?? '');
+      const align = (['left', 'center', 'right'] as const).includes(el.align as never) ? String(el.align) : 'center';
+      if (type === 'line') return <hr key={i} style={{ border: 'none', borderTop: '1px dashed #000', margin: '6px 0' }} />;
+      if (type === 'spacer') return <div key={i} style={{ height: 10 }} />;
+      if (type === 'logo') {
+        return (
+          <div key={i} style={{ textAlign: align as never, margin: '4px 0' }}>
+            {escudoBase64 ? (
+              <img src={`data:image/png;base64,${escudoBase64}`} alt="Escudo" style={{ width: 120, imageRendering: 'pixelated' }} />
+            ) : (
+              <div style={{ border: '1px dashed #888', color: '#888', fontSize: 11, padding: 10 }}>ESCUDO (sin imagen)</div>
+            )}
+          </div>
+        );
+      }
+      if (type === 'qr') {
+        const value = substituteVars(String(el.value ?? ''));
+        return (
+          <div key={i} style={{ textAlign: align as never, margin: '6px 0' }}>
+            <div style={{ display: 'inline-block', border: '2px solid #000', padding: 6, fontSize: 10, lineHeight: 1.4 }}>
+              ▓▓░▓<br />░▓▓░<br />▓░▓▓
+              <div style={{ marginTop: 4 }}>{value || 'QR'}</div>
+            </div>
+          </div>
+        );
+      }
+      const size = PREVIEW_FONT_SIZE[String(el.size ?? 'M')] ?? 14;
+      return (
+        <div key={i} style={{ textAlign: align as never, fontSize: size, fontWeight: el.bold ? 'bold' : 'normal', margin: '2px 0', wordBreak: 'break-word' }}>
+          {substituteVars(String(el.value ?? ''))}
+        </div>
+      );
+    })}
+  </div>
+);
+
+const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const { pushToast } = useToast();
   const invalidate = useInvalidateEntradas();
-  const { data: devices } = usePosDevices();
+  const queryClient = useQueryClient();
   const { data: template } = useEntradaTicketTemplate();
-  const { data: escudo } = useEntradaEscudoInfo();
-  const [deviceName, setDeviceName] = useState('');
-  const [newToken, setNewToken] = useState<PosDeviceCreated | null>(null);
   const [elements, setElements] = useState<Array<Record<string, unknown>> | null>(null);
   const [escudoWidth, setEscudoWidth] = useState('256');
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
 
   const currentElements = elements ?? (template?.layout.elements as Array<Record<string, unknown>> | undefined) ?? [];
 
-  const createDevice = async () => {
-    if (!deviceName.trim()) { pushToast('Nombre del dispositivo requerido', 'error'); return; }
-    try {
-      const baseUrl = `${window.location.origin}/api`;
-      const res = await apiClient.post<PosDeviceCreated>('/entradas/devices', { nombre: deviceName.trim(), baseUrl });
-      setNewToken(res.data);
-      setDeviceName('');
-      invalidate();
-    } catch (e) { err(e); }
-  };
+  const { data: escudoFull } = useQuery({
+    queryKey: ['entradas-escudo-full'],
+    queryFn: async () => {
+      const res = await apiClient.get<{ version: number; widthPx: number; pngBase64: string | null }>('/entradas/ticket-assets/escudo');
+      return res.data;
+    },
+  });
 
   const saveTemplate = async () => {
     try {
@@ -506,6 +564,112 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
       fd.append('widthPx', escudoWidth);
       await apiClient.post('/entradas/ticket-assets/escudo', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       pushToast('Escudo actualizado', 'success');
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['entradas-escudo-full'] });
+      queryClient.invalidateQueries({ queryKey: ['entradas-escudo'] });
+    } catch (e) { err(e); }
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gap: '1.5rem' }}>
+        <section>
+          <h3><Ticket size={16} /> Diseño del ticket (32 columnas)</h3>
+          <p><small>Variables: {'{{club}} {{torneo}} {{rival}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}}'}</small></p>
+          {currentElements.map((el, i) => (
+            <div key={i} className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', flexWrap: 'wrap' }}>
+              <strong style={{ minWidth: 60 }}>{String(el.type ?? '?')}</strong>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <input type="checkbox" checked={el.enabled !== false} disabled={!canWrite}
+                  onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], enabled: e.target.checked }; setElements(n); }} /> on
+              </label>
+              {typeof el.value === 'string' && (
+                <div style={{ flex: 1, minWidth: 200 }}><label>Texto</label>
+                  <input value={el.value} disabled={!canWrite}
+                    onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], value: e.target.value }; setElements(n); }} />
+                </div>
+              )}
+              {el.type === 'text' && (
+                <>
+                  <div><label>Tamaño</label>
+                    <select value={String(el.size ?? 'M')} disabled={!canWrite}
+                      onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], size: e.target.value }; setElements(n); }}>
+                      {['S', 'M', 'L', 'XL'].map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div><label>Alineación</label>
+                    <select value={String(el.align ?? 'center')} disabled={!canWrite}
+                      onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], align: e.target.value }; setElements(n); }}>
+                      {['left', 'center', 'right'].map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input type="checkbox" checked={el.bold === true} disabled={!canWrite}
+                      onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], bold: e.target.checked }; setElements(n); }} /> Negrita
+                  </label>
+                </>
+              )}
+              {canWrite && (
+                <>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, -1)}><ArrowUp size={12} /></button>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, 1)}><ArrowDown size={12} /></button>
+                  <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(currentElements.filter((_, j) => j !== i))}><X size={12} /></button>
+                </>
+              )}
+            </div>
+          ))}
+          {canWrite && (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn-primary btn-sm" onClick={saveTemplate}>Guardar diseño (v{(template?.version ?? 1) + (elements ? 1 : 0)})</button>
+              <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(null)}>Descartar cambios</button>
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h3><Upload size={16} /> Escudo del club (monocromático)</h3>
+          <p><small>Versión actual: v{escudoFull?.version ?? 1} · {escudoFull?.pngBase64 ? `imagen cargada (${escudoFull.widthPx}px)` : 'sin imagen'} · El POS la descarga una sola vez.</small></p>
+          {canWrite && (
+            <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
+              <div><label>Ancho (px)</label>
+                <select value={escudoWidth} onChange={(e) => setEscudoWidth(e.target.value)}>
+                  <option value="256">256 (58mm)</option>
+                  <option value="384">384 (80mm)</option>
+                </select>
+              </div>
+              <div><label>PNG (se convierte a 1-bit)</label>
+                <input type="file" accept="image/png,image/jpeg" onChange={(e) => uploadEscudo(e.target.files?.[0])} />
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <div style={{ position: 'sticky', top: 12 }}>
+        <h3>Vista previa</h3>
+        <p><small>Datos de ejemplo · aprox. 32 columnas{elements ? ' · con cambios sin guardar' : ''}</small></p>
+        <TicketPreview elements={currentElements} escudoBase64={escudoFull?.pngBase64 ?? null} />
+      </div>
+    </div>
+  );
+};
+
+// ── Configuración ────────────────────────────────────────────
+const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
+  const { pushToast } = useToast();
+  const invalidate = useInvalidateEntradas();
+  const { data: devices } = usePosDevices();
+  const [deviceName, setDeviceName] = useState('');
+  const [newToken, setNewToken] = useState<PosDeviceCreated | null>(null);
+  const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
+
+  const createDevice = async () => {
+    if (!deviceName.trim()) { pushToast('Nombre del dispositivo requerido', 'error'); return; }
+    try {
+      const baseUrl = `${window.location.origin}/api`;
+      const res = await apiClient.post<PosDeviceCreated>('/entradas/devices', { nombre: deviceName.trim(), baseUrl });
+      setNewToken(res.data);
+      setDeviceName('');
       invalidate();
     } catch (e) { err(e); }
   };
@@ -554,77 +718,6 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
             ))}
           </tbody>
         </table>
-      </section>
-
-      <section>
-        <h3><Ticket size={16} /> Diseño del ticket (32 columnas)</h3>
-        <p><small>Variables: {'{{club}} {{torneo}} {{rival}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}}'}</small></p>
-        {currentElements.map((el, i) => (
-          <div key={i} className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', flexWrap: 'wrap' }}>
-            <strong style={{ minWidth: 60 }}>{String(el.type ?? '?')}</strong>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="checkbox" checked={el.enabled !== false} disabled={!canWrite}
-                onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], enabled: e.target.checked }; setElements(n); }} /> on
-            </label>
-            {typeof el.value === 'string' && (
-              <div style={{ flex: 1, minWidth: 200 }}><label>Texto</label>
-                <input value={el.value} disabled={!canWrite}
-                  onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], value: e.target.value }; setElements(n); }} />
-              </div>
-            )}
-            {el.type === 'text' && (
-              <>
-                <div><label>Tamaño</label>
-                  <select value={String(el.size ?? 'M')} disabled={!canWrite}
-                    onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], size: e.target.value }; setElements(n); }}>
-                    {['S', 'M', 'L', 'XL'].map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div><label>Alineación</label>
-                  <select value={String(el.align ?? 'center')} disabled={!canWrite}
-                    onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], align: e.target.value }; setElements(n); }}>
-                    {['left', 'center', 'right'].map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input type="checkbox" checked={el.bold === true} disabled={!canWrite}
-                    onChange={(e) => { const n = [...currentElements]; n[i] = { ...n[i], bold: e.target.checked }; setElements(n); }} /> Negrita
-                </label>
-              </>
-            )}
-            {canWrite && (
-              <>
-                <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, -1)}><ArrowUp size={12} /></button>
-                <button type="button" className="btn-secondary btn-sm" onClick={() => moveEl(i, 1)}><ArrowDown size={12} /></button>
-                <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(currentElements.filter((_, j) => j !== i))}><X size={12} /></button>
-              </>
-            )}
-          </div>
-        ))}
-        {canWrite && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="button" className="btn-primary btn-sm" onClick={saveTemplate}>Guardar diseño (v{(template?.version ?? 1) + (elements ? 1 : 0)})</button>
-            <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(null)}>Descartar cambios</button>
-          </div>
-        )}
-      </section>
-
-      <section>
-        <h3><Upload size={16} /> Escudo del club (monocromático)</h3>
-        <p><small>Versión actual: v{escudo?.version ?? 1} · {escudo?.hasImage ? `imagen cargada (${escudo.widthPx}px)` : 'sin imagen'} · El POS la descarga una sola vez.</small></p>
-        {canWrite && (
-          <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end' }}>
-            <div><label>Ancho (px)</label>
-              <select value={escudoWidth} onChange={(e) => setEscudoWidth(e.target.value)}>
-                <option value="256">256 (58mm)</option>
-                <option value="384">384 (80mm)</option>
-              </select>
-            </div>
-            <div><label>PNG (se convierte a 1-bit)</label>
-              <input type="file" accept="image/png,image/jpeg" onChange={(e) => uploadEscudo(e.target.files?.[0])} />
-            </div>
-          </div>
-        )}
       </section>
     </div>
   );
