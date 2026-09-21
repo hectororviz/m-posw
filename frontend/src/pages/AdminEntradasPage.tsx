@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, MonitorSmartphone, Plus, RefreshCw, Ticket, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, MonitorSmartphone, Pencil, Plus, RefreshCw, Ticket, Trash2, Upload, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import {
   useEntradaFixtures,
@@ -85,29 +85,28 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
   );
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <div className="settings-field" style={{ minWidth: 280, margin: 0 }}>
-          <label>Partido</label>
-          <select value={fixtureId} onChange={(e) => setFixtureId(e.target.value)}>
-            <option value="">Todos (últimas 500)</option>
-            {options.map((f) => (
-              <option key={f.id} value={f.id}>
-                {fmtFecha(f.fecha)} · {f.torneo.nombre} vs {f.rival.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="settings-field" style={{ minWidth: 160, margin: 0 }}>
-          <label>Estado</label>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">Todos</option>
-            {['APPROVED', 'PENDING', 'REJECTED', 'EXPIRED', 'CANCELLED'].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
+    <div className="admin-page">
+      <div className="admin-page-header">
+        <h2>Ventas</h2>
       </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+        <select value={fixtureId} onChange={(e) => setFixtureId(e.target.value)} style={{ minWidth: 260 }}>
+          <option value="">Partido: todos (últimas 500)</option>
+          {options.map((f) => (
+            <option key={f.id} value={f.id}>
+              {fmtFecha(f.fecha)} · {f.torneo.nombre} vs {f.rival.nombre}
+            </option>
+          ))}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">Estado: todos</option>
+          {['APPROVED', 'PENDING', 'REJECTED', 'EXPIRED', 'CANCELLED'].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+
       {summary && fixtureId && (
         <div className="stats-grid" style={{ marginBottom: '1rem' }}>
           <div className="stat-card"><span className="stat-label">Local</span><span className="stat-value">{summary.local}</span></div>
@@ -115,30 +114,43 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
           <div className="stat-card"><span className="stat-label">Recaudado</span><span className="stat-value">${summary.recaudado}</span></div>
         </div>
       )}
-      {isLoading ? <div className="spinner" /> : (
-        <table className="sales-table">
-          <thead>
-            <tr><th>Fecha</th><th>Partido</th><th>Sector</th><th>Cant</th><th>Códigos</th><th>Total</th><th>Estado</th><th>POS</th></tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={8} style={{ textAlign: 'center', opacity: 0.6 }}>Sin ventas para este filtro</td></tr>
-            )}
-            {rows.map((s) => (
-              <tr key={s.id}>
-                <td style={{ whiteSpace: 'nowrap' }}>{fmtDateTime(s.createdAt)}</td>
-                <td>{s.fixture.torneo.nombre} vs {s.fixture.rival.nombre}</td>
-                <td>{s.sector}</td>
-                <td style={{ textAlign: 'center' }}>{s.cantidad}</td>
-                <td style={{ fontFamily: 'monospace' }}>{s.units.map((u) => u.codigo).join(', ')}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>${s.total}</td>
-                <td><StatusBadge status={s.status} /></td>
-                <td>{s.device.nombre}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+
+      <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
+        <div className="sales-table">
+          <div className="sales-table-head">
+            <span className="col-date" style={{ flex: '0 0 130px' }}>Fecha</span>
+            <span className="col-user" style={{ flex: 2 }}>Partido</span>
+            <span className="col-method" style={{ flex: '0 0 90px' }}>Sector</span>
+            <span className="col-num" style={{ flex: '0 0 50px' }}>Cant</span>
+            <span className="col-user" style={{ flex: 2 }}>Códigos</span>
+            <span className="col-total" style={{ flex: '0 0 100px' }}>Total</span>
+            <span className="col-method" style={{ flex: '0 0 100px' }}>Estado</span>
+            <span className="col-user" style={{ flex: '0 0 130px' }}>POS</span>
+          </div>
+          {isLoading ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Cargando...</span></div>
+          ) : rows.length === 0 ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin ventas para este filtro</span></div>
+          ) : (
+            rows.map((s) => (
+              <div key={s.id} className="sales-table-row">
+                <span className="col-date" style={{ flex: '0 0 130px' }}>{fmtDateTime(s.createdAt)}</span>
+                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{s.fixture.torneo.nombre} vs {s.fixture.rival.nombre}</span>
+                <span className="col-method" style={{ flex: '0 0 90px' }}>{s.sector}</span>
+                <span className="col-num" style={{ flex: '0 0 50px', textAlign: 'center' }}>{s.cantidad}</span>
+                <span className="col-user" style={{ flex: 2, fontFamily: 'monospace', fontSize: '0.8rem' }}>{s.units.map((u) => u.codigo).join(', ')}</span>
+                <span className="col-total" style={{ flex: '0 0 100px' }}>${s.total}</span>
+                <span className="col-method" style={{ flex: '0 0 100px' }}><StatusBadge status={s.status} /></span>
+                <span className="col-user" style={{ flex: '0 0 130px' }}>{s.device.nombre}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+        <span>Mostrando {rows.length} ventas</span>
+      </div>
     </div>
   );
 };
@@ -247,86 +259,110 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   };
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
+    <div className="admin-page">
+      <div className="admin-page-header">
+        <h2>Calendario</h2>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
-      {isLoading ? <div className="spinner" /> : (
-        <table className="sales-table">
-          <thead><tr><th>Fecha</th><th>Torneo</th><th>Rival</th><th>Horario</th><th>Estado</th>{canWrite && <th />}</tr></thead>
-          <tbody>
-            {ordenados.length === 0 && (
-              <tr><td colSpan={canWrite ? 6 : 5} style={{ textAlign: 'center', opacity: 0.6 }}>Sin partidos este mes</td></tr>
-            )}
-            {ordenados.map((f) => {
+
+      <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
+        <div className="sales-table">
+          <div className="sales-table-head">
+            <span className="col-date" style={{ flex: '0 0 130px' }}>Fecha</span>
+            <span className="col-user" style={{ flex: 1 }}>Torneo</span>
+            <span className="col-user" style={{ flex: 1 }}>Rival</span>
+            <span className="col-date" style={{ flex: '0 0 150px' }}>Horario</span>
+            <span className="col-method" style={{ flex: '0 0 110px' }}>Estado</span>
+            {canWrite && <span className="col-action" style={{ flex: '0 0 120px', textAlign: 'right' }}></span>}
+          </div>
+          {isLoading ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Cargando...</span></div>
+          ) : ordenados.length === 0 ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin partidos este mes</span></div>
+          ) : (
+            ordenados.map((f) => {
               const estado = fixtureEstado(f, now);
               const jugado = estado === 'JUGADO';
               return (
-                <tr key={f.id} style={jugado ? { opacity: 0.55 } : undefined}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{fmtFecha(f.fecha)}</td>
-                  <td>{f.torneo.nombre} <small style={{ opacity: 0.7 }}>(${f.torneo.precio})</small></td>
-                  <td>{f.rival.nombre}</td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{fmtHora(f.ventanaDesde)} → {fmtHora(f.ventanaHasta)}</td>
-                  <td><FixtureBadge estado={estado} /></td>
+                <div key={f.id} className="sales-table-row" style={jugado ? { opacity: 0.55 } : undefined}>
+                  <span className="col-date" style={{ flex: '0 0 130px' }}>{fmtFecha(f.fecha)}</span>
+                  <span className="col-user" style={{ flex: 1, fontWeight: 500 }}>{f.torneo.nombre} <small style={{ color: 'var(--color-text-muted)' }}>(${f.torneo.precio})</small></span>
+                  <span className="col-user" style={{ flex: 1 }}>{f.rival.nombre}</span>
+                  <span className="col-date" style={{ flex: '0 0 150px' }}>{fmtHora(f.ventanaDesde)} → {fmtHora(f.ventanaHasta)}</span>
+                  <span className="col-method" style={{ flex: '0 0 110px' }}><FixtureBadge estado={estado} /></span>
                   {canWrite && (
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      <button type="button" className="btn-secondary btn-sm" disabled={jugado} onClick={() => openEdit(f)}>Editar</button>{' '}
-                      <button type="button" className="btn-secondary btn-sm" disabled={jugado} onClick={() => toggleActive(f)}>{f.activo ? 'Desactivar' : 'Activar'}</button>
-                    </td>
+                    <span className="col-action" style={{ flex: '0 0 120px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                      <button className="btn-ghost" disabled={jugado} onClick={() => openEdit(f)} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
+                      <button className="btn-ghost" disabled={jugado} onClick={() => toggleActive(f)} title={f.activo ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>{f.activo ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                    </span>
                   )}
-                </tr>
+                </div>
               );
-            })}
-          </tbody>
-        </table>
-      )}
+            })
+          )}
+        </div>
+      </div>
+
+      <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
+        <span>Mostrando {ordenados.length} partidos</span>
+      </div>
+
       {canWrite && (
         <button type="button" className="fab-button-v2" onClick={() => setShowCreate(true)} aria-label="Nuevo partido" title="Nuevo partido">
           <Plus size={24} />
         </button>
       )}
       {showCreate && canWrite && (
-        <div className="ligas-modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ligas-modal-header"><strong>Nuevo partido</strong>
-              <button type="button" className="ligas-modal-close" onClick={() => setShowCreate(false)}><X size={16} /></button>
+        <div className="modal-backdrop" onClick={() => setShowCreate(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>Nuevo partido</h3>
+              <button className="icon-button" onClick={() => setShowCreate(false)}><X size={16} /></button>
             </div>
-            <div className="ligas-modal-body">
-              <div className="settings-field"><label>Fecha</label>
-                <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="settings-field"><label>Fecha</label>
+                  <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+                </div>
+                <div className="settings-field"><label>Torneo</label>
+                  <select value={form.torneoId} onChange={(e) => setForm({ ...form, torneoId: e.target.value })}>
+                    <option value="">Seleccionar</option>
+                    {(torneos ?? []).filter((t) => t.activo).map((t) => <option key={t.id} value={t.id}>{t.nombre} (${t.precio})</option>)}
+                  </select>
+                </div>
+                <div className="settings-field"><label>Rival</label>
+                  <select value={form.rivalId} onChange={(e) => setForm({ ...form, rivalId: e.target.value })}>
+                    <option value="">Seleccionar</option>
+                    {(rivales ?? []).filter((r) => r.activo).map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                  </select>
+                </div>
+                <button type="button" className="btn-primary btn-sm" onClick={submitCreate}>Guardar</button>
               </div>
-              <div className="settings-field"><label>Torneo</label>
-                <select value={form.torneoId} onChange={(e) => setForm({ ...form, torneoId: e.target.value })}>
-                  <option value="">Seleccionar</option>
-                  {(torneos ?? []).filter((t) => t.activo).map((t) => <option key={t.id} value={t.id}>{t.nombre} (${t.precio})</option>)}
-                </select>
-              </div>
-              <div className="settings-field"><label>Rival</label>
-                <select value={form.rivalId} onChange={(e) => setForm({ ...form, rivalId: e.target.value })}>
-                  <option value="">Seleccionar</option>
-                  {(rivales ?? []).filter((r) => r.activo).map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                </select>
-              </div>
-              <button type="button" className="btn-primary btn-sm" onClick={submitCreate}>Guardar</button>
             </div>
           </div>
         </div>
       )}
       {editing && (
-        <div className="ligas-modal-overlay" onClick={() => setEditing(null)}>
-          <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ligas-modal-header"><strong>Editar partido</strong>
-              <button type="button" className="ligas-modal-close" onClick={() => setEditing(null)}><X size={16} /></button>
+        <div className="modal-backdrop" onClick={() => setEditing(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>Editar partido</h3>
+              <button className="icon-button" onClick={() => setEditing(null)}><X size={16} /></button>
             </div>
-            <div className="ligas-modal-body">
+            <div className="modal-body">
               <p>{editing.torneo.nombre} vs {editing.rival.nombre} ({fmtFecha(editing.fecha)})</p>
-              <div className="settings-field"><label>Desde</label>
-                <input type="datetime-local" value={ventana.desde} onChange={(e) => setVentana({ ...ventana, desde: e.target.value })} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.75rem' }}>
+                <div className="settings-field"><label>Desde</label>
+                  <input type="datetime-local" value={ventana.desde} onChange={(e) => setVentana({ ...ventana, desde: e.target.value })} />
+                </div>
+                <div className="settings-field"><label>Hasta</label>
+                  <input type="datetime-local" value={ventana.hasta} onChange={(e) => setVentana({ ...ventana, hasta: e.target.value })} />
+                </div>
+                <button type="button" className="btn-primary btn-sm" onClick={submitEdit}>Guardar</button>
               </div>
-              <div className="settings-field"><label>Hasta</label>
-                <input type="datetime-local" value={ventana.hasta} onChange={(e) => setVentana({ ...ventana, hasta: e.target.value })} />
-              </div>
-              <button type="button" className="btn-primary btn-sm" onClick={submitEdit}>Guardar</button>
             </div>
           </div>
         </div>
@@ -399,96 +435,116 @@ const AbmTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   };
 
   return (
-    <div style={{ display: 'grid', gap: '1.5rem' }}>
-      <section>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+    <div className="admin-page">
+      <div className="admin-page-header">
+        <h2>Torneos y rivales</h2>
+      </div>
+
+      <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0 }}>Torneos</h3>
           {canWrite && (
-            <button type="button" className="btn-primary btn-sm" onClick={() => setTorneoModal({ nombre: '', precio: '' })} aria-label="Nuevo torneo">
-              <Plus size={14} />
+            <button type="button" className="btn-ghost" onClick={() => setTorneoModal({ nombre: '', precio: '' })} style={{ fontSize: '0.8rem' }}>
+              <Plus size={14} /> Nuevo
             </button>
           )}
         </div>
-        <table className="sales-table">
-          <thead><tr><th>Nombre</th><th>Precio</th><th>Activo</th>{canWrite && <th />}</tr></thead>
-          <tbody>
-            {(torneos ?? []).length === 0 && (
-              <tr><td colSpan={canWrite ? 4 : 3} style={{ textAlign: 'center', opacity: 0.6 }}>Sin torneos</td></tr>
-            )}
-            {(torneos ?? []).map((t) => (
-              <tr key={t.id}>
-                <td>{t.nombre}</td><td style={{ whiteSpace: 'nowrap' }}>${t.precio}</td><td>{t.activo ? 'Sí' : 'No'}</td>
+        <div className="sales-table">
+          <div className="sales-table-head">
+            <span className="col-user" style={{ flex: 2 }}>Nombre</span>
+            <span className="col-total" style={{ flex: '0 0 120px' }}>Precio</span>
+            <span className="col-method" style={{ flex: '0 0 90px' }}>Activo</span>
+            {canWrite && <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>}
+          </div>
+          {(torneos ?? []).length === 0 ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin torneos</span></div>
+          ) : (
+            (torneos ?? []).map((t) => (
+              <div key={t.id} className="sales-table-row">
+                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{t.nombre}</span>
+                <span className="col-total" style={{ flex: '0 0 120px' }}>${t.precio}</span>
+                <span className="col-method" style={{ flex: '0 0 90px' }}>{t.activo ? 'Sí' : 'No'}</span>
                 {canWrite && (
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => setTorneoModal({ id: t.id, nombre: t.nombre, precio: String(t.precio) })}>Editar</button>{' '}
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => toggleTorneo(t.id, t.activo)}>{t.activo ? 'Desactivar' : 'Activar'}</button>
-                  </td>
+                  <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                    <button className="btn-ghost" onClick={() => setTorneoModal({ id: t.id, nombre: t.nombre, precio: String(t.precio) })} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
+                    <button className="btn-ghost" onClick={() => toggleTorneo(t.id, t.activo)} title={t.activo ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>{t.activo ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                  </span>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
-      <section>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0 }}>Rivales</h3>
           {canWrite && (
-            <button type="button" className="btn-primary btn-sm" onClick={() => setRivalModal({ nombre: '' })} aria-label="Nuevo rival">
-              <Plus size={14} />
+            <button type="button" className="btn-ghost" onClick={() => setRivalModal({ nombre: '' })} style={{ fontSize: '0.8rem' }}>
+              <Plus size={14} /> Nuevo
             </button>
           )}
         </div>
-        <table className="sales-table">
-          <thead><tr><th>Nombre</th><th>Activo</th>{canWrite && <th />}</tr></thead>
-          <tbody>
-            {(rivales ?? []).length === 0 && (
-              <tr><td colSpan={canWrite ? 3 : 2} style={{ textAlign: 'center', opacity: 0.6 }}>Sin rivales</td></tr>
-            )}
-            {(rivales ?? []).map((r) => (
-              <tr key={r.id}>
-                <td>{r.nombre}</td><td>{r.activo ? 'Sí' : 'No'}</td>
+        <div className="sales-table">
+          <div className="sales-table-head">
+            <span className="col-user" style={{ flex: 2 }}>Nombre</span>
+            <span className="col-method" style={{ flex: '0 0 90px' }}>Activo</span>
+            {canWrite && <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>}
+          </div>
+          {(rivales ?? []).length === 0 ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin rivales</span></div>
+          ) : (
+            (rivales ?? []).map((r) => (
+              <div key={r.id} className="sales-table-row">
+                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{r.nombre}</span>
+                <span className="col-method" style={{ flex: '0 0 90px' }}>{r.activo ? 'Sí' : 'No'}</span>
                 {canWrite && (
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => setRivalModal({ id: r.id, nombre: r.nombre })}>Editar</button>{' '}
-                    <button type="button" className="btn-secondary btn-sm" onClick={() => toggleRival(r.id, r.activo)}>{r.activo ? 'Desactivar' : 'Activar'}</button>
-                  </td>
+                  <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                    <button className="btn-ghost" onClick={() => setRivalModal({ id: r.id, nombre: r.nombre })} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
+                    <button className="btn-ghost" onClick={() => toggleRival(r.id, r.activo)} title={r.activo ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>{r.activo ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                  </span>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       {torneoModal && canWrite && (
-        <div className="ligas-modal-overlay" onClick={() => setTorneoModal(null)}>
-          <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ligas-modal-header"><strong>{torneoModal.id ? 'Editar torneo' : 'Nuevo torneo'}</strong>
-              <button type="button" className="ligas-modal-close" onClick={() => setTorneoModal(null)}><X size={16} /></button>
+        <div className="modal-backdrop" onClick={() => setTorneoModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>{torneoModal.id ? 'Editar torneo' : 'Nuevo torneo'}</h3>
+              <button className="icon-button" onClick={() => setTorneoModal(null)}><X size={16} /></button>
             </div>
-            <div className="ligas-modal-body">
-              <div className="settings-field"><label>Nombre</label>
-                <input value={torneoModal.nombre} onChange={(e) => setTorneoModal({ ...torneoModal, nombre: e.target.value })} placeholder="Femenino" />
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="settings-field"><label>Nombre</label>
+                  <input value={torneoModal.nombre} onChange={(e) => setTorneoModal({ ...torneoModal, nombre: e.target.value })} placeholder="Femenino" />
+                </div>
+                <div className="settings-field"><label>Precio de la entrada</label>
+                  <input value={torneoModal.precio} onChange={(e) => setTorneoModal({ ...torneoModal, precio: e.target.value })} placeholder="1500" inputMode="decimal" />
+                </div>
+                <button type="button" className="btn-primary btn-sm" onClick={saveTorneo}>Guardar</button>
               </div>
-              <div className="settings-field"><label>Precio de la entrada</label>
-                <input value={torneoModal.precio} onChange={(e) => setTorneoModal({ ...torneoModal, precio: e.target.value })} placeholder="1500" inputMode="decimal" />
-              </div>
-              <button type="button" className="btn-primary btn-sm" onClick={saveTorneo}>Guardar</button>
             </div>
           </div>
         </div>
       )}
       {rivalModal && canWrite && (
-        <div className="ligas-modal-overlay" onClick={() => setRivalModal(null)}>
-          <div className="ligas-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ligas-modal-header"><strong>{rivalModal.id ? 'Editar rival' : 'Nuevo rival'}</strong>
-              <button type="button" className="ligas-modal-close" onClick={() => setRivalModal(null)}><X size={16} /></button>
+        <div className="modal-backdrop" onClick={() => setRivalModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>{rivalModal.id ? 'Editar rival' : 'Nuevo rival'}</h3>
+              <button className="icon-button" onClick={() => setRivalModal(null)}><X size={16} /></button>
             </div>
-            <div className="ligas-modal-body">
-              <div className="settings-field"><label>Nombre</label>
-                <input value={rivalModal.nombre} onChange={(e) => setRivalModal({ ...rivalModal, nombre: e.target.value })} placeholder="Mundialito" />
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="settings-field"><label>Nombre</label>
+                  <input value={rivalModal.nombre} onChange={(e) => setRivalModal({ ...rivalModal, nombre: e.target.value })} placeholder="Mundialito" />
+                </div>
+                <button type="button" className="btn-primary btn-sm" onClick={saveRival}>Guardar</button>
               </div>
-              <button type="button" className="btn-primary btn-sm" onClick={saveRival}>Guardar</button>
             </div>
           </div>
         </div>
@@ -573,20 +629,26 @@ const MpPosSection: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
         </div>
       )}
       {stores && (
-        <table className="sales-table">
-          <thead><tr><th>Tienda</th><th>POS</th>{canWrite && <th />}</tr></thead>
-          <tbody>
+        <div className="sales-table-wrapper" style={{ marginTop: '0.75rem' }}>
+          <div className="sales-table">
+            <div className="sales-table-head">
+              <span className="col-user" style={{ flex: 2 }}>Tienda</span>
+              <span className="col-user" style={{ flex: 2 }}>POS</span>
+              {canWrite && <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>}
+            </div>
             {stores.flatMap((s) => s.pos.map((p) => (
-              <tr key={`${s.id}-${p.id}`}>
-                <td>{s.name} ({s.id})</td>
-                <td>{p.name} ({p.id})</td>
+              <div key={`${s.id}-${p.id}`} className="sales-table-row">
+                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{s.name} <small style={{ color: 'var(--color-text-muted)' }}>({s.id})</small></span>
+                <span className="col-user" style={{ flex: 2 }}>{p.name} <small style={{ color: 'var(--color-text-muted)' }}>({p.id})</small></span>
                 {canWrite && (
-                  <td><button type="button" className="btn-primary btn-sm" onClick={() => select(s.id, p.id)}>Usar este</button></td>
+                  <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}>
+                    <button type="button" className="btn-primary btn-sm" onClick={() => select(s.id, p.id)}>Usar este</button>
+                  </span>
                 )}
-              </tr>
+              </div>
             )))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       )}
       {showCreate && canWrite && (
         <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'end', marginTop: '0.75rem' }}>
@@ -873,32 +935,43 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
             <small>Pairing: <code style={{ wordBreak: 'break-all' }}>{JSON.stringify(newToken.pairing)}</code></small>
           </div>
         )}
-        <table className="sales-table">
-          <thead><tr><th>Nombre</th><th>Activo</th><th>Última conexión</th>{canWrite && <th />}</tr></thead>
-          <tbody>
-            {(devices ?? []).map((d) => (
-              <tr key={d.id}>
-                <td>{d.nombre}</td><td>{d.activo ? 'Sí' : 'No'}</td><td>{fmtDateTime(d.lastSeenAt)}</td>
-                {canWrite && (
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <button type="button" className="btn-secondary btn-sm" onClick={async () => {
-                      try {
-                        const baseUrl = `${window.location.origin}/api`;
-                        const res = await apiClient.post<PosDeviceCreated>(`/entradas/devices/${d.id}/rotate`, { baseUrl });
-                        setNewToken(res.data);
-                        invalidate();
-                      } catch (e) { err(e); }
-                    }}><RefreshCw size={12} /> Rotar</button>{' '}
-                    <button type="button" className="btn-secondary btn-sm" onClick={async () => {
-                      if (!confirm(`Revocar ${d.nombre}?`)) return;
-                      try { await apiClient.post(`/entradas/devices/${d.id}/revoke`); invalidate(); } catch (e) { err(e); }
-                    }}><Trash2 size={12} /></button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="sales-table-wrapper">
+          <div className="sales-table">
+            <div className="sales-table-head">
+              <span className="col-user" style={{ flex: 2 }}>Nombre</span>
+              <span className="col-method" style={{ flex: '0 0 90px' }}>Activo</span>
+              <span className="col-date" style={{ flex: '0 0 150px' }}>Última conexión</span>
+              {canWrite && <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>}
+            </div>
+            {(devices ?? []).length === 0 ? (
+              <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin dispositivos</span></div>
+            ) : (
+              (devices ?? []).map((d) => (
+                <div key={d.id} className="sales-table-row">
+                  <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{d.nombre}</span>
+                  <span className="col-method" style={{ flex: '0 0 90px' }}>{d.activo ? 'Sí' : 'No'}</span>
+                  <span className="col-date" style={{ flex: '0 0 150px' }}>{fmtDateTime(d.lastSeenAt)}</span>
+                  {canWrite && (
+                    <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                      <button className="btn-ghost" onClick={async () => {
+                        try {
+                          const baseUrl = `${window.location.origin}/api`;
+                          const res = await apiClient.post<PosDeviceCreated>(`/entradas/devices/${d.id}/rotate`, { baseUrl });
+                          setNewToken(res.data);
+                          invalidate();
+                        } catch (e) { err(e); }
+                      }} title="Rotar token" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><RefreshCw size={14} /></button>
+                      <button className="btn-ghost" onClick={async () => {
+                        if (!confirm(`Revocar ${d.nombre}?`)) return;
+                        try { await apiClient.post(`/entradas/devices/${d.id}/revoke`); invalidate(); } catch (e) { err(e); }
+                      }} title="Revocar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );
