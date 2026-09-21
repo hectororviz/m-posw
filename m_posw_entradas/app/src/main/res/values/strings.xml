@@ -16,5 +16,6 @@
     <string name="pago_aprobado">¡Pago aprobado!</string>
     <string name="aceptar">Aceptar</string>
     <string name="volver">← Volver</string>
+    <string name="vendidas">vendidas</string>
     <string name="config_desc">Configuración</string>
 </resources>

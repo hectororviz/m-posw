@@ -148,6 +148,7 @@ class VentaFragment : Fragment() {
         super.onResume()
         _b?.let {
             bindHeader()
+            actualizarTorneo()
             actualizarSectores()
             actualizarContadores()
         }
@@ -162,12 +163,18 @@ class VentaFragment : Fragment() {
     private fun actualizarContadores() {
         val f = current()
         if (f == null) {
-            b.tvContadores.text = ""
+            b.cardContadores.visibility = View.GONE
             return
         }
-        val club = session.clubName.ifBlank { "Local" }
-        val rival = f.rival.ifBlank { "Visitante" }
-        b.tvContadores.text = "$club: ${f.vendidosL} · $rival: ${f.vendidosV}"
+        b.cardContadores.visibility = View.VISIBLE
+        b.tvNomLocal.text = session.clubName.ifBlank { "Local" }
+        b.tvNumLocal.text = f.vendidosL.toString()
+        b.tvNomVisitante.text = f.rival.ifBlank { "Visitante" }
+        b.tvNumVisitante.text = f.vendidosV.toString()
+    }
+
+    private fun actualizarTorneo() {
+        b.tvTorneo.text = current()?.torneo.orEmpty()
     }
 
     private fun registrarVentaLocal(fixtureId: String, sec: String, cant: Int) {
@@ -185,11 +192,17 @@ class VentaFragment : Fragment() {
         return fixtures.getOrNull(if (pos < 0) 0 else pos)
     }
 
+    private val totalFmt =
+        java.text.NumberFormat.getNumberInstance(java.util.Locale("es", "AR")).apply {
+            minimumFractionDigits = 2
+            maximumFractionDigits = 2
+        }
+
     private fun refreshTotal() {
         val f = current()
         b.tvCantidad.text = cantidad.toString()
         val total = (f?.precioDouble ?: 0.0) * cantidad
-        b.tvTotal.text = "$${"%.2f".format(total)}"
+        b.tvTotal.text = "$${totalFmt.format(total)}"
     }
 
     private fun cargarFixtures() {
@@ -202,6 +215,7 @@ class VentaFragment : Fragment() {
                     b.tvStatus.text = getString(com.mposw.entradas.R.string.sin_partidos)
                     b.spFixture.adapter = null
                     b.tvFixtureInfo.text = ""
+                    actualizarTorneo()
                     actualizarSectores()
                     actualizarContadores()
                 } else {
@@ -211,19 +225,21 @@ class VentaFragment : Fragment() {
                         fixtures,
                     )
                     val f = fixtures[0]
-                    b.tvFixtureInfo.text = "${f.torneo} vs ${f.rival} · $${f.precio}"
+                    b.tvFixtureInfo.text = "vs ${f.rival} · $${f.precio}"
                     b.spFixture.visibility = if (fixtures.size == 1) View.GONE else View.VISIBLE
                     b.tvStatus.text = ""
                     b.spFixture.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
                         override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
                             val fx = fixtures[pos]
-                            b.tvFixtureInfo.text = "${fx.torneo} vs ${fx.rival} · $${fx.precio}"
+                            b.tvFixtureInfo.text = "vs ${fx.rival} · $${fx.precio}"
                             refreshTotal()
+                            actualizarTorneo()
                             actualizarSectores()
                             actualizarContadores()
                         }
                         override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
                     }
+                    actualizarTorneo()
                     actualizarSectores()
                     actualizarContadores()
                 }
