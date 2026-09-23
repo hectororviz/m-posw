@@ -1119,6 +1119,65 @@ export interface TicketUnit {
   codigo: string;
   nro: number;
   sector: EntradaSector;
+  beneficioId?: string | null;
+  benefitCode?: string | null;
+  beneficioPorcentaje?: string | null;
+  beneficio?: { id: string; nombre: string; usoUnico: boolean } | null;
+}
+
+export type EntradaBeneficioSector = 'LOCAL' | 'VISITANTE' | 'AMBAS';
+
+export interface EntradaBeneficio {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  sector: EntradaBeneficioSector;
+  categoriaProdId: string | null;
+  productoId: string | null;
+  internetPlanId: string | null;
+  porcentaje: string | number;
+  descuentoMaximo: string | number | null;
+  usoUnico: boolean;
+  activo: boolean;
+  categoria?: { id: string; name: string } | null;
+  producto?: { id: string; name: string } | null;
+  internetPlan?: { id: string; name: string } | null;
+  createdAt: string;
+}
+
+export interface TicketSaleBeneficio {
+  codigo: string;
+  benefitCode: string | null;
+  qr: string | null;
+  beneficioId: string | null;
+  beneficioNombre: string | null;
+  porcentaje: string | null;
+  usoUnico: boolean | null;
+}
+
+export interface EntradaBeneficioValidation {
+  code: string;
+  codigo: string;
+  sector: EntradaSector;
+  fixture: { id: string; torneo: string; rival: string; fecha: string };
+  venta: { id: string; status: EntradaSaleStatus };
+  beneficio: {
+    id: string;
+    nombre: string;
+    descripcion: string | null;
+    porcentaje: string;
+    descuentoMaximo: string | null;
+    usoUnico: boolean;
+    destino: {
+      categoria: { id: string; name: string } | null;
+      producto: { id: string; name: string } | null;
+      internetPlan: { id: string; name: string } | null;
+    };
+  };
+  consumido: boolean;
+  consumidoAt: string | null;
+  disponible: boolean;
+  motivoNoDisponible: string | null;
 }
 
 export interface TicketSale {
@@ -1134,6 +1193,7 @@ export interface TicketSale {
   status: EntradaSaleStatus;
   device: { id: string; nombre: string };
   units: TicketUnit[];
+  beneficios?: TicketSaleBeneficio[];
   paidAt: string | null;
   createdAt: string;
 }

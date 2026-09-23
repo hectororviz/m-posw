@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -19,9 +20,12 @@ import { ModuleAccessGuard } from '../common/module-access.guard';
 import { RequireModule } from '../common/module-access.decorator';
 import { MAX_IMAGE_BYTES } from '../common/upload.constants';
 import { EntradasAdminService } from './entradas-admin.service';
+import { EntradasBeneficiosService } from './entradas-beneficios.service';
 import { CreateFixtureDto, UpdateFixtureDto } from './dto/create-fixture.dto';
 import { CreateRivalDto } from './dto/create-rival.dto';
 import { CreateTorneoDto } from './dto/create-torneo.dto';
+import { CreateEntradaBeneficioDto } from './dto/create-entrada-beneficio.dto';
+import { UpdateEntradaBeneficioDto } from './dto/update-entrada-beneficio.dto';
 import { SelectEntradasPosDto, SetupEntradasPosDto } from './dto/mp-pos.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 
@@ -29,7 +33,10 @@ import { UpdateTemplateDto } from './dto/update-template.dto';
 @UseGuards(JwtAuthGuard, ModuleAccessGuard)
 @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
 export class EntradasAdminController {
-  constructor(private readonly admin: EntradasAdminService) {}
+  constructor(
+    private readonly admin: EntradasAdminService,
+    private readonly beneficios: EntradasBeneficiosService,
+  ) {}
 
   // ── Torneos ──
   @Get('torneos')
@@ -150,6 +157,44 @@ export class EntradasAdminController {
   @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
   mpPosDisconnect() {
     return this.admin.mpPosDisconnect();
+  }
+
+  // ── Beneficios de bufet ──
+  // ABM: FULL. Validar/consumir: READ (puerta/cantina operan sin FULL).
+  @Get('beneficios')
+  listBeneficios() {
+    return this.beneficios.list();
+  }
+
+  @Post('beneficios')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
+  createBeneficio(@Body() dto: CreateEntradaBeneficioDto) {
+    return this.beneficios.create(dto);
+  }
+
+  @Patch('beneficios/:id')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
+  updateBeneficio(@Param('id') id: string, @Body() dto: UpdateEntradaBeneficioDto) {
+    return this.beneficios.update(id, dto);
+  }
+
+  @Delete('beneficios/:id')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
+  removeBeneficio(@Param('id') id: string) {
+    return this.beneficios.remove(id);
+  }
+
+  @Get('beneficios/validar/:code')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
+  validarBeneficio(@Param('code') code: string) {
+    return this.beneficios.validate(code, 'WEB');
+  }
+
+  @Post('beneficios/validar/:code/consumir')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
+  consumirBeneficio(@Param('code') code: string, @Req() req: any) {
+    const usuarioId = req.user?.sub || req.user?.id || undefined;
+    return this.beneficios.consume(code, { canal: 'WEB', usuarioId });
   }
 
   // ── Ventas ──

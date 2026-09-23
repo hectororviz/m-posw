@@ -135,6 +135,7 @@ model Category {
   updatedAt DateTime @updatedAt
   products  Product[]
   socioBeneficios SocioBeneficio[]
+  entradaBeneficios EntradaBeneficio[]
 }
 
 model Product {
@@ -156,6 +157,7 @@ model Product {
   recipeAsComposite RecipeIngredient[]   @relation("CompositeProduct")
   recipeAsRawMaterial RecipeIngredient[] @relation("RawMaterialProduct")
   socioBeneficios   SocioBeneficio[]
+  entradaBeneficios EntradaBeneficio[]
   internetPlan      InternetPlan?
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
@@ -461,6 +463,7 @@ model InternetPlan {
   product           Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
   categoryId        String?       @db.Uuid
   vouchers          SaleVoucher[]
+  entradaBeneficios EntradaBeneficio[]
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 }
@@ -991,6 +994,12 @@ enum EntradaSaleStatus {
   CANCELLED
 }
 
+enum EntradaBeneficioSector {
+  LOCAL
+  VISITANTE
+  AMBAS
+}
+
 model EntradaTorneo {
   id        String   @id @default(uuid()) @db.Uuid
   nombre    String   @unique
@@ -1090,12 +1099,77 @@ model TicketUnit {
   sector    EntradaSector
   nro       Int
   codigo    String
+  // Beneficio de bufet impreso en la entrada (QR corto). Null = sin beneficio.
+  beneficioId         String?           @db.Uuid
+  beneficio           EntradaBeneficio? @relation(fields: [beneficioId], references: [id], onDelete: SetNull)
+  benefitCode         String?           @unique
+  beneficioPorcentaje Decimal?          @db.Decimal(5, 2)
   createdAt DateTime       @default(now())
+
+  consumo     EntradaBeneficioConsumo?
+  validaciones EntradaBeneficioValidacion[]
 
   @@unique([fixtureId, sector, nro])
   @@unique([fixtureId, codigo])
   @@index([saleId])
   @@index([fixtureId])
+  @@index([beneficioId])
+  @@index([benefitCode])
+}
+
+// ─── Beneficios de entradas (bufet: descuentos / internet gratis) ───
+// Alcance global + sector (LOCAL | VISITANTE | AMBAS). El descuento NO aplica
+// a la entrada sino a una compra futura en bufet/cantina, validada por QR.
+
+model EntradaBeneficio {
+  id                String                 @id @default(uuid()) @db.Uuid
+  nombre            String
+  descripcion       String?
+  sector            EntradaBeneficioSector @default(AMBAS)
+  categoriaProdId   String?                @db.Uuid
+  categoria         Category?              @relation(fields: [categoriaProdId], references: [id], onDelete: SetNull)
+  productoId        String?                @db.Uuid
+  producto          Product?               @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  internetPlanId    String?                @db.Uuid
+  internetPlan      InternetPlan?          @relation(fields: [internetPlanId], references: [id], onDelete: SetNull)
+  porcentaje        Decimal                @db.Decimal(5, 2)
+  descuentoMaximo   Decimal?               @db.Decimal(10, 2)
+  usoUnico          Boolean                @default(true)
+  activo            Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  units             TicketUnit[]
+  consumos          EntradaBeneficioConsumo[]
+  validaciones      EntradaBeneficioValidacion[]
+
+  @@index([activo])
+  @@index([sector])
+}
+
+model EntradaBeneficioConsumo {
+  id                      String           @id @default(uuid()) @db.Uuid
+  beneficioId             String           @db.Uuid
+  beneficio               EntradaBeneficio @relation(fields: [beneficioId], references: [id], onDelete: Cascade)
+  ticketUnitId            String           @unique @db.Uuid
+  ticketUnit              TicketUnit       @relation(fields: [ticketUnitId], references: [id], onDelete: Cascade)
+  consumidoPorDeviceId    String?          @db.Uuid
+  consumidoPorUsuarioId   String?          @db.Uuid
+  createdAt               DateTime         @default(now())
+
+  @@index([beneficioId])
+}
+
+model EntradaBeneficioValidacion {
+  id           String           @id @default(uuid()) @db.Uuid
+  beneficioId  String           @db.Uuid
+  beneficio    EntradaBeneficio @relation(fields: [beneficioId], references: [id], onDelete: Cascade)
+  ticketUnitId String           @db.Uuid
+  ticketUnit   TicketUnit       @relation(fields: [ticketUnitId], references: [id], onDelete: Cascade)
+  canal        String           @default("WEB")
+  createdAt    DateTime         @default(now())
+
+  @@index([ticketUnitId])
+  @@index([beneficioId])
 }
 
 model EntradaContador {

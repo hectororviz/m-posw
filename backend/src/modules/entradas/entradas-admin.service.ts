@@ -310,7 +310,10 @@ export class EntradasAdminService {
       include: {
         fixture: { include: { torneo: true, rival: true } },
         device: { select: { id: true, nombre: true } },
-        units: { orderBy: { nro: 'asc' } },
+        units: {
+          orderBy: { nro: 'asc' },
+          include: { beneficio: { select: { id: true, nombre: true, usoUnico: true } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 500,

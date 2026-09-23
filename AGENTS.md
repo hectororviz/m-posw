@@ -1087,6 +1087,9 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 - **PosDevice**: `tokenHash` SHA256 (el token `ent_...` se muestra una sola vez + pairing `{baseUrl, token}` para QR). Revocable/rotatable.
 - **TicketSale**: `sector` informativo (mismo precio), `cantidad` 1-10, `CASH` aprueba directo, `MP_QR` crea orden Instore con `externalReference=ticket-<id>` en el **POS dedicado** (`Setting.mpEntradas*`, QR **estático** `mpEntradasQrData`, monto en 1 línea `quantity=1`). `requestId` único = idempotencia.
 - **TicketUnit / EntradaContador**: numeración por partido y sector (`L-001`, `V-001`, series independientes, contador atómico + `updateMany` condicional anti-doble-aprobación).
+- **EntradaBeneficio** (bufet): descuento % estilo socios para canjear en bufet con el QR de la entrada. Global + sector (`LOCAL|VISITANTE|AMBAS`, se asigna automático al aprobar: mayor %). Destino: categoría, producto o plan de internet. `usoUnico` (default true) vs multiuso.
+- **TicketUnit.beneficio**: cada unidad con beneficio lleva `beneficioId` + `benefitCode` corto único (10 chars, QR `ENT:<code>` ~14 chars) + snapshot `beneficioPorcentaje`. Sin beneficio → QR no se imprime.
+- **EntradaBeneficioConsumo** (`@@unique(ticketUnitId)` = anti-doble a nivel DB para uso único) + **EntradaBeneficioValidacion** (log de cada validación, cualquier canal).
 - **EntradaTicketTemplate** (singleton `default`, versionado) + **EntradaTicketAsset** (singleton `escudo`, PNG 1-bit ≤120KB base64). El POS los cachea por versión.
 
 ### Endpoints
@@ -1110,6 +1113,10 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 | `POST` | `/entradas/mp-pos/disconnect` | FULL | Desvincular (principal intacto) |
 | `GET` | `/entradas/sales?fixtureId=` | READ | Ventas con unidades |
 | `GET` | `/entradas/sales/summary?fixtureId=` | READ | Conteos L/V + recaudado |
+| `GET` | `/entradas/beneficios` | READ | ABM beneficios de bufet |
+| `POST` / `PATCH` / `DELETE` | `/entradas/beneficios[/:id]` | FULL | Crear/editar/eliminar (con historial → soft) |
+| `GET` | `/entradas/beneficios/validar/:code` | READ | Validar QR bufet (no consume, loguea) |
+| `POST` | `/entradas/beneficios/validar/:code/consumir` | READ | Consumir uso único (409 `YA_CONSUMIDO`) |
 | `GET` | `/entradas/ticket-template` | JWT o device | Layout JSON (cache por `version`) |
 | `GET` | `/entradas/ticket-assets/escudo` | JWT o device | PNG base64 (cache por `version`) |
 | `GET` | `/entradas/ticket-assets/escudo-info` | READ | Versión sin imagen (admin) |
@@ -1117,8 +1124,10 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 | `POST` | `/entradas/ticket-assets/escudo` | FULL | Subir PNG → 1-bit (multipart) |
 | `GET` | `/entradas/fixtures/vigentes` (alias `/hoy`) | device | Fixtures en ventana actual |
 | `POST` | `/entradas/sales/intent` | device | Crear venta (`X-Request-Id` idempotente). CASH→APPROVED, MP_QR→PENDING+`qrImageUrl` |
-| `GET` | `/entradas/sales/:id/status` | device | Polling + payload impresión (`datos`, `codigos`, versiones) |
+| `GET` | `/entradas/sales/:id/status` | device | Polling + payload impresión (`datos`, `codigos`, `beneficios[]`, versiones) |
 | `POST` | `/entradas/sales/:id/cancel` | device | Cancelar PENDING (+ `deleteOrder` MP) |
+| `GET` | `/entradas/beneficios/:code` | device | Validar QR bufet |
+| `POST` | `/entradas/beneficios/:code/consumir` | device | Consumir uso único (409 `YA_CONSUMIDO`) |
 | `GET` | `/entradas/socios/:uuid` | device | Socio + beneficios (futuro, sin uso en prueba) |
 
 ### Webhook MP
@@ -1129,7 +1138,7 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 - `Setting.enableEntradasModule` (default `false`): toggle en Configuración → Módulos + sidebar condicionado + `assertModuleEnabled()` en device service.
 
 ### Frontend
-`frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Diseño | Configuración` (subnav `treasury-subnav-link`). Tab Diseño con editor de bloques + preview en vivo (datos ejemplo, 32 cols, escudo real) y upload de escudo 1-bit. Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`, `useEntradasMpPos`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
+`frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Beneficios | Diseño | Configuración` (subnav `treasury-subnav-link`). Tab Beneficios (FULL: CRUD + toggle) y validador de QR en Ventas (READ: validar/consumir). Tab Diseño con editor de bloques + preview en vivo (datos ejemplo, 32 cols, escudo real) y upload de escudo 1-bit. Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`, `useEntradasMpPos`, `useEntradaBeneficios`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
 
 ### Límites conocidos (v1)
 - Una sola orden QR activa por POS de MP: con el POS dedicado, web y terminal usan cada uno el suyo y no se pisan. Con N terminales concurrentes se necesita 1 POS MP por terminal.

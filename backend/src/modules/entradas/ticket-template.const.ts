@@ -13,6 +13,8 @@ export const DEFAULT_TICKET_LAYOUT = {
     { type: 'qr', value: '{{codigo}}', align: 'center', enabled: true },
     { type: 'text', value: '${{precioUnit}} x{{cantidad}} = ${{total}}', size: 'M', align: 'center', enabled: true },
     { type: 'text', value: '{{footer}}', size: 'S', align: 'center', enabled: true },
+    { type: 'text', value: '{{beneficioNombre}} {{beneficioPorcentaje}}', size: 'M', align: 'center', bold: true, enabled: false },
+    { type: 'qr', value: '{{benefitQr}}', align: 'center', enabled: false },
   ],
 };
 
@@ -33,4 +35,7 @@ export const TICKET_VARIABLES = [
   'fechaPago',
   'footer',
   'escudo',
+  'benefitQr',
+  'beneficioNombre',
+  'beneficioPorcentaje',
 ];

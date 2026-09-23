@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { EntradaPayMethod, EntradaSaleStatus, EntradaSector, Prisma } from '@prisma/client';
+import { EntradaBeneficioSector, EntradaPayMethod, EntradaSaleStatus, EntradaSector, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { SociosQrService } from '../socios/socios-qr.service';
 import { MercadoPagoInstoreService } from '../sales/services/mercadopago-instore.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
+import { makeBenefitCode } from './entradas-beneficios.service';
 import type { EntradasDeviceContext } from './device.guard';
 
 const SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
@@ -320,6 +321,30 @@ export class EntradasSalesService {
       });
       const startNro = counter.ultimoNro - sale.cantidad + 1;
       const prefix = prefixFor(sale.sector);
+      // Beneficio de bufet por sector (global + LOCAL|VISITANTE|AMBAS): el de mayor %.
+      // No descuenta la entrada; se imprime como 2º QR para canjear en bufet/cantina.
+      const scopes =
+        sale.sector === 'LOCAL'
+          ? [EntradaBeneficioSector.LOCAL, EntradaBeneficioSector.AMBAS]
+          : [EntradaBeneficioSector.VISITANTE, EntradaBeneficioSector.AMBAS];
+      const rows = await tx.entradaBeneficio.findMany({
+        where: { activo: true, sector: { in: scopes } },
+        orderBy: { porcentaje: 'desc' },
+        take: 1,
+      });
+      const entradaBeneficio = rows[0] ?? null;
+      const codes = Array.from({ length: sale.cantidad }, () => (entradaBeneficio ? makeBenefitCode() : null));
+      const definedCodes = codes.filter((c): c is string => !!c);
+      if (definedCodes.length > 0) {
+        const existing = await tx.ticketUnit.findMany({
+          where: { benefitCode: { in: definedCodes } },
+          select: { benefitCode: true },
+        });
+        const taken = new Set(existing.map((e) => e.benefitCode));
+        for (let i = 0; i < codes.length; i++) {
+          if (codes[i] && taken.has(codes[i]!)) codes[i] = makeBenefitCode();
+        }
+      }
       await tx.ticketUnit.createMany({
         data: Array.from({ length: sale.cantidad }, (_, i) => {
           const nro = startNro + i;
@@ -329,6 +354,13 @@ export class EntradasSalesService {
             sector: sale.sector,
             nro,
             codigo: `${prefix}-${pad3(nro)}`,
+            ...(entradaBeneficio
+              ? {
+                  beneficioId: entradaBeneficio.id,
+                  benefitCode: codes[i],
+                  beneficioPorcentaje: entradaBeneficio.porcentaje,
+                }
+              : {}),
           };
         }),
       });
@@ -354,10 +386,20 @@ export class EntradasSalesService {
       fixture?: { torneo?: { nombre?: string }; rival?: { nombre?: string }; fecha?: Date };
       units?: { codigo: string }[];
     };
-    const [template, asset, setting] = await Promise.all([
+    const [template, asset, setting, benefitUnits] = await Promise.all([
       this.prisma.entradaTicketTemplate.findUnique({ where: { id: 'default' } }),
       this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } }),
       this.prisma.setting.findUnique({ where: { id: SETTING_ID }, select: { clubName: true, mpEntradasQrData: true } }),
+      this.prisma.ticketUnit.findMany({
+        where: { saleId: sale.id, beneficioId: { not: null } },
+        select: {
+          codigo: true,
+          benefitCode: true,
+          beneficioPorcentaje: true,
+          beneficio: { select: { id: true, nombre: true, usoUnico: true } },
+        },
+        orderBy: { nro: 'asc' },
+      }),
     ]);
     const codigos = (sale.units ?? []).map((u) => u.codigo);
     return {
@@ -380,6 +422,16 @@ export class EntradasSalesService {
         footer: 'Ticket no fiscal',
         qrImageUrl: setting?.mpEntradasQrData ?? null,
       },
+      // Beneficios de bufet por unidad (QR `ENT:<benefitCode>`). Vacío si no aplica.
+      beneficios: benefitUnits.map((u) => ({
+        codigo: u.codigo,
+        benefitCode: u.benefitCode,
+        qr: u.benefitCode ? `ENT:${u.benefitCode}` : null,
+        beneficioId: u.beneficio?.id ?? null,
+        beneficioNombre: u.beneficio?.nombre ?? null,
+        porcentaje: u.beneficioPorcentaje?.toString() ?? null,
+        usoUnico: u.beneficio?.usoUnico ?? null,
+      })),
       templateVersion: template?.version ?? 1,
       logoVersion: asset?.version ?? 1,
     };

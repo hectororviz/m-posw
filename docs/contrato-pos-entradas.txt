@@ -1,7 +1,9 @@
 ================================================================
-CONTRATO API POS ENTRADAS - m-posw (v1, primera prueba)
+CONTRATO API POS ENTRADAS - m-posw (v2, beneficios de bufet)
 ================================================================
 Estado: implementado en backend. No usar en produccion hasta aviso.
+v2 agrega: beneficios de bufet por unidad (QR `ENT:<code>`) + endpoints
+de validacion/consumo. v1 sigue compatible (beneficios: [] si no aplica).
 
 1. URL BASE Y RED
 -----------------
@@ -52,7 +54,14 @@ Provisioning (una vez, online):
     {"saleId":"uuid","status":"APPROVED","codigos":["L-013"],
      "cantidad":1,"precioUnit":"1500.00","descuento":"0",
      "total":"1500.00","paymentMethod":"CASH",...,
+     "beneficios":[{"codigo":"L-013","benefitCode":"K7Q2M9X4PA",
+       "qr":"ENT:K7Q2M9X4PA","beneficioId":"uuid",
+       "beneficioNombre":"Bebidas 20%","porcentaje":"20","usoUnico":false}],
      "datos":{...},"templateVersion":7,"logoVersion":3}
+   (beneficios: [] si la entrada no tiene beneficio asociado.
+   Cada unidad tiene su propio benefitCode de 10 chars; el QR impreso
+   es `ENT:<code>` (~14 chars, pensado para QR chico en 58mm).
+   El beneficio NO descuenta la entrada: es para canjear en bufet.)
   201 MP_QR (pendiente):
     {"saleId":"uuid","status":"PENDING",
      "qrImageUrl":"https://.../qr.png (o null si no configurado)",
@@ -113,6 +122,26 @@ Provisioning (una vez, online):
 
 3.7 GET /entradas/socios/:uuid -> FUTURO, en prueba no llamar.
 
+3.8 BENEFICIOS DE BUFET (QR por unidad, validacion + consumo)
+  La entrada puede traer un beneficio para bufet/cantina (ej: dto en
+  bebidas, hora de internet gratis). Alcance global + sector
+  (LOCAL/VISITANTE/AMBAS, se asigna automatico por sector al aprobar).
+  3.8.1 GET /entradas/beneficios/:code (device Bearer)
+    :code = `ENT:K7Q2M9X4PA` o `K7Q2M9X4PA` (tolerante a minusculas).
+    200 {"code":"K7Q2...","codigo":"L-013","sector":"LOCAL",
+     "fixture":{"torneo":"...","rival":"...","fecha":"..."},
+     "venta":{"status":"APPROVED"},
+     "beneficio":{"nombre":"...","porcentaje":"20","usoUnico":false,
+       "destino":{"categoria|producto|internetPlan":...}},
+     "consumido":false,"disponible":true,"motivoNoDisponible":null}
+    404 {"code":"BENEFICIO_NO_ENCONTRADO"} -> codigo invalido.
+  3.8.2 POST /entradas/beneficios/:code/consumir (device Bearer)
+    Marca consumo de uso unico (idempotente por unidad: 2do llamado
+    -> 409 {"code":"YA_CONSUMIDO"}). Multiuso (usoUnico=false) solo
+    loguea y responde {"multiuso":true} sin bloquear.
+    Errores: 400 VENTA_NO_APROBADA / BENEFICIO_INACTIVO.
+  Polling de status (3.3) tambien devuelve "beneficios":[] por venta.
+
 4. TICKET 58mm / SUNMI V2s (32 columnas)
 ------------------------------------------
 Template DSL versionado, ej:
@@ -128,13 +157,19 @@ Template DSL versionado, ej:
 Tipos: text | qr | logo | line | spacer (con enabled:true/false).
 Vars: club, torneo, rival, fecha, sector, codigo/codigos,
 precioUnit, cantidad, total, descuento, subtotal, ventaId,
-fechaPago, footer, escudo.
+fechaPago, footer, escudo, benefitQr, beneficioNombre,
+beneficioPorcentaje.
 Reglas POS:
  - Descargar template+escudo al arranque y cuando
    templateVersion/logoVersion cambien. Nunca por venta.
  - Una venta de N entradas = N tickets (iterar codigos).
    Numeracion por partido y sector: L-001... / V-001...
    independientes, reinician en cada fixture.
+ - Si el ticket trae beneficio (ver "beneficios" del status),
+   imprimir 2do QR con `qr` (`ENT:<code>`) + linea de
+   beneficioNombre. Los bloques {{benefitQr}}/{{beneficioNombre}}
+   del template vienen disabled por default: habilitar solo si hay.
+ - Para validar un beneficio en puerta/bufet usar 3.8 (no reimprimir).
  - Sunmi V2s: sunmi_printer_plus (printText/printQR/printImage,
    lineWrap 2 + cut). Si se queda sin papel -> guardar APPROVED e
    indicar "reimprimir" (NO reintentar el cobro).

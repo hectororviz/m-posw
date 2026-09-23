@@ -4,26 +4,33 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Eye, EyeOff, MonitorSmartphone, Pencil, Plus, RefreshCw, Ticket, Trash2, Upload, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import {
+  useAdminProducts,
+  useCategories,
   useEntradaFixtures,
   useEntradaRivales,
   useEntradaTicketTemplate,
   useEntradaTorneos,
   useEntradasMpPos,
   useEntradasSalesSummary,
+  useEntradaBeneficios,
+  useInternetPlans,
   useInvalidateEntradas,
   usePosDevices,
   useTicketSales,
+  consumirEntradaBeneficio,
+  validarEntradaBeneficio,
 } from '../api/queries';
-import type { EntradaFixture, EntradaSaleStatus, MpDetectedStore, PosDeviceCreated } from '../api/types';
+import type { EntradaBeneficio, EntradaBeneficioSector, EntradaBeneficioValidation, EntradaFixture, EntradaSaleStatus, MpDetectedStore, PosDeviceCreated } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 
-type TabId = 'ventas' | 'calendario' | 'abm' | 'diseno' | 'config';
+type TabId = 'ventas' | 'calendario' | 'abm' | 'beneficios' | 'diseno' | 'config';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'ventas', label: 'Ventas' },
   { id: 'calendario', label: 'Calendario' },
   { id: 'abm', label: 'ABM' },
+  { id: 'beneficios', label: 'Beneficios' },
   { id: 'diseno', label: 'Diseño' },
   { id: 'config', label: 'Configuración' },
 ];
@@ -45,7 +52,7 @@ export const AdminEntradasPage: React.FC = () => {
   const access = useModuleAccess('ENTRADAS');
   const canWrite = access === 'FULL';
   // READ: solo Ventas y Calendario (con control total ahí).
-  // ABM, Diseño y Configuración son FULL.
+  // ABM, Beneficios, Diseño y Configuración son FULL.
   const visibleTabs = TABS.filter((t) => canWrite || t.id === 'ventas' || t.id === 'calendario');
   const [tab, setTab] = useState<TabId>('ventas');
   const activeTab: TabId = visibleTabs.some((t) => t.id === tab) ? tab : 'ventas';
@@ -68,6 +75,7 @@ export const AdminEntradasPage: React.FC = () => {
         {activeTab === 'ventas' && <VentasTab canWrite={canWrite} />}
         {activeTab === 'calendario' && <CalendarioTab canWrite />}
         {activeTab === 'abm' && <AbmTab canWrite={canWrite} />}
+        {activeTab === 'beneficios' && <BeneficiosTab canWrite={canWrite} />}
         {activeTab === 'diseno' && <DisenoTab canWrite={canWrite} />}
         {activeTab === 'config' && <ConfigTab canWrite={canWrite} />}
       </div>
@@ -153,7 +161,10 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
                 <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{s.fixture.torneo.nombre} vs {s.fixture.rival.nombre}</span>
                 <span className="col-method" style={{ flex: '0 0 90px' }}>{s.sector}</span>
                 <span className="col-num" style={{ flex: '0 0 50px', textAlign: 'center' }}>{s.cantidad}</span>
-                <span className="col-user" style={{ flex: 2, fontFamily: 'monospace', fontSize: '0.8rem' }}>{s.units.map((u) => u.codigo).join(', ')}</span>
+                <span className="col-user" style={{ flex: 2, fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                  {s.units.map((u) => u.codigo).join(', ')}
+                  {s.units.some((u) => u.beneficioId) && <span title="Con beneficio de bufet"> ★</span>}
+                </span>
                 <span className="col-total" style={{ flex: '0 0 100px' }}>${s.total}</span>
                 <span className="col-method" style={{ flex: '0 0 100px' }}><StatusBadge status={s.status} /></span>
                 <span className="col-user" style={{ flex: '0 0 130px' }}>{s.device.nombre}</span>
@@ -166,6 +177,93 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
       <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
         <span>Mostrando {rows.length} ventas</span>
       </div>
+
+      <ValidadorBeneficio />
+    </div>
+  );
+};
+
+// ── Validador de beneficios (bufet/puerta: valida con READ, sin FULL) ──
+const ValidadorBeneficio: React.FC = () => {
+  const { pushToast } = useToast();
+  const [code, setCode] = useState('');
+  const [result, setResult] = useState<EntradaBeneficioValidation | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const validar = async () => {
+    if (!code.trim()) return;
+    setBusy(true);
+    try {
+      const data = await validarEntradaBeneficio(code);
+      setResult(data);
+    } catch (e) {
+      setResult(null);
+      pushToast(normalizeApiError(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const consumir = async () => {
+    if (!code.trim()) return;
+    setBusy(true);
+    try {
+      await consumirEntradaBeneficio(code);
+      pushToast('Beneficio consumido', 'success');
+      const data = await validarEntradaBeneficio(code);
+      setResult(data);
+    } catch (e) {
+      pushToast(normalizeApiError(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const destino = result
+    ? result.beneficio.destino.categoria?.name
+      ?? result.beneficio.destino.producto?.name
+      ?? result.beneficio.destino.internetPlan?.name
+      ?? '—'
+    : null;
+
+  return (
+    <div className="settings-section" style={{ marginTop: '1.25rem' }}>
+      <h3 style={{ margin: '0 0 0.25rem' }}>Validar beneficio de bufet</h3>
+      <p style={{ margin: '0 0 0.75rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+        Escaneá o cargá el QR de la entrada (<span style={{ fontFamily: 'monospace' }}>ENT:XXXXXXXXXX</span>).
+      </p>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          onKeyDown={(e) => { if (e.key === 'Enter') validar(); }}
+          placeholder="ENT:..."
+          style={{ fontFamily: 'monospace', minWidth: 220 }}
+        />
+        <button type="button" className="btn-ghost" onClick={validar} disabled={busy || !code.trim()}>
+          {busy ? '...' : 'Validar'}
+        </button>
+        {result?.disponible && (
+          <button type="button" className="btn-primary" onClick={consumir} disabled={busy}>
+            Consumir
+          </button>
+        )}
+      </div>
+      {result && (
+        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          {result.disponible
+            ? <span className="badge badge-success">Válido</span>
+            : <span className="badge badge-neutral">{result.consumido ? 'Consumido' : 'No disponible'}</span>}
+          <span><strong>{result.beneficio.nombre}</strong> ({result.beneficio.porcentaje}% en {destino})</span>
+          <span style={{ color: 'var(--color-text-muted)' }}>
+            {result.codigo} · {result.sector} · {result.fixture.torneo} vs {result.fixture.rival}
+            {result.beneficio.usoUnico ? ' · uso único' : ' · multiuso'}
+          </span>
+          {result.motivoNoDisponible && (
+            <span style={{ color: 'var(--color-danger-text)' }}>{result.motivoNoDisponible}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -753,6 +851,259 @@ const TicketPreview: React.FC<{ elements: Array<Record<string, unknown>>; escudo
     })}
   </div>
 );
+
+// ── Beneficios de bufet ──────────────────────────────────────
+type DestinoTipo = 'categoria' | 'producto' | 'internet';
+
+const BeneficiosTab: React.FC<{ canWrite: boolean }> = () => {
+  const { pushToast } = useToast();
+  const invalidate = useInvalidateEntradas();
+  const { data: beneficios, isLoading } = useEntradaBeneficios();
+  const { data: categorias } = useCategories();
+  const { data: productos } = useAdminProducts();
+  const { data: planes } = useInternetPlans();
+  const [modal, setModal] = useState<null | {
+    id?: string;
+    nombre: string;
+    descripcion: string;
+    sector: EntradaBeneficioSector;
+    destinoTipo: DestinoTipo;
+    categoriaProdId: string;
+    productoId: string;
+    internetPlanId: string;
+    porcentaje: string;
+    descuentoMaximo: string;
+    usoUnico: boolean;
+    activo: boolean;
+  }>(null);
+  const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
+
+  const destinoNombre = (b: EntradaBeneficio) =>
+    b.categoria?.name ?? b.producto?.name ?? b.internetPlan?.name ?? '—';
+
+  const openCreate = () => setModal({
+    nombre: '', descripcion: '', sector: 'AMBAS', destinoTipo: 'categoria',
+    categoriaProdId: '', productoId: '', internetPlanId: '',
+    porcentaje: '', descuentoMaximo: '', usoUnico: true, activo: true,
+  });
+
+  const openEdit = (b: EntradaBeneficio) => setModal({
+    id: b.id,
+    nombre: b.nombre,
+    descripcion: b.descripcion ?? '',
+    sector: b.sector,
+    destinoTipo: b.productoId ? 'producto' : b.internetPlanId ? 'internet' : 'categoria',
+    categoriaProdId: b.categoriaProdId ?? '',
+    productoId: b.productoId ?? '',
+    internetPlanId: b.internetPlanId ?? '',
+    porcentaje: String(b.porcentaje),
+    descuentoMaximo: b.descuentoMaximo != null ? String(b.descuentoMaximo) : '',
+    usoUnico: b.usoUnico,
+    activo: b.activo,
+  });
+
+  const save = async () => {
+    if (!modal || !modal.nombre.trim() || !modal.porcentaje) {
+      pushToast('Completá nombre y porcentaje', 'error');
+      return;
+    }
+    const destinoId = modal.destinoTipo === 'categoria' ? modal.categoriaProdId : modal.destinoTipo === 'producto' ? modal.productoId : modal.internetPlanId;
+    if (!destinoId) {
+      pushToast('Seleccioná el destino del beneficio', 'error');
+      return;
+    }
+    const payload: Record<string, unknown> = {
+      nombre: modal.nombre.trim(),
+      descripcion: modal.descripcion.trim() || undefined,
+      sector: modal.sector,
+      porcentaje: Number(modal.porcentaje),
+      descuentoMaximo: modal.descuentoMaximo ? Number(modal.descuentoMaximo) : undefined,
+      usoUnico: modal.usoUnico,
+      activo: modal.activo,
+      categoriaProdId: modal.destinoTipo === 'categoria' ? destinoId : undefined,
+      productoId: modal.destinoTipo === 'producto' ? destinoId : undefined,
+      internetPlanId: modal.destinoTipo === 'internet' ? destinoId : undefined,
+    };
+    try {
+      if (modal.id) {
+        await apiClient.patch(`/entradas/beneficios/${modal.id}`, payload);
+        pushToast('Beneficio actualizado', 'success');
+      } else {
+        await apiClient.post('/entradas/beneficios', payload);
+        pushToast('Beneficio creado', 'success');
+      }
+      setModal(null);
+      invalidate();
+    } catch (e) { err(e); }
+  };
+
+  const toggle = async (b: EntradaBeneficio) => {
+    try {
+      await apiClient.patch(`/entradas/beneficios/${b.id}`, { activo: !b.activo });
+      invalidate();
+    } catch (e) { err(e); }
+  };
+
+  const remove = async (b: EntradaBeneficio) => {
+    if (!window.confirm(`¿Eliminar "${b.nombre}"? (con historial se desactiva)`)) return;
+    try {
+      await apiClient.delete(`/entradas/beneficios/${b.id}`);
+      pushToast('Beneficio eliminado', 'success');
+      invalidate();
+    } catch (e) { err(e); }
+  };
+
+  return (
+    <div className="admin-page">
+      <div className="admin-page-header">
+        <h2>Beneficios de bufet</h2>
+      </div>
+      <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
+        Descuento % estilo socios para canjear en bufet con el QR de la entrada. Alcance global por sector: se asigna
+        automático al aprobar la venta (LOCAL, VISITANTE o AMBAS).
+      </p>
+
+      <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
+        <div className="sales-table">
+          <div className="sales-table-head">
+            <span className="col-user" style={{ flex: 2 }}>Beneficio</span>
+            <span className="col-method" style={{ flex: '0 0 90px' }}>Sector</span>
+            <span className="col-user" style={{ flex: 2 }}>Destino</span>
+            <span className="col-total" style={{ flex: '0 0 70px' }}>Dto</span>
+            <span className="col-method" style={{ flex: '0 0 90px' }}>Uso</span>
+            <span className="col-method" style={{ flex: '0 0 70px' }}>Estado</span>
+            <span className="col-action" style={{ flex: '0 0 120px' }}></span>
+          </div>
+          {isLoading ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Cargando...</span></div>
+          ) : (beneficios ?? []).length === 0 ? (
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin beneficios: las entradas salen sin QR de bufet</span></div>
+          ) : (
+            (beneficios ?? []).map((b) => (
+              <div key={b.id} className="sales-table-row">
+                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{b.nombre}</span>
+                <span className="col-method" style={{ flex: '0 0 90px' }}>{b.sector}</span>
+                <span className="col-user" style={{ flex: 2 }}>{destinoNombre(b)}</span>
+                <span className="col-total" style={{ flex: '0 0 70px', fontWeight: 600 }}>{Number(b.porcentaje)}%</span>
+                <span className="col-method" style={{ flex: '0 0 90px' }}>{b.usoUnico ? 'Único' : 'Multiuso'}</span>
+                <span className="col-method" style={{ flex: '0 0 70px' }}>
+                  {b.activo ? <span className="badge badge-success">Activo</span> : <span className="badge badge-neutral">Inactivo</span>}
+                </span>
+                <span className="col-action" style={{ flex: '0 0 120px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(b)} title="Editar"><Pencil size={16} /></button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => toggle(b)} title={b.activo ? 'Desactivar' : 'Activar'}>
+                    {b.activo ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => remove(b)} title="Eliminar" style={{ color: 'var(--color-danger-text)' }}><Trash2 size={16} /></button>
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo beneficio"><Plus size={24} /></button>
+
+      {modal && (
+        <div className="modal-backdrop" onClick={() => setModal(null)}>
+          <div className="modal user-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{modal.id ? 'Editar beneficio' : 'Nuevo beneficio'}</h3>
+              <button className="icon-button" onClick={() => setModal(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="settings-field">
+                  <label>Nombre *</label>
+                  <input value={modal.nombre} onChange={(e) => setModal({ ...modal, nombre: e.target.value })} placeholder="Bebidas 20% locales" />
+                </div>
+                <div className="settings-field">
+                  <label>Descripción</label>
+                  <input value={modal.descripcion} onChange={(e) => setModal({ ...modal, descripcion: e.target.value })} placeholder="Se canjea en bufet" />
+                </div>
+                <div className="settings-field">
+                  <label>Sector *</label>
+                  <select value={modal.sector} onChange={(e) => setModal({ ...modal, sector: e.target.value as EntradaBeneficioSector })}>
+                    <option value="LOCAL">Solo locales</option>
+                    <option value="VISITANTE">Solo visitantes</option>
+                    <option value="AMBAS">Ambas</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label>Destino</label>
+                  <select value={modal.destinoTipo} onChange={(e) => setModal({ ...modal, destinoTipo: e.target.value as DestinoTipo })}>
+                    <option value="categoria">Categoría</option>
+                    <option value="producto">Producto</option>
+                    <option value="internet">Plan de internet</option>
+                  </select>
+                </div>
+                {modal.destinoTipo === 'categoria' ? (
+                  <div className="settings-field">
+                    <label>Categoría *</label>
+                    <select value={modal.categoriaProdId} onChange={(e) => setModal({ ...modal, categoriaProdId: e.target.value })}>
+                      <option value="">Seleccionar</option>
+                      {(categorias ?? []).filter((c) => c.active).map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : modal.destinoTipo === 'producto' ? (
+                  <div className="settings-field">
+                    <label>Producto *</label>
+                    <select value={modal.productoId} onChange={(e) => setModal({ ...modal, productoId: e.target.value })}>
+                      <option value="">Seleccionar</option>
+                      {(productos ?? []).filter((p) => p.active).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="settings-field">
+                    <label>Plan de internet *</label>
+                    <select value={modal.internetPlanId} onChange={(e) => setModal({ ...modal, internetPlanId: e.target.value })}>
+                      <option value="">Seleccionar</option>
+                      {(planes ?? []).filter((p) => p.active).map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="settings-field">
+                  <label>Porcentaje de descuento (%) *</label>
+                  <input type="number" min="0" max="100" step="0.01" value={modal.porcentaje}
+                    onChange={(e) => setModal({ ...modal, porcentaje: e.target.value })} placeholder="20" />
+                </div>
+                <div className="settings-field">
+                  <label>Descuento máximo ($)</label>
+                  <input type="number" min="0" step="0.01" value={modal.descuentoMaximo}
+                    onChange={(e) => setModal({ ...modal, descuentoMaximo: e.target.value })} placeholder="Sin tope" />
+                </div>
+                <div className="settings-field">
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={modal.usoUnico} onChange={(e) => setModal({ ...modal, usoUnico: e.target.checked })} />
+                    <span className="toggle-switch-track" />
+                    Uso único (si no, multiuso)
+                  </label>
+                </div>
+                <div className="settings-field">
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={modal.activo} onChange={(e) => setModal({ ...modal, activo: e.target.checked })} />
+                    <span className="toggle-switch-track" />
+                    Activo
+                  </label>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={save}>Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const { pushToast } = useToast();
