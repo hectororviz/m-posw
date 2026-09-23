@@ -805,6 +805,9 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   ventaId: 'abc-123',
   fechaPago: '25/09 20:58',
   footer: 'Ticket no fiscal',
+  benefitQr: 'ENT:K7Q2M9X4PA',
+  beneficioNombre: 'Bebidas 20%',
+  beneficioPorcentaje: '20%',
   escudo: '',
 };
 
@@ -1249,6 +1252,7 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
                   <option value="line">Línea</option>
                   <option value="spacer">Espacio</option>
                   <option value="qr">QR</option>
+                  <option value="qr-beneficio">QR beneficio</option>
                   <option value="logo">Escudo</option>
                 </select>
                 <button
@@ -1257,6 +1261,14 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
                   onClick={() => {
                     const sel = document.getElementById('new-block-type') as HTMLSelectElement | null;
                     const type = sel?.value ?? 'text';
+                    if (type === 'qr-beneficio') {
+                      setElements([
+                        ...currentElements,
+                        { type: 'qr', value: '{{benefitQr}}', align: 'center', enabled: true },
+                        { type: 'text', value: '{{beneficioNombre}} {{beneficioPorcentaje}}', size: 'M', align: 'center', bold: true, enabled: true },
+                      ]);
+                      return;
+                    }
                     const base: Record<string, unknown> = { type, enabled: true };
                     if (type === 'text') Object.assign(base, { value: 'Nuevo texto', size: 'M', align: 'center' });
                     if (type === 'qr') Object.assign(base, { value: '{{codigo}}', align: 'center' });
@@ -1267,7 +1279,7 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
               </span>
             </div>
           )}
-          <p><small>{currentElements.length}/40 bloques · Variables: {'{{club}} {{torneo}} {{rival}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}}'}</small></p>
+          <p><small>{currentElements.length}/40 bloques · Variables: {'{{club}} {{torneo}} {{rival}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}} {{benefitQr}} {{beneficioNombre}} {{beneficioPorcentaje}}'}</small></p>
         </section>
 
         <section>
