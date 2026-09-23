@@ -30,10 +30,16 @@ object TicketRenderer {
         TemplateElement("qr", "{{codigo}}", null, "center", false, true),
         TemplateElement("text", "\${{precioUnit}} x{{cantidad}} = \${{total}}", "M", "center", false, true),
         TemplateElement("text", "{{footer}}", "S", "center", false, true),
+        TemplateElement("qr", "{{benefitQr}}", null, "center", false, true),
+        TemplateElement("text", "{{beneficioNombre}} {{beneficioPorcentaje}}", "M", "center", true, true),
     )
 
     fun varsFor(p: StatusPayload, codigo: String): Map<String, String> {
         val d: DatosTicket? = p.datos
+        // Beneficio de bufet de ESTA unidad (por codigo). Sin beneficio → vars vacías
+        // y los bloques se omiten solos (SunmiPrinter salta contenido en blanco).
+        val b = (p.beneficios ?: emptyList()).firstOrNull { it.codigo == codigo }
+        val pct = b?.porcentaje?.trim().orEmpty()
         return mapOf(
             "club" to (d?.club ?: ""),
             "torneo" to (d?.torneo ?: ""),
@@ -50,6 +56,9 @@ object TicketRenderer {
             "fechaPago" to (d?.fechaPago ?: ""),
             "footer" to (d?.footer ?: "Ticket no fiscal"),
             "escudo" to "{{escudo}}",
+            "benefitQr" to (b?.qr ?: ""),
+            "beneficioNombre" to (b?.beneficioNombre ?: ""),
+            "beneficioPorcentaje" to (if (pct.isEmpty()) "" else "$pct%"),
         )
     }
 

@@ -45,6 +45,18 @@ data class StatusPayload(
     val qrImageUrl: String?,
     val templateVersion: Int = 1,
     val logoVersion: Int = 1,
+    val beneficios: List<SaleBeneficio> = emptyList(),
+)
+
+// Beneficio de bufet por unidad (QR `ENT:<benefitCode>`). Vacío si la entrada no tiene.
+data class SaleBeneficio(
+    val codigo: String?,
+    val benefitCode: String?,
+    val qr: String?,
+    val beneficioId: String?,
+    val beneficioNombre: String?,
+    val porcentaje: String?,
+    val usoUnico: Boolean?,
 )
 
 data class DatosTicket(

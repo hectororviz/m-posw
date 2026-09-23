@@ -58,7 +58,12 @@ Provisioning (una vez, online):
   (socioUuid reservado futuro, mandar null en prueba)
   201 CASH aprobado directo:
     {"saleId":"uuid","status":"APPROVED","codigos":["L-013"],
-     "total":"1500.00","templateVersion":7,"logoVersion":3}
+     "total":"1500.00","templateVersion":7,"logoVersion":3,
+     "beneficios":[{"codigo":"L-013","benefitCode":"K7Q2M9X4PA",
+       "qr":"ENT:K7Q2M9X4PA","beneficioNombre":"Bebidas 20%",
+       "porcentaje":"20","usoUnico":false}]}
+   (beneficios: [] si la entrada no tiene beneficio de bufet.
+   Cada unidad tiene su propio QR `ENT:<code>` para canjear en bufet.)
   201 MP_QR pendiente:
     {"saleId":"uuid","status":"PENDING",
      "qr_data":"00020126...","templateVersion":7}
@@ -99,9 +104,15 @@ Ancho fijo: widthCols=32. Template DSL versionado:
    {"type":"text","value":"{{codigo}}","size":"XL","align":"center","bold":true},
    {"type":"qr","value":"{{codigo}}","align":"center"},
    {"type":"text","value":"${{precioUnit}} x{{cantidad}} = ${{total}}","size":"M","align":"center"},
-   {"type":"text","value":"{{footer}}","size":"S","align":"center"}]}
+   {"type":"text","value":"{{footer}}","size":"S","align":"center"},
+   {"type":"qr","value":"{{benefitQr}}","align":"center"},
+   {"type":"text","value":"{{beneficioNombre}} {{beneficioPorcentaje}}","size":"M","align":"center","bold":true}]}
 Vars: club, torneo, rival, fecha, sector, codigo/codigos,
-precioUnit, cantidad, total, ventaId, fechaPago, footer.
+precioUnit, cantidad, total, ventaId, fechaPago, footer,
+benefitQr, beneficioNombre, beneficioPorcentaje.
+Composicion por ticket: iterar codigos; para cada codigo buscar su
+entrada en "beneficios" por codigo. Sin beneficio las vars quedan
+vacias y esos bloques se omiten (no imprimir QR/nombre en blanco).
 Reglas POS:
  - Descargar template+escudo al arranque y cuando
    templateVersion/logoVersion cambien. Jamas por venta.
