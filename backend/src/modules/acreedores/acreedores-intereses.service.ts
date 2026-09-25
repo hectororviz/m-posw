@@ -4,7 +4,7 @@ import { PrismaService } from '../common/prisma.service';
 
 // ─── Regla simple y auditable ─────────────────────────────────────
 // Tasa mensual configurada (global o por acreedor). Cada lunes se aplica
-// UNA semana: tasaSemanal = tasaMensual * 7 / 30 (prorrateo lineal).
+// UNA semana: tasaSemanal = (tasaMensual ÷ 30) × 7 (prorrateo lineal).
 // Base = capital vencido > 30 días (fiados + ajustes MANUALES, FIFO: los
 // pagos alivian lo más antiguo primero). Amnistía única: la fecha efectiva
 // de cada capital es max(fechaOriginal, fechaAmnistia) — la deuda anterior

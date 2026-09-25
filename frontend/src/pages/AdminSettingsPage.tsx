@@ -1201,9 +1201,10 @@ export const AdminSettingsPage: React.FC = () => {
                   Recién genera interés 30 días después. Se normaliza al lunes de esa semana.
                 </p>
                 <p style={{ color: 'var(--color-text-faint)', fontSize: '0.85rem', marginTop: '0.75rem', lineHeight: 1.5 }}>
-                  Cada lunes 06:00 se debita una semana (tasa mensual × 7 ÷ 30) sobre el capital
-                  vencido hace más de 30 días. Las compras recientes no generan interés, los pagos
-                  alivian primero lo más viejo, los intereses previos no generan nuevo interés y
+                  Cada lunes 06:00 se debita una semana ((tasa mensual ÷ 30) × 7) sobre el capital
+                  vencido hace más de 30 días. Cada compra tiene 30 días de gracia desde su fecha
+                  (la deuda anterior a la amnistía cuenta desde la amnistía), los pagos
+                  alivian primero lo más viejo (incluidos intereses), los intereses previos no generan nuevo interés y
                   el saldo a favor no genera nada.
                   Cada aplicación queda registrada en el historial del acreedor con su período
                   (año-semana), base, interés acumulado y deuda actual.

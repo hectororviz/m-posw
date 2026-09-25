@@ -9,7 +9,7 @@ import {
 const D = (s: string) => new Date(`${s}T12:00:00Z`);
 
 describe('intereses acreedores (simple y auditable)', () => {
-  test('tasa semanal = mensual * 7/30', () => {
+  test('tasa semanal = (mensual ÷ 30) × 7', () => {
     expect(tasaSemanalDesdeMensual(12)).toBeCloseTo(2.8, 3);
     expect(calcularInteresSemanal(10000, 12)).toBe(280);
   });
