@@ -55,6 +55,7 @@ export const AdminSettingsPage: React.FC = () => {
     enableAcreedoresModule: true,
     interesAcreedoresHabilitado: false,
     tasaInteresMensualAcreedores: '',
+    interesFechaAmnistia: '',
     enableInternetModule: false,
     enableLigasModule: false,
     enablePlayersModule: false,
@@ -155,6 +156,7 @@ export const AdminSettingsPage: React.FC = () => {
         enableAcreedoresModule: settings.enableAcreedoresModule ?? true,
         interesAcreedoresHabilitado: settings.interesAcreedoresHabilitado ?? false,
         tasaInteresMensualAcreedores: settings.tasaInteresMensualAcreedores != null ? String(settings.tasaInteresMensualAcreedores) : '',
+        interesFechaAmnistia: settings.interesFechaAmnistia != null ? String(settings.interesFechaAmnistia).slice(0, 10) : '',
         enableInternetModule: settings.enableInternetModule ?? false,
         enableLigasModule: settings.enableLigasModule ?? false,
         enablePlayersModule: settings.enablePlayersModule ?? false,
@@ -240,6 +242,7 @@ export const AdminSettingsPage: React.FC = () => {
       const response = await apiClient.patch<Setting>('/settings', {
         interesAcreedoresHabilitado: form.interesAcreedoresHabilitado,
         tasaInteresMensualAcreedores: tasa,
+        interesFechaAmnistia: form.interesFechaAmnistia === '' ? null : form.interesFechaAmnistia,
       });
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
@@ -1165,7 +1168,7 @@ export const AdminSettingsPage: React.FC = () => {
                 <span>
                   <strong>Cobrar interés semanal automático</strong>
                   <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Cada lunes se aplica interés solo sobre deuda vencida hace más de 7 días</small>
+                  <small style={{ color: 'var(--color-text-faint)' }}>Cada lunes 06:00 se aplica interés solo sobre deuda vencida hace más de 30 días</small>
                 </span>
               </label>
               <div style={{ marginTop: '1rem' }}>
@@ -1177,17 +1180,33 @@ export const AdminSettingsPage: React.FC = () => {
                   min={0}
                   max={100}
                   step="0.01"
-                  placeholder="Ej: 5"
+                  placeholder="Ej: 12"
                   value={form.tasaInteresMensualAcreedores}
                   onChange={(e) => setForm({ ...form, tasaInteresMensualAcreedores: e.target.value })}
                   style={{ width: '12rem' }}
                 />
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  Fecha de amnistía (lunes)
+                </label>
+                <input
+                  type="date"
+                  value={form.interesFechaAmnistia}
+                  onChange={(e) => setForm({ ...form, interesFechaAmnistia: e.target.value })}
+                  style={{ width: '12rem' }}
+                />
+                <p style={{ color: 'var(--color-text-faint)', fontSize: '0.85rem', marginTop: '0.5rem', lineHeight: 1.5 }}>
+                  La deuda anterior a esta fecha queda en 0 días (aviso de la nueva política).
+                  Recién genera interés 30 días después. Se normaliza al lunes de esa semana.
+                </p>
                 <p style={{ color: 'var(--color-text-faint)', fontSize: '0.85rem', marginTop: '0.75rem', lineHeight: 1.5 }}>
-                  Cada lunes 09:30 se debita una semana (tasa mensual × 7 ÷ 30) sobre el capital
-                  vencido hace más de 7 días. Las compras recientes no generan interés, los pagos
-                  alivian primero lo más viejo y los intereses previos no generan nuevo interés.
+                  Cada lunes 06:00 se debita una semana (tasa mensual × 7 ÷ 30) sobre el capital
+                  vencido hace más de 30 días. Las compras recientes no generan interés, los pagos
+                  alivian primero lo más viejo, los intereses previos no generan nuevo interés y
+                  el saldo a favor no genera nada.
                   Cada aplicación queda registrada en el historial del acreedor con su período
-                  (año-semana), tasa y base de cálculo.
+                  (año-semana), base, interés acumulado y deuda actual.
                 </p>
               </div>
               <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end' }}>

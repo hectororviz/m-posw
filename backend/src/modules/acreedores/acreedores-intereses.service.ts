@@ -5,12 +5,15 @@ import { PrismaService } from '../common/prisma.service';
 // ─── Regla simple y auditable ─────────────────────────────────────
 // Tasa mensual configurada (global o por acreedor). Cada lunes se aplica
 // UNA semana: tasaSemanal = tasaMensual * 7 / 30 (prorrateo lineal).
-// Base = capital vencido > 7 días (fiados + ajustes MANUALES, FIFO: los
-// pagos alivian lo más antiguo primero). Los intereses previos NO generan
-// interés (sin anatocismo). Cada aplicación queda como un AjusteAcreedor
-// con esInteres=true + periodo "YYYY-Www": idempotente y trazable.
+// Base = capital vencido > 30 días (fiados + ajustes MANUALES, FIFO: los
+// pagos alivian lo más antiguo primero). Amnistía única: la fecha efectiva
+// de cada capital es max(fechaOriginal, fechaAmnistia) — la deuda anterior
+// a la amnistía queda en 0 días y recién genera a los 30 días del aviso.
+// Los intereses previos NO generan interés (sin anatocismo). Saldo a favor
+// no genera nada. Cada aplicación queda como un AjusteAcreedor con
+// esInteres=true + periodo "YYYY-Www": idempotente y trazable.
 
-export const DIAS_GRACIA_VENCIMIENTO = 7;
+export const DIAS_GRACIA_VENCIMIENTO = 30;
 export const DIAS_MES_PRORRATEO = 30;
 export const DIAS_SEMANA = 7;
 
@@ -48,17 +51,25 @@ interface CapitalEntry {
   monto: number;
 }
 
-/** Base vencida: capital con >7 días al corte menos pagos hasta el corte (FIFO: pagos a lo más viejo primero). */
+/** Base vencida: capital con >30 días al corte menos pagos hasta el corte (FIFO: pagos a lo más viejo primero).
+ * Amnistía única: fechaEfectiva = max(fechaOriginal, fechaAmnistia). */
 export function calcularBaseVencida(
   fiados: CapitalEntry[],
   ajustesCapital: CapitalEntry[],
   pagos: CapitalEntry[],
   corte: Date,
+  fechaAmnistia?: Date | null,
 ): { base: number; totalVencido: number; totalPagos: number } {
   const limite = new Date(corte.getTime() - DIAS_GRACIA_VENCIMIENTO * 24 * 3600 * 1000);
+  const amnistiaTs = fechaAmnistia ? new Date(fechaAmnistia).getTime() : null;
+  const esVencido = (fecha: Date): boolean => {
+    const ts = new Date(fecha).getTime();
+    const efectiva = amnistiaTs != null ? Math.max(ts, amnistiaTs) : ts;
+    return efectiva <= limite.getTime();
+  };
   const totalVencido = round2(
     [...fiados, ...ajustesCapital]
-      .filter((e) => new Date(e.fecha).getTime() <= limite.getTime())
+      .filter((e) => esVencido(new Date(e.fecha)))
       .reduce((s, e) => s + Number(e.monto), 0),
   );
   const totalPagos = round2(
@@ -80,6 +91,8 @@ export interface PreviewFila {
   tasaMensual: number;
   tasaSemanal: number;
   baseVencida: number;
+  interesAcumulado: number;
+  deudaActual: number;
   interes: number;
   periodo: string;
   yaAplicado: boolean;
@@ -96,6 +109,7 @@ export class AcreedoresInteresesService {
     return {
       habilitado: setting?.interesAcreedoresHabilitado === true,
       tasaGlobal: setting?.tasaInteresMensualAcreedores != null ? Number(setting.tasaInteresMensualAcreedores) : null,
+      fechaAmnistia: setting?.interesFechaAmnistia != null ? new Date(setting.interesFechaAmnistia as unknown as string) : null,
     };
   }
 
@@ -103,7 +117,7 @@ export class AcreedoresInteresesService {
   async preview(fechaRef?: Date): Promise<{ corte: Date; periodo: string; filas: PreviewFila[] }> {
     const corte = lunesDeSemana(fechaRef ?? new Date());
     const periodo = periodoSemanal(corte);
-    const { habilitado, tasaGlobal } = await this.getConfig();
+    const { habilitado, tasaGlobal, fechaAmnistia } = await this.getConfig();
 
     const acreedores = await this.prisma.acreedor.findMany({
       where: { activo: true },
@@ -117,20 +131,33 @@ export class AcreedoresInteresesService {
         a.tasaInteresMensual != null ? Number(a.tasaInteresMensual) : (tasaGlobal ?? 0);
       const ajustesInteres = a.ajustes.filter((x) => (x as unknown as { esInteres?: boolean }).esInteres);
       const ajustesCapital = a.ajustes.filter((x) => !(x as unknown as { esInteres?: boolean }).esInteres);
+      const pagosList = a.pagos.map((p) => ({ fecha: new Date(p.fecha), monto: Number(p.monto) }));
       const { base, totalVencido, totalPagos } = calcularBaseVencida(
         a.fiadoVentas.map((v) => ({ fecha: new Date(v.createdAt), monto: Number(v.monto) })),
         ajustesCapital.map((x) => ({ fecha: new Date(x.fecha), monto: Number(x.monto) })),
-        a.pagos.map((p) => ({ fecha: new Date(p.fecha), monto: Number(p.monto) })),
+        pagosList,
         corte,
+        fechaAmnistia,
       );
+      const interesAcumulado = round2(
+        ajustesInteres.reduce((s, x) => s + Number((x as unknown as { monto: unknown }).monto), 0),
+      );
+      const totalCapital = round2(
+        a.fiadoVentas.reduce((s, v) => s + Number(v.monto), 0) +
+          ajustesCapital.reduce((s, x) => s + Number((x as unknown as { monto: unknown }).monto), 0),
+      );
+      const saldoTotal = round2(totalCapital + interesAcumulado - totalPagos);
+      const deudaActual = round2(Math.max(0, saldoTotal));
       const yaAplicado = ajustesInteres.some(
         (x) => (x as unknown as { periodo?: string | null }).periodo === periodo,
       );
       const interes = calcularInteresSemanal(base, tasaMensual);
       let motivoOmision: string | null = null;
       if (!habilitado) motivoOmision = 'Intereses no habilitados en Configuración';
+      else if (!fechaAmnistia) motivoOmision = 'Falta fecha de amnistía en Configuración';
+      else if (saldoTotal <= 0) motivoOmision = 'Saldo a favor, no genera interés';
       else if (tasaMensual <= 0) motivoOmision = 'Sin tasa (ni propia ni global)';
-      else if (totalVencido <= 0) motivoOmision = 'Sin deuda vencida >7 días';
+      else if (totalVencido <= 0) motivoOmision = 'Sin deuda vencida >30 días';
       else if (base <= 0) motivoOmision = 'Pagos cubren lo vencido';
       else if (yaAplicado) motivoOmision = `Periodo ${periodo} ya aplicado`;
       else if (interes < 0.01) motivoOmision = 'Interés menor a $0,01';
@@ -140,6 +167,8 @@ export class AcreedoresInteresesService {
         tasaMensual: round2(tasaMensual),
         tasaSemanal: round2(tasaSemanalDesdeMensual(tasaMensual)),
         baseVencida: base,
+        interesAcumulado,
+        deudaActual,
         interes: motivoOmision ? 0 : interes,
         periodo,
         yaAplicado,
@@ -155,13 +184,14 @@ export class AcreedoresInteresesService {
     let aplicados = 0;
     for (const f of filas) {
       if (f.motivoOmision || f.interes <= 0) continue;
+      const deudaNueva = round2(f.deudaActual + f.interes);
       try {
         await this.prisma.ajusteAcreedor.create({
           data: {
             acreedorId: f.acreedorId,
             monto: f.interes,
             fecha: corte,
-            descripcion: `Interés semanal ${periodo} — ${f.tasaMensual}% mensual (→ ${f.tasaSemanal}% semanal) s/ $${f.baseVencida.toFixed(2)} vencido >7d`,
+            descripcion: `Interés semanal ${periodo} — ${f.tasaMensual}% mensual (→ ${f.tasaSemanal}% semanal) s/ base $${f.baseVencida.toFixed(2)} + int.acum. $${f.interesAcumulado.toFixed(2)} = deuda $${f.deudaActual.toFixed(2)} + nuevo $${f.interes.toFixed(2)} = $${deudaNueva.toFixed(2)}`,
             esInteres: true,
             periodo,
             tasaMensualAplicada: f.tasaMensual,
@@ -180,8 +210,9 @@ export class AcreedoresInteresesService {
     return { periodo, aplicados, omitidos, detalles: filas };
   }
 
-  // Lunes 12:30 UTC = 09:30 ART. Corte = lunes 12:00 UTC (incluye todo el finde).
-  @Cron('0 30 12 * * 1')
+  // Lunes 09:00 UTC = 06:00 ART (GMT-3). Corte = lunes 12:00 UTC (incluye todo el finde).
+  // Se corre temprano para que las notificaciones del lunes ya incluyan el interés.
+  @Cron('0 0 9 * * 1')
   async handleInteresSemanal() {
     try {
       const { habilitado } = await this.getConfig();

@@ -276,6 +276,7 @@ model Setting {
   enableAcreedoresModule Boolean @default(true)
   interesAcreedoresHabilitado Boolean @default(false)
   tasaInteresMensualAcreedores Decimal? @db.Decimal(5, 2)
+  interesFechaAmnistia DateTime?
   enableInternetModule        Boolean @default(false)
   enableLigasModule           Boolean @default(false)
   enablePlayersModule         Boolean @default(false)

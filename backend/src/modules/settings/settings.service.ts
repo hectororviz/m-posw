@@ -13,6 +13,16 @@ const DEFAULT_ERROR_ANIMATION_URL = '/animations/error.json';
 export class SettingsService {
   constructor(private prisma: PrismaService) {}
 
+  /** Normaliza la fecha de amnistía al lunes 12:00 UTC de su semana (convención del módulo). */
+  private normalizarLunesAmnistia(raw: string): Date {
+    const ref = new Date(raw);
+    const d = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), ref.getUTCDate(), 12, 0, 0));
+    const dow = d.getUTCDay();
+    const diff = (dow + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - diff);
+    return d;
+  }
+
   async getPublic() {
     const settings = await this.prisma.setting.findFirst();
     return {
@@ -83,6 +93,7 @@ export class SettingsService {
       enableEntradasModule: settings.enableEntradasModule,
       interesAcreedoresHabilitado: settings.interesAcreedoresHabilitado,
       tasaInteresMensualAcreedores: settings.tasaInteresMensualAcreedores != null ? Number(settings.tasaInteresMensualAcreedores) : null,
+      interesFechaAmnistia: settings.interesFechaAmnistia != null ? (settings.interesFechaAmnistia as Date).toISOString() : null,
       whatsappUseApi: settings.whatsappUseApi,
       whatsappWebMessage: settings.whatsappWebMessage,
       whatsappPhoneNumberId: settings.whatsappPhoneNumberId,
@@ -166,6 +177,14 @@ export class SettingsService {
         ...(dto.enableEntradasModule !== undefined ? { enableEntradasModule: dto.enableEntradasModule } : {}),
         ...(dto.interesAcreedoresHabilitado !== undefined ? { interesAcreedoresHabilitado: dto.interesAcreedoresHabilitado } : {}),
         ...(dto.tasaInteresMensualAcreedores !== undefined ? { tasaInteresMensualAcreedores: dto.tasaInteresMensualAcreedores } : {}),
+        ...(dto.interesFechaAmnistia !== undefined
+          ? {
+              interesFechaAmnistia:
+                dto.interesFechaAmnistia == null || dto.interesFechaAmnistia === ''
+                  ? null
+                  : this.normalizarLunesAmnistia(dto.interesFechaAmnistia as string),
+            }
+          : {}),
         ...(dto.whatsappUseApi !== undefined ? { whatsappUseApi: dto.whatsappUseApi } : {}),
         ...(dto.whatsappWebMessage !== undefined ? { whatsappWebMessage: dto.whatsappWebMessage } : {}),
         ...(dto.whatsappPhoneNumberId !== undefined ? { whatsappPhoneNumberId: dto.whatsappPhoneNumberId } : {}),

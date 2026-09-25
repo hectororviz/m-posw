@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateSettingDto {
@@ -135,6 +135,10 @@ export class UpdateSettingDto {
   @Min(0)
   @Type(() => Number)
   tasaInteresMensualAcreedores?: number | null;
+
+  @IsOptional()
+  @IsDateString()
+  interesFechaAmnistia?: string | null;
 
   @IsOptional()
   @IsArray()

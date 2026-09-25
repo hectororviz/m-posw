@@ -178,6 +178,7 @@ export interface Setting {
   enableAcreedoresModule?: boolean | null;
   interesAcreedoresHabilitado?: boolean | null;
   tasaInteresMensualAcreedores?: number | null;
+  interesFechaAmnistia?: string | null;
   enableInternetModule?: boolean | null;
   enableLigasModule?: boolean | null;
   enablePlayersModule?: boolean | null;
