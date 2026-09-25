@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.journeyapps.barcodescanner.ScanContract
@@ -66,6 +67,28 @@ class ConfigFragment : Fragment() {
         }
         b.btnTest.setOnClickListener { probar() }
         b.btnVolver.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
+
+        when (session.themeMode) {
+            "light" -> b.tgTheme.check(b.btnThemeLight.id)
+            "dark" -> b.tgTheme.check(b.btnThemeDark.id)
+            else -> b.tgTheme.check(b.btnThemeSystem.id)
+        }
+        b.tgTheme.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                b.btnThemeLight.id -> "light"
+                b.btnThemeDark.id -> "dark"
+                else -> "system"
+            }
+            session.themeMode = mode
+            AppCompatDelegate.setDefaultNightMode(
+                when (mode) {
+                    "light" -> AppCompatDelegate.MODE_NIGHT_NO
+                    "dark" -> AppCompatDelegate.MODE_NIGHT_YES
+                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                },
+            )
+        }
     }
 
     private fun refreshVersions() {

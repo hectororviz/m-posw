@@ -61,6 +61,10 @@ class SessionManager(context: Context) {
         get() = prefs.getInt("logoCacheVersion", -1)
         set(v) = prefs.edit().putInt("logoCacheVersion", v).apply()
 
+    var themeMode: String
+        get() = prefs.getString("themeMode", "system") ?: "system"
+        set(v) = prefs.edit().putString("themeMode", v).apply()
+
     /** Origen https sin el /api final, para resolver uploads relativos. */
     fun apiRoot(): String = baseUrl.removeSuffix("api/")
 

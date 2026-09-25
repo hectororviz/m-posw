@@ -87,7 +87,8 @@ Provisioning (una vez, online):
    "codigos":["L-013"],"cantidad":1,...,
    "datos":{"club":"...","torneo":"Femenino","rival":"Mundialito",
      "fecha":"2026-09-25","sector":"LOCAL","precioUnit":"1500.00",
-     "ventaId":"uuid","fechaPago":"...","footer":"Ticket no fiscal",
+     "ventaId":"uuid","fechaPago":"2026-09-25T23:18:00.000Z (ISO, hora de
+     pago; null si PENDING)","footer":"Ticket no fiscal",
      "qrImageUrl":"<misma imagen QR fija>"},
    "templateVersion":7,"logoVersion":3}
   APPROVED -> componer e imprimir (punto 4). EXPIRED/REJECTED ->

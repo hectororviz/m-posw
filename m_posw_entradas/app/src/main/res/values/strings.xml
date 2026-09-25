@@ -18,4 +18,8 @@
     <string name="volver">← Volver</string>
     <string name="vendidas">vendidas</string>
     <string name="config_desc">Configuración</string>
+    <string name="apariencia">Apariencia</string>
+    <string name="tema_sistema">Sistema</string>
+    <string name="tema_claro">Claro</string>
+    <string name="tema_oscuro">Noche</string>
 </resources>

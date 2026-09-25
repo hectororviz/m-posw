@@ -30,27 +30,27 @@
 
     <!-- Cobro: la acción más prominente de la pantalla -->
     <style name="Widget.Entradas.Button.Cobro" parent="Widget.Material3.Button">
-        <item name="android:minHeight">78dp</item>
-        <item name="android:textSize">19sp</item>
+        <item name="android:minHeight">64dp</item>
+        <item name="android:textSize">15sp</item>
         <item name="cornerRadius">20dp</item>
-        <item name="iconSize">30dp</item>
+        <item name="iconSize">24dp</item>
         <item name="iconTint">@color/cobro_on</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <!-- Sector L/V dentro del toggle group -->
     <style name="Widget.Entradas.Button.Sector" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="android:minHeight">68dp</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:textSize">17sp</item>
         <item name="cornerRadius">18dp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <!-- Stepper -/+ -->
     <style name="Widget.Entradas.Button.Stepper" parent="Widget.Material3.Button.TonalButton">
-        <item name="android:minHeight">72dp</item>
-        <item name="android:minWidth">72dp</item>
-        <item name="android:textSize">30sp</item>
+        <item name="android:minHeight">60dp</item>
+        <item name="android:minWidth">60dp</item>
+        <item name="android:textSize">28sp</item>
         <item name="cornerRadius">20dp</item>
     </style>
 

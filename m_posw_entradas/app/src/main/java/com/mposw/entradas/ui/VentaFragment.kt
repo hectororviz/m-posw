@@ -58,17 +58,17 @@ class VentaFragment : Fragment() {
         }
         b.btnMinus.setOnClickListener { if (cantidad > 1) cantidad--; refreshTotal() }
         b.btnPlus.setOnClickListener { if (cantidad < 10) cantidad++; refreshTotal() }
-        b.btnSocio.setOnClickListener {
-            scanSocio.launch(ScanOptions().setPrompt("Escaneá la credencial del socio").setBeepEnabled(true))
-        }
-        b.btnQuitarSocio.setOnClickListener {
-            socioUuid = null
-            b.tvSocio.text = ""
-            b.btnQuitarSocio.visibility = View.GONE
-        }
+        (activity as? MainActivity)?.setOnSocioClick(View.OnClickListener {
+            if (socioUuid != null) {
+                socioUuid = null
+                (activity as? MainActivity)?.setSocioActive(false)
+                toast("Socio quitado")
+            } else {
+                scanSocio.launch(ScanOptions().setPrompt("Escaneá la credencial del socio").setBeepEnabled(true))
+            }
+        })
         b.btnCash.setOnClickListener { cobrar("CASH") }
         b.btnQr.setOnClickListener { cobrar("MP_QR") }
-        b.btnReprint.setOnClickListener { reimprimir() }
         parentFragmentManager.setFragmentResultListener("qr_aprobado", this) { _, bundle ->
             val fixtureId = bundle.getString("fixtureId") ?: return@setFragmentResultListener
             val sec = bundle.getString("sector") ?: return@setFragmentResultListener
@@ -78,10 +78,15 @@ class VentaFragment : Fragment() {
         refreshSector()
         bindHeader()
         if (!session.isPaired) {
-            b.tvStatus.text = "Sin vincular: andá a Config y escaneá el QR de pairing."
+            toast("Sin vincular: andá a Config y escaneá el QR de pairing.")
         } else {
             cargarFixtures()
         }
+    }
+
+    private fun toast(msg: String) {
+        if (!isAdded) return
+        Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
     }
 
     private fun refreshSector() {
@@ -150,7 +155,8 @@ class VentaFragment : Fragment() {
             bindHeader()
             actualizarTorneo()
             actualizarSectores()
-            actualizarContadores()
+            refreshTotal()
+            (activity as? MainActivity)?.setSocioActive(socioUuid != null)
         }
     }
 
@@ -158,19 +164,6 @@ class VentaFragment : Fragment() {
         val f = current()
         b.btnLocal.text = session.clubName.ifBlank { "Local" }
         b.btnVisitante.text = f?.rival?.ifBlank { "Visitante" } ?: "Visitante"
-    }
-
-    private fun actualizarContadores() {
-        val f = current()
-        if (f == null) {
-            b.cardContadores.visibility = View.GONE
-            return
-        }
-        b.cardContadores.visibility = View.VISIBLE
-        b.tvNomLocal.text = session.clubName.ifBlank { "Local" }
-        b.tvNumLocal.text = f.vendidosL.toString()
-        b.tvNomVisitante.text = f.rival.ifBlank { "Visitante" }
-        b.tvNumVisitante.text = f.vendidosV.toString()
     }
 
     private fun actualizarTorneo() {
@@ -184,7 +177,6 @@ class VentaFragment : Fragment() {
             else if (sec == "LOCAL") fx.copy(vendidosL = fx.vendidosL + cant)
             else fx.copy(vendidosV = fx.vendidosV + cant)
         }
-        _b?.let { actualizarContadores() }
     }
 
     private fun current(): FixtureVigente? {
@@ -200,23 +192,21 @@ class VentaFragment : Fragment() {
 
     private fun refreshTotal() {
         val f = current()
-        b.tvCantidad.text = cantidad.toString()
+        _b?.tvCantidad?.text = cantidad.toString()
         val total = (f?.precioDouble ?: 0.0) * cantidad
-        b.tvTotal.text = "$${totalFmt.format(total)}"
+        (activity as? MainActivity)?.setBottomTotal("$$${totalFmt.format(total)}")
     }
 
     private fun cargarFixtures() {
         lifecycleScope.launch {
             try {
-                b.tvStatus.text = "Cargando partidos…"
                 val r = repo.vigentes()
                 fixtures = r.fixtures
                 if (fixtures.isEmpty()) {
-                    b.tvStatus.text = getString(com.mposw.entradas.R.string.sin_partidos)
+                    toast(getString(com.mposw.entradas.R.string.sin_partidos))
                     b.spFixture.adapter = null
                     actualizarTorneo()
                     actualizarSectores()
-                    actualizarContadores()
                 } else {
                     b.spFixture.adapter = ArrayAdapter(
                         requireContext(),
@@ -224,23 +214,20 @@ class VentaFragment : Fragment() {
                         fixtures,
                     )
                     b.spFixture.visibility = if (fixtures.size == 1) View.GONE else View.VISIBLE
-                    b.tvStatus.text = ""
                     b.spFixture.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
                         override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
                             refreshTotal()
                             actualizarTorneo()
                             actualizarSectores()
-                            actualizarContadores()
                         }
                         override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
                     }
                     actualizarTorneo()
                     actualizarSectores()
-                    actualizarContadores()
                 }
                 refreshTotal()
             } catch (e: Exception) {
-                b.tvStatus.text = ApiClient.parseError(e)
+                toast(ApiClient.parseError(e))
             }
         }
     }
@@ -260,21 +247,18 @@ class VentaFragment : Fragment() {
         if (uuid.isBlank()) return
         lifecycleScope.launch {
             try {
-                b.tvStatus.text = "Consultando socio…"
                 val r = repo.socio(uuid)
                 if (r.estado != "AL_DIA") {
-                    b.tvStatus.text = "Socio ${r.socio?.nombre ?: ""}: estado ${r.estado}. Sin descuento."
                     socioUuid = null
-                    b.tvSocio.text = ""
-                    b.btnQuitarSocio.visibility = View.GONE
+                    (activity as? MainActivity)?.setSocioActive(false)
+                    toast("Socio ${r.socio?.nombre ?: ""}: estado ${r.estado}. Sin descuento.")
                 } else {
                     socioUuid = uuid
-                    b.tvSocio.text = "${r.socio?.nombre} · ${r.socio?.nroSocio} · AL DÍA"
-                    b.tvStatus.text = "Socio aplicado. El descuento lo confirma el servidor."
-                    b.btnQuitarSocio.visibility = View.VISIBLE
+                    (activity as? MainActivity)?.setSocioActive(true)
+                    toast("Socio ${r.socio?.nombre ?: ""} aplicado. El descuento lo confirma el servidor.")
                 }
             } catch (e: Exception) {
-                b.tvStatus.text = "Socio: ${ApiClient.parseError(e)}"
+                toast("Socio: ${ApiClient.parseError(e)}")
             }
         }
     }
@@ -282,14 +266,13 @@ class VentaFragment : Fragment() {
     private fun cobrar(method: String) {
         val f = current()
         if (f == null) {
-            Toast.makeText(requireContext(), "No hay partido vigente", Toast.LENGTH_SHORT).show()
+            toast("No hay partido vigente")
             return
         }
         if (busy) return
         busy = true
         lifecycleScope.launch {
             try {
-                b.tvStatus.text = "Enviando…"
                 val (_, payload) = repo.intent(f.fixtureId, sector, cantidad, method, socioUuid)
                 repo.syncTemplateIfNeeded(payload.templateVersion, payload.logoVersion)
                 if (method == "CASH") {
@@ -297,19 +280,18 @@ class VentaFragment : Fragment() {
                         guardarEImprimir(payload)
                         registrarVentaLocal(f.fixtureId, sector, cantidad)
                         socioUuid = null
-                        b.tvSocio.text = ""
-                        b.btnQuitarSocio.visibility = View.GONE
+                        (activity as? MainActivity)?.setSocioActive(false)
                         PagoExitosoDialogFragment.new(
                             (payload.codigos ?: emptyList()).joinToString(", "),
                             payload.total,
                         ).show(parentFragmentManager, "ok")
                     } else {
-                        b.tvStatus.text = "Estado inesperado: ${payload.status}"
+                        toast("Estado inesperado: ${payload.status}")
                     }
                 } else {
                     val qrUrl = payload.qrImageUrl ?: payload.datos?.qrImageUrl
                     if (payload.saleId == null || qrUrl.isNullOrBlank()) {
-                        b.tvStatus.text = "QR no configurado en el servidor (qrImageUrl vacío)."
+                        toast("QR no configurado en el servidor (qrImageUrl vacío).")
                     } else {
                         val total = payload.total ?: totalFmt.format(f.precioDouble * cantidad)
                         QrPagoFragment.new(payload.saleId, qrUrl, total, f.fixtureId, sector, cantidad)
@@ -317,7 +299,7 @@ class VentaFragment : Fragment() {
                     }
                 }
             } catch (e: Exception) {
-                b.tvStatus.text = ApiClient.parseError(e)
+                toast(ApiClient.parseError(e))
             } finally {
                 busy = false
             }
@@ -330,30 +312,15 @@ class VentaFragment : Fragment() {
         val elements = TicketRenderer.parseTemplate(session.templateJson)
         val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
         val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
-        b.tvStatus.text = if (res.isSuccess) {
-            "APROBADA ${(payload.codigos ?: emptyList()).joinToString(", ")} · $${payload.total}"
+        if (res.isSuccess) {
+            toast("APROBADA ${(payload.codigos ?: emptyList()).joinToString(", ")} · $${payload.total}")
         } else {
-            "APROBADA pero sin imprimir. Usá Reimprimir. ${(payload.codigos ?: emptyList()).joinToString(", ")}"
-        }
-    }
-
-    private fun reimprimir() {
-        lifecycleScope.launch {
-            val last = AppDb.get(requireContext()).sales().last()
-            if (last == null) {
-                Toast.makeText(requireContext(), "No hay ventas guardadas", Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            val payload = repo.payloadFromJson(last.payloadJson) ?: return@launch
-            val elements = TicketRenderer.parseTemplate(session.templateJson)
-            val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
-            val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
-            b.tvStatus.text = if (res.isSuccess) "Reimpresa ${(payload.codigos ?: emptyList()).joinToString(", ")}"
-            else "No se pudo imprimir. Revisá papel/impresora."
+            toast("APROBADA pero sin imprimir: ${(payload.codigos ?: emptyList()).joinToString(", ")}")
         }
     }
 
     override fun onDestroyView() {
+        (activity as? MainActivity)?.setOnSocioClick(null)
         super.onDestroyView()
         _b = null
     }

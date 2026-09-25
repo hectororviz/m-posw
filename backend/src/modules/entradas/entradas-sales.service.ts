@@ -419,6 +419,7 @@ export class EntradasSalesService {
         fecha: anySale.fixture?.fecha ?? null,
         sector: sale.sector,
         ventaId: sale.id,
+        fechaPago: sale.paidAt ?? null,
         footer: 'Ticket no fiscal',
         qrImageUrl: setting?.mpEntradasQrData ?? null,
       },
