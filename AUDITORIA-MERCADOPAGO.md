@@ -185,22 +185,22 @@ Semana 1 bloqueantes: forzar firma estricta + tolerancia `ts`, agregar `X-Idempo
 Semana 2 altos: separar `test` y `live`, crear reembolsos + estados reales, endurecer polling con cursor persistido.
 Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos, pruebas de homologación con `payment_id` y `order_id` de prueba.
 
-## 8. Checklist de calidad
+## 8. Checklist de calidad (actualizado 2026-09-28 tras Fases 1-6, rama `fix/mp-homologacion-fase1`, sin deploy)
 
 | Criterio | Estado | Detalle |
 |---|---|---|
-| SDK oficial | No cumple | `fetch` manual, sin paquete `mercadopago` |
-| Credenciales prueba y producción | No cumple | Token único, sin `TEST-` y `APP_USR-` separados |
-| Idempotencia en creación | No cumple | Sin `X-Idempotency-Key` |
-| Idempotencia webhook | Parcial | Tabla única bien, falta en transferencias |
-| Firma webhook | Parcial | Lógica `HMAC` correcta pero desactivable |
-| Estados de pago | Parcial | `approved`, `pending`, `rejected` bien; `refunded`, `charged_back` mal |
-| Reembolsos | No cumple | Sin API de devoluciones |
-| Errores y reintentos | Parcial | Reintento simple, sin cola ni espera exponencial |
-| Seguridad y PCI | Cumple | QR + transferencia, sin tarjetas en servidor; corregir logs |
-| Experiencia de cobro | Parcial | Polling y cancelación bien; falta UX de `in_process` y `expired` |
-| OAuth y renovación | Cumple | Renovación a 5 minutos y cron diario |
-| Observabilidad | Parcial | Buenos prefijos `WEBHOOK_*`, falta correlación total por `requestId` |
+| SDK oficial | Cumple | `mercadopago@3.6.1` instalado; `getPayment` y `PaymentRefund` por SDK (Fase 2/4). PUT/DELETE Instore QR siguen por `fetch` (el SDK no cubre ese endpoint) con `X-Idempotency-Key` + retry |
+| Credenciales prueba y producción | Cumple (código; falta cargar valores) | `MP_ENV` + `MP_TEST_ACCESS_TOKEN` / `MP_LIVE_ACCESS_TOKEN` + guard fail-fast `live+TEST-` + entorno visible en `GET /mp-oauth/status` (Fase 3). Pendiente operativo: cargar tokens TEST en `.env` |
+| Idempotencia en creación | Cumple | `X-Idempotency-Key = <external_reference>:<uuid>` por intento en QR web y entradas + PUT idempotente por URL (Fase 2) |
+| Idempotencia webhook | Cumple | `PaymentEvent` unique + reserva `movimientoMP` pre-venta anti-doble-confirm (Fase 3 M2) |
+| Firma webhook | Cumple (código; falta secret) | Estricta en prod siempre, `merchant_order` igual que `payment`, tolerancia `ts` 300s, fail-closed sin secret (Fase 1). Pendiente operativo: `MP_WEBHOOK_SECRET` (§10.2) |
+| Estados de pago | Cumple | `refunded→REFUNDED`, `charged_back→CHARGEBACK`; `mapSaleStatus` los lleva a `REJECTED` (Fase 4) |
+| Reembolsos | Cumple | `POST /sales/:id/refund` solo ADMIN, total, con reversión stock+vouchers (Fase 4). Limitación v1: reembolsos desde panel MP no revierten stock |
+| Errores y reintentos | Cumple | Retry `500/1500/3000ms+jitter` en API + cola `WebhookRetry` 5 intentos `5s→30m` + `DEAD` manual (Fase 2/5). Sin Redis a propósito |
+| Seguridad y PCI | Cumple | QR + transferencia, sin tarjetas en servidor; logs recortados (Fase 1/2: sin headers/body) |
+| Experiencia de cobro | Cumple | Polling + cancelación + cron vencidos (Fase 5 L2); UX `IN_PROCESS`/`EXPIRED`/`REFUNDED`/`CHARGEBACK` con hints y botón Reintentar (Fase 6b) |
+| OAuth y renovación | Cumple | Renovación a 5 minutos y cron diario (sin cambios) |
+| Observabilidad | Cumple | Correlación total por `requestId` completo en webhook + retry + hints (Fase 1/5) |
 
 ## 9. Referencias
 
@@ -228,6 +228,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 | 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | HECHO | commit `850aa41` en `fix/mp-homologacion-fase1` (push ok) | build back+front ok; webhooks 18/18, instore 9/9, refunds 5/5, utils 6/6; enum aplicado en DB viva |
 | 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | HECHO | commit `bfc6e98` en `fix/mp-homologacion-fase1` (push ok) | build ok, 38/38 pass; tabla aplicada en DB viva |
 | 6 | Homologación: checklist + quality_evaluation + form_homologation | PARCIAL | form QR (prod.33) relevado; checklist API no aplicable; evaluation bloqueada | Bloqueado hasta deploy + pago TEST <7 días (ver §10.7) |
+| 6b | UX `in_process`/`expired` + §8 actualizado | HECHO | pendiente commit (CheckoutQrPage + §8) | build front ok |
 
 ### 10.1 Fase 1 — detalle (2026-09-28, HECHO, sin deploy aún)
 
@@ -297,5 +298,12 @@ Relevado vía MCP (cuenta con 3 apps: `solertest1`, `Noti-Transf`, `m-POSw 75663
 - `quality_checklist` → error en las 3 apps: `Product not homologable`. La API de homologación no cubre producto Instore QR; no es un problema de nuestro código.
 - `form_homologation get_form product_id=33 (QR Code)` → OK: 2 pasos (`operation`: marcas/países/cuentas; `qrFeatures`: descuentos por medio de pago opcional). Respuestas sugeridas: una marca, un país, una cuenta por país.
 - `quality_evaluation` → BLOQUEADO: exige `payment_id`/`order_id` TEST <7 días y no existe ningún cobro de prueba reciente (ni despliegue con los cambios). Pasos post-deploy: setear `MP_ENV=test` + `MP_TEST_ACCESS_TOKEN` (TEST-) en ventana de prueba, hacer 1 cobro QR + 1 transferencia + 1 reembolso, correr evaluation con esos IDs, luego `form submit` y volver a `MP_ENV=live`.
+
+### 10.8 Fase 6b — UX estados + §8 (2026-09-28, HECHO, sin deploy aún)
+
+- `frontend/src/pages/CheckoutQrPage.tsx`: mensajes diferenciados `IN_PROCESS` ("en proceso, no cierres"), `WAITING_PAYMENT`, `EXPIRED` ("el QR venció, generá uno nuevo"), `REFUNDED`/`CHARGEBACK` (antes caían en "Esperando pago…" sin mensaje); `handleTerminalStatus` maneja los 5 terminales con hint amigable de `mpStatusDetail` (`pending_waiting_payment`, `pending_contingency`, `pending_review_manual`, `expired`); timer visible solo mientras espera; botón `Reintentar pago` (primary) en errores terminales en vez de solo `Volver`.
+- §8 actualizado a estados reales post-Fases 1-5 (todo Cumple salvo pendientes operativos: valores TEST y secret).
+
+Verificación: `tsc + vite` ok (8.36s).
 
 Próximo paso para otra instancia: deploy (con `MP_WEBHOOK_SECRET` + `NODE_ENV=production` de §10.2) y luego evaluación con pagos TEST reales. Rollback: tag `pre-mp-homologacion-20260928` + backup `/tmp/opencode/mp-pre-backup-20260928.sql`.
