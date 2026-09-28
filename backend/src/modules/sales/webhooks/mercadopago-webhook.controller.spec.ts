@@ -90,6 +90,68 @@ describe('MercadoPagoWebhookController', () => {
     expect(processor.processWebhook).not.toHaveBeenCalled();
   });
 
+  it('rechaza merchant_order con firma invalida cuando el modo estricto esta habilitado', async () => {
+    const secret = 'secret';
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'MP_WEBHOOK_SECRET') return secret;
+        if (key === 'MP_WEBHOOK_STRICT_PAYMENT') return 'true';
+        return null;
+      }),
+    } as unknown as ConfigService;
+
+    const processor = {
+      processWebhook: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MercadoPagoWebhookProcessorService;
+
+    const controller = new MercadoPagoWebhookController(config, processor);
+    const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.handleWebhook(
+      { 'x-request-id': 'req-mo', 'x-signature': 'ts=1700000000, v1=deadbeef' },
+      { type: 'merchant_order', data: { id: '123' } },
+      { topic: 'merchant_order' },
+      { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
+      response as any,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(processor.processWebhook).not.toHaveBeenCalled();
+  });
+
+  it('rechaza firma valida pero con ts fuera de tolerancia (replay)', async () => {
+    const secret = 'secret';
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'MP_WEBHOOK_SECRET') return secret;
+        if (key === 'MP_WEBHOOK_STRICT_PAYMENT') return 'true';
+        return null;
+      }),
+    } as unknown as ConfigService;
+    const processor = {
+      processWebhook: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MercadoPagoWebhookProcessorService;
+    const controller = new MercadoPagoWebhookController(config, processor);
+
+    const resourceId = '789';
+    const requestId = 'req-stale';
+    const ts = '1700000000';
+    const manifest = `id:${resourceId};request-id:${requestId};ts:${ts};`;
+    const digest = createHmac('sha256', secret).update(manifest).digest('hex');
+
+    const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    await controller.handleWebhook(
+      { 'x-request-id': requestId, 'x-signature': `ts=${ts}, v1=${digest}` },
+      { type: 'payment', data: { id: resourceId } },
+      { topic: 'payment' },
+      { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
+      response as any,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(processor.processWebhook).not.toHaveBeenCalled();
+  });
+
   it('obtiene resourceId desde data.id y type', () => {
     const resourceId = getResourceId({
       query: { type: 'payment', 'data.id': '143523357831' },
