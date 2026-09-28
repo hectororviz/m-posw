@@ -3,7 +3,16 @@ import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { MercadoPagoWebhookProcessorService } from '../services/mercadopago-webhook-processor.service';
-import { getManifestId, getResourceId, verifySignature } from './mercadopago-webhook.utils';
+import { MercadoPagoQueryService } from '../services/mercadopago-query.service';
+import {
+  extractExternalReference,
+  getManifestId,
+  getResourceId,
+  isRecord,
+  mapMpPaymentToPaymentStatus,
+  verifySignature,
+} from './mercadopago-webhook.utils';
+import { PaymentStatus } from '@prisma/client';
 
 @SkipThrottle()
 @Controller('webhooks')
@@ -13,6 +22,7 @@ export class MercadoPagoWebhookController {
   constructor(
     private config: ConfigService,
     private processor: MercadoPagoWebhookProcessorService,
+    private mpQuery: MercadoPagoQueryService,
   ) {}
 
   @Post('mercadopago')
@@ -50,9 +60,14 @@ export class MercadoPagoWebhookController {
 
     const manifestId = getManifestId({ topic, body, query });
     const signatureResult = this.verifySignature({ headers, body }, manifestId, resourceId, topic);
+    let requestId = signatureResult.requestId;
     if (!signatureResult.isValid && signatureResult.shouldReject) {
-      response.status(401).json({ ok: false });
-      return;
+      if (await this.verifyFeedViaMpApi({ topic, body, query, resourceId })) {
+        requestId = requestId ?? requestIdHeader ?? undefined;
+      } else {
+        response.status(401).json({ ok: false });
+        return;
+      }
     }
 
     response.status(200).json({ ok: true });
@@ -62,7 +77,7 @@ export class MercadoPagoWebhookController {
           body,
           query,
           resourceId,
-          requestId: signatureResult.requestId,
+          requestId,
           topic,
         })
         .catch((error) => {
@@ -70,6 +85,87 @@ export class MercadoPagoWebhookController {
           this.logger.error(`WEBHOOK_PROCESSING_FAILED ${message}`);
         });
     });
+  }
+
+  private async verifyFeedViaMpApi(input: {
+    topic: string;
+    body: Record<string, unknown>;
+    query: Record<string, string>;
+    resourceId: string;
+  }): Promise<boolean> {
+    const queryDataId = input.query?.['data.id'];
+    const hasQueryDataId = typeof queryDataId === 'string' && queryDataId.trim() !== '';
+    const bodyData = isRecord(input.body?.data) ? input.body.data : null;
+    const bodyDataId = bodyData ? (bodyData as Record<string, unknown>).id : null;
+    const hasBodyDataId =
+      (typeof bodyDataId === 'string' && bodyDataId.trim() !== '') ||
+      typeof bodyDataId === 'number';
+    if (hasQueryDataId || hasBodyDataId) {
+      return false;
+    }
+    if (input.topic !== 'payment' && input.topic !== 'merchant_order') {
+      return false;
+    }
+    if (!/^\d+$/.test(input.resourceId)) {
+      return false;
+    }
+    try {
+      if (input.topic === 'payment') {
+        const payment = await this.mpQuery.getPayment(input.resourceId);
+        if (!isRecord(payment)) {
+          return false;
+        }
+        const status = typeof payment.status === 'string' ? payment.status : null;
+        const detail = typeof payment.status_detail === 'string' ? payment.status_detail : null;
+        if (mapMpPaymentToPaymentStatus(status, detail) !== PaymentStatus.APPROVED) {
+          this.logger.log(
+            `WEBHOOK_FEED_NOT_APPROVED topic=payment resourceId=${input.resourceId}`,
+          );
+          return false;
+        }
+        const ref = extractExternalReference(payment);
+        if (!ref || (!ref.startsWith('sale-') && !ref.startsWith('ticket-'))) {
+          this.logger.warn(
+            `WEBHOOK_FEED_REF_MISMATCH topic=payment resourceId=${input.resourceId}`,
+          );
+          return false;
+        }
+        this.logger.log(
+          `WEBHOOK_FEED_VERIFIED_VIA_API topic=payment resourceId=${input.resourceId} ref=${ref}`,
+        );
+        return true;
+      }
+      const resource = typeof input.body?.resource === 'string' ? input.body.resource : null;
+      const order = await this.mpQuery.getMerchantOrderByResource(resource, input.resourceId);
+      if (!isRecord(order)) {
+        return false;
+      }
+      const ref = extractExternalReference(order);
+      if (!ref || (!ref.startsWith('sale-') && !ref.startsWith('ticket-'))) {
+        this.logger.warn(
+          `WEBHOOK_FEED_REF_MISMATCH topic=merchant_order resourceId=${input.resourceId}`,
+        );
+        return false;
+      }
+      const rawPayments = (order as Record<string, unknown>).payments;
+      const payments = Array.isArray(rawPayments) ? rawPayments.filter(isRecord) : [];
+      const approved = payments.some(
+        (payment) =>
+          mapMpPaymentToPaymentStatus(
+            typeof payment.status === 'string' ? payment.status : null,
+            typeof payment.status_detail === 'string' ? payment.status_detail : null,
+          ) === PaymentStatus.APPROVED,
+      );
+      this.logger.log(
+        `WEBHOOK_FEED_VERIFIED_VIA_API topic=merchant_order resourceId=${input.resourceId} ref=${ref} approved=${approved}`,
+      );
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `WEBHOOK_FEED_API_VERIFY_FAILED topic=${input.topic} resourceId=${input.resourceId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
   }
 
   private verifySignature(
