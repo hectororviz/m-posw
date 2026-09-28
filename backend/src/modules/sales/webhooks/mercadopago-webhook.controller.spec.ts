@@ -24,7 +24,11 @@ describe('MercadoPagoWebhookController', () => {
       processWebhook: jest.fn().mockResolvedValue(undefined),
     } as unknown as MercadoPagoWebhookProcessorService;
 
-    const controller = new MercadoPagoWebhookController(config, processor);
+    const mpQuery = {
+      getPayment: jest.fn(),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
 
     const resourceId = '123';
     const requestId = 'req-1';
@@ -66,7 +70,11 @@ describe('MercadoPagoWebhookController', () => {
       processWebhook: jest.fn().mockResolvedValue(undefined),
     } as unknown as MercadoPagoWebhookProcessorService;
 
-    const controller = new MercadoPagoWebhookController(config, processor);
+    const mpQuery = {
+      getPayment: jest.fn(),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
 
     const resourceId = '456';
     const requestId = 'req-2';
@@ -104,7 +112,11 @@ describe('MercadoPagoWebhookController', () => {
       processWebhook: jest.fn().mockResolvedValue(undefined),
     } as unknown as MercadoPagoWebhookProcessorService;
 
-    const controller = new MercadoPagoWebhookController(config, processor);
+    const mpQuery = {
+      getPayment: jest.fn(),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
     const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
 
     await controller.handleWebhook(
@@ -131,7 +143,11 @@ describe('MercadoPagoWebhookController', () => {
     const processor = {
       processWebhook: jest.fn().mockResolvedValue(undefined),
     } as unknown as MercadoPagoWebhookProcessorService;
-    const controller = new MercadoPagoWebhookController(config, processor);
+    const mpQuery = {
+      getPayment: jest.fn(),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
 
     const resourceId = '789';
     const requestId = 'req-stale';
@@ -149,6 +165,112 @@ describe('MercadoPagoWebhookController', () => {
     );
 
     expect(response.status).toHaveBeenCalledWith(401);
+    expect(processor.processWebhook).not.toHaveBeenCalled();
+  });
+
+  it('acepta feed legacy con HMAC invalido si la API confirma pago aprobado propio', async () => {
+    const secret = 'secret';
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'MP_WEBHOOK_SECRET') return secret;
+        if (key === 'MP_WEBHOOK_STRICT_PAYMENT') return 'true';
+        return null;
+      }),
+    } as unknown as ConfigService;
+    const processor = {
+      processWebhook: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MercadoPagoWebhookProcessorService;
+    const mpQuery = {
+      getPayment: jest.fn().mockResolvedValue({
+        id: 181282340620,
+        status: 'approved',
+        status_detail: 'accredited',
+        external_reference: 'sale-abc-123',
+      }),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
+    const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.handleWebhook(
+      { 'x-request-id': 'req-feed', 'x-signature': 'ts=1700000000, v1=deadbeef' },
+      { resource: '181282340620', topic: 'payment' },
+      { id: '181282340620', topic: 'payment' },
+      { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
+      response as any,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(processor.processWebhook).toHaveBeenCalled();
+  });
+
+  it('rechaza feed legacy si el pago es ajeno o no aprobado', async () => {
+    const secret = 'secret';
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'MP_WEBHOOK_SECRET') return secret;
+        if (key === 'MP_WEBHOOK_STRICT_PAYMENT') return 'true';
+        return null;
+      }),
+    } as unknown as ConfigService;
+    const processor = {
+      processWebhook: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MercadoPagoWebhookProcessorService;
+    const mpQuery = {
+      getPayment: jest.fn().mockResolvedValue({
+        id: 999,
+        status: 'approved',
+        status_detail: 'accredited',
+        external_reference: 'other-system-ref',
+      }),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
+    const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.handleWebhook(
+      { 'x-request-id': 'req-feed', 'x-signature': 'ts=1700000000, v1=deadbeef' },
+      { resource: '999', topic: 'payment' },
+      { id: '999', topic: 'payment' },
+      { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
+      response as any,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(processor.processWebhook).not.toHaveBeenCalled();
+  });
+
+  it('no llama a la API si el formato nuevo trae HMAC invalido', async () => {
+    const secret = 'secret';
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'MP_WEBHOOK_SECRET') return secret;
+        if (key === 'MP_WEBHOOK_STRICT_PAYMENT') return 'true';
+        return null;
+      }),
+    } as unknown as ConfigService;
+    const processor = {
+      processWebhook: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MercadoPagoWebhookProcessorService;
+    const mpQuery = {
+      getPayment: jest.fn(),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
+    const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.handleWebhook(
+      { 'x-request-id': 'req-x', 'x-signature': 'ts=1700000000, v1=deadbeef' },
+      { type: 'payment', data: { id: '456' } },
+      { topic: 'payment' },
+      { method: 'POST', originalUrl: '/webhooks/mercadopago', url: '/webhooks/mercadopago' } as any,
+      response as any,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(mpQuery.getPayment).not.toHaveBeenCalled();
     expect(processor.processWebhook).not.toHaveBeenCalled();
   });
 
