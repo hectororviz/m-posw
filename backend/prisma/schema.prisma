@@ -261,6 +261,25 @@ model PaymentEvent {
   @@unique([provider, topic, resourceId])
 }
 
+model WebhookRetry {
+  id         String   @id @default(uuid()) @db.Uuid
+  provider   String   @default("MP")
+  topic      String
+  resourceId String
+  payload    Json
+  requestId  String?
+  attempts   Int      @default(0)
+  nextRetryAt DateTime
+  lastError  String?
+  status     String   @default("PENDING")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, topic, resourceId])
+  @@index([status, nextRetryAt])
+}
+
 model Setting {
   id          String   @id @default(uuid()) @db.Uuid
   storeName   String

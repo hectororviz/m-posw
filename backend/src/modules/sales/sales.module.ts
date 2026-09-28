@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
 import { InternetVouchersModule } from '../internet-vouchers/internet-vouchers.module';
@@ -13,7 +14,7 @@ import { RefundsService } from './services/refunds.service';
 import { SalesGateway } from './websockets/sales.gateway';
 
 @Module({
-  imports: [InternetVouchersModule, AcreedoresModule],
+  imports: [ScheduleModule.forRoot(), InternetVouchersModule, AcreedoresModule],
   controllers: [SalesController, MercadoPagoWebhookController],
   providers: [
     SalesService,

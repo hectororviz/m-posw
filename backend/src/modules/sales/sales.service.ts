@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MovementType, PaymentMethod, PaymentStatus, Prisma, ProductType, SaleStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../common/prisma.service';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto, SaleItemInputDto } from './dto/create-sale.dto';
@@ -400,6 +401,34 @@ export class SalesService {
     return { saleId: updatedSale.id, ticketPrintedAt: updatedSale.ticketPrintedAt, alreadyPrinted: false };
   }
 
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async cleanupExpiredQrSales() {
+    let stale: Array<{ id: string }> = [];
+    try {
+      stale = await this.prisma.sale.findMany({
+        where: {
+          status: SaleStatus.PENDING,
+          paymentMethod: PaymentMethod.MP_QR,
+          createdAt: { lt: new Date(Date.now() - 15 * 60 * 1000) },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 20,
+        select: { id: true },
+      });
+    } catch (error) {
+      this.logger.warn(`QR cleanup poll failed: ${error}`);
+      return;
+    }
+    for (const sale of stale) {
+      try {
+        await this.cancelQrSale(sale.id, { id: 'system-cron', role: 'ADMIN' });
+        this.logger.log(`QR cleanup: venta ${sale.id} cancelada por vencimiento (>15min PENDING)`);
+      } catch (error) {
+        this.logger.warn(`QR cleanup: no se pudo cancelar venta ${sale.id}: ${error}`);
+      }
+    }
+  }
+
   async cancelQrSale(saleId: string, requester: { id: string; role: string }) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
@@ -413,7 +442,15 @@ export class SalesService {
       throw new BadRequestException('La venta ya está aprobada');
     }
 
-    await this.mpService.deleteOrder();
+    try {
+      await this.mpService.deleteOrder();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('Mercado Pago error 404')) {
+        throw error;
+      }
+      this.logger.warn(`Cancel sale=${saleId}: orden MP ya inexistente (404), cancelando local`);
+    }
 
     const updatedSale = await this.prisma.sale.update({
       where: { id: saleId },

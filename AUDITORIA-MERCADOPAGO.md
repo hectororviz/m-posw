@@ -226,8 +226,8 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 | 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | commit `41b936e` en `fix/mp-homologacion-fase1` (push ok) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
 | 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | HECHO | commit `b422665` en `fix/mp-homologacion-fase1` (push ok) | build ok, 27/27 pass; columna aplicada en DB viva + migración idempotente para deploy |
 | 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | HECHO | commit `850aa41` en `fix/mp-homologacion-fase1` (push ok) | build back+front ok; webhooks 18/18, instore 9/9, refunds 5/5, utils 6/6; enum aplicado en DB viva |
-| 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | TODO | — | Sin Redis para no agregar punto de caída |
-| 6 | Homologación: checklist + quality_evaluation + form_homologation | TODO | — | Necesita `payment_id/order_id` TEST <7 días |
+| 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | HECHO | pendiente commit (WebhookRetry + processor + sales cron) | build ok, 38/38 pass; tabla aplicada en DB viva |
+| 6 | Homologación: checklist + quality_evaluation + form_homologation | PARCIAL | form QR (prod.33) relevado; checklist API no aplicable; evaluation bloqueada | Bloqueado hasta deploy + pago TEST <7 días (ver §10.7) |
 
 ### 10.1 Fase 1 — detalle (2026-09-28, HECHO, sin deploy aún)
 
@@ -281,4 +281,21 @@ Cambios frontend:
 
 Verificación: `prisma generate + validate` ok; `npm run build` backend ok; frontend `tsc + vite` ok (8.59s); suites: webhooks 18/18 (con nuevo mapeo), instore 9/9, refunds 5/5 nuevo. Combo de 4 suites en paralelo dio 1 worker flake (28 tests pass, 0 fail); re-corridas por separado e `--runInBand` todo verde.
 
-Próximo paso para otra instancia: Fase 5 (M1 cola DB persistente + L2 cron QR vencidos), luego Fase 6 (homologación TEST <7 días). Deploy general bloqueado hasta `MP_WEBHOOK_SECRET` + `NODE_ENV=production` (§10.2).
+### 10.6 Fase 5 — detalle (2026-09-28, HECHO, sin deploy aún)
+
+Cambios (sin Redis a propósito: un servicio más = un punto de caída más):
+- M1 Migración `20261229000001_add_webhook_retry` (idempotente): tabla `WebhookRetry` (`provider/topic/resourceId` unique, `payload` Json, `requestId`, `attempts`, `nextRetryAt`, `lastError`, `status PENDING|DONE|DEAD`, índice `(status,nextRetryAt)`). Aplicada en DB viva vía `psql`.
+- `mercadopago-webhook-processor.service.ts`: `processWebhook` ahora es wrapper (core + `enqueueRetry` + rethrow; el controller sigue respondiendo 200 inmediato y logueando como antes). `processWebhookCore` = lógica anterior intacta (transiciones de estado por duplicados preservadas). Backoff persistido `5s/30s/2m/10m/30m`, 5 intentos → `DEAD` (revisión manual, `WEBHOOK_RETRY_DEAD`). Cron `@Cron(EVERY_MINUTE)` reprocesa hasta 10 vencidos; `DEAD` no se toca (solo actualiza payload/error). `requestId` completo correlaciona todo el flujo (observabilidad).
+- L2 `sales.service.ts`: `cancelQrSale` tolera `404` de MP (orden ya inexistente → cancela local igual; antes fallaba y reintentaba eternamente). Cron `@Cron(EVERY_5_MINUTES)` cancela `MP_QR + PENDING + >15min` (máx 20, más viejas primero) como `system-cron/ADMIN`, con catch por venta. `sales.module.ts` importa `ScheduleModule.forRoot()`. Entradas (`TicketSale`) fuera de alcance: su cancelación la maneja el terminal.
+- Specs nuevos: `mercadopago-webhook-retry.spec.ts` (3 tests: enqueue+rethrow, DONE, DEAD) + `sales-cleanup.spec.ts` (2 tests: cancela 2 y tolera fallo, vacío no-op).
+
+Verificación: `prisma generate` ok; `npm run build` ok; 38/38 pass (webhooks 18, instore 9, refunds 5, utils 6, retry 3, cleanup 2 — corridas `--runInBand`; el runner paralelo da flakes de workers, no fallos de tests).
+
+### 10.7 Fase 6 — homologación (2026-09-28, PARCIAL, bloqueada hasta deploy)
+
+Relevado vía MCP (cuenta con 3 apps: `solertest1`, `Noti-Transf`, `m-POSw 7566305658638578`):
+- `quality_checklist` → error en las 3 apps: `Product not homologable`. La API de homologación no cubre producto Instore QR; no es un problema de nuestro código.
+- `form_homologation get_form product_id=33 (QR Code)` → OK: 2 pasos (`operation`: marcas/países/cuentas; `qrFeatures`: descuentos por medio de pago opcional). Respuestas sugeridas: una marca, un país, una cuenta por país.
+- `quality_evaluation` → BLOQUEADO: exige `payment_id`/`order_id` TEST <7 días y no existe ningún cobro de prueba reciente (ni despliegue con los cambios). Pasos post-deploy: setear `MP_ENV=test` + `MP_TEST_ACCESS_TOKEN` (TEST-) en ventana de prueba, hacer 1 cobro QR + 1 transferencia + 1 reembolso, correr evaluation con esos IDs, luego `form submit` y volver a `MP_ENV=live`.
+
+Próximo paso para otra instancia: deploy (con `MP_WEBHOOK_SECRET` + `NODE_ENV=production` de §10.2) y luego evaluación con pagos TEST reales. Rollback: tag `pre-mp-homologacion-20260928` + backup `/tmp/opencode/mp-pre-backup-20260928.sql`.
