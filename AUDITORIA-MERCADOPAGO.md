@@ -309,7 +309,8 @@ Verificación: `tsc + vite` ok (8.36s).
 
 ### 10.9 Fase 7 — limpieza `.env` (2026-09-28, PARCIAL, rama `chore/env-cleanup`)
 
-Pedido: limpiar `.env` (tokens MP supuestamente obsoletos con OAuth). Hallazgo del gate: `Setting.mpLinked=false`, sin token OAuth en DB → el runtime usa el fallback `.env` (`MP_ACCESS_TOKEN` live). La limpieza total (quitar tokens + fallback del código) rompería los cobros hoy: ABORTADA.
+Pedido: limpiar `.env` (tokens MP supuestamente obsoletos con OAuth). Gate inicial en DB de desarrollo (`m-posw-db-1`): `mpLinked=false` → se abortó la limpieza total por seguridad.
+Corrección con instancia productiva (`~/srv/mposw/soler`, contenedores `soler-*`): `Setting.mpLinked=true`, `mpAccessToken` (75ch), refresh válido hasta 2026-12-01, store/pos configurados → **prod usa OAuth (DB), no `.env`**. Su `.env` ni siquiera tiene `MP_ACCESS_TOKEN`/`MP_COLLECTOR_ID`/`MP_ENV`. Además prod SÍ tiene `MP_WEBHOOK_SECRET` y corre con `NODE_ENV=production` (verificado en container) → el fail-closed de Fase 1 funcionará al desplegar. La limpieza total del fallback legacy queda viable post-deploy (manteniendo `MP_ENV/TEST/LIVE` para homologación).
 Aplicado (cero riesgo, 0 referencias en código/compuestas/docs):
 - Eliminadas de `.env` y `.env.example`: `MP_DEFAULT_EXTERNAL_STORE_ID`, `MP_DEFAULT_EXTERNAL_POS_ID`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PIN`, `CAJA01_PASSWORD` (comentadas y activas).
 - Backup: `.env.bak-20260928` (gitignorado, junto a `.env.bak-20260914`).
