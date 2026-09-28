@@ -337,3 +337,11 @@ Bugs propios hallados al recuperar (fix en `sales.service.ts` + `sales-expire.sp
 - `expireIfNeeded` expiraba ANTES de buscar el pago (podía marcar `EXPIRED` una venta pagada). Ahora `findApprovedPayment()` primero: si MP tiene aprobado → aprueba local en vez de expirar.
 Verificación: build ok, 42/42 pass (38 + 4 nuevos).
 Resolución #1803 (2026-09-28 ~15:11): con secret + fix desplegados (`:latest` con `findApprovedPayment`), `GET payment-status` aprobó la venta (payment `181282340620`) y `POST complete` la finalizó con stock. Scan posterior: 0 firmas inválidas, 0 FATAL/DEAD.
+
+### 10.12 Scripts de instancias `~/srv/mposw` (2026-09-28, HECHO, fuera del repo git)
+
+Causa raíz del incidente: `scripts/make_instancia.sh` generaba `MP_SECRET=$(openssl rand -hex 24)` por instancia — MP jamás conoció esos valores → con firma estricta todo daría 401 en cualquier instancia nueva.
+- `make_instancia.sh`: secret fijo del panel (app `...638578`) con comentario de no-regenerar + backups `.bak-20260928`.
+- `templates/.env.template` + `templates/docker-compose.yml`: eliminados `ADMIN_EMAIL`/`ADMIN_NAME` (0 refs en código); comentario de secret compartido.
+- Verificado: `bash -n` OK + simulación de generación (0 placeholders restantes).
+- Pendiente: `noe7/.env` aún tiene el secret viejo (hash distinto) → actualizar antes de desplegarle el código nuevo + restart.
