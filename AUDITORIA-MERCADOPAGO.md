@@ -226,7 +226,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 | 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | commit `41b936e` en `fix/mp-homologacion-fase1` (push ok) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
 | 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | HECHO | commit `b422665` en `fix/mp-homologacion-fase1` (push ok) | build ok, 27/27 pass; columna aplicada en DB viva + migración idempotente para deploy |
 | 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | HECHO | commit `850aa41` en `fix/mp-homologacion-fase1` (push ok) | build back+front ok; webhooks 18/18, instore 9/9, refunds 5/5, utils 6/6; enum aplicado en DB viva |
-| 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | HECHO | pendiente commit (WebhookRetry + processor + sales cron) | build ok, 38/38 pass; tabla aplicada en DB viva |
+| 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | HECHO | commit `bfc6e98` en `fix/mp-homologacion-fase1` (push ok) | build ok, 38/38 pass; tabla aplicada en DB viva |
 | 6 | Homologación: checklist + quality_evaluation + form_homologation | PARCIAL | form QR (prod.33) relevado; checklist API no aplicable; evaluation bloqueada | Bloqueado hasta deploy + pago TEST <7 días (ver §10.7) |
 
 ### 10.1 Fase 1 — detalle (2026-09-28, HECHO, sin deploy aún)
