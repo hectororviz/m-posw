@@ -223,7 +223,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 |---|---|---|---|---|
 | 0 | Blindaje: tag + backup + branch + baseline tests | HECHO | tag `pre-mp-homologacion-20260928` (push ok), backup `/tmp/opencode/mp-pre-backup-20260928.sql`, branch `fix/mp-homologacion-fase1` | `git tag --list` ok, `pg_dump` 189K, tests base 16/16 pass |
 | 1 | C1 firma estricta + ts 5min + merchant_order igual + M3 recorte logs | HECHO | commit `5186da1` en branch `fix/mp-homologacion-fase1` (push ok) | 18/18 pass + `npm run build` ok |
-| 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | pendiente commit (package.json + instore.service) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
+| 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | commit `41b936e` en `fix/mp-homologacion-fase1` (push ok) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
 | 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | TODO | — | Requiere nuevas env `MP_ENV/MP_TEST_*/MP_LIVE_*` + `Setting.lastMpPollAt` |
 | 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | TODO | — | Requiere migración Prisma expand (ADD VALUE, sin rewrite) |
 | 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | TODO | — | Sin Redis para no agregar punto de caída |
