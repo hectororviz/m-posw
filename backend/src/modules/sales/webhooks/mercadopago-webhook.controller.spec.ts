@@ -274,6 +274,47 @@ describe('MercadoPagoWebhookController', () => {
     expect(processor.processWebhook).not.toHaveBeenCalled();
   });
 
+  it('bloquea la rama Feed tras 30 intentos/min por IP sin llamar a MP', async () => {
+    const secret = 'secret';
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'MP_WEBHOOK_SECRET') return secret;
+        if (key === 'MP_WEBHOOK_STRICT_PAYMENT') return 'true';
+        return null;
+      }),
+    } as unknown as ConfigService;
+    const processor = {
+      processWebhook: jest.fn().mockResolvedValue(undefined),
+    } as unknown as MercadoPagoWebhookProcessorService;
+    const mpQuery = {
+      getPayment: jest.fn(),
+      getMerchantOrderByResource: jest.fn(),
+    };
+    const controller = new MercadoPagoWebhookController(config, processor, mpQuery as any);
+    const req = {
+      method: 'POST',
+      originalUrl: '/webhooks/mercadopago',
+      url: '/webhooks/mercadopago',
+      ip: '10.0.0.9',
+      headers: {},
+      socket: {},
+    } as any;
+
+    for (let i = 0; i < 31; i++) {
+      const response = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      await controller.handleWebhook(
+        { 'x-request-id': `req-t-${i}`, 'x-signature': 'ts=1700000000, v1=deadbeef' },
+        { resource: '999', topic: 'payment' },
+        { id: '999', topic: 'payment' },
+        req,
+        response as any,
+      );
+      expect(response.status).toHaveBeenCalledWith(401);
+    }
+
+    expect(mpQuery.getPayment).toHaveBeenCalledTimes(30);
+  });
+
   it('obtiene resourceId desde data.id y type', () => {
     const resourceId = getResourceId({
       query: { type: 'payment', 'data.id': '143523357831' },

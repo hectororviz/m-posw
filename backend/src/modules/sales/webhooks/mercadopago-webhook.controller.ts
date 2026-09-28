@@ -18,6 +18,10 @@ import { PaymentStatus } from '@prisma/client';
 @Controller('webhooks')
 export class MercadoPagoWebhookController {
   private readonly logger = new Logger(MercadoPagoWebhookController.name);
+  private readonly feedAttempts = new Map<string, number[]>();
+  private static readonly FEED_WINDOW_MS = 60 * 1000;
+  private static readonly FEED_LIMIT_PER_MIN = 30;
+  private static readonly FEED_MAX_TRACKED_IPS = 10000;
 
   constructor(
     private config: ConfigService,
@@ -62,6 +66,13 @@ export class MercadoPagoWebhookController {
     const signatureResult = this.verifySignature({ headers, body }, manifestId, resourceId, topic);
     let requestId = signatureResult.requestId;
     if (!signatureResult.isValid && signatureResult.shouldReject) {
+      if (!this.allowFeedAttempt(request)) {
+        this.logger.warn(
+          `WEBHOOK_FEED_THROTTLED topic=${topic} resourceId=${resourceId} requestId=${requestIdHeader ?? 'missing'}`,
+        );
+        response.status(401).json({ ok: false });
+        return;
+      }
       if (await this.verifyFeedViaMpApi({ topic, body, query, resourceId })) {
         requestId = requestId ?? requestIdHeader ?? undefined;
       } else {
@@ -85,6 +96,33 @@ export class MercadoPagoWebhookController {
           this.logger.error(`WEBHOOK_PROCESSING_FAILED ${message}`);
         });
     });
+  }
+
+  private allowFeedAttempt(request: Request): boolean {
+    const forwarded = request.headers?.['x-forwarded-for'];
+    const firstForwarded = Array.isArray(forwarded)
+      ? forwarded[0]
+      : typeof forwarded === 'string'
+        ? forwarded.split(',')[0]
+        : undefined;
+    const ip = (firstForwarded ?? request?.ip ?? request?.socket?.remoteAddress ?? 'unknown').trim();
+    const now = Date.now();
+    const windowStart = now - MercadoPagoWebhookController.FEED_WINDOW_MS;
+    let hits = this.feedAttempts.get(ip) ?? [];
+    hits = hits.filter((at) => at > windowStart);
+    if (hits.length >= MercadoPagoWebhookController.FEED_LIMIT_PER_MIN) {
+      this.feedAttempts.set(ip, hits);
+      return false;
+    }
+    hits.push(now);
+    if (this.feedAttempts.size >= MercadoPagoWebhookController.FEED_MAX_TRACKED_IPS && !this.feedAttempts.has(ip)) {
+      const oldest = this.feedAttempts.keys().next();
+      if (!oldest.done) {
+        this.feedAttempts.delete(oldest.value);
+      }
+    }
+    this.feedAttempts.set(ip, hits);
+    return true;
   }
 
   private async verifyFeedViaMpApi(input: {

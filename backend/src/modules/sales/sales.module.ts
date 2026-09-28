@@ -11,11 +11,13 @@ import { MercadoPagoInstoreService } from './services/mercadopago-instore.servic
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 import { MercadoPagoWebhookProcessorService } from './services/mercadopago-webhook-processor.service';
 import { RefundsService } from './services/refunds.service';
+import { WebhookRetriesService } from './services/webhook-retries.service';
+import { WebhookRetriesController } from './webhooks/webhook-retries.controller';
 import { SalesGateway } from './websockets/sales.gateway';
 
 @Module({
   imports: [ScheduleModule.forRoot(), InternetVouchersModule, AcreedoresModule],
-  controllers: [SalesController, MercadoPagoWebhookController],
+  controllers: [SalesController, MercadoPagoWebhookController, WebhookRetriesController],
   providers: [
     SalesService,
     PrismaService,
@@ -24,6 +26,7 @@ import { SalesGateway } from './websockets/sales.gateway';
     MercadoPagoQueryService,
     MercadoPagoWebhookProcessorService,
     RefundsService,
+    WebhookRetriesService,
     SalesGateway,
   ],
   exports: [SalesService, MercadoPagoInstoreService, MercadoPagoQueryService, RefundsService],

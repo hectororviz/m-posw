@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { useAdminSales, useCashCloses, useManualMovements, useSettings } from '../api/queries';
+import { useAdminSales, useCashCloses, useManualMovements, useRetryWebhook, useSettings, useWebhookRetries } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
@@ -78,6 +78,22 @@ export const AdminSalesPage: React.FC = () => {
   const [isRefunding, setIsRefunding] = useState(false);
   const [isClosingPeriod, setIsClosingPeriod] = useState(false);
   const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const [salesTab, setSalesTab] = useState<'ventas' | 'reintentos'>('ventas');
+  const [retryStatus, setRetryStatus] = useState('');
+  const { data: retriesData } = useWebhookRetries(retryStatus || undefined, isAdmin);
+  const { data: deadData } = useWebhookRetries(isAdmin ? 'DEAD' : undefined, isAdmin && salesTab === 'ventas');
+  const retryWebhook = useRetryWebhook();
+  const deadCount = deadData?.total ?? 0;
+
+  const handleRetryWebhook = async (id: string) => {
+    try {
+      await retryWebhook.mutateAsync(id);
+      pushToast('Reintento encolado.', 'success');
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    }
+  };
   const [closePreview, setClosePreview] = useState<{
     from: string; to: string;
     summary: { salesTotal: number | string; salesCashTotal: number | string; salesQrTotal: number | string; salesTransferTotal?: number | string; movementsInTotal: number | string; movementsOutTotal: number | string; netCashDelta: number | string; };
@@ -305,6 +321,67 @@ export const AdminSalesPage: React.FC = () => {
 
   const handleOpenPrint = () => { setPrintStart(startDate ? `${startDate}T00:00` : ''); setPrintEnd(endDate ? `${endDate}T23:59` : ''); setIsPrintOpen(true); };
 
+  if (isAdmin && salesTab === 'reintentos') {
+    return (
+      <div>
+        <div className="page-header">
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Ventas</h2>
+              <p className="page-header-subtitle">Reintentos de webhook de Mercado Pago.</p>
+            </div>
+          </div>
+        </div>
+        <nav className="treasury-subnav">
+          <button type="button" className="treasury-subnav-link" onClick={() => setSalesTab('ventas')}>Ventas</button>
+          <button type="button" className="treasury-subnav-link active" onClick={() => setSalesTab('reintentos')}>Reintentos{deadCount > 0 ? ` (${deadCount})` : ''}</button>
+        </nav>
+        <div className="stock-toolbar">
+          <label className="input-field input-field--compact" style={{ margin: 0 }}>
+            <select value={retryStatus} onChange={(e) => setRetryStatus(e.target.value)} style={{ padding: '0.5rem 0.65rem', fontSize: '0.85rem' }}>
+              <option value="">Todos</option>
+              <option value="PENDING">Pendientes</option>
+              <option value="DONE">Procesados</option>
+              <option value="DEAD">Fallidos</option>
+            </select>
+          </label>
+        </div>
+        {(retriesData?.data ?? []).length === 0 ? (
+          <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
+            <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>Sin reintentos para este filtro.</p>
+          </div>
+        ) : (
+          <div className="sales-table-wrapper">
+            <div className="sales-table">
+              <div className="sales-table-head">
+                <span className="col-date">Fecha</span>
+                <span className="col-type">Tópico</span>
+                <span className="col-user">Recurso</span>
+                <span className="col-total">Intentos</span>
+                <span className="col-method">Estado</span>
+                <span className="col-action"></span>
+              </div>
+              {(retriesData?.data ?? []).map((job) => (
+                <div key={job.id} className="sales-table-row">
+                  <span className="col-date">{formatDate(job.updatedAt)} {formatTime(job.updatedAt)}</span>
+                  <span className="col-type">{job.topic}</span>
+                  <span className="col-user" title={job.lastError ?? ''}>{job.resourceId}</span>
+                  <span className="col-total">{job.attempts}</span>
+                  <span className="col-method">{job.status}</span>
+                  <span className="col-action">
+                    {(job.status === 'DEAD' || job.status === 'PENDING') && (
+                      <button type="button" className="btn-ghost btn-sm" disabled={retryWebhook.isPending} onClick={() => handleRetryWebhook(job.id)}>Reintentar</button>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -315,6 +392,12 @@ export const AdminSalesPage: React.FC = () => {
           </div>
         </div>
       </div>
+      {isAdmin && (
+        <nav className="treasury-subnav">
+          <button type="button" className="treasury-subnav-link active" onClick={() => setSalesTab('ventas')}>Ventas</button>
+          <button type="button" className="treasury-subnav-link" onClick={() => setSalesTab('reintentos')}>Reintentos{deadCount > 0 ? ` (${deadCount})` : ''}</button>
+        </nav>
+      )}
 
       <div className="sales-kpis">
         <div className="sales-kpi-card">
