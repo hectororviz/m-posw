@@ -196,17 +196,21 @@ export class MercadoPagoOauthService {
     return { ok: true, detection };
   }
 
-  async getStatus(): Promise<{ linked: boolean; expiresAt: Date | null; mpPosId: string | null; mpQrData: string | null }> {
+  async getStatus(): Promise<{ linked: boolean; expiresAt: Date | null; mpPosId: string | null; mpQrData: string | null; env: 'test' | 'live'; isTest: boolean; tokenSource: string }> {
     const setting = await this.prisma.setting.findUnique({
       where: { id: DEFAULT_SETTING_ID },
-      select: { mpLinked: true, mpTokenExpiresAt: true, mpPosId: true, mpQrData: true },
+      select: { mpLinked: true, mpTokenExpiresAt: true, mpPosId: true, mpQrData: true, mpAccessToken: true },
     });
+    const { env, isTest } = this.mpConfig.getEnvironment();
 
     return {
       linked: setting?.mpLinked ?? false,
       expiresAt: setting?.mpTokenExpiresAt ?? null,
       mpPosId: setting?.mpPosId ?? null,
       mpQrData: setting?.mpQrData ?? null,
+      env,
+      isTest,
+      tokenSource: setting?.mpLinked && setting?.mpAccessToken ? 'oauth' : this.mpConfig.getTokenSource(),
     };
   }
 

@@ -76,7 +76,8 @@ export class MercadoPagoWebhookController {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
     const secret =
       this.config.get<string>('MP_WEBHOOK_SECRET') ||
-      this.config.get<string>('MP_WEBHOOK_SECRET_LIVE');
+      this.config.get<string>('MP_WEBHOOK_SECRET_LIVE') ||
+      this.config.get<string>('MP_WEBHOOK_SECRET_TEST');
     const strictPayment = this.isStrictPaymentEnabled(isProduction);
     const isPaymentTopic = topic === 'payment' || topic === 'merchant_order';
 

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
 import { SalesService } from '../sales/sales.service';
@@ -41,92 +42,62 @@ export class PaymentsService {
   async pollTransfer(montoEsperado: number, userId: string): Promise<PollTransferResponse> {
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
-      throw new Error('MP_ACCESS_TOKEN no configurado');
+      throw new Error('MP access token no configurado (OAuth o .env)');
     }
 
-    // Calculate time range (last 2 minutes)
     const now = new Date();
-    const beginDate = new Date(now.getTime() - 2 * 60 * 1000);
-    
+    const beginDate = await this.getPollCursor(now);
     const beginDateISO = beginDate.toISOString();
     const endDateISO = now.toISOString();
 
-    // Build URL with query params
-    const url = new URL(`${this.baseUrl}/v1/payments/search`);
-    url.searchParams.append('range', 'date_created');
-    url.searchParams.append('begin_date', beginDateISO);
-    url.searchParams.append('end_date', endDateISO);
-    url.searchParams.append('sort', 'date_created');
-    url.searchParams.append('criteria', 'desc');
-    url.searchParams.append('limit', '10');
-    url.searchParams.append('status', 'approved');
-
-    this.logger.debug(`Polling MP transfers: ${url.toString()}`);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+    if (process.env.MP_INTEGRATOR_ID) {
+      headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+    }
 
     try {
-      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-      if (process.env.MP_INTEGRATOR_ID) {
-        headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
-      }
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers,
-        signal: controller.signal,
-      });
+      const payments = await this.searchTransferPayments(headers, beginDateISO, endDateISO);
 
-      const data = (await response.json()) as MPResponse;
-
-      if (!response.ok) {
-        this.logger.error(`MP API error: ${response.status}`, data);
-        throw new Error(`MercadoPago API error: ${response.status}`);
-      }
-
-      const payments = data.results || [];
-      
       // Filter for CVU/transfer payments
       const transferPayments = payments.filter((payment) => {
-        // Only CVU transfers or money transfers
-        const isTransfer = 
-          payment.payment_method_id === 'cvu' || 
+        const isTransfer =
+          payment.payment_method_id === 'cvu' ||
           payment.operation_type === 'money_transfer';
-        
+
         if (!isTransfer) return false;
-        
-        // Skip already processed payments for this session
+
         const paymentId = String(payment.id);
         if (this.seenPaymentIds.has(paymentId)) return false;
-        
+
         return true;
       });
 
       if (transferPayments.length === 0) {
+        await this.savePollCursor(now);
         return { hay_pago: false };
       }
 
       // Get the most recent payment
       const payment = transferPayments[0];
       const paymentId = String(payment.id);
-      
-      // Check if already stored in DB
+
+      // DB is source of truth (survives restarts, unlike seenPaymentIds)
       const existing = await this.prisma.movimientoMP.findUnique({
         where: { paymentId },
       });
 
-      if (existing?.notificado) {
-        // Already processed, skip it
+      if (existing?.notificado || existing?.procesado) {
         this.seenPaymentIds.add(paymentId);
+        await this.savePollCursor(now);
         return { hay_pago: false };
       }
 
-      // Format payer name
-      const payerName = payment.payer 
+      const payerName = payment.payer
         ? [payment.payer.first_name, payment.payer.last_name].filter(Boolean).join(' ') || payment.payer.email
         : undefined;
 
       this.logger.log(`Found transfer payment: ${paymentId}, amount: ${payment.transaction_amount}`);
+      await this.savePollCursor(now);
 
       return {
         hay_pago: true,
@@ -141,9 +112,86 @@ export class PaymentsService {
         throw new Error('Timeout consultando MercadoPago');
       }
       throw error;
-    } finally {
-      clearTimeout(timeout);
     }
+  }
+
+  private async getPollCursor(now: Date): Promise<Date> {
+    const DEFAULT_WINDOW_MS = 5 * 60 * 1000;
+    const MAX_WINDOW_MS = 15 * 60 * 1000;
+    try {
+      const setting = await this.prisma.setting.findFirst({
+        select: { lastMpPollAt: true },
+      });
+      if (setting?.lastMpPollAt) {
+        const cursor = new Date(setting.lastMpPollAt);
+        if (cursor > now) {
+          return new Date(now.getTime() - 2 * 60 * 1000);
+        }
+        if (now.getTime() - cursor.getTime() > MAX_WINDOW_MS) {
+          return new Date(now.getTime() - MAX_WINDOW_MS);
+        }
+        return cursor;
+      }
+    } catch {
+      this.logger.warn('No se pudo leer lastMpPollAt, usando ventana por defecto');
+    }
+    return new Date(now.getTime() - DEFAULT_WINDOW_MS);
+  }
+
+  private async savePollCursor(at: Date): Promise<void> {
+    try {
+      await this.prisma.setting.updateMany({ data: { lastMpPollAt: at } });
+    } catch {
+      this.logger.warn('No se pudo persistir lastMpPollAt');
+    }
+  }
+
+  private async searchTransferPayments(
+    headers: Record<string, string>,
+    beginDateISO: string,
+    endDateISO: string,
+  ): Promise<MPPayment[]> {
+    const PAGE_LIMIT = 50;
+    const MAX_PAGES = 3;
+    const all: MPPayment[] = [];
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const url = new URL(`${this.baseUrl}/v1/payments/search`);
+      url.searchParams.append('range', 'date_created');
+      url.searchParams.append('begin_date', beginDateISO);
+      url.searchParams.append('end_date', endDateISO);
+      url.searchParams.append('sort', 'date_created');
+      url.searchParams.append('criteria', 'desc');
+      url.searchParams.append('limit', String(PAGE_LIMIT));
+      url.searchParams.append('offset', String(page * PAGE_LIMIT));
+      url.searchParams.append('status', 'approved');
+
+      if (page === 0) {
+        this.logger.debug(`Polling MP transfers: ${url.toString()}`);
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      try {
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as MPResponse;
+        if (!response.ok) {
+          this.logger.error(`MP API error: ${response.status}`, data);
+          throw new Error(`MercadoPago API error: ${response.status}`);
+        }
+        const results = data.results || [];
+        all.push(...results);
+        if (results.length < PAGE_LIMIT) {
+          break;
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    return all;
   }
 
   async confirmTransfer(
@@ -218,7 +266,45 @@ export class PaymentsService {
       throw new Error('El total no coincide con los items y descuentos');
     }
 
-    // Create the sale and movimiento in a transaction
+    // Reserve paymentId FIRST (anti double-confirm concurrente: @@unique(paymentId)).
+    // Si otro request lo reservó, P2002 → devolver la venta existente o 409 si aún no terminó.
+    try {
+      await this.prisma.movimientoMP.create({
+        data: {
+          paymentId,
+          monto: roundedReceived,
+          montoEsperado: roundedTotal,
+          pagador: null,
+          tipo: 'cvu',
+          fecha: new Date(),
+          notificado: true,
+          procesado: false,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const concurrent = await this.prisma.movimientoMP.findUnique({
+          where: { paymentId },
+          include: { sale: true },
+        });
+        if (concurrent?.procesado && concurrent.saleId) {
+          return {
+            success: true,
+            saleId: concurrent.saleId,
+            orderNumber: concurrent.sale?.orderNumber,
+            message: 'Pago ya procesado',
+          };
+        }
+        if (concurrent && !concurrent.procesado && !concurrent.saleId) {
+          this.logger.warn(`Reserva previa sin venta paymentId=${paymentId}, completando venta`);
+        } else {
+          throw new ConflictException('Pago en proceso de confirmación, reintente');
+        }
+      }
+      throw error;
+    }
+
+    // Create the sale and link movimiento in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
       const sale = await tx.sale.create({
         data: {

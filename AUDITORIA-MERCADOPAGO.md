@@ -224,7 +224,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 | 0 | Blindaje: tag + backup + branch + baseline tests | HECHO | tag `pre-mp-homologacion-20260928` (push ok), backup `/tmp/opencode/mp-pre-backup-20260928.sql`, branch `fix/mp-homologacion-fase1` | `git tag --list` ok, `pg_dump` 189K, tests base 16/16 pass |
 | 1 | C1 firma estricta + ts 5min + merchant_order igual + M3 recorte logs | HECHO | commit `5186da1` en branch `fix/mp-homologacion-fase1` (push ok) | 18/18 pass + `npm run build` ok |
 | 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | commit `41b936e` en `fix/mp-homologacion-fase1` (push ok) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
-| 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | TODO | — | Requiere nuevas env `MP_ENV/MP_TEST_*/MP_LIVE_*` + `Setting.lastMpPollAt` |
+| 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | HECHO | pendiente commit (mp-config + oauth status + payments + migración) | build ok, 27/27 pass; columna aplicada en DB viva + migración idempotente para deploy |
 | 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | TODO | — | Requiere migración Prisma expand (ADD VALUE, sin rewrite) |
 | 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | TODO | — | Sin Redis para no agregar punto de caída |
 | 6 | Homologación: checklist + quality_evaluation + form_homologation | TODO | — | Necesita `payment_id/order_id` TEST <7 días |
@@ -255,4 +255,13 @@ Cambios:
 
 Verificación: `npm run build` ok; `src/modules/sales/webhooks/` 18/18 pass; `mercadopago-instore.service.spec.ts` 9/9 pass. Suite completa `src/modules/sales/` excede timeout local (no se corre entera para no bloquear).
 
-Próximo paso para otra instancia: Fase 3 (H2 test/live split + H3 cursor persistido + M2), luego Fase 4 (migración única refunds + idempotency key).
+### 10.4 Fase 3 — detalle (2026-09-28, HECHO, sin deploy aún)
+
+Cambios:
+- H2 `mp-config.service.ts`: `getEnvironment()` (`MP_ENV=test|live`, inferido por prefijo `TEST-`/`APP_USR-` si falta); `resolveEnvToken()` usa `MP_TEST_ACCESS_TOKEN` en test y `MP_LIVE_ACCESS_TOKEN` en live con fallback legacy `MP_ACCESS_TOKEN`; guard fail-fast: `live + TEST- → throw 'Token de prueba en entorno live'`; `test + APP_USR- → warn`. `getTokenSource()` para diagnóstico. `mercadopago-oauth.service.ts:getStatus()` ahora expone `env/isTest/tokenSource` (visible en panel). `.env.example`: `MP_ENV/MP_TEST_ACCESS_TOKEN/MP_LIVE_ACCESS_TOKEN`. Webhook acepta `MP_WEBHOOK_SECRET || _LIVE || _TEST`.
+- H3 `payments.service.ts`: cursor persistido `Setting.lastMpPollAt` (default 5min, clamp 15min, futuro → 2min); paginación `limit 50/offset` hasta 3 páginas (150 pagos, antes `limit 10` sin offset = pagos perdidos con >10); DB como fuente de verdad (`movimientoMP.notificado/procesado`, sobrevive reinicios; `seenPaymentIds` queda como caché extra); cursor se guarda en cada poll exitoso. Migración `20260928132541_add_setting_last_mp_poll_at` (`ADD COLUMN IF NOT EXISTS`, idempotente). Columna ya aplicada en DB viva vía `psql` (el container tiene imagen vieja sin la migración; en el próximo `up --build` se aplica sola sin conflicto).
+- M2 `confirmTransfer`: reserva `movimientoMP{procesado:false}` ANTES de crear la venta; doble confirm concurrente → `P2002` → si ya procesada devuelve venta existente, si reserva huérfana sin venta la completa, sino `409 Conflict` (antes: `upsert` post-venta = 2 ventas posibles).
+
+Verificación: `npx prisma generate + validate` ok; `npm run build` ok; webhooks 18/18 + instore 9/9 = 27/27 pass; backend container vivo (imagen vieja, deploy pendiente con secret).
+
+Próximo paso para otra instancia: Fase 4 (H1 refunds + REFUNDED/CHARGEBACK + `POST /sales/:id/refund` + columna `Sale.mpIdempotencyKey` en la misma migración), luego Fase 5 (M1 cola DB + L2 cron QR) y Fase 6 (homologación con TEST <7 días).

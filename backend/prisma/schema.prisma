@@ -314,6 +314,7 @@ model Setting {
   mpExternalStoreId String?
   mpQrData        String?
   mpLinked        Boolean  @default(false)
+  lastMpPollAt    DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

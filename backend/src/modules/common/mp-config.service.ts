@@ -54,11 +54,52 @@ export class MercadoPagoConfigService {
       this.logger.warn('No se pudo leer el token OAuth de la DB, usando fallback de .env');
     }
 
-    const envToken = this.config.get<string>('MP_ACCESS_TOKEN');
+    const { token: envToken, source } = this.resolveEnvToken();
     if (!envToken) {
-      this.logger.error('MP_ACCESS_TOKEN no configurado (ni en DB ni en .env)');
+      this.logger.error('MP access token no configurado (ni OAuth en DB ni en .env)');
+    } else if (source !== 'oauth') {
+      this.logger.debug(`MP token desde .env (${source})`);
     }
     return envToken ?? '';
+  }
+
+  getEnvironment(): { env: 'test' | 'live'; isTest: boolean } {
+    const raw = (this.config.get<string>('MP_ENV') || '').toLowerCase().trim();
+    if (raw === 'test' || raw === 'live') {
+      return { env: raw, isTest: raw === 'test' };
+    }
+    const probe =
+      this.config.get<string>('MP_TEST_ACCESS_TOKEN') ||
+      this.config.get<string>('MP_LIVE_ACCESS_TOKEN') ||
+      this.config.get<string>('MP_ACCESS_TOKEN') ||
+      '';
+    if (probe.startsWith('TEST-')) {
+      return { env: 'test', isTest: true };
+    }
+    return { env: 'live', isTest: false };
+  }
+
+  getTokenSource(): string {
+    return this.resolveEnvToken().source;
+  }
+
+  private resolveEnvToken(): { token: string | undefined; source: string } {
+    const { env } = this.getEnvironment();
+    const testToken = this.config.get<string>('MP_TEST_ACCESS_TOKEN');
+    const liveToken = this.config.get<string>('MP_LIVE_ACCESS_TOKEN');
+    const legacyToken = this.config.get<string>('MP_ACCESS_TOKEN');
+    const picked = env === 'test' ? testToken || legacyToken : liveToken || legacyToken;
+    const source = env === 'test' ? 'env-test' : 'env-live';
+    if (env === 'live' && picked?.startsWith('TEST-')) {
+      this.logger.error(
+        'MP_ENV=live con token TEST-: bloqueo arranque de cobros reales. Configure MP_LIVE_ACCESS_TOKEN (APP_USR-).',
+      );
+      throw new Error('Token de prueba en entorno live');
+    }
+    if (env === 'test' && picked?.startsWith('APP_USR-')) {
+      this.logger.warn('MP_ENV=test con token live (APP_USR-): solo para homologación controlada');
+    }
+    return { token: picked, source: picked === legacyToken && legacyToken ? 'legacy' : source };
   }
 
   async getCollectorId(): Promise<string> {
