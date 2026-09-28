@@ -128,6 +128,14 @@ como deuda conocida.
 | OAuth y renovación | Cumple | Umbral 5 min + cron; verificado `expiresAt` vigente en prod |
 | Observabilidad | Cumple parcial | Correlación `requestId` total; falta alerta ante racha de `INVALID`/`DEAD` |
 
+## 7. Resolución M1+M2+M3 (2026-09-28, rama `fix/mp-hallazgos-menores`, merge a `main`, desplegado en soler)
+
+- M1: sliding-window en memoria (30/min por IP, solo rama Feed) + `WEBHOOK_FEED_THROTTLED`; `@SkipThrottle` de clase intacto. Tests 23/23.
+- M2: `GET/POST /webhooks/retries[/:id/retry]` (VENTAS FULL + ADMIN) + tab "Reintentos" en `AdminSalesPage` con badge DEAD y reintento en 1 click. Verificado en prod: `200 {"total":0}`.
+- M3: log `TRANSFER_FILTERED_OUT` con dedup para medir 30 días; filtro sin cambios.
+- B1: confirmado N/A (Entradas usa POS MP dedicado). B2: diferido; el usuario fortalece contraseñas por su lado.
+- Verificación: build back+front ok, 31 tests back, frontend sirve bundle nuevo.
+
 ## 6. Referencias
 
 * Webhooks y firma `x-signature`: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
