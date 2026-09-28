@@ -1,5 +1,6 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PaymentStatus, Prisma, SaleStatus } from '@prisma/client';
 import { EntradasSalesService } from '../../entradas/entradas-sales.service';
 import { PrismaService } from '../../common/prisma.service';
@@ -49,6 +50,15 @@ export class MercadoPagoWebhookProcessorService {
   }
 
   async processWebhook(payload: WebhookPayload) {
+    try {
+      await this.processWebhookCore(payload);
+    } catch (error) {
+      await this.enqueueRetry(payload, error);
+      throw error;
+    }
+  }
+
+  async processWebhookCore(payload: WebhookPayload) {
     const { topic, resourceId, requestId } = payload;
     const eventResourceId = resourceId ?? 'unknown';
     const isNewEvent = await this.ensureIdempotency(topic, eventResourceId);
@@ -532,6 +542,126 @@ export class MercadoPagoWebhookProcessorService {
           })
         : null)
     );
+  }
+
+  private readonly webhookRetryDelaysMs = [5000, 30000, 120000, 600000, 1800000];
+  private readonly maxWebhookRetries = 5;
+
+  private async enqueueRetry(payload: WebhookPayload, error: unknown) {
+    const resourceId = payload.resourceId ?? 'unknown';
+    const message = error instanceof Error ? error.message : String(error);
+    const lastError = message.slice(0, 500);
+    try {
+      const existing = await this.prisma.webhookRetry.findUnique({
+        where: {
+          provider_topic_resourceId: { provider: 'MP', topic: payload.topic, resourceId },
+        },
+      });
+      if (existing?.status === 'DEAD') {
+        await this.prisma.webhookRetry.update({
+          where: { id: existing.id },
+          data: {
+            payload: toJsonValue({ body: payload.body, query: payload.query }),
+            lastError,
+          },
+        });
+        this.logger.warn(
+          `WEBHOOK_RETRY_DEAD_KEPT topic=${payload.topic} resourceId=${resourceId} requestId=${payload.requestId ?? 'unknown'}`,
+        );
+        return;
+      }
+      const nextRetryAt = new Date(Date.now() + this.webhookRetryDelaysMs[0]);
+      await this.prisma.webhookRetry.upsert({
+        where: {
+          provider_topic_resourceId: { provider: 'MP', topic: payload.topic, resourceId },
+        },
+        create: {
+          provider: 'MP',
+          topic: payload.topic,
+          resourceId,
+          payload: toJsonValue({ body: payload.body, query: payload.query }),
+          requestId: payload.requestId,
+          attempts: 0,
+          nextRetryAt,
+          lastError,
+          status: 'PENDING',
+        },
+        update: {
+          payload: toJsonValue({ body: payload.body, query: payload.query }),
+          requestId: payload.requestId,
+          status: 'PENDING',
+          lastError,
+          nextRetryAt,
+        },
+      });
+      this.logger.log(
+        `WEBHOOK_RETRY_ENQUEUED topic=${payload.topic} resourceId=${resourceId} requestId=${payload.requestId ?? 'unknown'}`,
+      );
+    } catch (dbError) {
+      this.logger.error(`WEBHOOK_RETRY_ENQUEUE_FAILED topic=${payload.topic} resourceId=${resourceId}: ${dbError}`);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async processDueRetries() {
+    let due: Array<{ id: string; topic: string; resourceId: string; payload: unknown; requestId: string | null; attempts: number }> = [];
+    try {
+      due = await this.prisma.webhookRetry.findMany({
+        where: { status: 'PENDING', nextRetryAt: { lte: new Date() } },
+        orderBy: { nextRetryAt: 'asc' },
+        take: 10,
+        select: { id: true, topic: true, resourceId: true, payload: true, requestId: true, attempts: true },
+      });
+    } catch (error) {
+      this.logger.warn(`WEBHOOK_RETRY_POLL_FAILED: ${error}`);
+      return;
+    }
+    for (const job of due) {
+      const stored = isRecord(job.payload) ? job.payload : null;
+      const body = stored && isRecord(stored.body) ? (stored.body as Record<string, unknown>) : {};
+      const queryRaw = stored?.query;
+      const query: Record<string, string> = isRecord(queryRaw)
+        ? Object.fromEntries(
+            Object.entries(queryRaw).filter(([, v]) => typeof v === 'string'),
+          ) as Record<string, string>
+        : {};
+      try {
+        await this.processWebhookCore({
+          body,
+          query,
+          resourceId: job.resourceId,
+          requestId: job.requestId ?? undefined,
+          topic: job.topic,
+        });
+        await this.prisma.webhookRetry.update({
+          where: { id: job.id },
+          data: { status: 'DONE', lastError: null },
+        });
+        this.logger.log(`WEBHOOK_RETRY_DONE topic=${job.topic} resourceId=${job.resourceId} attempts=${job.attempts}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const attempts = job.attempts + 1;
+        if (attempts >= this.maxWebhookRetries) {
+          await this.prisma.webhookRetry.update({
+            where: { id: job.id },
+            data: { status: 'DEAD', attempts, lastError: message.slice(0, 500) },
+          });
+          this.logger.error(
+            `WEBHOOK_RETRY_DEAD topic=${job.topic} resourceId=${job.resourceId} attempts=${attempts}: revisión manual`,
+          );
+        } else {
+          await this.prisma.webhookRetry.update({
+            where: { id: job.id },
+            data: {
+              attempts,
+              nextRetryAt: new Date(Date.now() + this.webhookRetryDelaysMs[Math.min(attempts, this.webhookRetryDelaysMs.length - 1)]),
+              lastError: message.slice(0, 500),
+            },
+          });
+          this.logger.warn(`WEBHOOK_RETRY_FAILED topic=${job.topic} resourceId=${job.resourceId} attempts=${attempts}`);
+        }
+      }
+    }
   }
 
   private async ensureIdempotency(topic: string, resourceId: string) {

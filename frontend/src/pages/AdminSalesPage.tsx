@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { useAdminSales, useCashCloses, useManualMovements, useSettings } from '../api/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
@@ -74,7 +75,9 @@ export const AdminSalesPage: React.FC = () => {
   const [printStart, setPrintStart] = useState('');
   const [printEnd, setPrintEnd] = useState('');
   const [isSavingMovement, setIsSavingMovement] = useState(false);
+  const [isRefunding, setIsRefunding] = useState(false);
   const [isClosingPeriod, setIsClosingPeriod] = useState(false);
+  const { user } = useAuth();
   const [closePreview, setClosePreview] = useState<{
     from: string; to: string;
     summary: { salesTotal: number | string; salesCashTotal: number | string; salesQrTotal: number | string; salesTransferTotal?: number | string; movementsInTotal: number | string; movementsOutTotal: number | string; netCashDelta: number | string; };
@@ -269,6 +272,30 @@ export const AdminSalesPage: React.FC = () => {
     window.location.href = `/printticket?data=${encodeURIComponent(encodeBase64(JSON.stringify(payload)))}`;
   };
 
+  const canRefundSelected =
+    user?.role === 'ADMIN' &&
+    selectedSale?.paymentMethod === 'MP_QR' &&
+    (selectedSale?.paymentStatus ?? 'APPROVED') === 'APPROVED' &&
+    !selectedSale?.refundedAt &&
+    selectedSale?.status === 'APPROVED';
+
+  const handleRefundSale = async () => {
+    if (!selectedSale || !canRefundSelected || isRefunding) return;
+    const ok = window.confirm(`¿Reembolsar el total de ${formatCurrency(selectedSale.total)} a Mercado Pago? Esta acción devuelve el dinero al cliente y revierte stock y vouchers.`);
+    if (!ok) return;
+    setIsRefunding(true);
+    try {
+      await apiClient.post(`/sales/${selectedSale.id}/refund`, {});
+      pushToast('Reembolso acreditado en Mercado Pago.', 'success');
+      setSelectedSaleId(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin-sales'] });
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
   const handleReprintCashCloseTicket = (cc: typeof selectedCashClose) => {
     if (!cc) return;
     const payload: TicketPayload = { clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: cc.closedAt, itemsStyle: 'summary', items: [], criteria: [{ label: 'Desde:', value: `${formatDate(cc.from)} ${formatTime(cc.from)}` }, { label: 'Hasta:', value: `${formatDate(cc.to)} ${formatTime(cc.to)}` }], summary: [{ label: 'Ventas:', value: formatCurrency(cc.salesTotal) }, { label: 'Efectivo:', value: formatCurrency(cc.salesCashTotal) }, { label: 'QR:', value: formatCurrency(cc.salesQrTotal) }, { label: 'Transferencia:', value: formatCurrency(cc.salesTransferTotal ?? 0) }, { label: '', value: '' }, { label: 'Entradas:', value: formatCurrency(cc.movementsInTotal) }, { label: 'Salidas:', value: formatCurrency(cc.movementsOutTotal) }, { label: 'Neto caja:', value: formatCurrency(cc.netCashDelta) }], title: 'CIERRE DE CAJA', footer: cc.note || 'Cierre de caja' };
@@ -359,6 +386,12 @@ export const AdminSalesPage: React.FC = () => {
               <div className="sales-detail-row"><span>Fecha</span><span>{formatDate(selectedSale.createdAt)} {formatTime(selectedSale.createdAt)}</span></div>
               <div className="sales-detail-row"><span>Total</span><strong>{formatCurrency(selectedSale.total)}</strong></div>
               <div className="sales-detail-row"><span>Medio de pago</span><span>{getPaymentMethodLabel(selectedSale.paymentMethod)}</span></div>
+              {(selectedSale.paymentStatus === 'REFUNDED' || selectedSale.refundedAt) && (
+                <div className="sales-detail-row"><span>Estado</span><span className="badge badge-neutral">Reembolsada</span></div>
+              )}
+              {selectedSale.paymentStatus === 'CHARGEBACK' && (
+                <div className="sales-detail-row"><span>Estado</span><span className="badge badge-neutral">Contracargo</span></div>
+              )}
               <div className="sales-detail-products">
                 {selectedSale.items.map((item) => (
                   <div key={item.id} className="sales-detail-product">{item.quantity} x {item.product.name} <span>{formatCurrency(item.subtotal)}</span></div>
@@ -378,6 +411,9 @@ export const AdminSalesPage: React.FC = () => {
               )}
               <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setSelectedSaleId(null)}>Cerrar</button>
+                {canRefundSelected && (
+                  <button type="button" className="btn-danger" onClick={handleRefundSale} disabled={isRefunding}>{isRefunding ? 'Reembolsando...' : 'Reembolsar'}</button>
+                )}
                 <button type="button" className="btn-secondary" onClick={() => handleReprintTicket(selectedSale.id)}>Reimprimir ticket</button>
               </div>
             </div>

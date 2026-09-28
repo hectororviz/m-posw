@@ -23,28 +23,25 @@ export class MercadoPagoWebhookController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    this.logger.log(
-      `WEBHOOK_RECEIVED ${JSON.stringify({
-        method: request.method,
-        url: request.originalUrl ?? request.url,
-        query,
-        headers,
-        body,
-      })}`,
-    );
-
     const resourceId = getResourceId({ query, body });
-    if (!resourceId) {
-      this.logger.warn('WEBHOOK_MP_PAYMENT_ID_MISSING');
-      response.status(200).json({ ok: true });
-      return;
-    }
     const topic =
       (typeof body?.topic === 'string' && body.topic) ||
       (typeof body?.type === 'string' && body.type) ||
       query?.topic ||
       query?.type ||
       'unknown';
+    const requestIdHeader = Array.isArray(headers['x-request-id'])
+      ? headers['x-request-id'][0]
+      : headers['x-request-id'];
+    this.logger.log(
+      `WEBHOOK_RECEIVED method=${request.method} url=${request.originalUrl ?? request.url} topic=${topic} resourceId=${resourceId ?? 'missing'} requestId=${requestIdHeader ?? 'missing'}`,
+    );
+
+    if (!resourceId) {
+      this.logger.warn('WEBHOOK_MP_PAYMENT_ID_MISSING');
+      response.status(200).json({ ok: true });
+      return;
+    }
 
     const manifestId = getManifestId({ topic, body, query });
     const signatureResult = this.verifySignature({ headers, body }, manifestId, resourceId, topic);
@@ -77,18 +74,23 @@ export class MercadoPagoWebhookController {
     topic: string,
   ) {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
-    const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
-    const strictPayment = this.isStrictPaymentEnabled();
+    const secret =
+      this.config.get<string>('MP_WEBHOOK_SECRET') ||
+      this.config.get<string>('MP_WEBHOOK_SECRET_LIVE') ||
+      this.config.get<string>('MP_WEBHOOK_SECRET_TEST');
+    const strictPayment = this.isStrictPaymentEnabled(isProduction);
+    const isPaymentTopic = topic === 'payment' || topic === 'merchant_order';
 
     if (!secret) {
       if (isProduction) {
-        this.logger.error('WEBHOOK_MP_SECRET_MISSING');
-        if (topic === 'payment' && strictPayment) {
-          return { isValid: false, shouldReject: true };
-        }
-        return { isValid: false, shouldReject: false };
+        this.logger.error(
+          'WEBHOOK_MP_SECRET_MISSING fail-closed: configure MP_WEBHOOK_SECRET antes de recibir cobros reales',
+        );
+        return { isValid: false, shouldReject: isPaymentTopic, requestId: undefined as string | undefined };
       }
-      this.logger.warn('WEBHOOK_MP_SECRET_MISSING_NON_STRICT');
+      this.logger.warn(
+        'WEBHOOK_MP_SECRET_MISSING_NON_STRICT dev-only: firma no verificada, no usar en produccion',
+      );
       return { isValid: true, requestId: undefined, shouldReject: false };
     }
 
@@ -103,19 +105,24 @@ export class MercadoPagoWebhookController {
 
     if (!result.isValid) {
       this.logger.warn(
-        `WEBHOOK_MP_SIGNATURE_INVALID ts=${result.ts ?? 'unknown'} received=${receivedSignatureSnippet} calculated=${calculatedHashSnippet} resourceId=${resourceId} requestId=${result.requestId ?? 'unknown'}`,
+        `WEBHOOK_MP_SIGNATURE_INVALID topic=${topic} ts=${result.ts ?? 'unknown'} received=${receivedSignatureSnippet} calculated=${calculatedHashSnippet} resourceId=${resourceId} requestId=${result.requestId ?? 'unknown'}`,
       );
-      if (topic === 'merchant_order') {
-        this.logger.warn(
-          `WEBHOOK_MP_SIGNATURE_INVALID_NON_STRICT topic=merchant_order requestId=${result.requestId ?? 'unknown'}`,
-        );
-        return { isValid: false, requestId: result.requestId, shouldReject: false };
-      }
       return {
         isValid: false,
         requestId: result.requestId,
-        shouldReject: topic === 'payment' && strictPayment,
+        shouldReject: isPaymentTopic && strictPayment,
       };
+    }
+
+    const ts = Number(result.ts ?? 0);
+    if (Number.isFinite(ts) && ts > 0) {
+      const skewSec = Math.abs(Date.now() / 1000 - ts);
+      if (skewSec > 300) {
+        this.logger.warn(
+          `WEBHOOK_MP_SIGNATURE_STALE topic=${topic} skewSec=${Math.round(skewSec)} resourceId=${resourceId} requestId=${result.requestId ?? 'unknown'}`,
+        );
+        return { isValid: false, requestId: result.requestId, shouldReject: true };
+      }
     }
 
     if (topic === 'merchant_order') {
@@ -127,14 +134,14 @@ export class MercadoPagoWebhookController {
     return { isValid: true, requestId: result.requestId, shouldReject: false };
   }
 
-  private isStrictPaymentEnabled() {
+  private isStrictPaymentEnabled(isProduction = false) {
+    if (isProduction) {
+      return true;
+    }
     const raw = this.config.get<string | boolean>('MP_WEBHOOK_STRICT_PAYMENT');
     if (raw === true || raw === 'true' || raw === '1') {
       return true;
     }
-    if (raw === false || raw === 'false' || raw === '0' || raw === undefined || raw === null) {
-      return false;
-    }
-    return Boolean(raw);
+    return false;
   }
 }

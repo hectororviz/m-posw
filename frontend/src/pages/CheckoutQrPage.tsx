@@ -51,14 +51,34 @@ const getStatusMessage = (status: PaymentStatus) => {
     case 'CANCELLED':
       return 'Pago cancelado.';
     case 'EXPIRED':
-      return 'Pago vencido.';
-    case 'PENDING':
+      return 'El QR venció sin acreditarse. Podés generar uno nuevo.';
+    case 'REFUNDED':
+      return 'Esta venta fue reembolsada.';
+    case 'CHARGEBACK':
+      return 'El pago fue desconocido (contracargo). Avisá en caja.';
     case 'IN_PROCESS':
+      return 'Tu pago está en proceso. No cierres esta pantalla…';
     case 'WAITING_PAYMENT':
+      return 'Pago en espera de acreditación…';
+    case 'PENDING':
     case 'NONE':
     default:
-      return 'Esperando pago…';
+      return 'Esperando pago… Escaneá el QR con Mercado Pago.';
   }
+};
+
+const mpDetailHints: Record<string, string> = {
+  pending_waiting_payment: 'Mercado Pago aún no acreditó el pago.',
+  pending_contingency: 'Mercado Pago procesa el pago con demora.',
+  pending_review_manual: 'El pago está en revisión manual de Mercado Pago.',
+  expired: 'El QR venció. Generá uno nuevo para reintentar.',
+};
+
+const getDetailHint = (detail: string | null) => {
+  if (!detail) {
+    return null;
+  }
+  return mpDetailHints[detail.toLowerCase()] ?? null;
 };
 
 export const CheckoutQrPage: React.FC = () => {
@@ -82,6 +102,13 @@ export const CheckoutQrPage: React.FC = () => {
   const itemsSnapshotRef = useRef(items);
 
   const isWaiting = waitingStatuses.has(status);
+  const isTerminalError =
+    status === 'REJECTED' ||
+    status === 'CANCELLED' ||
+    status === 'EXPIRED' ||
+    status === 'REFUNDED' ||
+    status === 'CHARGEBACK';
+  const detailHint = getDetailHint(mpStatusDetail);
 
   const statusMessage = useMemo(() => {
     return getStatusMessage(status);
@@ -145,8 +172,15 @@ export const CheckoutQrPage: React.FC = () => {
         }
         return;
       }
-      if (nextStatus === 'REJECTED' || nextStatus === 'CANCELLED' || nextStatus === 'EXPIRED') {
-        const message = detail || getStatusMessage(nextStatus);
+      if (
+        nextStatus === 'REJECTED' ||
+        nextStatus === 'CANCELLED' ||
+        nextStatus === 'EXPIRED' ||
+        nextStatus === 'REFUNDED' ||
+        nextStatus === 'CHARGEBACK'
+      ) {
+        const hint = getDetailHint(detail ?? null);
+        const message = hint || detail || getStatusMessage(nextStatus);
         setErrorMessage(message);
         pushToast(message, 'error');
       }
@@ -266,15 +300,22 @@ export const CheckoutQrPage: React.FC = () => {
           {isWaiting && <div className="spinner" aria-hidden="true" />}
           <p>{statusMessage}</p>
           <p className="qr-status">Estado: {status}</p>
-          <p className="qr-timer">{formatTime(timeLeft)}</p>
+          {isWaiting && <p className="qr-timer">{formatTime(timeLeft)}</p>}
           {!isWaiting && <p className="error-text">{statusMessage}</p>}
-          {mpStatusDetail && <p className="error-text">{mpStatusDetail}</p>}
+          {detailHint && <p className="error-text">{detailHint}</p>}
+          {!detailHint && mpStatusDetail && <p className="error-text">{mpStatusDetail}</p>}
           {errorMessage && <p className="error-text">{errorMessage}</p>}
         </div>
         <div className="checkout-actions">
-          <button type="button" className="ghost-button" onClick={() => navigate('/checkout/payment')}>
-            Volver
-          </button>
+          {isTerminalError ? (
+            <button type="button" className="primary-button" onClick={() => navigate('/checkout/payment')}>
+              Reintentar pago
+            </button>
+          ) : (
+            <button type="button" className="ghost-button" onClick={() => navigate('/checkout/payment')}>
+              Volver
+            </button>
+          )}
         </div>
       </div>
     </AppLayout>

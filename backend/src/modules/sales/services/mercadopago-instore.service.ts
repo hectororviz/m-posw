@@ -1,10 +1,13 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Sale, SaleItem } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { MercadoPagoConfigService } from '../../common/mp-config.service';
 import { PrismaService } from '../../common/prisma.service';
 
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
+const MP_RETRY_DELAYS_MS = [500, 1500, 3000];
 
 interface CreateOrderInput {
   sale: Sale & { items: (SaleItem & { product: { name: string; price: unknown } })[] };
@@ -60,7 +63,9 @@ export class MercadoPagoInstoreService {
     this.logger.debug(
       `Mercado Pago request: PUT ${url} (collectorId=${collectorId}, externalStoreId=${externalStoreId}, externalPosId=${externalPosId})`,
     );
-    await this.request('PUT', url, payload);
+    const idempotencyKey = `${payload.external_reference}:${randomUUID()}`;
+    this.logger.debug(`MP idempotency key sale=${input.sale.id} key=${idempotencyKey}`);
+    await this.request('PUT', url, payload, { idempotencyKey });
   }
 
   /**
@@ -121,7 +126,9 @@ export class MercadoPagoInstoreService {
     this.logger.debug(
       `Mercado Pago ticket order: PUT ${url} external_reference=${input.externalReference} total=${payload.total_amount}`,
     );
-    await this.request('PUT', url, payload);
+    const idempotencyKey = `${payload.external_reference}:${randomUUID()}`;
+    this.logger.debug(`MP idempotency key ticket=${input.externalReference} key=${idempotencyKey}`);
+    await this.request('PUT', url, payload, { idempotencyKey });
   }
 
   async deleteOrder(origen: 'default' | 'entradas' = 'default') {
@@ -134,9 +141,23 @@ export class MercadoPagoInstoreService {
     await this.request('DELETE', url);
   }
 
+  private async getSdkPaymentClient() {
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) {
+      throw new HttpException('MP_ACCESS_TOKEN no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    return new Payment(new MercadoPagoConfig({ accessToken: token }));
+  }
+
   async getPayment(paymentId: string) {
-    const url = `${this.baseUrl}/v1/payments/${paymentId}`;
-    return this.request('GET', url);
+    try {
+      const client = await this.getSdkPaymentClient();
+      return await client.get({ id: paymentId });
+    } catch (error) {
+      this.logger.warn(`MP SDK getPayment fallo, fallback a fetch paymentId=${paymentId}: ${error}`);
+      const url = `${this.baseUrl}/v1/payments/${paymentId}`;
+      return this.request('GET', url);
+    }
   }
 
   async getPosInfo(posId: string) {
@@ -329,7 +350,12 @@ export class MercadoPagoInstoreService {
     return 'https://pos.csdsoler.com.ar/api/webhooks/mercadopago';
   }
 
-  private async request<T = unknown>(method: string, url: string, payload?: unknown): Promise<T> {
+  private async request<T = unknown>(
+    method: string,
+    url: string,
+    payload?: unknown,
+    opts?: { idempotencyKey?: string },
+  ): Promise<T> {
     const token = await this.mpConfig.getAccessToken();
     if (!token) {
       throw new HttpException('MP_ACCESS_TOKEN no configurado', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -350,12 +376,6 @@ export class MercadoPagoInstoreService {
     this.logger.debug(
       `Mercado Pago request dispatch: ${method} ${url} payload=${payloadSummary ? JSON.stringify(payloadSummary) : 'none'}`,
     );
-    const controller = new AbortController();
-    let didTimeout = false;
-    const timeout = setTimeout(() => {
-      didTimeout = true;
-      controller.abort();
-    }, this.timeoutMs);
     const jsonBody = hasBody ? JSON.stringify(payload) : undefined;
     if (hasBody && !jsonBody) {
       throw new HttpException('Payload inválido para Mercado Pago', HttpStatus.BAD_REQUEST);
@@ -379,47 +399,107 @@ export class MercadoPagoInstoreService {
         }
       }
     }
-    try {
-      const headers: Record<string, string> = {
-        Authorization: `Bearer ${token}`,
-      };
-      if (process.env.MP_INTEGRATOR_ID) {
-        headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
-      }
-      if (hasBody) {
-        headers['Content-Type'] = 'application/json';
-      }
-      this.logger.debug(
-        `Mercado Pago request config: ${method} ${url} body=${jsonBody ?? 'none'}`,
-      );
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: jsonBody,
-        signal: controller.signal,
-      });
-      const text = await response.text();
-      if (!response.ok) {
-        const error: { response?: { status: number; data: string } } = {
-          response: { status: response.status, data: text },
-        };
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+    };
+    if (process.env.MP_INTEGRATOR_ID) {
+      headers['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
+    }
+    if (hasBody) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (opts?.idempotencyKey) {
+      headers['X-Idempotency-Key'] = opts.idempotencyKey;
+    }
+    this.logger.debug(
+      `Mercado Pago request config: ${method} ${url} hasBody=${hasBody} idempotency=${opts?.idempotencyKey ? 'yes' : 'no'}`,
+    );
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt <= MP_RETRY_DELAYS_MS.length; attempt++) {
+      const controller = new AbortController();
+      let didTimeout = false;
+      const timeout = setTimeout(() => {
+        didTimeout = true;
+        controller.abort();
+      }, this.timeoutMs);
+      try {
+        const response = await fetch(url, {
+          method,
+          headers,
+          body: jsonBody,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        const text = await response.text();
+        if (!response.ok) {
+          if (this.isRetryableStatus(response.status) && attempt < MP_RETRY_DELAYS_MS.length) {
+            clearTimeout(timeout);
+            this.logger.warn(
+              `Mercado Pago retryable status=${response.status} attempt=${attempt + 1} ${method} ${url}`,
+            );
+            await this.sleepWithJitter(MP_RETRY_DELAYS_MS[attempt]);
+            continue;
+          }
+          const error: { response?: { status: number; data: string } } = {
+            response: { status: response.status, data: text },
+          };
+          throw error;
+        }
+        const bodyPreview = this.truncateText(text, 1024);
+        const parsed = text ? this.safeJsonParse(text) : null;
+        const keyFields = this.extractKeyFields(parsed);
+        if (method === 'PUT' && url.includes('/instore/qr/')) {
+          this.logger.log(
+            `MP instore order OK status=${response.status} body_preview=${bodyPreview} key_fields=${JSON.stringify(
+              keyFields,
+            )}`,
+          );
+        } else {
+          this.logger.debug(
+            `Mercado Pago response OK status=${response.status} body_preview=${bodyPreview}`,
+          );
+        }
+        return (parsed ?? (text as unknown)) as T;
+      } catch (error) {
+        clearTimeout(timeout);
+        lastError = error;
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'response' in error &&
+          error.response
+        ) {
+          throw error;
+        }
+        if (error instanceof HttpException) {
+          throw error;
+        }
+        if (didTimeout) {
+          this.logger.error(
+            `Mercado Pago timeout after ${this.timeoutMs}ms on ${method} ${url} attempt=${attempt + 1}`,
+          );
+        }
+        if (attempt < MP_RETRY_DELAYS_MS.length && !didTimeout) {
+          const code =
+            typeof error === 'object' && error !== null && 'code' in error
+              ? String((error as { code?: string }).code)
+              : '';
+          if (code === 'AbortError' && !didTimeout) {
+            throw error;
+          }
+        }
+        if (attempt < MP_RETRY_DELAYS_MS.length && (didTimeout || this.isNetworkError(error))) {
+          this.logger.warn(
+            `Mercado Pago network retry attempt=${attempt + 1} ${method} ${url}`,
+          );
+          await this.sleepWithJitter(MP_RETRY_DELAYS_MS[attempt]);
+          continue;
+        }
         throw error;
       }
-      const bodyPreview = this.truncateText(text, 1024);
-      const parsed = text ? this.safeJsonParse(text) : null;
-      const keyFields = this.extractKeyFields(parsed);
-      if (method === 'PUT' && url.includes('/instore/qr/')) {
-        this.logger.log(
-          `MP instore order OK status=${response.status} body_preview=${bodyPreview} key_fields=${JSON.stringify(
-            keyFields,
-          )}`,
-        );
-      } else {
-        this.logger.debug(
-          `Mercado Pago response OK status=${response.status} body_preview=${bodyPreview}`,
-        );
-      }
-      return (parsed ?? (text as unknown)) as T;
+    }
+    try {
+      throw lastError;
     } catch (error) {
       if (
         typeof error === 'object' &&
@@ -434,11 +514,6 @@ export class MercadoPagoInstoreService {
         throw new HttpException(
           `Mercado Pago error ${response.status} en ${method} ${url}: ${response.data}`,
           HttpStatus.BAD_GATEWAY,
-        );
-      }
-      if (didTimeout) {
-        this.logger.error(
-          `Mercado Pago timeout after ${this.timeoutMs}ms on ${method} ${url}`,
         );
       }
       if (error instanceof HttpException) {
@@ -457,9 +532,36 @@ export class MercadoPagoInstoreService {
         `Mercado Pago network error: ${errorCode} ${errorMessage}`,
         HttpStatus.BAD_GATEWAY,
       );
-    } finally {
-      clearTimeout(timeout);
     }
+  }
+
+  private isRetryableStatus(status: number) {
+    return status === 429 || (status >= 500 && status <= 599);
+  }
+
+  private isNetworkError(error: unknown) {
+    if (typeof error !== 'object' || error === null) {
+      return true;
+    }
+    if ('code' in error) {
+      const code = String((error as { code?: unknown }).code ?? '');
+      if (
+        code === 'ECONNRESET' ||
+        code === 'ETIMEDOUT' ||
+        code === 'ENOTFOUND' ||
+        code === 'EAI_AGAIN' ||
+        code === 'UND_ERR_CONNECT_TIMEOUT' ||
+        code === 'UND_ERR_SOCKET'
+      ) {
+        return true;
+      }
+    }
+    return true;
+  }
+
+  private sleepWithJitter(baseMs: number) {
+    const jitter = Math.floor(Math.random() * 250);
+    return new Promise((resolve) => setTimeout(resolve, baseMs + jitter));
   }
 
   private safeJsonParse(text: string): Record<string, unknown> | null {
