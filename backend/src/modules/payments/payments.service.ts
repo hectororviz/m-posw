@@ -118,12 +118,17 @@ export class PaymentsService {
   private async getPollCursor(now: Date): Promise<Date> {
     const DEFAULT_WINDOW_MS = 5 * 60 * 1000;
     const MAX_WINDOW_MS = 15 * 60 * 1000;
+    // Solape: MP puede tardar en indexar/aprobar un pago ya creado. Sin solape,
+    // un pago creado cerca del fin de una ventana y aprobado después queda
+    // invisible para siempre (incidente transferencia 2026-09-28). El dedup
+    // (seenPaymentIds + movimientoMP) hace el solape seguro.
+    const OVERLAP_MS = 3 * 60 * 1000;
     try {
       const setting = await this.prisma.setting.findFirst({
         select: { lastMpPollAt: true },
       });
       if (setting?.lastMpPollAt) {
-        const cursor = new Date(setting.lastMpPollAt);
+        const cursor = new Date(setting.lastMpPollAt.getTime() - OVERLAP_MS);
         if (cursor > now) {
           return new Date(now.getTime() - 2 * 60 * 1000);
         }
