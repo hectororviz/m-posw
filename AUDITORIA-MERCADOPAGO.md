@@ -225,7 +225,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 | 1 | C1 firma estricta + ts 5min + merchant_order igual + M3 recorte logs | HECHO | commit `5186da1` en branch `fix/mp-homologacion-fase1` (push ok) | 18/18 pass + `npm run build` ok |
 | 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | commit `41b936e` en `fix/mp-homologacion-fase1` (push ok) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
 | 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | HECHO | commit `b422665` en `fix/mp-homologacion-fase1` (push ok) | build ok, 27/27 pass; columna aplicada en DB viva + migración idempotente para deploy |
-| 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | HECHO | pendiente commit (migración + refunds.service + controller + frontend) | build back+front ok, 33/33 suites nuevas; enum aplicado en DB viva |
+| 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | HECHO | commit `850aa41` en `fix/mp-homologacion-fase1` (push ok) | build back+front ok; webhooks 18/18, instore 9/9, refunds 5/5, utils 6/6; enum aplicado en DB viva |
 | 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | TODO | — | Sin Redis para no agregar punto de caída |
 | 6 | Homologación: checklist + quality_evaluation + form_homologation | TODO | — | Necesita `payment_id/order_id` TEST <7 días |
 
