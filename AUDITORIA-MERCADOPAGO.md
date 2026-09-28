@@ -336,3 +336,4 @@ Bugs propios hallados al recuperar (fix en `sales.service.ts` + `sales-expire.sp
 - `cancelQrSale` toleraba 404 solo por mensaje; el error real es objeto `{response:{status}}` → `String() = "[object Object]"` → 500 y cleanup fallando en ventas viejas.
 - `expireIfNeeded` expiraba ANTES de buscar el pago (podía marcar `EXPIRED` una venta pagada). Ahora `findApprovedPayment()` primero: si MP tiene aprobado → aprueba local en vez de expirar.
 Verificación: build ok, 42/42 pass (38 + 4 nuevos).
+Resolución #1803 (2026-09-28 ~15:11): con secret + fix desplegados (`:latest` con `findApprovedPayment`), `GET payment-status` aprobó la venta (payment `181282340620`) y `POST complete` la finalizó con stock. Scan posterior: 0 firmas inválidas, 0 FATAL/DEAD.
