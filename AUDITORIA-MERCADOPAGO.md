@@ -346,6 +346,12 @@ Síntoma: transferencia aprobada en MP (`181294008248`, $100, `account_money`/`m
 
 Con el secret correcto, el formato nuevo (`?data.id=&type=`, Webhooks v2) valida HMAC perfecto; el formato viejo (`?id=&topic=`, `user-agent: MercadoPago Feed v2.0`) no coincide con NINGUNA variante de manifest (16 probadas, 2 claves) → el Feed firma con otra clave/lógica no documentada. Solución (rama `fix/mp-feed-fallback`, merge a `main`): ante HMAC inválido en formato Feed, se verifica contra la API de MP (canal confiable OAuth): payment aprobado + `external_reference` propio (`sale-`/`ticket-`) → se procesa; si no → 401. Verificado en prod con venta #1805: `FEED_VERIFIED_VIA_API` payment + merchant_order → `APPROVED/APPROVED` en segundos. Formato nuevo sin `data.id` nunca toca la API (401 directo, 22/22 tests).
 
+### 10.12 Ter — finalize + zombies 400 (2026-09-28, HECHO y verificado en prod)
+
+- `cancelQrSale`/`expireIfNeeded`: toleran `400 in_store_order_delete_error` como orden inexistente (30 ventas QR zombies de ago–sep se cancelaron solas en el primer cron; 0 PENDING restantes).
+- `expireIfNeeded` al aprobar finaliza completo (estado APPROVED + stock + vouchers, con `updateMany` condicional anti-doble stock si el webhook llegó primero).
+- Specs `sales-expire.spec.ts` 6/6; regresión 31/31; merge a `main` y desplegado en soler.
+
 ### 10.12 Scripts de instancias `~/srv/mposw` (2026-09-28, HECHO, fuera del repo git)
 
 Causa raíz del incidente: `scripts/make_instancia.sh` generaba `MP_SECRET=$(openssl rand -hex 24)` por instancia — MP jamás conoció esos valores → con firma estricta todo daría 401 en cualquier instancia nueva.
