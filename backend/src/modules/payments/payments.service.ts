@@ -64,7 +64,17 @@ export class PaymentsService {
           payment.payment_method_id === 'cvu' ||
           payment.operation_type === 'money_transfer';
 
-        if (!isTransfer) return false;
+        if (!isTransfer) {
+          // Telemetría M3: medir métodos descartados para decidir si ampliar el filtro
+          const paymentId = String(payment.id);
+          if (!this.seenPaymentIds.has(`filtered:${paymentId}`)) {
+            this.seenPaymentIds.add(`filtered:${paymentId}`);
+            this.logger.debug(
+              `TRANSFER_FILTERED_OUT id=${paymentId} method=${payment.payment_method_id ?? '?'} op=${payment.operation_type ?? '?'} status=${payment.status ?? '?'}`,
+            );
+          }
+          return false;
+        }
 
         const paymentId = String(payment.id);
         if (this.seenPaymentIds.has(paymentId)) return false;

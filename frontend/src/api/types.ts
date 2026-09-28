@@ -1245,3 +1245,24 @@ export interface MpDetectedStore {
   address: string;
   pos: MpDetectedPos[];
 }
+
+export interface WebhookRetry {
+  id: string;
+  provider: string;
+  topic: string;
+  resourceId: string;
+  requestId?: string | null;
+  attempts: number;
+  nextRetryAt: string;
+  lastError?: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedWebhookRetries {
+  data: WebhookRetry[];
+  total: number;
+  page: number;
+  limit: number;
+}
