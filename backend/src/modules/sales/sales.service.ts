@@ -424,7 +424,8 @@ export class SalesService {
         await this.cancelQrSale(sale.id, { id: 'system-cron', role: 'ADMIN' });
         this.logger.log(`QR cleanup: venta ${sale.id} cancelada por vencimiento (>15min PENDING)`);
       } catch (error) {
-        this.logger.warn(`QR cleanup: no se pudo cancelar venta ${sale.id}: ${error}`);
+        const detail = error instanceof Error ? error.message : JSON.stringify(error)?.slice(0, 200);
+        this.logger.warn(`QR cleanup: no se pudo cancelar venta ${sale.id}: ${detail}`);
       }
     }
   }
@@ -445,8 +446,7 @@ export class SalesService {
     try {
       await this.mpService.deleteOrder();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!message.includes('Mercado Pago error 404')) {
+      if (!this.isMpNotFoundError(error)) {
         throw error;
       }
       this.logger.warn(`Cancel sale=${saleId}: orden MP ya inexistente (404), cancelando local`);
@@ -489,6 +489,19 @@ export class SalesService {
     throw error;
   }
 
+  private isMpNotFoundError(error: unknown) {
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+      const response = (error as { response?: unknown }).response;
+      if (typeof response === 'object' && response !== null && 'status' in response) {
+        if (Number((response as { status?: unknown }).status) === 404) {
+          return true;
+        }
+      }
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes('404');
+  }
+
   private async expireIfNeeded(
     sale: {
       id: string;
@@ -504,7 +517,33 @@ export class SalesService {
     if (sale.paymentStartedAt > cutoff) {
       return null;
     }
-    await this.mpService.deleteOrder();
+    const approvedPayment = await this.findApprovedPayment(`sale-${sale.id}`, sale.id);
+    if (approvedPayment) {
+      this.logger.log(`Venta ${sale.id} pagada en MP pero aún PENDING: aprobando en vez de expirar`);
+      return this.prisma.sale.update({
+        where: { id: sale.id },
+        data: {
+          paymentStatus: PaymentStatus.APPROVED,
+          paidAt: new Date(),
+          mpPaymentId: approvedPayment.paymentId,
+          mpStatus: approvedPayment.mpStatus,
+          mpStatusDetail: approvedPayment.mpStatusDetail,
+          statusUpdatedAt: new Date(),
+        },
+        include: {
+          user: { select: { id: true, username: true } },
+          items: { include: { product: { include: { category: true } } } },
+        },
+      });
+    }
+    try {
+      await this.mpService.deleteOrder();
+    } catch (error) {
+      if (!this.isMpNotFoundError(error)) {
+        throw error;
+      }
+      this.logger.warn(`Expire sale=${sale.id}: orden MP ya inexistente (404), expirando local`);
+    }
     return this.prisma.sale.update({
       where: { id: sale.id },
       data: {
@@ -706,6 +745,35 @@ export class SalesService {
     if (Math.abs(roundedReceived - computedTotal) > 0.009) {
       throw new BadRequestException('El total no coincide con los items');
     }
+  }
+
+  private async findApprovedPayment(
+    externalReference: string,
+    saleId: string,
+  ): Promise<{ paymentId: string; mpStatus: string | null; mpStatusDetail: string | null } | null> {
+    let searchResults: unknown = null;
+    try {
+      searchResults =
+        await this.mpQueryService.searchPaymentsByExternalReference(externalReference);
+    } catch (error) {
+      this.logger.warn(`MP pre-expire search failed saleId=${saleId}: ${error}`);
+      return null;
+    }
+    const latest = this.pickLatestPayment(searchResults);
+    if (!latest || typeof latest !== 'object') {
+      return null;
+    }
+    const record = latest as Record<string, unknown>;
+    const mpStatus = typeof record.status === 'string' ? record.status : null;
+    const mpStatusDetail = typeof record.status_detail === 'string' ? record.status_detail : null;
+    if (mapMpPaymentToPaymentStatus(mpStatus, mpStatusDetail) !== PaymentStatus.APPROVED) {
+      return null;
+    }
+    const paymentId = record.id !== undefined && record.id !== null ? String(record.id) : null;
+    if (!paymentId) {
+      return null;
+    }
+    return { paymentId, mpStatus, mpStatusDetail };
   }
 
   private pickLatestPayment(response: unknown) {

@@ -319,3 +319,20 @@ Aplicado (cero riesgo, 0 referencias en código/compuestas/docs):
 Condición para retomar la limpieza total: vincular OAuth en prod (`GET /mp-oauth/connect` → `mpLinked=true`) y recién ahí quitar legacy del código (ver plan en conversación 2026-09-28).
 
 Próximo paso para otra instancia: deploy (con `MP_WEBHOOK_SECRET` + `NODE_ENV=production` de §10.2) y luego evaluación con pagos TEST reales. Rollback: tag `pre-mp-homologacion-20260928` + backup `/tmp/opencode/mp-pre-backup-20260928.sql`.
+
+### 10.10 Deploy prod soler (2026-09-28, HECHO)
+
+- Merge a `main` (`9dc8225` + `aea6559`) + tag rescate `v2.0.1-pre-mp`. Actions compiló `:latest` (verificado en imagen: `processWebhookCore`, mapeo `REFUNDED`, bundle front con "Reintentar pago").
+- Instancia `~/srv/mposw/soler`: backup DB `soler-pre-mp-20260928.sql` (2.0M en `/tmp/opencode/`); `pull` + `down/up -d` (sin `--build`: soler usa imágenes del registry).
+- Migraciones aplicadas manual + `resolve --applied` x3 (el `ADD VALUE` de enum no corre en transacción de `migrate deploy`): `lastMpPollAt`, `REFUNDED/CHARGEBACK` + `mpIdempotencyKey` + `refundedAt`, tabla `WebhookRetry`. Arranque limpio, `migrate deploy` sin pendientes.
+- Humo: login OK, `GET /mp-oauth/status` → `linked:true, env:live, tokenSource:oauth`; frontend sirve bundle nuevo; únicos errores en logs = mis pruebas de humo (404/400 intencionales).
+- Rollback: pinnear `:v2.0.1-pre-mp` en compose, o tag `pre-mp-homologacion-20260928` + backup SQL.
+- Pendiente: ventana TEST (`MP_ENV=test` + token TEST) para `quality_evaluation` + `form submit` (§10.7).
+
+### 10.11 Incidente #1803 + fix expire-race (2026-09-28, HECHO, pendiente deploy)
+
+Síntoma: venta QR #1803 ($100) pagada en MP pero `PENDING` tras 2 min. Causa raíz: `MP_WEBHOOK_SECRET` de prod no coincidía con el generado en el panel (webhooks nunca configurados ahí) → `401` en todos los webhooks. Resuelto: secret del panel → `.env` prod (backup `.env.bak-20260928-secret`) + restart backend.
+Bugs propios hallados al recuperar (fix en `sales.service.ts` + `sales-expire.spec.ts` 4/4):
+- `cancelQrSale` toleraba 404 solo por mensaje; el error real es objeto `{response:{status}}` → `String() = "[object Object]"` → 500 y cleanup fallando en ventas viejas.
+- `expireIfNeeded` expiraba ANTES de buscar el pago (podía marcar `EXPIRED` una venta pagada). Ahora `findApprovedPayment()` primero: si MP tiene aprobado → aprueba local en vez de expirar.
+Verificación: build ok, 42/42 pass (38 + 4 nuevos).
