@@ -446,7 +446,7 @@ export class SalesService {
     try {
       await this.mpService.deleteOrder();
     } catch (error) {
-      if (!this.isMpNotFoundError(error)) {
+      if (!this.isMpOrderGoneError(error)) {
         throw error;
       }
       this.logger.warn(`Cancel sale=${saleId}: orden MP ya inexistente (404), cancelando local`);
@@ -489,17 +489,30 @@ export class SalesService {
     throw error;
   }
 
-  private isMpNotFoundError(error: unknown) {
+  private isMpOrderGoneError(error: unknown) {
     if (typeof error === 'object' && error !== null && 'response' in error) {
       const response = (error as { response?: unknown }).response;
-      if (typeof response === 'object' && response !== null && 'status' in response) {
-        if (Number((response as { status?: unknown }).status) === 404) {
+      if (typeof response === 'object' && response !== null) {
+        const record = response as { status?: unknown; data?: unknown };
+        if (Number(record.status) === 404) {
           return true;
+        }
+        if (Number(record.status) === 400 && typeof record.data === 'string') {
+          try {
+            const parsed = JSON.parse(record.data) as { error?: unknown };
+            if (parsed?.error === 'in_store_order_delete_error') {
+              return true;
+            }
+          } catch {
+            if (record.data.includes('in_store_order_delete_error')) {
+              return true;
+            }
+          }
         }
       }
     }
     const message = error instanceof Error ? error.message : String(error);
-    return message.includes('404');
+    return message.includes('404') || message.includes('in_store_order_delete_error');
   }
 
   private async expireIfNeeded(
@@ -520,9 +533,10 @@ export class SalesService {
     const approvedPayment = await this.findApprovedPayment(`sale-${sale.id}`, sale.id);
     if (approvedPayment) {
       this.logger.log(`Venta ${sale.id} pagada en MP pero aún PENDING: aprobando en vez de expirar`);
-      return this.prisma.sale.update({
-        where: { id: sale.id },
+      const claimed = await this.prisma.sale.updateMany({
+        where: { id: sale.id, status: SaleStatus.PENDING, paymentStatus: PaymentStatus.PENDING },
         data: {
+          status: SaleStatus.APPROVED,
           paymentStatus: PaymentStatus.APPROVED,
           paidAt: new Date(),
           mpPaymentId: approvedPayment.paymentId,
@@ -530,6 +544,25 @@ export class SalesService {
           mpStatusDetail: approvedPayment.mpStatusDetail,
           statusUpdatedAt: new Date(),
         },
+      });
+      if (claimed.count === 0) {
+        this.logger.log(`Venta ${sale.id} ya finalizada por otro camino, sin doble stock`);
+        return this.prisma.sale.findUnique({
+          where: { id: sale.id },
+          include: {
+            user: { select: { id: true, username: true } },
+            items: { include: { product: { include: { category: true } } } },
+          },
+        });
+      }
+      await this.decrementStockForSale(sale.id);
+      try {
+        await this.internetVouchers.generateVouchersForSale(sale.id);
+      } catch (err) {
+        this.logger.error(`Error generando vouchers para sale ${sale.id}: ${err}`);
+      }
+      return this.prisma.sale.findUnique({
+        where: { id: sale.id },
         include: {
           user: { select: { id: true, username: true } },
           items: { include: { product: { include: { category: true } } } },
@@ -539,7 +572,7 @@ export class SalesService {
     try {
       await this.mpService.deleteOrder();
     } catch (error) {
-      if (!this.isMpNotFoundError(error)) {
+      if (!this.isMpOrderGoneError(error)) {
         throw error;
       }
       this.logger.warn(`Expire sale=${sale.id}: orden MP ya inexistente (404), expirando local`);
