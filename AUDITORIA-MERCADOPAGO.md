@@ -338,6 +338,10 @@ Bugs propios hallados al recuperar (fix en `sales.service.ts` + `sales-expire.sp
 Verificación: build ok, 42/42 pass (38 + 4 nuevos).
 Resolución #1803 (2026-09-28 ~15:11): con secret + fix desplegados (`:latest` con `findApprovedPayment`), `GET payment-status` aprobó la venta (payment `181282340620`) y `POST complete` la finalizó con stock. Scan posterior: 0 firmas inválidas, 0 FATAL/DEAD.
 
+### 10.13 Incidente transferencia sin confirmación (2026-09-28, fix desplegado)
+
+Síntoma: transferencia aprobada en MP (`181294008248`, $100, `account_money`/`money_transfer`) nunca ofrecida por el poll. Causa: ventanas de 5s sin solape + cursor que solo avanza; un pago creado al borde y aprobado segundos después queda invisible para siempre (el filtro sí matcheaba). Fix (`payments.service.ts`): `getPollCursor` resta `OVERLAP_MS=3min` (dedup existente lo hace seguro) + spec `payments-poll.spec.ts` 2/2. Merge a `main` y desplegado en soler. La transferencia del incidente aparece en el próximo poll (reabrir la pantalla).
+
 ### 10.12 Bis — causa raíz firmas Feed + fallback verificado (2026-09-28, HECHO y verificado en prod)
 
 Con el secret correcto, el formato nuevo (`?data.id=&type=`, Webhooks v2) valida HMAC perfecto; el formato viejo (`?id=&topic=`, `user-agent: MercadoPago Feed v2.0`) no coincide con NINGUNA variante de manifest (16 probadas, 2 claves) → el Feed firma con otra clave/lógica no documentada. Solución (rama `fix/mp-feed-fallback`, merge a `main`): ante HMAC inválido en formato Feed, se verifica contra la API de MP (canal confiable OAuth): payment aprobado + `external_reference` propio (`sale-`/`ticket-`) → se procesa; si no → 401. Verificado en prod con venta #1805: `FEED_VERIFIED_VIA_API` payment + merchant_order → `APPROVED/APPROVED` en segundos. Formato nuevo sin `data.id` nunca toca la API (401 directo, 22/22 tests).
