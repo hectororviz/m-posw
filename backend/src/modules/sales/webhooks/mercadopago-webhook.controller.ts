@@ -36,6 +36,11 @@ export class MercadoPagoWebhookController {
     this.logger.log(
       `WEBHOOK_RECEIVED method=${request.method} url=${request.originalUrl ?? request.url} topic=${topic} resourceId=${resourceId ?? 'missing'} requestId=${requestIdHeader ?? 'missing'}`,
     );
+    if (this.isDumpEnabled()) {
+      this.logger.warn(
+        `WEBHOOK_DUMP url=${request.originalUrl ?? request.url} query=${JSON.stringify(query)} headers=${JSON.stringify(this.pickDumpHeaders(headers))} body=${JSON.stringify(body)?.slice(0, 2000)}`,
+      );
+    }
 
     if (!resourceId) {
       this.logger.warn('WEBHOOK_MP_PAYMENT_ID_MISSING');
@@ -132,6 +137,21 @@ export class MercadoPagoWebhookController {
     }
 
     return { isValid: true, requestId: result.requestId, shouldReject: false };
+  }
+
+  private isDumpEnabled() {
+    const raw = this.config.get<string | boolean>('DEBUG_MP_WEBHOOK_DUMP');
+    return raw === true || raw === 'true' || raw === '1';
+  }
+
+  private pickDumpHeaders(headers: Record<string, string | string[] | undefined>) {
+    const picked: Record<string, unknown> = {};
+    for (const name of ['x-signature', 'x-request-id', 'content-type', 'user-agent']) {
+      if (headers[name] !== undefined) {
+        picked[name] = headers[name];
+      }
+    }
+    return picked;
   }
 
   private isStrictPaymentEnabled(isProduction = false) {
