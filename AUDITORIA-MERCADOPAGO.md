@@ -223,7 +223,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 |---|---|---|---|---|
 | 0 | Blindaje: tag + backup + branch + baseline tests | HECHO | tag `pre-mp-homologacion-20260928` (push ok), backup `/tmp/opencode/mp-pre-backup-20260928.sql`, branch `fix/mp-homologacion-fase1` | `git tag --list` ok, `pg_dump` 189K, tests base 16/16 pass |
 | 1 | C1 firma estricta + ts 5min + merchant_order igual + M3 recorte logs | HECHO | commit `5186da1` en branch `fix/mp-homologacion-fase1` (push ok) | 18/18 pass + `npm run build` ok |
-| 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | TODO | — | Siguiente paso: `npm i mercadopago`, wrapper en `mercadopago-instore.service.ts`, `Sale.mpIdempotencyKey` |
+| 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | pendiente commit (package.json + instore.service) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
 | 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | TODO | — | Requiere nuevas env `MP_ENV/MP_TEST_*/MP_LIVE_*` + `Setting.lastMpPollAt` |
 | 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | TODO | — | Requiere migración Prisma expand (ADD VALUE, sin rewrite) |
 | 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | TODO | — | Sin Redis para no agregar punto de caída |
@@ -238,11 +238,21 @@ Cambios:
 
 Verificación: `npm test -- src/modules/sales/webhooks/` 18/18 pass; `npm run build` ok.
 
-### 10.2 BLOQUEADO — acción manual antes del deploy (evita caída de cobros)
+### 10.2 ACLARACIÓN — MP_WEBHOOK_SECRET es único de la app, NO por usuario (2026-09-28)
 
-` .env` actual: `MP_WEBHOOK_SECRET=MISSING`, `MP_WEBHOOK_SECRET_LIVE=MISSING`, `NODE_ENV=MISSING`.
-Sin secret, en cuanto `NODE_ENV=production` el código nuevo responde `401` a webhooks reales (fail-closed correcto para homologación, pero corta cobros QR hoy).
-Antes de `docker compose up --build`: copiar el secret desde panel MP → `.env` (`MP_WEBHOOK_SECRET=...`), setear `NODE_ENV=production`, y validar con 1 cobro QR test + `docker compose logs backend | grep WEBHOOK_`.
-Rollback: `git reset --hard pre-mp-homologacion-20260928` + restore backup + `docker compose up -d --build`.
+OAuth evita que cada vendedor toque el panel de MP: vincula con 1 click (`GET /mp-oauth/connect`) y el sistema guarda `mpAccessToken/Store/POS` por cuenta. El `MP_WEBHOOK_SECRET`, en cambio, es **uno solo, de NUESTRA aplicación** (`developers.mercadopago.com → Tus integraciones → la app con MP_CLIENT_ID → Webhooks → clave secreta`). MP firma todos los webhooks al `notification_url` (`https://pos.csdsoler.com.ar/api/webhooks/mercadopago`, ver `mercadopago-instore.service.ts:getNotificationUrl`) con esa clave. Por eso es un paso manual **único del operador**, no por usuario. Futuro (Fase 3+): guardar ese secret en tabla `Setting` editable desde `/admin` para no tocar `.env` (igual que WhatsApp).
 
-Próximo paso para otra instancia: commitear Fase 1 en `fix/mp-homologacion-fase1`, pushear branch, luego Fase 2 (SDK + idempotencia).
+BLOQUEADO antes del deploy: `.env` actual `MP_WEBHOOK_SECRET=MISSING`, `MP_WEBHOOK_SECRET_LIVE=MISSING`, `NODE_ENV=MISSING`. Sin secret, con `NODE_ENV=production` el código Fase 1 responde `401` a webhooks reales (fail-closed correcto para homologación, pero corta cobros QR hoy).
+Antes de `docker compose up --build`: copiar el secret de TU app MP → `.env` (`MP_WEBHOOK_SECRET=...`), setear `NODE_ENV=production`, validar con 1 cobro QR test + `docker compose logs backend | grep WEBHOOK_`.
+Rollback: `git reset --hard pre-mp-homologacion-20260928` + restore backup `/tmp/opencode/mp-pre-backup-20260928.sql` + `docker compose up -d --build`.
+
+### 10.3 Fase 2 — detalle (2026-09-28, HECHO, sin deploy aún)
+
+Cambios:
+- `backend/package.json`: agregada dependencia `mercadopago@3.6.1` (SDK oficial). Instalación requirió `sudo chown -R ubuntu:ubuntu node_modules package.json package-lock.json` porque `node_modules` había quedado con owner `root` del build Docker.
+- `mercadopago-instore.service.ts`: `createOrUpdateOrder` (ventas web `sale-<id>`) y `putTicketOrder` (entradas `ticket-<id>`) generan `X-Idempotency-Key = <external_reference>:<uuid>` por intento y lo reutilizan en los reintentos del mismo intento (evita doble orden ante timeout/doble click). `request()` envía el header, reintenta 3 veces `500/1500/3000ms+jitter ≤250ms` solo en `429/5xx/timeout/red` (4xx fail-fast), con `AbortController` fresco por intento y timeout 15s intacto. Log de request recortado a `hasBody/idempotency` (sin body completo, completa M3). `getPayment()` ahora usa SDK `Payment(new MercadoPagoConfig({accessToken}))` con fallback a `fetch` si el SDK falla (sin caída).
+- Decisión sin migración: NO se creó columna `Sale.mpIdempotencyKey` para evitar 2 migraciones; el PUT Instore ya es idempotente por URL (`external_reference` único) + header por intento. La columna se agregará en Fase 4 junto a `REFUNDED/CHARGEBACK` en una sola migración.
+
+Verificación: `npm run build` ok; `src/modules/sales/webhooks/` 18/18 pass; `mercadopago-instore.service.spec.ts` 9/9 pass. Suite completa `src/modules/sales/` excede timeout local (no se corre entera para no bloquear).
+
+Próximo paso para otra instancia: Fase 3 (H2 test/live split + H3 cursor persistido + M2), luego Fase 4 (migración única refunds + idempotency key).
