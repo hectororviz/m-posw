@@ -15,11 +15,14 @@ describe('mapMpPaymentToPaymentStatus', () => {
     expect(mapMpPaymentToPaymentStatus('in_process')).toBe(PaymentStatus.PENDING);
   });
 
-  it('maps rejected/cancelled/refunded/charged_back to REJECTED', () => {
+  it('maps rejected/cancelled to REJECTED', () => {
     expect(mapMpPaymentToPaymentStatus('rejected')).toBe(PaymentStatus.REJECTED);
     expect(mapMpPaymentToPaymentStatus('cancelled')).toBe(PaymentStatus.REJECTED);
-    expect(mapMpPaymentToPaymentStatus('refunded')).toBe(PaymentStatus.REJECTED);
-    expect(mapMpPaymentToPaymentStatus('charged_back')).toBe(PaymentStatus.REJECTED);
+  });
+
+  it('maps refunded/charged_back to their own states (Fase 4 H1)', () => {
+    expect(mapMpPaymentToPaymentStatus('refunded')).toBe(PaymentStatus.REFUNDED);
+    expect(mapMpPaymentToPaymentStatus('charged_back')).toBe(PaymentStatus.CHARGEBACK);
   });
 
   it('maps expired payments to EXPIRED', () => {

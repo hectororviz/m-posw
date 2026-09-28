@@ -9,6 +9,7 @@ import { MercadoPagoWebhookController } from './webhooks/mercadopago-webhook.con
 import { MercadoPagoInstoreService } from './services/mercadopago-instore.service';
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 import { MercadoPagoWebhookProcessorService } from './services/mercadopago-webhook-processor.service';
+import { RefundsService } from './services/refunds.service';
 import { SalesGateway } from './websockets/sales.gateway';
 
 @Module({
@@ -21,8 +22,9 @@ import { SalesGateway } from './websockets/sales.gateway';
     MercadoPagoInstoreService,
     MercadoPagoQueryService,
     MercadoPagoWebhookProcessorService,
+    RefundsService,
     SalesGateway,
   ],
-  exports: [SalesService, MercadoPagoInstoreService, MercadoPagoQueryService],
+  exports: [SalesService, MercadoPagoInstoreService, MercadoPagoQueryService, RefundsService],
 })
 export class SalesModule {}

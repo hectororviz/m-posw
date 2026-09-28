@@ -63,6 +63,8 @@ enum PaymentStatus {
   APPROVED
   REJECTED
   EXPIRED
+  REFUNDED
+  CHARGEBACK
 }
 
 enum MovementType {
@@ -199,6 +201,8 @@ model Sale {
   mpOrderId String?
   mpPaymentId String?
   mpMerchantOrderId String?
+  mpIdempotencyKey String?
+  refundedAt DateTime?
   mpQrData String?
   mpStatus String?
   mpStatusDetail String?

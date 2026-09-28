@@ -225,7 +225,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 | 1 | C1 firma estricta + ts 5min + merchant_order igual + M3 recorte logs | HECHO | commit `5186da1` en branch `fix/mp-homologacion-fase1` (push ok) | 18/18 pass + `npm run build` ok |
 | 2 | C2 SDK oficial + X-Idempotency-Key + L1 retry jitter | HECHO | commit `41b936e` en `fix/mp-homologacion-fase1` (push ok) | build ok, webhooks 18/18, instore 9/9; `Sale.mpIdempotencyKey` diferido a migración única Fase 4 |
 | 3 | H2 test/live split + H3 polling cursor persistido + M2 idempotencia transfer | HECHO | commit `b422665` en `fix/mp-homologacion-fase1` (push ok) | build ok, 27/27 pass; columna aplicada en DB viva + migración idempotente para deploy |
-| 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | TODO | — | Requiere migración Prisma expand (ADD VALUE, sin rewrite) |
+| 4 | H1 refunds + REFUNDED/CHARGEBACK + endpoint `POST /sales/:id/refund` | HECHO | pendiente commit (migración + refunds.service + controller + frontend) | build back+front ok, 33/33 suites nuevas; enum aplicado en DB viva |
 | 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | TODO | — | Sin Redis para no agregar punto de caída |
 | 6 | Homologación: checklist + quality_evaluation + form_homologation | TODO | — | Necesita `payment_id/order_id` TEST <7 días |
 
@@ -264,4 +264,21 @@ Cambios:
 
 Verificación: `npx prisma generate + validate` ok; `npm run build` ok; webhooks 18/18 + instore 9/9 = 27/27 pass; backend container vivo (imagen vieja, deploy pendiente con secret).
 
-Próximo paso para otra instancia: Fase 4 (H1 refunds + REFUNDED/CHARGEBACK + `POST /sales/:id/refund` + columna `Sale.mpIdempotencyKey` en la misma migración), luego Fase 5 (M1 cola DB + L2 cron QR) y Fase 6 (homologación con TEST <7 días).
+### 10.5 Fase 4 — detalle (2026-09-28, HECHO, sin deploy aún)
+
+Alcance acordado: reembolso TOTAL, solo `MP_QR`, revierte stock + desactiva vouchers, botón en detalle de venta solo ADMIN.
+
+Cambios backend:
+- Migración `20261229000000_add_mp_refund_states` (nombre posterior a la última existente para orden correcto): `PaymentStatus ADD VALUE IF NOT EXISTS REFUNDED/CHARGEBACK` + `Sale.mpIdempotencyKey TEXT` (diferida de Fase 2, misma migración) + `Sale.refundedAt`. Aplicada en DB viva vía `psql` (enum verificado con 6 valores); migración idempotente para el próximo `up --build`.
+- `mercadopago-webhook.utils.ts`: `refunded→REFUNDED`, `charged_back→CHARGEBACK` (antes REJECTED); `mapSaleStatus` mapea ambos a `SaleStatus.REJECTED` (reportes intactos). Spec actualizado +1 test.
+- `sales/services/refunds.service.ts` (nuevo): `refundSale(saleId, {id, role})` — `403` si no ADMIN; valida QR + APPROVED + no reembolsada + `mpPaymentId`; SDK `PaymentRefund.create({payment_id, requestOptions:{idempotencyKey:'refund:<saleId>'}})` (reembolso total: sin `body`); transacción setea `REFUNDED/REJECTED/refundedAt` + `mpRaw` con respuesta y auditor (`refundedBy`); revierte stock con `increment` atómico (espejo de `decrementStockForSale`, compuestas incluidas); `deactivateBySale` en try/catch (si falla, warn y el admin reintenta desde vouchers). Errores MP ya-reembolsado → `409`.
+- `sales.controller.ts`: `POST /sales/:id/refund` con `@RequireModule(VENTAS, FULL)` + check ADMIN en servicio. Registrado en `sales.module.ts`.
+- Limitación v1 documentada: reembolsos hechos en panel MP llegan por webhook como `REFUNDED` sin reversión de stock/vouchers (el camino soportado es la GUI). Entradas (`TicketSale`) fuera de alcance.
+
+Cambios frontend:
+- `api/types.ts`: `PaymentStatus` suma `REFUNDED/CHARGEBACK`; `Sale` suma `paymentStatus/mpPaymentId/refundedAt`.
+- `AdminSalesPage.tsx`: botón `Reembolsar` (`btn-danger`) en el footer del modal solo si `role==='ADMIN' && MP_QR && paymentStatus APPROVED && !refundedAt && status APPROVED`; confirm con total, `isRefunding`, toast, `invalidateQueries(['admin-sales'])`; badges `Reembolsada/Contracargo`.
+
+Verificación: `prisma generate + validate` ok; `npm run build` backend ok; frontend `tsc + vite` ok (8.59s); suites: webhooks 18/18 (con nuevo mapeo), instore 9/9, refunds 5/5 nuevo. Combo de 4 suites en paralelo dio 1 worker flake (28 tests pass, 0 fail); re-corridas por separado e `--runInBand` todo verde.
+
+Próximo paso para otra instancia: Fase 5 (M1 cola DB persistente + L2 cron QR vencidos), luego Fase 6 (homologación TEST <7 días). Deploy general bloqueado hasta `MP_WEBHOOK_SECRET` + `NODE_ENV=production` (§10.2).

@@ -116,7 +116,9 @@ export type PaymentStatus =
   | 'APPROVED'
   | 'REJECTED'
   | 'CANCELLED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'REFUNDED'
+  | 'CHARGEBACK';
 
 export interface SaleItem {
   id: string;
@@ -138,9 +140,12 @@ export interface Sale {
   orderNumber: number;
   total: number;
   status: SaleStatus;
+  paymentStatus?: PaymentStatus | null;
   paymentMethod?: PaymentMethod;
   cashReceived?: number | null;
   changeAmount?: number | null;
+  mpPaymentId?: string | null;
+  refundedAt?: string | null;
   createdAt: string;
   paidAt?: string | null;
   ticketPrintedAt?: string | null;

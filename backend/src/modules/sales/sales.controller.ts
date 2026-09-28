@@ -7,11 +7,15 @@ import { RequireModule } from '../common/module-access.decorator';
 import { CreateManualMovementDto } from './dto/create-manual-movement.dto';
 import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto } from './dto/create-sale.dto';
 import { SalesService } from './sales.service';
+import { RefundsService } from './services/refunds.service';
 
 @Controller('sales')
 @UseGuards(JwtAuthGuard, ModuleAccessGuard)
 export class SalesController {
-  constructor(private readonly salesService: SalesService) {}
+  constructor(
+    private readonly salesService: SalesService,
+    private readonly refundsService: RefundsService,
+  ) {}
 
   @Post('cash')
   @RequireModule(ModuleKey.POS, ModuleAccess.FULL)
@@ -110,5 +114,14 @@ export class SalesController {
     @Param('id') id: string,
   ) {
     return this.salesService.markTicketPrinted(id, { id: req.user.sub, role: req.user.role });
+  }
+
+  @Post(':id/refund')
+  @RequireModule(ModuleKey.VENTAS, ModuleAccess.FULL)
+  refundSale(
+    @Req() req: { user: { sub: string; role: string } },
+    @Param('id') id: string,
+  ) {
+    return this.refundsService.refundSale(id, { id: req.user.sub, role: req.user.role });
   }
 }

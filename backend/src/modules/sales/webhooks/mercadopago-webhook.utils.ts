@@ -272,13 +272,14 @@ export const mapMpPaymentToPaymentStatus = (
   if (normalizedStatus === 'pending' || normalizedStatus === 'in_process') {
     return PaymentStatus.PENDING;
   }
-  if (
-    normalizedStatus === 'rejected' ||
-    normalizedStatus === 'cancelled' ||
-    normalizedStatus === 'refunded' ||
-    normalizedStatus === 'charged_back'
-  ) {
+  if (normalizedStatus === 'rejected' || normalizedStatus === 'cancelled') {
     return PaymentStatus.REJECTED;
+  }
+  if (normalizedStatus === 'refunded') {
+    return PaymentStatus.REFUNDED;
+  }
+  if (normalizedStatus === 'charged_back') {
+    return PaymentStatus.CHARGEBACK;
   }
   if (normalizedStatus === 'expired') {
     return PaymentStatus.EXPIRED;
@@ -291,7 +292,11 @@ export const mapSaleStatus = (status: PaymentStatus) => {
   if (status === PaymentStatus.APPROVED) {
     return SaleStatus.APPROVED;
   }
-  if (status === PaymentStatus.REJECTED) {
+  if (
+    status === PaymentStatus.REJECTED ||
+    status === PaymentStatus.REFUNDED ||
+    status === PaymentStatus.CHARGEBACK
+  ) {
     return SaleStatus.REJECTED;
   }
   if (status === PaymentStatus.EXPIRED) {
