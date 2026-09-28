@@ -229,6 +229,7 @@ Semana 3 medios y bajos: cola con reintentos, recorte de logs, cron de vencidos,
 | 5 | M1 cola DB persistente + L2 cron QR vencidos + observabilidad requestId | HECHO | commit `bfc6e98` en `fix/mp-homologacion-fase1` (push ok) | build ok, 38/38 pass; tabla aplicada en DB viva |
 | 6 | Homologación: checklist + quality_evaluation + form_homologation | PARCIAL | form QR (prod.33) relevado; checklist API no aplicable; evaluation bloqueada | Bloqueado hasta deploy + pago TEST <7 días (ver §10.7) |
 | 6b | UX `in_process`/`expired` + §8 actualizado | HECHO | commit `3322173` en `fix/mp-homologacion-fase1` (push ok) | build front ok |
+| 7 | Limpieza `.env` (rama `chore/env-cleanup`) | PARCIAL (solo muertas) | backup `.env.bak-20260928` | Gate OAuth: `mpLinked=false` → legacy vigente, no se toca código ni tokens |
 
 ### 10.1 Fase 1 — detalle (2026-09-28, HECHO, sin deploy aún)
 
@@ -305,5 +306,16 @@ Relevado vía MCP (cuenta con 3 apps: `solertest1`, `Noti-Transf`, `m-POSw 75663
 - §8 actualizado a estados reales post-Fases 1-5 (todo Cumple salvo pendientes operativos: valores TEST y secret).
 
 Verificación: `tsc + vite` ok (8.36s).
+
+### 10.9 Fase 7 — limpieza `.env` (2026-09-28, PARCIAL, rama `chore/env-cleanup`)
+
+Pedido: limpiar `.env` (tokens MP supuestamente obsoletos con OAuth). Gate inicial en DB de desarrollo (`m-posw-db-1`): `mpLinked=false` → se abortó la limpieza total por seguridad.
+Corrección con instancia productiva (`~/srv/mposw/soler`, contenedores `soler-*`): `Setting.mpLinked=true`, `mpAccessToken` (75ch), refresh válido hasta 2026-12-01, store/pos configurados → **prod usa OAuth (DB), no `.env`**. Su `.env` ni siquiera tiene `MP_ACCESS_TOKEN`/`MP_COLLECTOR_ID`/`MP_ENV`. Además prod SÍ tiene `MP_WEBHOOK_SECRET` y corre con `NODE_ENV=production` (verificado en container) → el fail-closed de Fase 1 funcionará al desplegar. La limpieza total del fallback legacy queda viable post-deploy (manteniendo `MP_ENV/TEST/LIVE` para homologación).
+Aplicado (cero riesgo, 0 referencias en código/compuestas/docs):
+- Eliminadas de `.env` y `.env.example`: `MP_DEFAULT_EXTERNAL_STORE_ID`, `MP_DEFAULT_EXTERNAL_POS_ID`, `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PIN`, `CAJA01_PASSWORD` (comentadas y activas).
+- Backup: `.env.bak-20260928` (gitignorado, junto a `.env.bak-20260914`).
+- Se mantienen: `MP_ACCESS_TOKEN`/`MP_COLLECTOR_ID` (fallback vigente), `MP_ENV/TEST/LIVE` (homologación), secrets webhook, OAuth, Supabase, Vite, Docker.
+- Verificado: `grep` 0 refs + `docker compose config` válido. Sin cambios de código → sin build/tests.
+Condición para retomar la limpieza total: vincular OAuth en prod (`GET /mp-oauth/connect` → `mpLinked=true`) y recién ahí quitar legacy del código (ver plan en conversación 2026-09-28).
 
 Próximo paso para otra instancia: deploy (con `MP_WEBHOOK_SECRET` + `NODE_ENV=production` de §10.2) y luego evaluación con pagos TEST reales. Rollback: tag `pre-mp-homologacion-20260928` + backup `/tmp/opencode/mp-pre-backup-20260928.sql`.
