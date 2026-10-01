@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFinanzasMonthly, useFinanzasSummary, useMpAuditoriaStatus } from '../api/queries';
+import { useFinanzasMonthly, useFinanzasSummary } from '../api/queries';
 
 const formatCurrency = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
@@ -18,7 +18,6 @@ export const FinanzasResumenPage: React.FC = () => {
   const { data, isLoading } = useFinanzasSummary({ from: from || undefined, to: to || undefined });
   const year = Number((to || toDate).slice(0, 4));
   const { data: monthly = [] } = useFinanzasMonthly(year);
-  const { data: mpStatus } = useMpAuditoriaStatus();
 
   const openRubro = (id: string) =>
     navigate(`/admin/tesoreria/rubros/${id}?from=${from}&to=${to}`);
@@ -82,12 +81,6 @@ export const FinanzasResumenPage: React.FC = () => {
               <div className="summary-card">
                 <span className="summary-card__label">Resultado operativo</span>
                 <span className="summary-card__value">{formatCurrency(data.operativoNet)}</span>
-              </div>
-            )}
-            {mpStatus?.balance != null && (
-              <div className="summary-card summary-card--accent">
-                <span className="summary-card__label">Saldo MP vivo</span>
-                <span className="summary-card__value">{formatCurrency(mpStatus.balance)}</span>
               </div>
             )}
           </div>

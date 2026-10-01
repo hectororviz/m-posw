@@ -184,7 +184,7 @@ export const useFinanzasMovements = (params?: {
   groupVentas?: string;
   page?: number;
   limit?: number;
-}) =>
+}, enabled = true) =>
   useQuery({
     queryKey: ['finanzas-movements', params],
     queryFn: async () => {
@@ -193,6 +193,7 @@ export const useFinanzasMovements = (params?: {
       });
       return response.data;
     },
+    enabled,
   });
 
 export const useResponsables = () =>

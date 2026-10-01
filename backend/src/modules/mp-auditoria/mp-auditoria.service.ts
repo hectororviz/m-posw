@@ -317,25 +317,23 @@ export class MpAuditoriaService {
     };
   }
 
-  // ─── Saldo vivo MP ──
+  // ─── Saldo MP según sistema ──
+  // NOTA: la API pública de MP no expone saldo con este OAuth
+  // (/v1/account/balance → 404, /users/.../mercadopago-accounts → 403 sin permiso
+  // especial). Se calcula desde los movimientos registrados.
   async balance() {
-    const token = await this.mpConfig.getAccessToken();
-    if (!token) throw new BadRequestException('MP access token no configurado');
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    try {
-      const res = await fetch(`${this.baseUrl}/v1/account/balance`, {
-        headers: this.headers(token),
-        signal: controller.signal,
-      });
-      const data = (await res.json()) as { available_balance?: number; total_amount?: number; retained?: number };
-      if (!res.ok) throw new Error(`MP balance ${res.status}`);
-      const available = Number(data.available_balance ?? data.total_amount ?? 0);
-      await this.prisma.setting.updateMany({ data: { mpBalanceCached: available, mpBalanceAt: new Date() } });
-      return { disponible: available, retenido: Number(data.retained ?? 0), at: new Date() };
-    } finally {
-      clearTimeout(timeout);
-    }
+    await this.finanzas.ensureDefaults();
+    const account = await this.prisma.moneyAccount.findFirst({ where: { kind: 'MERCADOPAGO' as never } });
+    if (!account) throw new BadRequestException('Cuenta Mercado Pago no existe');
+    const rows = await this.prisma.moneyMovement.findMany({
+      where: { accountId: account.id, voidedAt: null },
+      select: { kind: true, amount: true },
+    });
+    let delta = 0;
+    for (const m of rows) delta += m.kind === 'INGRESO' ? Number(m.amount) : -Number(m.amount);
+    const saldo = round2(Number(account.initialBalance) + delta);
+    await this.prisma.setting.updateMany({ data: { mpBalanceCached: saldo, mpBalanceAt: new Date() } });
+    return { disponible: saldo, at: new Date() };
   }
 
   // ─── Listado + resumen ──

@@ -63,14 +63,14 @@ export const FinanzasMovimientosPage: React.FC<{
   });
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const expandedDay = expandedGroup ? expandedGroup.replace('grupo-venta-', '').split('-').slice(0, 3).join('-') : null;
-  const { data: groupChildren } = useFinanzasMovements(expandedDay ? {
-    from: expandedDay,
-    to: expandedDay,
+  const { data: groupChildren } = useFinanzasMovements({
+    from: expandedDay ?? undefined,
+    to: expandedDay ?? undefined,
     accountId: effectiveAccountId || undefined,
     source: 'VENTA',
     page: 1,
     limit: 100,
-  } : { page: 1, limit: 0 });
+  }, Boolean(expandedDay));
 
   // Modal nuevo movimiento
   const [modalOpen, setModalOpen] = useState(false);
