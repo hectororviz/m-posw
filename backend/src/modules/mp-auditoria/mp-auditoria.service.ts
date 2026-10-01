@@ -7,7 +7,7 @@ import { FinanzasService } from '../finanzas/finanzas.service';
 import { ListMpMovementsDto } from './dto/mp-auditoria.dto';
 
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
-const CUTOVER_ISO = '2026-09-01T03:00:00.000Z';
+const CUTOVER_ISO = '2026-10-01T03:00:00.000Z';
 
 interface MPPayment {
   id: string | number;

@@ -39,7 +39,7 @@ export const MpAuditoriaPage: React.FC = () => {
   const { pushToast } = useToast();
 
   const toDate = new Date().toISOString().slice(0, 10);
-  const [from, setFrom] = useState('2026-09-01');
+  const [from, setFrom] = useState('2026-10-01');
   const [to, setTo] = useState(toDate);
   const [estado, setEstado] = useState('');
   const [tipo, setTipo] = useState('');

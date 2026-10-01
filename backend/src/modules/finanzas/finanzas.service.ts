@@ -248,7 +248,7 @@ export class FinanzasService {
   }
 
   async backfillVentas(since?: string) {
-    const from = since ? new Date(since) : new Date('2026-09-01T03:00:00Z');
+    const from = since ? new Date(since) : new Date('2026-10-01T03:00:00Z');
     const sales = await this.prisma.sale.findMany({
       where: {
         createdAt: { gte: from },

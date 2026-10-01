@@ -259,7 +259,7 @@ frontend/src/pages/
 
 **Rutas legacy** (`/admin/contabilidad/*`) redirigen automáticamente a `/admin/tesoreria/*`.
 
-### Tesorería v2 (Finanzas + Auditoría MP, vigente desde 2026-10-01, corte 01/09/26)
+### Tesorería v2 (Finanzas + Auditoría MP, vigente desde 2026-10-01, corte 01/10/26)
 
 Tabs en `TreasuryLayout`: `Resumen | Efectivo | Auditoría MP | Configuración` (rutas `/admin/tesoreria/*`, legacy `movimientos/cuentas` redirigen).
 

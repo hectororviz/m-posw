@@ -156,7 +156,7 @@ export const FinanzasCuentasPage: React.FC = () => {
   const runBackfill = async () => {
     setMpBusy(true);
     try {
-      const since = (settings as { mpAuditSince?: string | null } | undefined)?.mpAuditSince ?? '2026-09-01T03:00:00.000Z';
+      const since = (settings as { mpAuditSince?: string | null } | undefined)?.mpAuditSince ?? '2026-10-01T03:00:00.000Z';
       const res = await apiClient.post('/mp-auditoria/backfill', { from: since });
       pushToast(`Histórico traído: ${res.data.nuevos} movimientos`, 'success');
       await refresh();
@@ -170,7 +170,7 @@ export const FinanzasCuentasPage: React.FC = () => {
   const runBackfillVentas = async () => {
     setMpBusy(true);
     try {
-      const since = (settings as { mpAuditSince?: string | null } | undefined)?.mpAuditSince ?? '2026-09-01T03:00:00.000Z';
+      const since = (settings as { mpAuditSince?: string | null } | undefined)?.mpAuditSince ?? '2026-10-01T03:00:00.000Z';
       const res = await apiClient.post('/finanzas/backfill-ventas', { since });
       pushToast(`Ventas evaluadas: ${res.data.evaluadas}, entradas: ${res.data.entradasVenta}`, 'success');
       await queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
