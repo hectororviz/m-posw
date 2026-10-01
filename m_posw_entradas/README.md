@@ -5,7 +5,6 @@ Consume `https://CLIENTE.mposw.com.ar/api/entradas/...` con Retrofit e imprime e
 impresora integrada del Sunmi V2s con el SDK oficial (`com.sunmi:printerlibrary`).
 
 Contrato válido: `docs/contrato-pos-entradas.txt` del repo principal.
-`requerimientos_api.txt` de esta carpeta es la propuesta original (histórica).
 
 ## Vinculación
 1. En la web: Entradas → Dispositivos → generar device (token `ent_…` + QR pairing `{"baseUrl","token"}`).

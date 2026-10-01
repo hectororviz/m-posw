@@ -8,6 +8,7 @@ import { MercadoPagoQueryService } from './mercadopago-query.service';
 import { SalesGateway } from '../websockets/sales.gateway';
 import { SalesService } from '../sales.service';
 import { InternetVouchersService } from '../../internet-vouchers/internet-vouchers.service';
+import { FinanzasService } from '../../finanzas/finanzas.service';
 import {
   extractExternalReference,
   extractMerchantOrderId,
@@ -39,6 +40,14 @@ export class MercadoPagoWebhookProcessorService {
     private internetVouchers: InternetVouchersService,
     private moduleRef: ModuleRef,
   ) {}
+
+  private finanzasService(): FinanzasService | null {
+    try {
+      return this.moduleRef.get(FinanzasService, { strict: false });
+    } catch {
+      return null;
+    }
+  }
 
   private entradasService(): EntradasSalesService | null {
     try {
@@ -357,6 +366,7 @@ export class MercadoPagoWebhookProcessorService {
     // Decrementar stock si la venta acaba de ser aprobada
     if (wasNotApproved && resolvedSaleStatus === SaleStatus.APPROVED) {
       await this.salesService.decrementStockForSale(sale.id);
+      await this.finanzasService()?.recordVenta(sale.id).catch((e) => this.logger.warn(`recordVenta ${sale.id}: ${e}`));
       try {
         await this.internetVouchers.generateVouchersForSale(sale.id);
       } catch (err) {

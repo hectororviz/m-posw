@@ -5,9 +5,10 @@ import { InternetVouchersModule } from '../internet-vouchers/internet-vouchers.m
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { SalesModule } from '../sales/sales.module';
+import { FinanzasModule } from '../finanzas/finanzas.module';
 
 @Module({
-  imports: [forwardRef(() => SalesModule), InternetVouchersModule],
+  imports: [forwardRef(() => SalesModule), InternetVouchersModule, FinanzasModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, PrismaService, MercadoPagoConfigService],
   exports: [PaymentsService],

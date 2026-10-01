@@ -27,6 +27,7 @@ import { PlayersStatsModule } from './players-stats/players-stats.module';
 import { PatrimonioModule } from './patrimonio/patrimonio.module';
 import { CoachesModule } from './coaches/coaches.module';
 import { FinanzasModule } from './finanzas/finanzas.module';
+import { MpAuditoriaModule } from './mp-auditoria/mp-auditoria.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { EntradasModule } from './entradas/entradas.module';
 
@@ -59,6 +60,7 @@ import { EntradasModule } from './entradas/entradas.module';
     PatrimonioModule,
     CoachesModule,
     FinanzasModule,
+    MpAuditoriaModule,
     NotificacionesModule,
     EntradasModule,
   ],

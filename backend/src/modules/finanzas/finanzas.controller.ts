@@ -8,7 +8,10 @@ import {
   CreateMoneyAccountDto,
   CreateMoneyCategoryDto,
   CreateMoneyMovementDto,
+  CreateResponsableDto,
+  CreateTraspasoDto,
   ListMovementsDto,
+  MonthlyQueryDto,
   SummaryQueryDto,
   UpdateMoneyAccountDto,
   UpdateMoneyCategoryDto,
@@ -84,5 +87,41 @@ export class FinanzasController {
   @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   voidMovement(@Param('id') id: string, @Body() dto: VoidMovementDto) {
     return this.service.voidMovement(id, dto?.reason);
+  }
+
+  @Get('monthly')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.READ)
+  monthly(@Query() query: MonthlyQueryDto) {
+    return this.service.monthly(query.year ?? new Date().getFullYear());
+  }
+
+  @Post('traspasos')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
+  createTraspaso(@Req() req: { user?: { sub?: string; id?: string } }, @Body() dto: CreateTraspasoDto) {
+    return this.service.createTraspaso(req.user?.sub ?? req.user?.id, dto);
+  }
+
+  @Post('backfill-ventas')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
+  backfillVentas(@Body() dto: { since?: string }) {
+    return this.service.backfillVentas(dto?.since);
+  }
+
+  @Get('responsables')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.READ)
+  responsables() {
+    return this.service.listResponsables();
+  }
+
+  @Post('responsables')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
+  createResponsable(@Body() dto: CreateResponsableDto) {
+    return this.service.createResponsable(dto.nombre);
+  }
+
+  @Patch('responsables/:id/toggle')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
+  toggleResponsable(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.toggleResponsable(id);
   }
 }

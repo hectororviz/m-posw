@@ -28,7 +28,7 @@ const buildService = (overrides: {
       : jest.fn().mockResolvedValue(undefined),
   } as any;
   const internetVouchers = { generateVouchersForSale: jest.fn().mockResolvedValue([]) } as any;
-  const service = new SalesService(prisma, {} as any, mpService, mpQueryService, internetVouchers, {} as any);
+  const service = new SalesService(prisma, {} as any, mpService, mpQueryService, internetVouchers, {} as any, {} as any);
   return { service, prisma, mpQueryService, mpService, internetVouchers };
 };
 

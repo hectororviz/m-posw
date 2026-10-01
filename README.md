@@ -34,7 +34,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Dashboard de estadísticas**: KPIs con badges, últimos 15 días, últimos 6 meses, promedios con gráficos.
 - **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia) con movimientos de entrada/salida.
 - **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
-- **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Notificaciones, Ligas, Jugadores, Patrimonio e Internet desde Configuración → Módulos.
+- **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Notificaciones, Ligas, Jugadores, Patrimonio, Internet y Entradas desde Configuración → Módulos.
 
 ### Padrón de Socios
 - **CRUD de socios**: datos personales, tipo de socio, estado (activo/inactivo/suspendido), fecha de alta.
@@ -70,8 +70,6 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Venta de vouchers**: al vender un plan desde el POS, el sistema genera un PIN de acceso único respaldado por RADIUS. El PIN se imprime en el ticket de venta.
 - **Integración con api-radius**: comunicación con servidor RADIUS externo para generación, consulta y anulación de vouchers.
 - **Control de vouchers**: listado de vouchers vendidos con estado (Activo/Usado), sin mostrar el PIN en pantalla por seguridad.
-- **Integración con api-radius**: comunicación con servidor RADIUS externo para generación, consulta y anulación de vouchers.
-- **Control de vouchers**: listado de vouchers vendidos con estado (Activo/Usado), sin mostrar el PIN en pantalla por seguridad.
 
 ### WhatsApp / Notificaciones de deuda
 - **Notificación vía WhatsApp Cloud API**: envío de mensajes WhatsApp a acreedores con deuda pendiente, usando la API oficial de Meta (WhatsApp Business).
@@ -80,6 +78,13 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Rate limiting**: 1 segundo de espera entre envíos para respetar los límites de WhatsApp Cloud API.
 - **Historial de envíos**: registro completo de cada notificación (destinatario, mensaje, estado, error) en `/admin/notificaciones?tab=history`.
 
+### Entradas / POS externo
+- **Venta de entradas desde terminal Android** (Sunmi V2s, 58mm): app nativa en `m_posw_entradas/` que consume `https://${CADDY_HOST}/api/entradas/...` con token de dispositivo (`ent_...`), sin JWT de usuarios. Contrato congelado en `docs/contrato-pos-entradas.txt`.
+- **Numeración por partido y sector**: series independientes `L-001` / `V-001` con contador atómico. Ventana de venta configurable por fixture.
+- **Cobro en efectivo o QR**: efectivo aprueba directo; QR usa un POS de Mercado Pago dedicado (QR estático) con polling de estado y cancelación.
+- **Beneficios de bufet**: cada entrada puede traer un descuento canjeable en bufet (QR `ENT:<código>`), de uso único o multiuso, validable desde el POS o la web.
+- **Tickets térmicos versionados**: layout JSON + escudo 1-bit cacheados por versión en el terminal.
+
 ### Personalización
 - Nombre del comercio/club, logo, favicon y color principal de la UI configurable desde el panel admin.
 - Encabezado del ticket personalizable.
@@ -87,9 +92,9 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Sidebar colapsable**: navegación responsive con toggle, ideal para pantallas pequeñas.
 
 ### Roles y seguridad
-- **ADMIN**: acceso completo a configuración, reportes, tesorería y gestión de usuarios.
-- **USER** (caja): acceso restringido al POS y a sus propias ventas.
-- Autenticación JWT con sesiones revocables.
+- **ADMIN**: acceso completo a todos los módulos. No tiene registros de permisos.
+- **USER**: acceso configurable por módulo (HIDDEN / READ / FULL) vía `UserModulePermission`, con módulo de inicio opcional.
+- Autenticación JWT con sesiones revocables. Rate limiting en login, security headers (Helmet), CORS estricto.
 
 ## Casos de uso
 
@@ -105,6 +110,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | **Institución educativa** | Registro y seguimiento del patrimonio institucional (mobiliario, equipamiento, etc.) con historial de eventos y auditoría. Bajas lógicas sin pérdida de trazabilidad. |
 | **Proveedor de WiFi** | Venta de vouchers de acceso a internet. Planes configurables, generación automática de PINs respaldados por RADIUS. Impresión del PIN en el ticket de venta. |
 | **Club con acreedores** | Notificación a acreedores con deuda vía WhatsApp Cloud API. Mensaje personalizable con monto y antigüedad. Envío masivo o individual. |
+| **Partido / evento con boletería** | Venta de entradas desde terminal Sunmi V2s con impresora integrada (efectivo o QR). Numeración L/V por partido, beneficios de bufet en el ticket. |
 
 ## Ventajas
 
@@ -246,12 +252,13 @@ docker compose up -d --build
 |----------|-------------|
 | `DATABASE_URL` | Conexión a PostgreSQL |
 | `JWT_SECRET` | Clave de firma para tokens JWT |
-| `ADMIN_EMAIL` | Email del usuario administrador inicial |
-| `ADMIN_PASSWORD` | Contraseña del admin (o usar `ADMIN_PIN`) |
-| `CAJA01_PASSWORD` | Contraseña de la caja inicial (rol USER) |
+| `ADMIN_USERNAME` | Usuario del administrador inicial (requerido, sin default) |
+| `ADMIN_PASSWORD` | Contraseña del admin inicial (requerida, sin default) |
 | `CORS_ORIGIN` | Origen permitido para CORS (con protocolo) |
 | `VITE_API_BASE_URL` | `/api` si usás proxy, o URL completa del backend |
-| `MP_ACCESS_TOKEN` | Access Token de Mercado Pago (opcional si usás OAuth) |
+| `MP_ENV` | Entorno MP: `test` (tokens `TEST-`) o `live` (tokens `APP_USR-`). Se infiere por prefijo si se omite |
+| `MP_TEST_ACCESS_TOKEN` / `MP_LIVE_ACCESS_TOKEN` | Tokens separados por entorno (homologación sin tocar producción) |
+| `MP_ACCESS_TOKEN` | Access Token legacy (fallback si no se usan los separados) |
 | `MP_COLLECTOR_ID` | Collector ID de Mercado Pago (opcional si usás OAuth) |
 | `MP_DEFAULT_EXTERNAL_STORE_ID` | Store ID externo configurado en MP (opcional si usás OAuth) |
 | `MP_DEFAULT_EXTERNAL_POS_ID` | POS ID externo configurado en MP (opcional si usás OAuth) |
@@ -266,10 +273,7 @@ Ver `.env.example` para la lista completa.
 
 ## Credenciales iniciales
 
-Al iniciar por primera vez, el seed crea:
-
-- **Admin**: `ADMIN_EMAIL` + `ADMIN_PASSWORD` (o `ADMIN_PIN`, que tiene prioridad si ambos están definidos).
-- **Caja01**: usuario con rol USER y `CAJA01_PASSWORD`.
+El seed exige `ADMIN_USERNAME` + `ADMIN_PASSWORD` (sin valores por defecto: si faltan, el backend no arranca). Crea el usuario admin inicial; los usuarios de caja se crean desde Configuración → Usuarios.
 
 ## Métodos de pago
 
@@ -290,6 +294,9 @@ El cajero ingresa el monto recibido y el sistema calcula el vuelto automáticame
 3. Si el monto coincide, el cajero confirma la venta.
 
 **No usa webhooks**: funciona por polling contra la API de MP.
+
+### 4. Reembolsos
+`POST /sales/:id/refund` (solo ADMIN, ventas `MP_QR` aprobadas, reembolso total): revierte stock y desactiva vouchers. Webhooks con `refunded` / `charged_back` se mapean a estados propios sin romper reportes.
 
 ### 4. OAuth Mercado Pago (nuevo en v2)
 Vinculá tu cuenta de Mercado Pago en 2 clics desde Configuración → Mercado Pago:

@@ -9,6 +9,7 @@ import { MercadoPagoInstoreService } from './services/mercadopago-instore.servic
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 import { InternetVouchersService } from '../internet-vouchers/internet-vouchers.service';
 import { AcreedoresService } from '../acreedores/acreedores.service';
+import { FinanzasService } from '../finanzas/finanzas.service';
 import {
   mapMpPaymentToPaymentStatus,
 } from './webhooks/mercadopago-webhook.utils';
@@ -25,6 +26,7 @@ export class SalesService {
     private mpQueryService: MercadoPagoQueryService,
     private internetVouchers: InternetVouchersService,
     private acreedoresService: AcreedoresService,
+    private finanzasService: FinanzasService,
   ) {}
 
   async createCashSale(userId: string, dto: CreateCashSaleDto) {
@@ -56,6 +58,7 @@ export class SalesService {
         });
         this.logger.log(`Venta en efectivo creada saleId=${sale.id}, decrementando stock...`);
         await this.decrementStockForSale(sale.id);
+        await this.finanzasService.recordVenta(sale.id).catch((e) => this.logger.warn(`recordVenta ${sale.id}: ${e}`));
         this.logger.log(`Stock decrementado para saleId=${sale.id}`);
         const vouchers = await this.internetVouchers.generateVouchersForSale(sale.id);
         if (vouchers.length > 0) {
@@ -365,6 +368,7 @@ export class SalesService {
 
     this.logger.log(`Venta ${saleId} completada, decrementando stock...`);
     await this.decrementStockForSale(saleId);
+    await this.finanzasService.recordVenta(saleId).catch((e) => this.logger.warn(`recordVenta ${saleId}: ${e}`));
     this.logger.log(`Stock decrementado para venta ${saleId}`);
 
     try {

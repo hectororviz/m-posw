@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFinanzasSummary } from '../api/queries';
+import { useFinanzasMonthly, useFinanzasSummary, useMpAuditoriaStatus } from '../api/queries';
 
 const formatCurrency = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
@@ -16,6 +16,9 @@ export const FinanzasResumenPage: React.FC = () => {
   const [to, setTo] = useState(toDate);
 
   const { data, isLoading } = useFinanzasSummary({ from: from || undefined, to: to || undefined });
+  const year = Number((to || toDate).slice(0, 4));
+  const { data: monthly = [] } = useFinanzasMonthly(year);
+  const { data: mpStatus } = useMpAuditoriaStatus();
 
   const openRubro = (id: string) =>
     navigate(`/admin/tesoreria/rubros/${id}?from=${from}&to=${to}`);
@@ -75,6 +78,18 @@ export const FinanzasResumenPage: React.FC = () => {
               <span className="summary-card__label">Resultado</span>
               <span className="summary-card__value">{formatCurrency(data.netResult)}</span>
             </div>
+            {data.operativoNet !== undefined && (data.operativoNet !== data.netResult) && (
+              <div className="summary-card">
+                <span className="summary-card__label">Resultado operativo</span>
+                <span className="summary-card__value">{formatCurrency(data.operativoNet)}</span>
+              </div>
+            )}
+            {mpStatus?.balance != null && (
+              <div className="summary-card summary-card--accent">
+                <span className="summary-card__label">Saldo MP vivo</span>
+                <span className="summary-card__value">{formatCurrency(mpStatus.balance)}</span>
+              </div>
+            )}
           </div>
 
           <div className="section">
@@ -117,6 +132,32 @@ export const FinanzasResumenPage: React.FC = () => {
                     <span className="finanzas-bar-value">{formatCurrency(c.income)}</span>
                   </button>
                 ))}
+              </div>
+            )}
+          </div>
+
+          <div className="section">
+            <h3>Cortes mensuales {year}</h3>
+            {monthly.length === 0 ? (
+              <p className="empty-text">Sin movimientos este año.</p>
+            ) : (
+              <div className="treasury-table-wrapper">
+                <div className="treasury-table finanzas-table">
+                  <div className="treasury-table-head finanzas-row">
+                    <span>Mes</span>
+                    <span className="num">Ingresos</span>
+                    <span className="num">Gastos</span>
+                    <span className="num">Neto</span>
+                  </div>
+                  {monthly.map((m) => (
+                    <div key={m.month} className="treasury-table-row finanzas-row">
+                      <span>{m.month}</span>
+                      <span className="num">{formatCurrency(m.income)}</span>
+                      <span className="num">{formatCurrency(m.expense)}</span>
+                      <span className="num">{formatCurrency(m.net)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -40,7 +40,8 @@ const buildService = (overrides: {
   } as any;
   const mpConfig = { getAccessToken: jest.fn().mockResolvedValue('token') } as any;
   const vouchers = { deactivateBySale: jest.fn().mockResolvedValue({}) } as any;
-  return { service: new RefundsService(prisma, mpConfig, vouchers), prisma, vouchers, createMock };
+  const finanzas = { voidVenta: jest.fn().mockResolvedValue(null) } as any;
+  return { service: new RefundsService(prisma, mpConfig, vouchers, finanzas), prisma, vouchers, createMock };
 };
 
 describe('RefundsService', () => {

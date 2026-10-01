@@ -376,8 +376,15 @@ export interface MoneyCategory {
   id: string;
   name: string;
   kind: 'INGRESO' | 'EGRESO' | 'AMBOS';
+  grupo?: 'OPERATIVO' | 'FINANCIERO';
   active: boolean;
   position: number;
+}
+
+export interface Responsable {
+  id: string;
+  nombre: string;
+  active: boolean;
 }
 
 export interface FinanzasSummary {
@@ -386,24 +393,79 @@ export interface FinanzasSummary {
   totalIncome: number;
   totalExpense: number;
   netResult: number;
+  operativoIncome?: number;
+  operativoExpense?: number;
+  operativoNet?: number;
   byCategory: { id: string; name: string; income: number; expense: number; net: number }[];
   dailySales: { date: string; method: string; accountId: string | null; total: number; count: number }[];
+}
+
+export interface FinanzasMonthly {
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
 }
 
 export interface FinanzasMovement {
   id: string;
   date: string;
   kind: 'INGRESO' | 'EGRESO';
+  concepto?: string;
   description: string;
+  observaciones?: string | null;
+  responsableId?: string | null;
+  responsableNombre?: string | null;
+  transferGroupId?: string | null;
   categoryId: string;
   categoryName: string;
+  categoryGrupo?: string;
   accountId: string;
   accountName: string;
   amountIn: number;
   amountOut: number;
-  source: 'MANUAL' | 'COBRO_FIADO' | 'CUOTA_SOCIO' | 'AJUSTE' | 'VENTA_DIARIA';
+  source: 'MANUAL' | 'COBRO_FIADO' | 'CUOTA_SOCIO' | 'AJUSTE' | 'VENTA' | 'VENTA_GRUPO' | 'VENTA_DIARIA' | 'TRASPASO' | 'MP_SYNC';
+  sourceId?: string | null;
   salesCount: number;
   voided: boolean;
+}
+
+export type MpAuditEstado = 'PENDIENTE' | 'SUGERIDO' | 'CONCILIADO' | 'IGNORADO';
+export type MpMovementTipo = 'COBRO_QR' | 'TRANSFERENCIA' | 'RETIRO' | 'GASTO' | 'FEE' | 'REFUND' | 'CHARGEBACK' | 'OTRO';
+
+export interface MpAuditoriaItem {
+  id: string;
+  mpPaymentId: string;
+  tipo: MpMovementTipo;
+  estado: MpAuditEstado;
+  montoBruto: number;
+  fee: number;
+  montoNeto: number;
+  pagador?: string | null;
+  email?: string | null;
+  externalRef?: string | null;
+  fechaMp: string;
+  nota?: string | null;
+  conciliadoAt?: string | null;
+  vinculos: { saleId?: string | null; moneyMovementId?: string | null; montoAsignado: number; gasto?: { descripcion: string; categoria: string } | null }[];
+}
+
+export interface MpAuditoriaResponse {
+  data: MpAuditoriaItem[];
+  total: number;
+  page: number;
+  limit: number;
+  resumen: { estado: MpAuditEstado; count: number; total: number }[];
+}
+
+export interface MpAuditoriaStatus {
+  job?: { id: string; status: string; detail?: string | null; updatedAt: string } | null;
+  since?: string | null;
+  cursor?: string | null;
+  pendientes: number;
+  balance?: number | null;
+  balanceAt?: string | null;
+  running: boolean;
 }
 
 export interface FinanzasMovementsResponse {

@@ -20,7 +20,8 @@ import { AdminSociosPage } from './pages/AdminSociosPage';
 import { AdminSociosMatrizPage } from './pages/AdminSociosMatrizPage';
 import { AdminSociosBeneficiosPage } from './pages/AdminSociosBeneficiosPage';
 import { FinanzasResumenPage } from './pages/FinanzasResumenPage';
-import { FinanzasMovimientosPage } from './pages/FinanzasMovimientosPage';
+import { EfectivoPage } from './pages/EfectivoPage';
+import { MpAuditoriaPage } from './pages/MpAuditoriaPage';
 import { FinanzasCuentasPage } from './pages/FinanzasCuentasPage';
 import { FinanzasRubroPage } from './pages/FinanzasRubroPage';
 import { TreasuryLayout } from './pages/TreasuryLayout';
@@ -245,12 +246,14 @@ export const App: React.FC = () => {
           </ModuleRoute>
         }>
           <Route index element={<FinanzasResumenPage />} />
-          <Route path="movimientos" element={<FinanzasMovimientosPage />} />
-          <Route path="cuentas" element={<FinanzasCuentasPage />} />
+          <Route path="movimientos" element={<Navigate to="/admin/tesoreria/efectivo" replace />} />
+          <Route path="cuentas" element={<Navigate to="/admin/tesoreria/configuracion" replace />} />
+          <Route path="efectivo" element={<EfectivoPage />} />
+          <Route path="auditoria-mp" element={<MpAuditoriaPage />} />
+          <Route path="configuracion" element={<FinanzasCuentasPage />} />
           <Route path="rubros/:categoryId" element={<FinanzasRubroPage />} />
-          <Route path="reportes" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
-          <Route path="gastos" element={<Navigate to="/admin/tesoreria/movimientos" replace />} />
-          <Route path="configuracion" element={<Navigate to="/admin/tesoreria/cuentas" replace />} />
+          <Route path="reportes" element={<Navigate to="/admin/tesoreria/efectivo" replace />} />
+          <Route path="gastos" element={<Navigate to="/admin/tesoreria/efectivo" replace />} />
         </Route>
         <Route path="patrimonio" element={
           <ModuleRoute module="PATRIMONIO">

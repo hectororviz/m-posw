@@ -214,6 +214,15 @@ MercadoPagoConfigService.getAccessToken()
 
 **Configuración MP por caja**: Con OAuth, los `mpStoreId`/`mpPosId` se guardan en `Setting`. Sin OAuth, los campos `externalStoreId`/`externalPosId` en `User` deben coincidir con los configurados en el dashboard de MP.
 
+**Estado actual (post-homologación 2026-09-28, deployado en prod):**
+- SDK oficial `mercadopago@3.6.1`: `getPayment` y reembolsos vía SDK. El PUT/DELETE de órdenes Instore QR sigue por `fetch` (el SDK no cubre ese endpoint) con `X-Idempotency-Key = <external_reference>:<uuid>` por intento + retry `500/1500/3000ms+jitter` solo en `429/5xx/timeout/red`.
+- Entornos separados: `MP_ENV=test|live` (inferido por prefijo `TEST-`/`APP_USR-` si se omite). `MP_TEST_ACCESS_TOKEN` / `MP_LIVE_ACCESS_TOKEN` con fallback legacy `MP_ACCESS_TOKEN`. Fail-fast: token `TEST-` en `live` frena el arranque. Entorno visible en `GET /mp-oauth/status`.
+- Reembolsos: `POST /sales/:id/refund` (solo ADMIN, `MP_QR` aprobada, total). Revierte stock atómico + desactiva vouchers. `PaymentStatus` incluye `REFUNDED` / `CHARGEBACK` (reportes los agrupan como `REJECTED`). Límite v1: reembolsos desde el panel de MP llegan por webhook sin reversión de stock.
+- Webhook: estricto siempre en producción (`merchant_order` igual que `payment`), tolerancia `ts` 300s anti-replay, fail-closed sin secret. Sin Redis a propósito: cola persistente en tabla `WebhookRetry` (backoff `5s/30s/2m/10m/30m`, 5 intentos → `DEAD` manual, cron cada minuto). Logs recortados (sin headers/body).
+- Expiración QR: cron cada 5 min cancela `MP_QR` + `PENDING` + `>15min` (tolera 404 de MP).
+- Polling transferencias: cursor persistido `Setting.lastMpPollAt` + paginación (hasta 150 pagos), `movimientoMP` como fuente de verdad anti-duplicados (sobrevive reinicios). Reserva pre-venta anti-doble-confirm concurrente.
+- `docs/guia-testing-integracion-mp.md` y `docs/mercadopago-transfer-confirmation.md` se eliminaron (2026-09-28) por obsoletos; esta sección es la referencia vigente.
+
 ## Treasury / Tesorería Module
 
 Módulo de contabilidad con partida doble. Accesible desde `/admin/tesoreria` (solo ADMIN).
@@ -249,6 +258,17 @@ frontend/src/pages/
 ```
 
 **Rutas legacy** (`/admin/contabilidad/*`) redirigen automáticamente a `/admin/tesoreria/*`.
+
+### Tesorería v2 (Finanzas + Auditoría MP, vigente desde 2026-10-01, corte 01/09/26)
+
+Tabs en `TreasuryLayout`: `Resumen | Efectivo | Auditoría MP | Configuración` (rutas `/admin/tesoreria/*`, legacy `movimientos/cuentas` redirigen).
+
+- **Entradas automáticas**: cada `Sale APPROVED` (CASH/MP_QR/TRANSFER, no FIADO) crea un `MoneyMovement source=VENTA/sourceId=sale.id` idempotente vía `FinanzasService.recordVenta()` (hooks: `createCashSale`, `completeSale`, `confirmTransfer`, webhook approve, `refunds → voidVenta`). Las filas virtuales `VENTA_DIARIA` se eliminaron; el tab Efectivo agrupa con `?groupVentas=1` (grupos colapsables por día).
+- **MoneyMovement**: suma `concepto`, `observaciones`, `responsableId` (ABM `Responsable`), `transferGroupId`. `MoneyCategory.grupo = OPERATIVO|FINANCIERO` (Préstamos/Intereses/Cambio Caja = FINANCIERO, no entran al resultado operativo). `MoneyMovementSource += VENTA|TRASPASO|MP_SYNC`.
+- **Traspasos**: `POST /finanzas/traspasos` crea par EGRESO/INGRESO con mismo `transferGroupId` (categoría `Cambio Caja`).
+- **Auditoría MP** (`backend/src/modules/mp-auditoria/`): tabla `MpAccountMovement` (snapshot `GET /v1/payments/search`, upsert por `mpPaymentId`, tipos COBRO_QR/TRANSFERENCIA/RETIRO/GASTO/FEE/REFUND/CHARGEBACK) + puente `MpConciliacion` (1:N a Sale/MoneyMovement) + `MpSyncJob`. Sync: cron horario `0 * * * *` + 1× por sesión (frontend `sessionStorage`) + botón manual. Backfill por semanas `POST /mp-auditoria/backfill {from}` (corte default `2026-09-01`). Saldo vivo `GET /mp-auditoria/balance` (`/v1/account/balance`, cache en `Setting.mpBalanceCached`). Auto-match por `externalReference sale-/ticket-`, `mpPaymentId`, o monto±ventana (→ `SUGERIDO`). Categorizar crea `MoneyMovement MP_SYNC` en cuenta Mercado Pago.
+- **Configuración**: ABM cuentas (con saldo inicial), categorías (con grupo), responsables + sección MP (corte `mpAuditSince`, traer histórico, saldo).
+- **Config**: `Setting.mpAuditEnabled/mpAuditSince/mpAuditCursor`. Migración `20261229000002_auditoria_mp`.
 
 ## Socios / Padrón de Socios Module
 
@@ -364,7 +384,9 @@ Solapa "Módulos" en Configuración (entre Usuarios y Sistema) para habilitar/de
 Los toggles se persisten en la tabla `Setting` y se aplican en tiempo real sin recargar.
 
 ## Acreedores / Fiado Module
-...
+
+Ventas fiadas con control de saldo por acreedor. El POS vende con `paymentMethod: FIADO` asociado a un acreedor activo; los pagos (`POST /acreedores/:id/pagos`) y ajustes (`POST /acreedores/:id/ajustes`) imputan en FIFO contra `FiadoVenta.saldoRestante`. Límites opcionales por acreedor (`limiteDeuda` bloquea, `advertenciaDeuda` avisa) e intereses configurables (`GET /acreedores/intereses/preview`, `POST /acreedores/intereses/aplicar`).
+
 ### Configuración
 - **Toggle "Fiado"** en AdminSettingsPage → pestaña Ventas → Medios de pago (visible solo si `enableAcreedoresModule === true`).
 - Por defecto desactivado (`enableFiadoPayment: false`).
