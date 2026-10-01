@@ -127,7 +127,7 @@ export class MpAuditoriaService {
   // Auto-match: externalRef sale-/ticket- / mpPaymentId en Sale / monto+fecha cercano
   private async autoMatch(mpId: string) {
     const mp = await this.prisma.mpAccountMovement.findUnique({ where: { id: mpId }, include: { conciliaciones: true } });
-    if (!mp || mp.estado !== 'PENDIENTE' || mp.conciliaciones.length > 0) return;
+    if (!mp || (mp.estado !== 'PENDIENTE' && mp.estado !== 'SUGERIDO') || mp.conciliaciones.length > 0) return;
     const ext = mp.externalRef || '';
     if (ext.startsWith('sale-')) {
       const saleId = ext.slice(5);
@@ -146,12 +146,22 @@ export class MpAuditoriaService {
       await this.link(mpId, { saleId: byPayment.id, monto: Number(mp.montoNeto) });
       return;
     }
+    // Transferencias: el paymentId vive en MovimientoMP (Sale.mpPaymentId queda null)
+    const byMovimiento = await this.prisma.movimientoMP.findUnique({
+      where: { paymentId: mp.mpPaymentId },
+      select: { saleId: true },
+    });
+    if (byMovimiento?.saleId) {
+      await this.link(mpId, { saleId: byMovimiento.saleId, monto: Number(mp.montoNeto) });
+      return;
+    }
     // Sugerencia por monto + ventana ±3 días contra ventas MP_QR/TRANSFER sin conciliar
+    const window = { gte: new Date(mp.fechaMp.getTime() - 3 * 864e5), lte: new Date(mp.fechaMp.getTime() + 3 * 864e5) };
     const candidates = await this.prisma.sale.findMany({
       where: {
         paymentMethod: { in: ['MP_QR', 'TRANSFER'] as never },
         total: { gte: new Prisma.Decimal(Number(mp.montoNeto) - 0.05), lte: new Prisma.Decimal(Number(mp.montoNeto) + 0.05) },
-        paidAt: { gte: new Date(mp.fechaMp.getTime() - 3 * 864e5), lte: new Date(mp.fechaMp.getTime() + 3 * 864e5) },
+        OR: [{ paidAt: window }, { paidAt: null, createdAt: window }],
       },
       take: 5,
       select: { id: true },
@@ -179,6 +189,47 @@ export class MpAuditoriaService {
       where: { id: mpId },
       data: { estado: 'CONCILIADO', conciliadoAt: new Date() },
     });
+  }
+
+  // ─── Reconciliación masiva: corre autoMatch sobre todo lo pendiente ──
+  async reconcileAll() {
+    if (this.running) throw new BadRequestException('Ya hay una sincronización en curso');
+    this.running = true;
+    try {
+      let vinculados = 0;
+      let sugeridos = 0;
+      const PAGE = 200;
+      for (;;) {
+        const batch = await this.prisma.mpAccountMovement.findMany({
+          where: { estado: { in: ['PENDIENTE', 'SUGERIDO'] as never } },
+          select: { id: true },
+          take: PAGE,
+        });
+        if (batch.length === 0) break;
+        for (const m of batch) {
+          const before = await this.prisma.mpAccountMovement.findUnique({
+            where: { id: m.id },
+            select: { estado: true },
+          });
+          await this.autoMatch(m.id);
+          const after = await this.prisma.mpAccountMovement.findUnique({
+            where: { id: m.id },
+            select: { estado: true },
+          });
+          if (before?.estado !== after?.estado) {
+            if (after?.estado === 'CONCILIADO') vinculados += 1;
+            if (after?.estado === 'SUGERIDO') sugeridos += 1;
+          }
+        }
+        if (batch.length < PAGE) break;
+      }
+      const pendientes = await this.prisma.mpAccountMovement.count({
+        where: { estado: { in: ['PENDIENTE', 'SUGERIDO'] as never } },
+      });
+      return { vinculados, sugeridos, pendientes };
+    } finally {
+      this.running = false;
+    }
   }
 
   // ─── Sync incremental (cursor) ──

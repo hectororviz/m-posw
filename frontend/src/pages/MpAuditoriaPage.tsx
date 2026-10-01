@@ -87,6 +87,20 @@ export const MpAuditoriaPage: React.FC = () => {
     }
   };
 
+  const reconcile = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await apiClient.post('/mp-auditoria/reconciliar', {});
+      pushToast(`Asociadas ${res.data.vinculados} ventas, ${res.data.sugeridos} sugeridas (${res.data.pendientes} pendientes)`, 'success');
+      await refresh();
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Sync 1× por sesión al abrir la página (navegar entre tabs no re-sincroniza)
   useEffect(() => {
     if (!canWrite) return;
@@ -131,9 +145,14 @@ export const MpAuditoriaPage: React.FC = () => {
           </p>
         </div>
         {canWrite && (
-          <button className="btn-primary finanzas-fab-btn" disabled={syncing} onClick={() => doSync(false)}>
-            <span className="finanzas-fab-label">{syncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-ghost finanzas-fab-btn" disabled={syncing} onClick={() => reconcile()}>
+              <span className="finanzas-fab-label">Asociar ventas</span>
+            </button>
+            <button className="btn-primary finanzas-fab-btn" disabled={syncing} onClick={() => doSync(false)}>
+              <span className="finanzas-fab-label">{syncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
+            </button>
+          </div>
         )}
       </div>
 

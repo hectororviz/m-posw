@@ -167,6 +167,20 @@ export const FinanzasCuentasPage: React.FC = () => {
     }
   };
 
+  const runBackfillVentas = async () => {
+    setMpBusy(true);
+    try {
+      const since = (settings as { mpAuditSince?: string | null } | undefined)?.mpAuditSince ?? '2026-09-01T03:00:00.000Z';
+      const res = await apiClient.post('/finanzas/backfill-ventas', { since });
+      pushToast(`Ventas evaluadas: ${res.data.evaluadas}, entradas: ${res.data.entradasVenta}`, 'success');
+      await queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setMpBusy(false);
+    }
+  };
+
   const refreshBalance = async () => {
     setMpBusy(true);
     try {
@@ -356,6 +370,9 @@ export const FinanzasCuentasPage: React.FC = () => {
               </button>
               <button className="btn-ghost" disabled={mpBusy || mpStatus?.running} onClick={runBackfill}>
                 {mpBusy ? 'Trayendo...' : 'Traer histórico'}
+              </button>
+              <button className="btn-ghost" disabled={mpBusy} onClick={runBackfillVentas}>
+                Generar entradas de ventas
               </button>
               <button className="btn-ghost" disabled={mpBusy} onClick={refreshBalance}>
                 Actualizar saldo

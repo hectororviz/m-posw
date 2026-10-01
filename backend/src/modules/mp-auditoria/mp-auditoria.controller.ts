@@ -47,6 +47,12 @@ export class MpAuditoriaController {
     return this.service.backfill(dto?.from);
   }
 
+  @Post('reconciliar')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
+  reconciliar() {
+    return this.service.reconcileAll();
+  }
+
   @Post(':id/vincular')
   @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   vincular(@Param('id', ParseUUIDPipe) id: string, @Body() dto: VincularDto, @Req() req: { user?: { sub?: string; id?: string } }) {
