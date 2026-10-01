@@ -106,6 +106,16 @@ export class SettingsService {
       hasWebhookVerifyToken: !!settings.whatsappWebhookVerifyToken,
       movementInReasons: settings.movementInReasons,
       movementOutReasons: settings.movementOutReasons,
+      mpAuditEnabled: (settings as { mpAuditEnabled?: boolean }).mpAuditEnabled ?? true,
+      mpAuditSince: (settings as { mpAuditSince?: Date | null }).mpAuditSince
+        ? ((settings as { mpAuditSince?: Date }).mpAuditSince as Date).toISOString()
+        : null,
+      mpBalanceCached: (settings as { mpBalanceCached?: unknown }).mpBalanceCached != null
+        ? Number((settings as { mpBalanceCached?: unknown }).mpBalanceCached as string)
+        : null,
+      mpBalanceAt: (settings as { mpBalanceAt?: Date | null }).mpBalanceAt
+        ? ((settings as { mpBalanceAt?: Date }).mpBalanceAt as Date).toISOString()
+        : null,
     };
   }
 
@@ -197,6 +207,10 @@ export class SettingsService {
         ...(dto.whatsappAppSecret !== undefined ? { whatsappAppSecret: dto.whatsappAppSecret } : {}),
         ...(dto.movementInReasons !== undefined ? { movementInReasons: dto.movementInReasons } : {}),
         ...(dto.movementOutReasons !== undefined ? { movementOutReasons: dto.movementOutReasons } : {}),
+        ...(dto.mpAuditEnabled !== undefined ? { mpAuditEnabled: dto.mpAuditEnabled } : {}),
+        ...(dto.mpAuditSince !== undefined
+          ? { mpAuditSince: dto.mpAuditSince == null || dto.mpAuditSince === '' ? null : new Date(dto.mpAuditSince) }
+          : {}),
       },
     });
 

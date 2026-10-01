@@ -4,6 +4,7 @@ import { PrismaService } from '../common/prisma.service';
 import { MercadoPagoConfigService } from '../common/mp-config.service';
 import { InternetVouchersModule } from '../internet-vouchers/internet-vouchers.module';
 import { AcreedoresModule } from '../acreedores/acreedores.module';
+import { FinanzasModule } from '../finanzas/finanzas.module';
 import { SalesController } from './sales.controller';
 import { SalesService } from './sales.service';
 import { MercadoPagoWebhookController } from './webhooks/mercadopago-webhook.controller';
@@ -14,7 +15,7 @@ import { RefundsService } from './services/refunds.service';
 import { SalesGateway } from './websockets/sales.gateway';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), InternetVouchersModule, AcreedoresModule],
+  imports: [ScheduleModule.forRoot(), InternetVouchersModule, AcreedoresModule, FinanzasModule],
   controllers: [SalesController, MercadoPagoWebhookController],
   providers: [
     SalesService,

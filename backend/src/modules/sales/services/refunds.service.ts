@@ -13,6 +13,7 @@ import { MercadoPagoConfig, PaymentRefund } from 'mercadopago';
 import { MercadoPagoConfigService } from '../../common/mp-config.service';
 import { PrismaService } from '../../common/prisma.service';
 import { InternetVouchersService } from '../../internet-vouchers/internet-vouchers.service';
+import { FinanzasService } from '../../finanzas/finanzas.service';
 import { toJsonValue } from '../webhooks/mercadopago-webhook.utils';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class RefundsService {
     private prisma: PrismaService,
     private mpConfig: MercadoPagoConfigService,
     private internetVouchers: InternetVouchersService,
+    private finanzas: FinanzasService,
   ) {}
 
   async refundSale(saleId: string, requester: { id: string; role: string }) {
@@ -106,6 +108,7 @@ export class RefundsService {
       this.logger.warn(`Refund sale=${saleId}: no se pudieron desactivar vouchers: ${error}`);
     }
 
+    await this.finanzas.voidVenta(saleId, 'Reembolso MP').catch((e) => this.logger.warn(`voidVenta ${saleId}: ${e}`));
     this.logger.log(`Venta reembolsada saleId=${saleId} by=${requester.id}`);
     return updated;
   }

@@ -18,7 +18,7 @@ describe('PaymentsService.pollTransfer overlap (incidente transferencia 2026-09-
       movimientoMP: { findUnique: jest.fn().mockResolvedValue(null) },
     } as any;
     const mpConfig = { getAccessToken: jest.fn().mockResolvedValue('token') } as any;
-    const service = new PaymentsService(prisma, mpConfig, {} as any, {} as any);
+    const service = new PaymentsService(prisma, mpConfig, {} as any, {} as any, {} as any);
 
     let requestedUrl = '';
     global.fetch = jest.fn().mockImplementation((url: string) => {
@@ -46,7 +46,7 @@ describe('PaymentsService.pollTransfer overlap (incidente transferencia 2026-09-
       movimientoMP: { findUnique: jest.fn().mockResolvedValue(null) },
     } as any;
     const mpConfig = { getAccessToken: jest.fn().mockResolvedValue('token') } as any;
-    const service = new PaymentsService(prisma, mpConfig, {} as any, {} as any);
+    const service = new PaymentsService(prisma, mpConfig, {} as any, {} as any, {} as any);
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,

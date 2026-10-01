@@ -141,6 +141,14 @@ export class UpdateSettingDto {
   interesFechaAmnistia?: string | null;
 
   @IsOptional()
+  @IsBoolean()
+  mpAuditEnabled?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  mpAuditSince?: string | null;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   movementInReasons?: string[];

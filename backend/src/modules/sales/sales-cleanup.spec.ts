@@ -8,7 +8,7 @@ describe('SalesService.cleanupExpiredQrSales (Fase 5 L2)', () => {
         findMany: jest.fn().mockResolvedValue([{ id: 's1' }, { id: 's2' }]),
       },
     } as any;
-    const service = new SalesService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const service = new SalesService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
     const cancel = jest
       .spyOn(service, 'cancelQrSale')
       .mockRejectedValueOnce(new Error('MP 500'))
@@ -25,7 +25,7 @@ describe('SalesService.cleanupExpiredQrSales (Fase 5 L2)', () => {
 
   it('no hace nada si no hay vencidas', async () => {
     const prisma = { sale: { findMany: jest.fn().mockResolvedValue([]) } } as any;
-    const service = new SalesService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any);
+    const service = new SalesService(prisma, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
     const cancel = jest.spyOn(service, 'cancelQrSale');
 
     await service.cleanupExpiredQrSales();

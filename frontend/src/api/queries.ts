@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, InternetPlan, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
+import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -179,6 +179,9 @@ export const useFinanzasMovements = (params?: {
   accountId?: string;
   categoryId?: string;
   search?: string;
+  source?: string;
+  responsableId?: string;
+  groupVentas?: string;
   page?: number;
   limit?: number;
 }) =>
@@ -190,6 +193,66 @@ export const useFinanzasMovements = (params?: {
       });
       return response.data;
     },
+  });
+
+export const useResponsables = () =>
+  useQuery({
+    queryKey: ['finanzas-responsables'],
+    queryFn: async () => {
+      const response = await apiClient.get<Responsable[]>('/finanzas/responsables');
+      return response.data;
+    },
+    staleTime: fiveMinutes,
+  });
+
+export const useFinanzasMonthly = (year?: number) =>
+  useQuery({
+    queryKey: ['finanzas-monthly', year],
+    queryFn: async () => {
+      const response = await apiClient.get<FinanzasMonthly[]>('/finanzas/monthly', {
+        params: year ? { year } : {},
+      });
+      return response.data;
+    },
+  });
+
+// Auditoría MP (sync 1× por sesión + manual; stale largo para no re-sincronizar al navegar)
+export const useMpAuditoria = (params?: {
+  from?: string;
+  to?: string;
+  estado?: string;
+  tipo?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) =>
+  useQuery({
+    queryKey: ['mp-auditoria', params],
+    queryFn: async () => {
+      const response = await apiClient.get<MpAuditoriaResponse>('/mp-auditoria', { params });
+      return response.data;
+    },
+    staleTime: 30 * 60 * 1000,
+  });
+
+export const useMpAuditoriaDetail = (id?: string) =>
+  useQuery({
+    queryKey: ['mp-auditoria', id],
+    queryFn: async () => {
+      const response = await apiClient.get<MpAuditoriaItem & { candidatos?: { id: string; orderNumber: number; total: number; paymentMethod: string; paidAt: string }[] }>(`/mp-auditoria/${id}`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+  });
+
+export const useMpAuditoriaStatus = () =>
+  useQuery({
+    queryKey: ['mp-auditoria-status'],
+    queryFn: async () => {
+      const response = await apiClient.get<MpAuditoriaStatus>('/mp-auditoria/status');
+      return response.data;
+    },
+    staleTime: 60 * 1000,
   });
 
 export const useFinanzasRubroDetail = (

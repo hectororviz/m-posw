@@ -16,15 +16,31 @@ const DEFAULT_ACCOUNTS = [
   { name: 'Mercado Pago', kind: 'MERCADOPAGO' as const, position: 1 },
 ];
 
-const DEFAULT_CATEGORIES: Array<{ name: string; kind: 'INGRESO' | 'EGRESO' | 'AMBOS'; position: number }> = [
-  { name: 'Ventas mostrador', kind: 'INGRESO', position: 0 },
-  { name: 'Cuotas sociales', kind: 'INGRESO', position: 1 },
-  { name: 'Cobro fiado', kind: 'INGRESO', position: 2 },
-  { name: 'Compras mercadería', kind: 'EGRESO', position: 3 },
-  { name: 'Servicios', kind: 'EGRESO', position: 4 },
-  { name: 'Otros ingresos', kind: 'INGRESO', position: 5 },
-  { name: 'Otros gastos', kind: 'EGRESO', position: 6 },
+const DEFAULT_CATEGORIES: Array<{ name: string; kind: 'INGRESO' | 'EGRESO' | 'AMBOS'; grupo: string; position: number }> = [
+  { name: 'Ventas mostrador', kind: 'INGRESO', grupo: 'OPERATIVO', position: 0 },
+  { name: 'Cuotas sociales', kind: 'INGRESO', grupo: 'OPERATIVO', position: 1 },
+  { name: 'Cobro fiado', kind: 'INGRESO', grupo: 'OPERATIVO', position: 2 },
+  { name: 'Comida', kind: 'EGRESO', grupo: 'OPERATIVO', position: 3 },
+  { name: 'Bebidas', kind: 'AMBOS', grupo: 'OPERATIVO', position: 4 },
+  { name: 'Transporte', kind: 'AMBOS', grupo: 'OPERATIVO', position: 5 },
+  { name: 'Insumos', kind: 'EGRESO', grupo: 'OPERATIVO', position: 6 },
+  { name: 'Materiales', kind: 'EGRESO', grupo: 'OPERATIVO', position: 7 },
+  { name: 'Indumentaria', kind: 'AMBOS', grupo: 'OPERATIVO', position: 8 },
+  { name: 'Árbitros', kind: 'EGRESO', grupo: 'OPERATIVO', position: 9 },
+  { name: 'Administración', kind: 'AMBOS', grupo: 'OPERATIVO', position: 10 },
+  { name: 'Servicios', kind: 'EGRESO', grupo: 'OPERATIVO', position: 11 },
+  { name: 'Torneos', kind: 'AMBOS', grupo: 'OPERATIVO', position: 12 },
+  { name: 'Cta Cte.', kind: 'AMBOS', grupo: 'OPERATIVO', position: 13 },
+  { name: 'Compras mercadería', kind: 'EGRESO', grupo: 'OPERATIVO', position: 14 },
+  { name: 'Préstamos', kind: 'AMBOS', grupo: 'FINANCIERO', position: 15 },
+  { name: 'Intereses', kind: 'EGRESO', grupo: 'FINANCIERO', position: 16 },
+  { name: 'Cambio Caja', kind: 'AMBOS', grupo: 'FINANCIERO', position: 17 },
+  { name: 'Otros ingresos', kind: 'INGRESO', grupo: 'OPERATIVO', position: 18 },
+  { name: 'Otros gastos', kind: 'EGRESO', grupo: 'OPERATIVO', position: 19 },
+  { name: 'Otros', kind: 'AMBOS', grupo: 'OPERATIVO', position: 20 },
 ];
+
+const DEFAULT_RESPONSABLES = ['Luis', 'Belén', 'Fernanda', 'Héctor'];
 
 const round = (v: Prisma.Decimal | number | string) =>
   new Prisma.Decimal(v.toString()).toDecimalPlaces(2);
@@ -62,7 +78,14 @@ export class FinanzasService {
     for (const c of DEFAULT_CATEGORIES) {
       await this.prisma.moneyCategory.upsert({
         where: { name: c.name },
-        create: { name: c.name, kind: c.kind, position: c.position },
+        create: { name: c.name, kind: c.kind, grupo: c.grupo, position: c.position },
+        update: {},
+      });
+    }
+    for (const nombre of DEFAULT_RESPONSABLES) {
+      await this.prisma.responsable.upsert({
+        where: { nombre },
+        create: { nombre },
         update: {},
       });
     }
@@ -119,18 +142,28 @@ export class FinanzasService {
     await this.ensureDefaults();
     const position = await this.prisma.moneyCategory.count();
     return this.prisma.moneyCategory.create({
-      data: { name: dto.name.trim(), kind: (dto.kind ?? 'AMBOS') as never, position },
+      data: {
+        name: dto.name.trim(),
+        kind: (dto.kind ?? 'AMBOS') as never,
+        grupo: ((dto as { grupo?: string }).grupo === 'FINANCIERO' ? 'FINANCIERO' : 'OPERATIVO'),
+        position,
+      },
     });
   }
 
   async updateCategory(id: string, dto: UpdateMoneyCategoryDto) {
     const category = await this.prisma.moneyCategory.findUnique({ where: { id } });
     if (!category) throw new NotFoundException('Categoría no encontrada');
+    if (dto.active === false) {
+      const inUse = await this.prisma.moneyMovement.count({ where: { categoryId: id } });
+      if (inUse > 0) throw new BadRequestException('La categoría tiene movimientos asociados');
+    }
     return this.prisma.moneyCategory.update({
       where: { id },
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.kind !== undefined ? { kind: dto.kind as never } : {}),
+        ...(((dto as { grupo?: string }).grupo === 'OPERATIVO' || (dto as { grupo?: string }).grupo === 'FINANCIERO') ? { grupo: (dto as { grupo?: string }).grupo } : {}),
         ...(dto.active !== undefined ? { active: dto.active } : {}),
       },
     });
@@ -146,6 +179,12 @@ export class FinanzasService {
     if (category.kind !== 'AMBOS' && category.kind !== dto.kind) {
       throw new BadRequestException(`La categoría "${category.name}" es solo de ${category.kind === 'INGRESO' ? 'ingresos' : 'egresos'}`);
     }
+    let responsableId: string | null = null;
+    if ((dto as { responsableId?: string }).responsableId) {
+      const r = await this.prisma.responsable.findUnique({ where: { id: (dto as { responsableId?: string }).responsableId! } });
+      if (!r || !r.active) throw new BadRequestException('Responsable no válido');
+      responsableId = r.id;
+    }
     return this.prisma.moneyMovement.create({
       data: {
         date: dto.date ? new Date(dto.date) : new Date(),
@@ -153,12 +192,138 @@ export class FinanzasService {
         amount: round(dto.amount),
         accountId: dto.accountId,
         categoryId: dto.categoryId,
+        concepto: ((dto as { concepto?: string }).concepto ?? dto.description).trim().slice(0, 120),
         description: dto.description.trim(),
+        observaciones: (dto as { observaciones?: string }).observaciones?.trim() || null,
+        responsableId,
         source: 'MANUAL',
         userId: userId ?? null,
       },
-      include: { account: true, category: true },
+      include: { account: true, category: true, responsable: true },
     });
+  }
+
+  // ─── Venta → entrada automática (idempotente source=VENTA/sourceId=sale.id) ──
+  async recordVenta(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({ where: { id: saleId } });
+    if (!sale) return null;
+    if (sale.paymentMethod === 'FIADO') return null;
+    if (sale.status !== 'APPROVED' && sale.paymentStatus !== 'APPROVED') return null;
+    const existing = await this.prisma.moneyMovement.findFirst({
+      where: { source: 'VENTA' as never, sourceId: sale.id },
+    });
+    if (existing) return existing;
+    await this.ensureDefaults();
+    const method = sale.paymentMethod === 'CASH' ? 'CASH' : 'MP';
+    const accountId = await this.resolveSalesAccountId(method);
+    if (!accountId) return null;
+    let category = await this.prisma.moneyCategory.findUnique({ where: { name: 'Ventas mostrador' } });
+    if (!category) {
+      category = await this.prisma.moneyCategory.create({ data: { name: 'Ventas mostrador', kind: 'INGRESO' } });
+    }
+    return this.prisma.moneyMovement.create({
+      data: {
+        date: sale.paidAt ?? sale.createdAt,
+        kind: 'INGRESO',
+        amount: sale.total as never,
+        accountId,
+        categoryId: category.id,
+        concepto: `Venta #${sale.orderNumber}`,
+        description: `Venta #${sale.orderNumber} (${sale.paymentMethod === 'CASH' ? 'efectivo' : 'Mercado Pago'})`,
+        source: 'VENTA' as never,
+        sourceId: sale.id,
+      },
+    });
+  }
+
+  async voidVenta(saleId: string, reason?: string) {
+    const entry = await this.prisma.moneyMovement.findFirst({
+      where: { source: 'VENTA' as never, sourceId: saleId, voidedAt: null },
+    });
+    if (!entry) return null;
+    return this.prisma.moneyMovement.update({
+      where: { id: entry.id },
+      data: { voidedAt: new Date(), voidReason: reason ?? 'Venta anulada/reembolsada' },
+    });
+  }
+
+  async backfillVentas(since?: string) {
+    const from = since ? new Date(since) : new Date('2026-09-01T03:00:00Z');
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        createdAt: { gte: from },
+        paymentMethod: { in: ['CASH', 'MP_QR', 'TRANSFER'] as never },
+        OR: [{ status: 'APPROVED' as never }, { paymentStatus: 'APPROVED' as never }],
+      },
+      select: { id: true },
+      take: 2000,
+    });
+    let created = 0;
+    for (const s of sales) {
+      const r = await this.recordVenta(s.id);
+      if (r && (r as { createdAt?: Date })) created += 1;
+    }
+    const count = await this.prisma.moneyMovement.count({ where: { source: 'VENTA' as never } });
+    return { evaluadas: sales.length, entradasVenta: count };
+  }
+
+  // ─── Traspaso interno (par EGRESO/INGRESO con mismo transferGroupId) ──
+  async createTraspaso(userId: string | undefined, dto: { fromAccountId: string; toAccountId: string; amount: number; date?: string; responsableId?: string; observaciones?: string }) {
+    if (dto.fromAccountId === dto.toAccountId) throw new BadRequestException('Origen y destino deben diferir');
+    if (!dto.amount || dto.amount <= 0) throw new BadRequestException('Monto mayor a 0');
+    const [from, to] = await Promise.all([
+      this.prisma.moneyAccount.findUnique({ where: { id: dto.fromAccountId } }),
+      this.prisma.moneyAccount.findUnique({ where: { id: dto.toAccountId } }),
+    ]);
+    if (!from?.active || !to?.active) throw new BadRequestException('Cuenta no válida');
+    await this.ensureDefaults();
+    let category = await this.prisma.moneyCategory.findUnique({ where: { name: 'Cambio Caja' } });
+    if (!category) category = await this.prisma.moneyCategory.create({ data: { name: 'Cambio Caja', kind: 'AMBOS' } });
+    const groupId = `traspaso-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const date = dto.date ? new Date(dto.date) : new Date();
+    const out = await this.prisma.moneyMovement.create({
+      data: {
+        date, kind: 'EGRESO', amount: round(dto.amount), accountId: from.id, categoryId: category.id,
+        concepto: `Traspaso a ${to.name}`, description: `Traspaso a ${to.name}`,
+        observaciones: dto.observaciones?.trim() || null, responsableId: dto.responsableId ?? null,
+        transferGroupId: groupId, source: 'TRASPASO' as never, userId: userId ?? null,
+      },
+    });
+    await this.prisma.moneyMovement.create({
+      data: {
+        date, kind: 'INGRESO', amount: round(dto.amount), accountId: to.id, categoryId: category.id,
+        concepto: `Traspaso desde ${from.name}`, description: `Traspaso desde ${from.name}`,
+        observaciones: dto.observaciones?.trim() || null, responsableId: dto.responsableId ?? null,
+        transferGroupId: groupId, source: 'TRASPASO' as never, userId: userId ?? null,
+      },
+    });
+    return { groupId, egresoId: out.id };
+  }
+
+  // ─── Responsables ABM ──
+  async listResponsables(includeInactive = false) {
+    await this.ensureDefaults();
+    return this.prisma.responsable.findMany({
+      where: includeInactive ? {} : { active: true },
+      orderBy: { nombre: 'asc' },
+    });
+  }
+
+  async createResponsable(nombre: string) {
+    const clean = nombre.trim().slice(0, 60);
+    if (!clean) throw new BadRequestException('Nombre requerido');
+    await this.ensureDefaults();
+    return this.prisma.responsable.upsert({ where: { nombre: clean }, create: { nombre: clean }, update: {} });
+  }
+
+  async toggleResponsable(id: string) {
+    const r = await this.prisma.responsable.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Responsable no encontrado');
+    if (r.active) {
+      const inUse = await this.prisma.moneyMovement.count({ where: { responsableId: id } });
+      if (inUse > 0) throw new BadRequestException('Tiene movimientos asociados, no se puede desactivar');
+    }
+    return this.prisma.responsable.update({ where: { id }, data: { active: !r.active } });
   }
 
   async recordCobro(input: {
@@ -203,14 +368,43 @@ export class FinanzasService {
     const movement = await this.prisma.moneyMovement.findUnique({ where: { id } });
     if (!movement) throw new NotFoundException('Movimiento no encontrado');
     if (movement.voidedAt) throw new BadRequestException('El movimiento ya está anulado');
-    if (movement.source !== 'MANUAL') {
-      throw new BadRequestException('Solo se pueden anular movimientos manuales');
+    if (movement.source !== 'MANUAL' && movement.source !== 'TRASPASO') {
+      throw new BadRequestException('Solo se pueden anular movimientos manuales o traspasos');
+    }
+    if (movement.source === 'TRASPASO' && movement.transferGroupId) {
+      await this.prisma.moneyMovement.updateMany({
+        where: { transferGroupId: movement.transferGroupId, voidedAt: null },
+        data: { voidedAt: new Date(), voidReason: reason?.trim() || null },
+      });
     }
     return this.prisma.moneyMovement.update({
       where: { id },
       data: { voidedAt: new Date(), voidReason: reason?.trim() || null },
       include: { account: true, category: true },
     });
+  }
+
+  // ─── Resumen mensual (cortes por mes) ──
+  async monthly(year: number) {
+    await this.ensureDefaults();
+    const rows = await this.prisma.moneyMovement.findMany({
+      where: {
+        voidedAt: null,
+        date: { gte: new Date(Date.UTC(year, 0, 1)), lt: new Date(Date.UTC(year + 1, 0, 1)) },
+      },
+      select: { date: true, kind: true, amount: true, accountId: true },
+    });
+    const byMonth = new Map<string, { income: number; expense: number }>();
+    for (const m of rows) {
+      const key = m.date.toISOString().slice(0, 7);
+      const e = byMonth.get(key) ?? { income: 0, expense: 0 };
+      if (m.kind === 'INGRESO') e.income += Number(m.amount);
+      else e.expense += Number(m.amount);
+      byMonth.set(key, e);
+    }
+    return [...byMonth.entries()]
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+      .map(([month, v]) => ({ month, income: Math.round(v.income * 100) / 100, expense: Math.round(v.expense * 100) / 100, net: Math.round((v.income - v.expense) * 100) / 100 }));
   }
 
   // ─── Ventas agregadas por día ─────────────────────────────
@@ -284,9 +478,6 @@ export class FinanzasService {
     for (const m of movements) {
       add(m.accountId, m.kind === 'INGRESO' ? new Prisma.Decimal(m.amount) : new Prisma.Decimal(m.amount).neg());
     }
-    for (const g of daily) {
-      add(g.method === 'CASH' ? cashId : mpId, g.total);
-    }
 
     const balances = accounts.map((a) => {
       const delta = totals.get(a.id) ?? new Prisma.Decimal(0);
@@ -313,12 +504,15 @@ export class FinanzasService {
       }
       byCategory.set(id, c);
     };
+    let operativoIncome = new Prisma.Decimal(0);
+    let operativoExpense = new Prisma.Decimal(0);
     for (const m of movements) {
+      const grupo = (m.category as { grupo?: string }).grupo ?? 'OPERATIVO';
       bumpCat(m.categoryId, m.category.name, m.kind as 'INGRESO' | 'EGRESO', new Prisma.Decimal(m.amount));
-    }
-    let ventasCategory = (await this.prisma.moneyCategory.findUnique({ where: { name: 'Ventas mostrador' } }))?.id ?? 'ventas';
-    for (const g of daily) {
-      bumpCat(ventasCategory, 'Ventas mostrador', 'INGRESO', g.total);
+      if (grupo !== 'FINANCIERO') {
+        if (m.kind === 'INGRESO') operativoIncome = operativoIncome.add(new Prisma.Decimal(m.amount));
+        else operativoExpense = operativoExpense.add(new Prisma.Decimal(m.amount));
+      }
     }
 
     return {
@@ -329,6 +523,9 @@ export class FinanzasService {
       totalIncome: Number(income.toDecimalPlaces(2)),
       totalExpense: Number(expense.toDecimalPlaces(2)),
       netResult: Number(income.sub(expense).toDecimalPlaces(2)),
+      operativoIncome: Number(operativoIncome.toDecimalPlaces(2)),
+      operativoExpense: Number(operativoExpense.toDecimalPlaces(2)),
+      operativoNet: Number(operativoIncome.sub(operativoExpense).toDecimalPlaces(2)),
       byCategory: [...byCategory.values()].map((c) => ({
         id: c.id,
         name: c.name,
@@ -385,10 +582,7 @@ export class FinanzasService {
     const sum = await this.summary({ from: query.from, to: query.to });
     const catSum = sum.byCategory.find((c) => c.id === categoryId);
 
-    const list = await this.movements(
-      { ...query, categoryId },
-      { includeDaily: category.name === 'Ventas mostrador' },
-    );
+    const list = await this.movements({ ...query, categoryId });
 
     return {
       category: { id: category.id, name: category.name, kind: category.kind },
@@ -404,7 +598,7 @@ export class FinanzasService {
 
   // ─── Listado combinado ────────────────────────────────────
 
-  async movements(query: ListMovementsDto, opts?: { includeDaily?: boolean }) {
+  async movements(query: ListMovementsDto & { source?: string; responsableId?: string; groupVentas?: string }) {
     await this.ensureDefaults();
     const from = parseDayStart(query.from);
     const to = parseDayEnd(query.to);
@@ -415,15 +609,23 @@ export class FinanzasService {
       ...(from || to ? { date: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
       ...(query.accountId ? { accountId: query.accountId } : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...((query as { source?: string }).source ? { source: (query as { source?: string }).source as never } : {}),
+      ...((query as { responsableId?: string }).responsableId ? { responsableId: (query as { responsableId?: string }).responsableId } : {}),
       ...(query.search
-        ? { description: { contains: query.search, mode: 'insensitive' } }
+        ? {
+            OR: [
+              { description: { contains: query.search, mode: 'insensitive' } },
+              { concepto: { contains: query.search, mode: 'insensitive' } },
+              { observaciones: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
         : {}),
     };
 
     const [rows, total] = await Promise.all([
       this.prisma.moneyMovement.findMany({
         where,
-        include: { account: true, category: true },
+        include: { account: true, category: true, responsable: true },
         orderBy: { date: 'desc' },
         take: limit,
         skip: (page - 1) * limit,
@@ -435,33 +637,65 @@ export class FinanzasService {
       id: m.id,
       date: m.date,
       kind: m.kind,
+      concepto: (m as { concepto?: string }).concepto ?? m.description,
       description: m.description,
+      observaciones: (m as { observaciones?: string | null }).observaciones ?? null,
+      responsableId: (m as { responsableId?: string | null }).responsableId ?? null,
+      responsableNombre: (m as { responsable?: { nombre?: string } | null }).responsable?.nombre ?? null,
+      transferGroupId: (m as { transferGroupId?: string | null }).transferGroupId ?? null,
       categoryId: m.categoryId,
       categoryName: m.category.name,
+      categoryGrupo: (m.category as { grupo?: string }).grupo ?? 'OPERATIVO',
       accountId: m.accountId,
       accountName: m.account.name,
       amountIn: m.kind === 'INGRESO' ? Number(m.amount) : 0,
       amountOut: m.kind === 'EGRESO' ? Number(m.amount) : 0,
       source: m.source,
+      sourceId: m.sourceId,
       salesCount: 0,
       voided: m.voidedAt !== null,
     }));
 
-    // Ventas diarias como filas virtuales (vista general o detalle de Ventas mostrador)
-    let dailyRows: typeof items = [];
-    if (!query.search && (!query.categoryId || opts?.includeDaily)) {
-      dailyRows = await this.buildDailyRows(from, to, query.accountId);
+    // Grupos colapsables de ventas (VENTA agrupada por día+cuenta, hijos vía source=VENTA&from&to)
+    if ((query as { groupVentas?: string }).groupVentas === '1' && !query.search && !query.categoryId && !(query as { source?: string }).source) {
+      const groups = new Map<string, { date: string; accountId: string; accountName: string; count: number; total: number }>();
+      const ventas = items.filter((i) => i.source === 'VENTA' && !i.voided);
+      for (const v of ventas) {
+        const key = `${new Date(v.date).toISOString().slice(0, 10)}|${v.accountId}`;
+        const g = groups.get(key) ?? { date: new Date(v.date).toISOString().slice(0, 10), accountId: v.accountId, accountName: v.accountName, count: 0, total: 0 };
+        g.count += 1;
+        g.total = Math.round((g.total + v.amountIn) * 100) / 100;
+        groups.set(key, g);
+      }
+      const rest = items.filter((i) => !(i.source === 'VENTA' && !i.voided));
+      const groupRows = [...groups.values()].map((g) => ({
+        id: `grupo-venta-${g.date}-${g.accountId}`,
+        date: new Date(`${g.date}T12:00:00.000Z`),
+        kind: 'INGRESO' as const,
+        concepto: `Ventas del día (${g.count})`,
+        description: `Ventas del día (${g.count})`,
+        observaciones: null,
+        responsableId: null,
+        responsableNombre: null,
+        transferGroupId: null,
+        categoryId: '',
+        categoryName: 'Ventas mostrador',
+        categoryGrupo: 'OPERATIVO',
+        accountId: g.accountId,
+        accountName: g.accountName,
+        amountIn: g.total,
+        amountOut: 0,
+        source: 'VENTA_GRUPO' as never,
+        sourceId: g.date as unknown as string,
+        salesCount: g.count,
+        voided: false,
+      }));
+      const combined = [...rest, ...groupRows].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
+      return { data: combined, total, page, limit };
     }
 
-    const combined = [...items, ...dailyRows].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-    );
-
-    return {
-      data: combined.slice((page - 1) * limit, page * limit),
-      total: total + dailyRows.length,
-      page,
-      limit,
-    };
+    return { data: items, total, page, limit };
   }
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Ban } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
-import { useFinanzasMovements, useMoneyAccounts, useMoneyCategories } from '../api/queries';
+import { useFinanzasMovements, useMoneyAccounts, useMoneyCategories, useResponsables } from '../api/queries';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 import { useToast } from '../components/ToastProvider';
 import type { FinanzasMovement } from '../api/types';
@@ -14,14 +14,22 @@ const formatDate = (d: string) =>
   new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
 
 const sourceBadge = (m: FinanzasMovement) => {
-  if (m.source === 'VENTA_DIARIA') return <span className="badge badge-success">Venta diaria</span>;
+  if (m.source === 'VENTA_GRUPO') return <span className="badge badge-success">Ventas del día ({m.salesCount})</span>;
+  if (m.source === 'VENTA' || m.source === 'VENTA_DIARIA') return <span className="badge badge-success">Venta</span>;
   if (m.source === 'COBRO_FIADO') return <span className="badge badge-info">Cobro fiado</span>;
   if (m.source === 'CUOTA_SOCIO') return <span className="badge badge-info">Cuota socio</span>;
+  if (m.source === 'TRASPASO') return <span className="badge badge-info">Traspaso</span>;
+  if (m.source === 'MP_SYNC') return <span className="badge badge-info">Mercado Pago</span>;
   if (m.voided) return <span className="badge badge-warning">Anulado</span>;
   return <span className="badge badge-neutral">Manual</span>;
 };
 
-export const FinanzasMovimientosPage: React.FC = () => {
+export const FinanzasMovimientosPage: React.FC<{
+  fixedAccountId?: string;
+  title?: string;
+  subtitle?: string;
+  hideAccountFilter?: boolean;
+}> = ({ fixedAccountId, title = 'Movimientos', subtitle = 'Compras, gastos, cobros y ventas', hideAccountFilter = false }) => {
   const access = useModuleAccess('TESORERIA');
   const canWrite = access === 'FULL';
   const queryClient = useQueryClient();
@@ -41,15 +49,28 @@ export const FinanzasMovimientosPage: React.FC = () => {
 
   const { data: accounts = [] } = useMoneyAccounts();
   const { data: categories = [] } = useMoneyCategories();
+  const { data: responsables = [] } = useResponsables();
+  const effectiveAccountId = fixedAccountId ?? accountId;
   const { data, isLoading } = useFinanzasMovements({
     from: from || undefined,
     to: to || undefined,
-    accountId: accountId || undefined,
+    accountId: effectiveAccountId || undefined,
     categoryId: categoryId || undefined,
     search: search || undefined,
+    groupVentas: '1',
     page,
     limit: 30,
   });
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const expandedDay = expandedGroup ? expandedGroup.replace('grupo-venta-', '').split('-').slice(0, 3).join('-') : null;
+  const { data: groupChildren } = useFinanzasMovements(expandedDay ? {
+    from: expandedDay,
+    to: expandedDay,
+    accountId: effectiveAccountId || undefined,
+    source: 'VENTA',
+    page: 1,
+    limit: 100,
+  } : { page: 1, limit: 0 });
 
   // Modal nuevo movimiento
   const [modalOpen, setModalOpen] = useState(false);
@@ -58,15 +79,27 @@ export const FinanzasMovimientosPage: React.FC = () => {
   const [mAccountId, setMAccountId] = useState('');
   const [mCategoryId, setMCategoryId] = useState('');
   const [description, setDescription] = useState('');
+  const [concepto, setConcepto] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [responsableId, setResponsableId] = useState('');
   const [mDate, setMDate] = useState(toDate);
   const [saving, setSaving] = useState(false);
+  // Modal traspaso
+  const [traspasoOpen, setTraspasoOpen] = useState(false);
+  const [tAmount, setTAmount] = useState('');
+  const [tToAccount, setTToAccount] = useState('');
+  const [tResponsable, setTResponsable] = useState('');
+  const [tObs, setTObs] = useState('');
 
   const openModal = () => {
     setKind('EGRESO');
     setAmount('');
-    setMAccountId(accounts[0]?.id ?? '');
+    setMAccountId(fixedAccountId ?? accounts[0]?.id ?? '');
     setMCategoryId('');
     setDescription('');
+    setConcepto('');
+    setObservaciones('');
+    setResponsableId('');
     setMDate(new Date().toISOString().slice(0, 10));
     setModalOpen(true);
   };
@@ -92,11 +125,41 @@ export const FinanzasMovimientosPage: React.FC = () => {
         amount: value,
         accountId: mAccountId,
         categoryId: mCategoryId,
+        concepto: concepto.trim() || undefined,
         description: description.trim(),
+        observaciones: observaciones.trim() || undefined,
+        responsableId: responsableId || undefined,
         date: mDate || undefined,
       });
       pushToast(kind === 'EGRESO' ? 'Gasto registrado' : 'Ingreso registrado', 'success');
       setModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['finanzas-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTraspaso = async () => {
+    const value = Number(String(tAmount).replace(',', '.'));
+    if (!value || value <= 0 || !tToAccount) {
+      pushToast('Ingresá monto y cuenta destino', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiClient.post('/finanzas/traspasos', {
+        fromAccountId: fixedAccountId || effectiveAccountId,
+        toAccountId: tToAccount,
+        amount: value,
+        responsableId: tResponsable || undefined,
+        observaciones: tObs.trim() || undefined,
+      });
+      pushToast('Traspaso registrado', 'success');
+      setTraspasoOpen(false);
+      setTAmount('');
       queryClient.invalidateQueries({ queryKey: ['finanzas-movements'] });
       queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
     } catch (err) {
@@ -124,13 +187,20 @@ export const FinanzasMovimientosPage: React.FC = () => {
     <div className="finanzas-page">
       <div className="page-header">
         <div>
-          <h2>Movimientos</h2>
-          <p className="page-subtitle">Compras, gastos, cobros y ventas diarias</p>
+          <h2>{title}</h2>
+          <p className="page-subtitle">{subtitle}</p>
         </div>
         {canWrite && (
-          <button className="btn-primary finanzas-fab-btn" onClick={openModal}>
-            <Plus size={18} /> <span className="finanzas-fab-label">Compra / Gasto</span>
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {fixedAccountId && (
+              <button className="btn-ghost finanzas-fab-btn" onClick={() => { setTToAccount(''); setTraspasoOpen(true); }}>
+                <span className="finanzas-fab-label">Traspaso</span>
+              </button>
+            )}
+            <button className="btn-primary finanzas-fab-btn" onClick={openModal}>
+              <Plus size={18} /> <span className="finanzas-fab-label">Compra / Gasto</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -143,15 +213,17 @@ export const FinanzasMovimientosPage: React.FC = () => {
           <label>Hasta</label>
           <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
         </div>
-        <div className="filter-field">
-          <label>Cuenta</label>
-          <select value={accountId} onChange={(e) => { setAccountId(e.target.value); setPage(1); }}>
-            <option value="">Todas</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
-        </div>
+        {!hideAccountFilter && (
+          <div className="filter-field">
+            <label>Cuenta</label>
+            <select value={accountId} onChange={(e) => { setAccountId(e.target.value); setPage(1); }}>
+              <option value="">Todas</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="filter-field">
           <label>Categoría</label>
           <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}>
@@ -181,34 +253,65 @@ export const FinanzasMovimientosPage: React.FC = () => {
       {data && data.data.length > 0 && (
         <div className="finanzas-list">
           {data.data.map((m) => (
-            <div key={m.id} className={`finanzas-card${m.voided ? ' is-voided' : ''}`}>
-              <div className="finanzas-card-main">
-                <span className="finanzas-card-date">{formatDate(m.date)}</span>
-                <div className="finanzas-card-body">
-                  <strong className="finanzas-card-desc">{m.description}</strong>
-                  <span className="finanzas-card-meta">
-                    {m.categoryName} · {m.accountName}
-                  </span>
+            <div key={m.id}>
+              <div
+                className={`finanzas-card${m.voided ? ' is-voided' : ''}`}
+                style={m.source === 'VENTA_GRUPO' ? { cursor: 'pointer' } : undefined}
+                onClick={m.source === 'VENTA_GRUPO' ? () => setExpandedGroup(expandedGroup === m.id ? null : m.id) : undefined}
+              >
+                <div className="finanzas-card-main">
+                  <span className="finanzas-card-date">{formatDate(m.date)}</span>
+                  <div className="finanzas-card-body">
+                    <strong className="finanzas-card-desc">
+                      {m.source === 'VENTA_GRUPO' ? `${expandedGroup === m.id ? '▾' : '▸'} ` : ''}{m.concepto || m.description}
+                    </strong>
+                    <span className="finanzas-card-meta">
+                      {m.categoryName} · {m.accountName}
+                      {m.responsableNombre ? ` · ${m.responsableNombre}` : ''}
+                    </span>
+                    {m.observaciones && (
+                      <span className="finanzas-card-meta">{m.observaciones}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="finanzas-card-side">
+                  {m.amountIn > 0 && (
+                    <span className="finanzas-amount in">+{formatCurrency(m.amountIn)}</span>
+                  )}
+                  {m.amountOut > 0 && (
+                    <span className="finanzas-amount out">−{formatCurrency(m.amountOut)}</span>
+                  )}
+                  <span className="finanzas-card-badges">{sourceBadge(m)}</span>
+                  {canWrite && (m.source === 'MANUAL' || m.source === ('TRASPASO' as string)) && !m.voided && (m.source as string) !== 'VENTA_GRUPO' && (
+                    <button
+                      className="btn-ghost finanzas-void"
+                      title="Anular"
+                      onClick={(e) => { e.stopPropagation(); handleVoid(m.id); }}
+                    >
+                      <Ban size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="finanzas-card-side">
-                {m.amountIn > 0 && (
-                  <span className="finanzas-amount in">+{formatCurrency(m.amountIn)}</span>
-                )}
-                {m.amountOut > 0 && (
-                  <span className="finanzas-amount out">−{formatCurrency(m.amountOut)}</span>
-                )}
-                <span className="finanzas-card-badges">{sourceBadge(m)}</span>
-                {canWrite && m.source === 'MANUAL' && !m.voided && (
-                  <button
-                    className="btn-ghost finanzas-void"
-                    title="Anular"
-                    onClick={() => handleVoid(m.id)}
-                  >
-                    <Ban size={15} />
-                  </button>
-                )}
-              </div>
+              {m.source === 'VENTA_GRUPO' && expandedGroup === m.id && groupChildren && (
+                <div style={{ marginLeft: 24 }}>
+                  {groupChildren.data.map((c) => (
+                    <div key={c.id} className="finanzas-card">
+                      <div className="finanzas-card-main">
+                        <span className="finanzas-card-date">{formatDate(c.date)}</span>
+                        <div className="finanzas-card-body">
+                          <strong className="finanzas-card-desc">{c.concepto || c.description}</strong>
+                          <span className="finanzas-card-meta">{c.categoryName}</span>
+                        </div>
+                      </div>
+                      <div className="finanzas-card-side">
+                        <span className="finanzas-amount in">+{formatCurrency(c.amountIn)}</span>
+                        <span className="finanzas-card-badges">{sourceBadge(c)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -270,20 +373,22 @@ export const FinanzasMovimientosPage: React.FC = () => {
               />
             </div>
 
-            <div className="settings-field">
-              <label>De dónde {kind === 'EGRESO' ? 'salió' : 'ingresó'} el dinero</label>
-              <div className="finanzas-chips">
-                {accounts.map((a) => (
-                  <button
-                    key={a.id}
-                    className={mAccountId === a.id ? 'chip active' : 'chip'}
-                    onClick={() => setMAccountId(a.id)}
-                  >
-                    {a.name}
-                  </button>
-                ))}
+            {!fixedAccountId && (
+              <div className="settings-field">
+                <label>De dónde {kind === 'EGRESO' ? 'salió' : 'ingresó'} el dinero</label>
+                <div className="finanzas-chips">
+                  {accounts.map((a) => (
+                    <button
+                      key={a.id}
+                      className={mAccountId === a.id ? 'chip active' : 'chip'}
+                      onClick={() => setMAccountId(a.id)}
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="settings-field">
               <label>Categoría</label>
@@ -293,6 +398,17 @@ export const FinanzasMovimientosPage: React.FC = () => {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+            </div>
+
+            <div className="settings-field">
+              <label>Concepto</label>
+              <input
+                type="text"
+                value={concepto}
+                onChange={(e) => setConcepto(e.target.value)}
+                placeholder="Ej: Milanesa x 20"
+                maxLength={120}
+              />
             </div>
 
             <div className="settings-field">
@@ -307,6 +423,27 @@ export const FinanzasMovimientosPage: React.FC = () => {
             </div>
 
             <div className="settings-field">
+              <label>Responsable</label>
+              <select value={responsableId} onChange={(e) => setResponsableId(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {responsables.map((r) => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="settings-field">
+              <label>Observaciones</label>
+              <input
+                type="text"
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                placeholder="Ej: Jornada vs Ipa"
+                maxLength={500}
+              />
+            </div>
+
+            <div className="settings-field">
               <label>Fecha</label>
               <input type="date" value={mDate} onChange={(e) => setMDate(e.target.value)} />
             </div>
@@ -317,6 +454,59 @@ export const FinanzasMovimientosPage: React.FC = () => {
               </button>
               <button className="btn-primary" disabled={saving} onClick={handleSave}>
                 {saving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {traspasoOpen && (
+        <div className="modal-overlay" onClick={() => !saving && setTraspasoOpen(false)}>
+          <div className="modal-card finanzas-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Traspaso interno (Cambio Caja)</h3>
+            <div className="settings-field">
+              <label>Monto</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={tAmount}
+                onChange={(e) => {
+                  const v = e.target.value.replace(',', '.');
+                  if (v === '' || /^\d*\.?\d*$/.test(v)) setTAmount(v);
+                }}
+                placeholder="0.00"
+                autoFocus
+                className="finanzas-amount-input"
+              />
+            </div>
+            <div className="settings-field">
+              <label>Cuenta destino</label>
+              <select value={tToAccount} onChange={(e) => setTToAccount(e.target.value)}>
+                <option value="">Elegí destino...</option>
+                {accounts.filter((a) => a.id !== (fixedAccountId || effectiveAccountId)).map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="settings-field">
+              <label>Responsable</label>
+              <select value={tResponsable} onChange={(e) => setTResponsable(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {responsables.map((r) => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="settings-field">
+              <label>Observaciones</label>
+              <input type="text" value={tObs} onChange={(e) => setTObs(e.target.value)} maxLength={500} />
+            </div>
+            <div className="modal-actions">
+              <button className="btn-ghost" disabled={saving} onClick={() => setTraspasoOpen(false)}>
+                Cancelar
+              </button>
+              <button className="btn-primary" disabled={saving} onClick={handleTraspaso}>
+                {saving ? 'Guardando...' : 'Guardar traspaso'}
               </button>
             </div>
           </div>

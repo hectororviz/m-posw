@@ -45,6 +45,10 @@ export class CreateMoneyCategoryDto {
   @IsOptional()
   @IsIn(['INGRESO', 'EGRESO', 'AMBOS'])
   kind?: 'INGRESO' | 'EGRESO' | 'AMBOS';
+
+  @IsOptional()
+  @IsIn(['OPERATIVO', 'FINANCIERO'])
+  grupo?: 'OPERATIVO' | 'FINANCIERO';
 }
 
 export class UpdateMoneyCategoryDto {
@@ -57,6 +61,10 @@ export class UpdateMoneyCategoryDto {
   @IsOptional()
   @IsIn(['INGRESO', 'EGRESO', 'AMBOS'])
   kind?: 'INGRESO' | 'EGRESO' | 'AMBOS';
+
+  @IsOptional()
+  @IsIn(['OPERATIVO', 'FINANCIERO'])
+  grupo?: 'OPERATIVO' | 'FINANCIERO';
 
   @IsOptional()
   @IsBoolean()
@@ -83,6 +91,20 @@ export class CreateMoneyMovementDto {
   description: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  concepto?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  observaciones?: string;
+
+  @IsOptional()
+  @IsUUID()
+  responsableId?: string;
+
+  @IsOptional()
   @IsDateString()
   date?: string;
 }
@@ -107,6 +129,18 @@ export class ListMovementsDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsString()
+  source?: string;
+
+  @IsOptional()
+  @IsUUID()
+  responsableId?: string;
+
+  @IsOptional()
+  @IsString()
+  groupVentas?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -143,4 +177,44 @@ export enum MoneyMovementSourceDto {
   COBRO_FIADO = 'COBRO_FIADO',
   CUOTA_SOCIO = 'CUOTA_SOCIO',
   AJUSTE = 'AJUSTE',
+}
+
+export class CreateTraspasoDto {
+  @IsUUID()
+  fromAccountId!: string;
+
+  @IsUUID()
+  toAccountId!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  amount!: number;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsUUID()
+  responsableId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  observaciones?: string;
+}
+
+export class CreateResponsableDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(60)
+  nombre!: string;
+}
+
+export class MonthlyQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  year?: number;
 }
