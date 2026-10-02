@@ -1,10 +1,23 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Pencil } from 'lucide-react';
+import { Pencil, Plus } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useMoneyAccounts, useMoneyCategories, useResponsables, useMpAuditoriaStatus, useSettings } from '../api/queries';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 import { useToast } from '../components/ToastProvider';
+
+type Entity = 'accounts' | 'categories' | 'responsables';
+type ModalMode = 'view' | 'edit' | 'new';
+
+interface ModalState {
+  entity: Entity;
+  mode: ModalMode;
+  id?: string;
+}
+
+type Account = { id: string; name: string; kind: string; initialBalance: number | string; active: boolean };
+type Category = { id: string; name: string; kind: string; grupo?: string; active: boolean };
+type Responsable = { id: string; nombre: string; active: boolean };
 
 export const FinanzasCuentasPage: React.FC = () => {
   const access = useModuleAccess('TESORERIA');
@@ -18,15 +31,19 @@ export const FinanzasCuentasPage: React.FC = () => {
   const { data: mpStatus } = useMpAuditoriaStatus();
   const { data: settings } = useSettings();
 
+  const [modal, setModal] = useState<ModalState | null>(null);
+
+  // Campos cuenta
   const [accountName, setAccountName] = useState('');
   const [accountKind, setAccountKind] = useState('OTRO');
   const [accountBalance, setAccountBalance] = useState('');
-  const [editingAccount, setEditingAccount] = useState<string | null>(null);
+  // Campos categoría
   const [categoryName, setCategoryName] = useState('');
   const [categoryKind, setCategoryKind] = useState('AMBOS');
   const [categoryGrupo, setCategoryGrupo] = useState('OPERATIVO');
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  // Campos responsable
   const [responsableName, setResponsableName] = useState('');
+
   const [mpSince, setMpSince] = useState('');
   const [mpBusy, setMpBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,6 +55,43 @@ export const FinanzasCuentasPage: React.FC = () => {
     await queryClient.invalidateQueries({ queryKey: ['mp-auditoria-status'] });
   };
 
+  const readOnly = modal?.mode === 'view';
+
+  // ─── Abrir modal ──
+  const openViewAccount = (a: Account) => {
+    setAccountName(a.name);
+    setAccountKind(a.kind);
+    setAccountBalance(String(a.initialBalance ?? ''));
+    setModal({ entity: 'accounts', mode: 'view', id: a.id });
+  };
+  const openNewAccount = () => {
+    setAccountName('');
+    setAccountKind('OTRO');
+    setAccountBalance('');
+    setModal({ entity: 'accounts', mode: 'new' });
+  };
+  const openViewCategory = (c: Category) => {
+    setCategoryName(c.name);
+    setCategoryKind(c.kind);
+    setCategoryGrupo(c.grupo ?? 'OPERATIVO');
+    setModal({ entity: 'categories', mode: 'view', id: c.id });
+  };
+  const openNewCategory = () => {
+    setCategoryName('');
+    setCategoryKind('AMBOS');
+    setCategoryGrupo('OPERATIVO');
+    setModal({ entity: 'categories', mode: 'new' });
+  };
+  const openViewResponsable = (r: Responsable) => {
+    setResponsableName(r.nombre);
+    setModal({ entity: 'responsables', mode: 'view', id: r.id });
+  };
+  const openNewResponsable = () => {
+    setResponsableName('');
+    setModal({ entity: 'responsables', mode: 'new' });
+  };
+
+  // ─── Guardar ──
   const saveAccount = async () => {
     if (!accountName.trim()) {
       pushToast('Ingresá el nombre de la cuenta', 'error');
@@ -46,23 +100,18 @@ export const FinanzasCuentasPage: React.FC = () => {
     setSaving(true);
     try {
       const balance = accountBalance === '' ? undefined : Number(String(accountBalance).replace(',', '.'));
-      if (editingAccount) {
-        await apiClient.patch(`/finanzas/accounts/${editingAccount}`, {
-          name: accountName.trim(),
-          kind: accountKind,
-          ...(balance !== undefined && !Number.isNaN(balance) ? { initialBalance: balance } : {}),
-        });
+      const payload = {
+        name: accountName.trim(),
+        kind: accountKind,
+        ...(balance !== undefined && !Number.isNaN(balance) ? { initialBalance: balance } : {}),
+      };
+      if (modal?.mode === 'edit') {
+        await apiClient.patch(`/finanzas/accounts/${modal.id}`, payload);
       } else {
-        await apiClient.post('/finanzas/accounts', {
-          name: accountName.trim(),
-          kind: accountKind,
-          ...(balance !== undefined && !Number.isNaN(balance) ? { initialBalance: balance } : {}),
-        });
+        await apiClient.post('/finanzas/accounts', payload);
       }
       pushToast('Cuenta guardada', 'success');
-      setAccountName('');
-      setAccountBalance('');
-      setEditingAccount(null);
+      setModal(null);
       await refresh();
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
@@ -72,6 +121,7 @@ export const FinanzasCuentasPage: React.FC = () => {
   };
 
   const toggleAccount = async (id: string, active: boolean) => {
+    if (!canWrite) return;
     try {
       await apiClient.patch(`/finanzas/accounts/${id}`, { active: !active });
       await refresh();
@@ -87,23 +137,29 @@ export const FinanzasCuentasPage: React.FC = () => {
     }
     setSaving(true);
     try {
-      if (editingCategory) {
-        await apiClient.patch(`/finanzas/categories/${editingCategory}`, {
-          name: categoryName.trim(),
-          kind: categoryKind,
-          grupo: categoryGrupo,
-        });
+      const payload = { name: categoryName.trim(), kind: categoryKind, grupo: categoryGrupo };
+      if (modal?.mode === 'edit') {
+        await apiClient.patch(`/finanzas/categories/${modal.id}`, payload);
       } else {
-        await apiClient.post('/finanzas/categories', { name: categoryName.trim(), kind: categoryKind, grupo: categoryGrupo });
+        await apiClient.post('/finanzas/categories', payload);
       }
       pushToast('Categoría guardada', 'success');
-      setCategoryName('');
-      setEditingCategory(null);
+      setModal(null);
       await refresh();
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleCategory = async (id: string, active: boolean) => {
+    if (!canWrite) return;
+    try {
+      await apiClient.patch(`/finanzas/categories/${id}`, { active: !active });
+      await refresh();
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
     }
   };
 
@@ -116,7 +172,7 @@ export const FinanzasCuentasPage: React.FC = () => {
     try {
       await apiClient.post('/finanzas/responsables', { nombre: responsableName.trim() });
       pushToast('Responsable guardado', 'success');
-      setResponsableName('');
+      setModal(null);
       await refresh();
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
@@ -126,6 +182,7 @@ export const FinanzasCuentasPage: React.FC = () => {
   };
 
   const toggleResponsable = async (id: string) => {
+    if (!canWrite) return;
     try {
       await apiClient.patch(`/finanzas/responsables/${id}/toggle`, {});
       await refresh();
@@ -194,14 +251,18 @@ export const FinanzasCuentasPage: React.FC = () => {
     }
   };
 
-  const toggleCategory = async (id: string, active: boolean) => {
-    try {
-      await apiClient.patch(`/finanzas/categories/${id}`, { active: !active });
-      await refresh();
-    } catch (err) {
-      pushToast(normalizeApiError(err), 'error');
-    }
-  };
+  const modalTitle = (() => {
+    if (!modal) return '';
+    const names: Record<Entity, { s: string; nuevo: string }> = {
+      accounts: { s: 'Cuenta', nuevo: 'nueva' },
+      categories: { s: 'Categoría', nuevo: 'nueva' },
+      responsables: { s: 'Responsable', nuevo: 'nuevo' },
+    };
+    const n = names[modal.entity];
+    return modal.mode === 'new' ? `${n.s} ${n.nuevo}` : n.s;
+  })();
+
+  const isReadOnlyEntity = modal?.entity === 'responsables';
 
   return (
     <div className="finanzas-page">
@@ -215,15 +276,16 @@ export const FinanzasCuentasPage: React.FC = () => {
       {(loadingA || loadingC) && <p className="loading-text">Cargando...</p>}
 
       <div className="finanzas-config-grid">
+        {/* Cuentas */}
         <div className="section">
           <h3>Cuentas (de dónde sale / entra el dinero)</h3>
           <div className="finanzas-simple-list">
             {accounts.map((a) => (
-              <div key={a.id} className={`finanzas-simple-row${a.active ? '' : ' inactive'}`}>
+              <div key={a.id} className={`finanzas-simple-row${a.active ? '' : ' inactive'}`} onClick={() => openViewAccount(a)} style={{ cursor: 'pointer' }}>
                 <span><strong>{a.name}</strong> <small>· {a.kind} · inicial ${Number(a.initialBalance).toLocaleString('es-AR')}</small></span>
                 {canWrite && (
-                  <span className="finanzas-row-actions">
-                    <button className="btn-ghost" title="Editar" onClick={() => { setEditingAccount(a.id); setAccountName(a.name); setAccountKind(a.kind); setAccountBalance(String(a.initialBalance)); }}>
+                  <span className="finanzas-row-actions" onClick={(e) => e.stopPropagation()}>
+                    <button className="btn-ghost" title="Editar" onClick={() => openViewAccount(a)}>
                       <Pencil size={14} />
                     </button>
                     <button className="btn-ghost" onClick={() => toggleAccount(a.id, a.active)}>
@@ -236,51 +298,21 @@ export const FinanzasCuentasPage: React.FC = () => {
           </div>
           {canWrite && (
             <div className="finanzas-inline-form">
-              <input
-                type="text"
-                placeholder="Nueva cuenta (ej: Banco Galicia)..."
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                maxLength={60}
-              />
-              <select value={accountKind} onChange={(e) => setAccountKind(e.target.value)}>
-                <option value="EFECTIVO">Efectivo</option>
-                <option value="MERCADOPAGO">Mercado Pago</option>
-                <option value="BANCO">Banco</option>
-                <option value="OTRO">Otra</option>
-              </select>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="Saldo inicial"
-                value={accountBalance}
-                onChange={(e) => {
-                  const v = e.target.value.replace(',', '.');
-                  if (v === '' || /^\d*\.?\d*$/.test(v)) setAccountBalance(v);
-                }}
-                style={{ maxWidth: 130 }}
-              />
-              <button className="btn-primary" disabled={saving} onClick={saveAccount}>
-                {editingAccount ? 'Guardar' : 'Agregar'}
-              </button>
-              {editingAccount && (
-                <button className="btn-ghost" onClick={() => { setEditingAccount(null); setAccountName(''); setAccountBalance(''); }}>
-                  Cancelar
-                </button>
-              )}
+              <button className="btn-primary" onClick={openNewAccount}><Plus size={14} style={{ verticalAlign: -2 }} /> Agregar cuenta</button>
             </div>
           )}
         </div>
 
+        {/* Categorías */}
         <div className="section">
           <h3>Categorías (en qué se gasta / de qué se ingresa)</h3>
           <div className="finanzas-simple-list">
             {categories.map((c) => (
-              <div key={c.id} className={`finanzas-simple-row${c.active ? '' : ' inactive'}`}>
+              <div key={c.id} className={`finanzas-simple-row${c.active ? '' : ' inactive'}`} onClick={() => openViewCategory(c)} style={{ cursor: 'pointer' }}>
                 <span><strong>{c.name}</strong> <small>· {c.kind === 'AMBOS' ? 'ambos' : c.kind.toLowerCase()} · {(c.grupo ?? 'OPERATIVO').toLowerCase()}</small></span>
                 {canWrite && (
-                  <span className="finanzas-row-actions">
-                    <button className="btn-ghost" title="Editar" onClick={() => { setEditingCategory(c.id); setCategoryName(c.name); setCategoryKind(c.kind); setCategoryGrupo(c.grupo ?? 'OPERATIVO'); }}>
+                  <span className="finanzas-row-actions" onClick={(e) => e.stopPropagation()}>
+                    <button className="btn-ghost" title="Editar" onClick={() => openViewCategory(c)}>
                       <Pencil size={14} />
                     </button>
                     <button className="btn-ghost" onClick={() => toggleCategory(c.id, c.active)}>
@@ -293,42 +325,23 @@ export const FinanzasCuentasPage: React.FC = () => {
           </div>
           {canWrite && (
             <div className="finanzas-inline-form">
-              <input
-                type="text"
-                placeholder="Nueva categoría (ej: Panadería)..."
-                value={categoryName}
-                onChange={(e) => setCategoryName(e.target.value)}
-                maxLength={60}
-              />
-              <select value={categoryKind} onChange={(e) => setCategoryKind(e.target.value)}>
-                <option value="AMBOS">Ambos</option>
-                <option value="INGRESO">Ingreso</option>
-                <option value="EGRESO">Egreso</option>
-              </select>
-              <select value={categoryGrupo} onChange={(e) => setCategoryGrupo(e.target.value)}>
-                <option value="OPERATIVO">Operativo</option>
-                <option value="FINANCIERO">Financiero</option>
-              </select>
-              <button className="btn-primary" disabled={saving} onClick={saveCategory}>
-                {editingCategory ? 'Guardar' : 'Agregar'}
-              </button>
-              {editingCategory && (
-                <button className="btn-ghost" onClick={() => { setEditingCategory(null); setCategoryName(''); }}>
-                  Cancelar
-                </button>
-              )}
+              <button className="btn-primary" onClick={openNewCategory}><Plus size={14} style={{ verticalAlign: -2 }} /> Agregar categoría</button>
             </div>
           )}
         </div>
 
+        {/* Responsables */}
         <div className="section">
           <h3>Responsables</h3>
           <div className="finanzas-simple-list">
             {responsables.map((r) => (
-              <div key={r.id} className={`finanzas-simple-row${r.active ? '' : ' inactive'}`}>
+              <div key={r.id} className={`finanzas-simple-row${r.active ? '' : ' inactive'}`} onClick={() => openViewResponsable(r)} style={{ cursor: 'pointer' }}>
                 <span><strong>{r.nombre}</strong></span>
                 {canWrite && (
-                  <span className="finanzas-row-actions">
+                  <span className="finanzas-row-actions" onClick={(e) => e.stopPropagation()}>
+                    <button className="btn-ghost" title="Editar" onClick={() => openViewResponsable(r)}>
+                      <Pencil size={14} />
+                    </button>
                     <button className="btn-ghost" onClick={() => toggleResponsable(r.id)}>
                       {r.active ? 'Desactivar' : 'Activar'}
                     </button>
@@ -339,20 +352,12 @@ export const FinanzasCuentasPage: React.FC = () => {
           </div>
           {canWrite && (
             <div className="finanzas-inline-form">
-              <input
-                type="text"
-                placeholder="Nuevo responsable..."
-                value={responsableName}
-                onChange={(e) => setResponsableName(e.target.value)}
-                maxLength={60}
-              />
-              <button className="btn-primary" disabled={saving} onClick={saveResponsable}>
-                Agregar
-              </button>
+              <button className="btn-primary" onClick={openNewResponsable}><Plus size={14} style={{ verticalAlign: -2 }} /> Agregar responsable</button>
             </div>
           )}
         </div>
 
+        {/* Mercado Pago */}
         <div className="section">
           <h3>Mercado Pago</h3>
           <p className="page-subtitle">
@@ -361,22 +366,19 @@ export const FinanzasCuentasPage: React.FC = () => {
               : '01/09/2026'}
             {' · '}pendientes: {mpStatus?.pendientes ?? '—'}
             {mpStatus?.balance != null ? ` · saldo vivo $${Number(mpStatus.balance).toLocaleString('es-AR')}` : ''}
+            {mpStatus?.disponible != null
+              ? ` · disponible $${Number(mpStatus.disponible).toLocaleString('es-AR')}${mpStatus?.disponibleAt ? ` (${new Date(mpStatus.disponibleAt).toLocaleDateString('es-AR')})` : ''}`
+              : ''}
           </p>
           {canWrite && (
             <div className="finanzas-inline-form">
               <input type="date" value={mpSince} onChange={(e) => setMpSince(e.target.value)} />
-              <button className="btn-ghost" disabled={saving} onClick={saveMpSince}>
-                Guardar corte
-              </button>
+              <button className="btn-ghost" disabled={saving} onClick={saveMpSince}>Guardar corte</button>
               <button className="btn-ghost" disabled={mpBusy || mpStatus?.running} onClick={runBackfill}>
                 {mpBusy ? 'Trayendo...' : 'Traer histórico'}
               </button>
-              <button className="btn-ghost" disabled={mpBusy} onClick={runBackfillVentas}>
-                Generar entradas de ventas
-              </button>
-              <button className="btn-ghost" disabled={mpBusy} onClick={refreshBalance}>
-                Actualizar saldo
-              </button>
+              <button className="btn-ghost" disabled={mpBusy} onClick={runBackfillVentas}>Generar entradas de ventas</button>
+              <button className="btn-ghost" disabled={mpBusy} onClick={refreshBalance}>Actualizar saldo</button>
             </div>
           )}
           {mpStatus?.job && (
@@ -384,6 +386,93 @@ export const FinanzasCuentasPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal único ver/editar */}
+      {modal && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal-card finanzas-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{modalTitle}</h3>
+
+            {modal.entity === 'accounts' && (
+              <>
+                <div className="settings-field">
+                  <label>Nombre</label>
+                  <input type="text" value={accountName} disabled={readOnly} onChange={(e) => setAccountName(e.target.value)} maxLength={60} />
+                </div>
+                <div className="settings-field">
+                  <label>Tipo</label>
+                  <select value={accountKind} disabled={readOnly} onChange={(e) => setAccountKind(e.target.value)}>
+                    <option value="EFECTIVO">Efectivo</option>
+                    <option value="MERCADOPAGO">Mercado Pago</option>
+                    <option value="BANCO">Banco</option>
+                    <option value="OTRO">Otra</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label>Saldo inicial</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={accountBalance}
+                    disabled={readOnly}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(',', '.');
+                      if (v === '' || /^\d*\.?\d*$/.test(v)) setAccountBalance(v);
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            {modal.entity === 'categories' && (
+              <>
+                <div className="settings-field">
+                  <label>Nombre</label>
+                  <input type="text" value={categoryName} disabled={readOnly} onChange={(e) => setCategoryName(e.target.value)} maxLength={60} />
+                </div>
+                <div className="settings-field">
+                  <label>Tipo</label>
+                  <select value={categoryKind} disabled={readOnly} onChange={(e) => setCategoryKind(e.target.value)}>
+                    <option value="AMBOS">Ambos</option>
+                    <option value="INGRESO">Ingreso</option>
+                    <option value="EGRESO">Egreso</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label>Grupo</label>
+                  <select value={categoryGrupo} disabled={readOnly} onChange={(e) => setCategoryGrupo(e.target.value)}>
+                    <option value="OPERATIVO">Operativo</option>
+                    <option value="FINANCIERO">Financiero</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            {modal.entity === 'responsables' && (
+              <div className="settings-field">
+                <label>Nombre</label>
+                <input type="text" value={responsableName} disabled={readOnly} onChange={(e) => setResponsableName(e.target.value)} maxLength={60} />
+              </div>
+            )}
+
+            <div className="modal-actions">
+              {readOnly && canWrite && !isReadOnlyEntity && (
+                <button className="btn-ghost" onClick={() => setModal({ ...modal, mode: modal.id ? 'edit' : 'new' })}>Editar</button>
+              )}
+              <button className="btn-ghost" onClick={() => setModal(null)}>Cerrar</button>
+              {!readOnly && canWrite && (
+                <button
+                  className="btn-primary"
+                  disabled={saving}
+                  onClick={modal.entity === 'accounts' ? saveAccount : modal.entity === 'categories' ? saveCategory : saveResponsable}
+                >
+                  Guardar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

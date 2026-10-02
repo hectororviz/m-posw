@@ -346,6 +346,8 @@ model Setting {
   mpBalanceAt     DateTime?
   releaseReportEnabled Boolean @default(true)
   lastOutflowSyncAt     DateTime?
+  mpDisponible  Decimal? @db.Decimal(12, 2)
+  mpDisponibleAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

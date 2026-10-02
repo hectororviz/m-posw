@@ -465,6 +465,9 @@ export interface MpAuditoriaStatus {
   pendientes: number;
   balance?: number | null;
   balanceAt?: string | null;
+  disponible?: number | null;
+  disponibleAt?: string | null;
+  lastOutflowSyncAt?: string | null;
   running: boolean;
 }
 

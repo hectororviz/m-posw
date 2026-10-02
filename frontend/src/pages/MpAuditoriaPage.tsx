@@ -46,7 +46,7 @@ export const MpAuditoriaPage: React.FC = () => {
   const [estado, setEstado] = useState('');
   const [tipo, setTipo] = useState('');
   const [search, setSearch] = useState('');
-  const [onlyPending, setOnlyPending] = useState(true);
+  const [onlyPending, setOnlyPending] = useState(false);
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);

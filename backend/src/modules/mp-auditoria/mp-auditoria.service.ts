@@ -304,7 +304,7 @@ export class MpAuditoriaService {
 
   async syncStatus() {
     const job = await this.prisma.mpSyncJob.findFirst({ orderBy: { createdAt: 'desc' } });
-    const s = await this.prisma.setting.findFirst({ select: { mpAuditSince: true, mpAuditCursor: true, mpBalanceCached: true, mpBalanceAt: true } });
+    const s = await this.prisma.setting.findFirst({ select: { mpAuditSince: true, mpAuditCursor: true, mpBalanceCached: true, mpBalanceAt: true, mpDisponible: true, mpDisponibleAt: true, lastOutflowSyncAt: true } });
     const pendientes = await this.prisma.mpAccountMovement.count({ where: { estado: { in: ['PENDIENTE', 'SUGERIDO'] as never } } });
     return {
       job,
@@ -313,6 +313,9 @@ export class MpAuditoriaService {
       pendientes,
       balance: (s as { mpBalanceCached?: unknown })?.mpBalanceCached != null ? Number((s as { mpBalanceCached?: unknown }).mpBalanceCached as number) : null,
       balanceAt: (s as { mpBalanceAt?: Date | null })?.mpBalanceAt ?? null,
+      disponible: (s as { mpDisponible?: unknown })?.mpDisponible != null ? Number((s as { mpDisponible?: unknown }).mpDisponible as number) : null,
+      disponibleAt: (s as { mpDisponibleAt?: Date | null })?.mpDisponibleAt ?? null,
+      lastOutflowSyncAt: (s as { lastOutflowSyncAt?: Date | null })?.lastOutflowSyncAt ?? null,
       running: this.running,
     };
   }
@@ -533,12 +536,29 @@ export class MpAuditoriaService {
       }
       const csv = await this.downloadReleaseReport(token, fileName);
       const salidasImportadas = await this.ingestOutflows(csv);
+      const disponible = this.extractDisponible(csv);
+      if (disponible != null) {
+        await this.prisma.setting.updateMany({
+          data: { mpDisponible: new Prisma.Decimal(disponible), mpDisponibleAt: now },
+        });
+      }
       await this.prisma.setting.updateMany({ data: { lastOutflowSyncAt: now } });
       this.logger.log(`release report ${fileName}: ${salidasImportadas} salida(s) importada(s)`);
-      return { reportId, fileName, descargado: true, salidasImportadas };
+      return { reportId, fileName, descargado: true, salidasImportadas, disponible };
     } finally {
       this.running = false;
     }
+  }
+
+  // Lee la fila RECORD_TYPE='total' (saldo disponible al cierre del período).
+  private extractDisponible(csv: string): number | null {
+    for (const row of this.parseReleaseCsv(csv)) {
+      if ((row['RECORD_TYPE'] ?? '').trim() === 'total') {
+        const v = parseFloat(String(row['NET_CREDIT_AMOUNT'] ?? '0'));
+        if (!Number.isNaN(v)) return v;
+      }
+    }
+    return null;
   }
 
   // ─── Listado + resumen ──
