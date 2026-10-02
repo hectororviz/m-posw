@@ -164,6 +164,7 @@ export const MpAuditoriaPage: React.FC = () => {
           <p className="page-subtitle">
             Movimientos de la cuenta MP y su vínculo con el sistema
             {status?.cursor ? ` · actualizado ${new Date(status.cursor).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+            {status?.disponible != null ? ` · disponible ${formatCurrency(status.disponible)}${status?.disponibleAt ? ` (${new Date(status.disponibleAt).toLocaleDateString('es-AR')})` : ''}` : ''}
           </p>
         </div>
         {canWrite && (

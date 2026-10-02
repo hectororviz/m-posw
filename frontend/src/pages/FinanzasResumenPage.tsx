@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFinanzasMonthly, useFinanzasSummary } from '../api/queries';
+import { useFinanzasMonthly, useFinanzasSummary, useMpAuditoriaStatus } from '../api/queries';
 
 const formatCurrency = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
@@ -18,6 +18,7 @@ export const FinanzasResumenPage: React.FC = () => {
   const { data, isLoading } = useFinanzasSummary({ from: from || undefined, to: to || undefined });
   const year = Number((to || toDate).slice(0, 4));
   const { data: monthly = [] } = useFinanzasMonthly(year);
+  const { data: mpStatus } = useMpAuditoriaStatus();
 
   const openRubro = (id: string) =>
     navigate(`/admin/tesoreria/rubros/${id}?from=${from}&to=${to}`);
@@ -65,6 +66,15 @@ export const FinanzasResumenPage: React.FC = () => {
                 <span className="summary-card__value">{formatCurrency(a.balance)}</span>
               </div>
             ))}
+            {mpStatus?.disponible != null && (
+              <div className="summary-card summary-card--info">
+                <span className="summary-card__label">Saldo disponible MP</span>
+                <span className="summary-card__value">{formatCurrency(mpStatus.disponible)}</span>
+                {mpStatus?.disponibleAt ? (
+                  <span className="summary-card__meta">al {new Date(mpStatus.disponibleAt).toLocaleDateString('es-AR')}</span>
+                ) : null}
+              </div>
+            )}
             <div className="summary-card summary-card--success">
               <span className="summary-card__label">Total ingresos</span>
               <span className="summary-card__value">{formatCurrency(data.totalIncome)}</span>
