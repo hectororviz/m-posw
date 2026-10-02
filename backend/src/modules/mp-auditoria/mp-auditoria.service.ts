@@ -336,6 +336,211 @@ export class MpAuditoriaService {
     return { disponible: saldo, at: new Date() };
   }
 
+  // ─── Salidas de billetera vía Reporte de Liberaciones (release_report) ──
+  // Nota: GET /v1/payments/search sólo expone ingresos. Los retiros de la
+  // billetera (payout) se obtienen del Reporte de Liberaciones, único endpoint
+  // financiero autorizado con el OAuth actual. Sólo registra SALIDAS; las
+  // entradas siguen por el flujo existente (recordVenta / payments/search).
+  private readonly releaseBaseUrl = 'https://api.mercadopago.com/v1/account/release_report';
+  private readonly RELEASE_WINDOW_MS = 12 * 3600 * 1000; // reporte de las últimas 12 h
+  private readonly RELEASE_POLL_MS = 5 * 60 * 1000;      // poll cada 5 min
+  private readonly RELEASE_MAX_WAIT_MS = 90 * 60 * 1000; // tope 90 min
+
+  private releaseHeaders(token: string) {
+    return {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  private async ensureReleaseConfig(token: string) {
+    const body = {
+      file_name_prefix: 'mposw-soler',
+      frequency: { hour: 0, type: 'monthly', value: 1 },
+      display_timezone: 'GMT-04',
+      report_translation: 'es',
+      scheduled: false,
+      execute_after_withdrawal: false,
+      include_withdrawal_at_end: true,
+      compensate_detail: false,
+      check_available_balance: false,
+      columns: [
+        { key: 'DATE' },
+        { key: 'SOURCE_ID' },
+        { key: 'EXTERNAL_REFERENCE' },
+        { key: 'RECORD_TYPE' },
+        { key: 'DESCRIPTION' },
+        { key: 'NET_DEBIT_AMOUNT' },
+        { key: 'NET_CREDIT_AMOUNT' },
+      ],
+    };
+    const get = await fetch(`${this.releaseBaseUrl}/config`, { headers: { Authorization: `Bearer ${token}` } });
+    const method = get.status === 404 ? 'POST' : 'PUT';
+    const res = await fetch(`${this.releaseBaseUrl}/config`, {
+      method,
+      headers: this.releaseHeaders(token),
+      body: JSON.stringify(body),
+    });
+    if (res.status >= 400) throw new Error(`release config ${method} ${res.status}: ${await res.text()}`);
+    if (res.status === 404) {
+      throw new Error('release config no se pudo crear');
+    }
+  }
+
+  private async generateReleaseReport(token: string, beginISO: string, endISO: string): Promise<number> {
+    const res = await fetch(this.releaseBaseUrl, {
+      method: 'POST',
+      headers: this.releaseHeaders(token),
+      body: JSON.stringify({ begin_date: beginISO, end_date: endISO }),
+    });
+    if (res.status !== 202) throw new Error(`release generate ${res.status}: ${await res.text()}`);
+    const data = (await res.json()) as { id?: number };
+    return Number(data.id);
+  }
+
+  private async waitReleaseReport(token: string, beginISO: string): Promise<string | null> {
+    const started = Date.now();
+    const beginDay = beginISO.slice(0, 10);
+    while (Date.now() - started < this.RELEASE_MAX_WAIT_MS) {
+      const res = await fetch(`${this.releaseBaseUrl}/list`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error(`release list ${res.status}`);
+      const list = (await res.json()) as Array<{
+        begin_date?: string;
+        date_created?: string;
+        status?: string;
+        file_name?: string;
+      }>;
+      const matches = (list || []).filter(
+        (r) => r.status === 'enabled' && r.file_name && String(r.begin_date ?? '').slice(0, 10) === beginDay,
+      );
+      if (matches.length > 0) {
+        matches.sort((a, b) => String(b.date_created ?? '').localeCompare(String(a.date_created ?? '')));
+        return matches[0].file_name ?? null;
+      }
+      await new Promise((r) => setTimeout(r, this.RELEASE_POLL_MS));
+    }
+    this.logger.warn(`release report timeout esperando archivo para ${beginDay}`);
+    return null;
+  }
+
+  private async downloadReleaseReport(token: string, fileName: string): Promise<string> {
+    const res = await fetch(`${this.releaseBaseUrl}/${encodeURIComponent(fileName)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`release download ${res.status}`);
+    return await res.text();
+  }
+
+  // Convierte filas del CSV a objetos; soporta comillas simples y valores sin comas internas.
+  private parseReleaseCsv(csv: string): Array<Record<string, string>> {
+    const lines = csv.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return [];
+    const header = lines[0].split(',');
+    const rows: Array<Record<string, string>> = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].split(',');
+      const row: Record<string, string> = {};
+      header.forEach((h, idx) => {
+        row[h.trim()] = (cells[idx] ?? '').replace(/^"|"$/g, '').trim();
+      });
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  // Sólo ingesta SALIDAS de la billetera (payout/withdrawal) → MpAccountMovement tipo RETIRO.
+  // Ignora reserve_* (netean a 0) y las filas de crédito (entradas, ya cubiertas).
+  private isOutflowRow(row: Record<string, string>): boolean {
+    const desc = (row['DESCRIPTION'] ?? '').toLowerCase();
+    if (desc !== 'payout' && desc !== 'withdrawal') return false;
+    const debit = parseFloat(String(row['NET_DEBIT_AMOUNT'] ?? '0'));
+    return debit > 0;
+  }
+
+  private async ingestOutflows(csv: string): Promise<number> {
+    const rows = this.parseReleaseCsv(csv);
+    let importados = 0;
+    for (const row of rows) {
+      if (!this.isOutflowRow(row)) continue;
+      const sourceId = (row['SOURCE_ID'] ?? '').trim();
+      if (!sourceId) continue;
+      const debit = parseFloat(row['NET_DEBIT_AMOUNT']);
+      const ext = (row['EXTERNAL_REFERENCE'] ?? '').trim() || null;
+      const fecha = new Date(row['DATE'] ?? new Date().toISOString());
+      const existing = await this.prisma.mpAccountMovement.findUnique({ where: { mpPaymentId: sourceId } });
+      const raw = { record_type: row['RECORD_TYPE'] ?? null, description: row['DESCRIPTION'] ?? null } as never;
+      await this.prisma.mpAccountMovement.upsert({
+        where: { mpPaymentId: sourceId },
+        create: {
+          mpPaymentId: sourceId,
+          tipo: 'RETIRO' as never,
+          montoBruto: this.round2decimal(debit),
+          fee: this.round2decimal(0),
+          montoNeto: this.round2decimal(debit),
+          pagador: null,
+          email: null,
+          externalRef: ext,
+          merchantOrderId: null,
+          fechaMp: fecha,
+          raw,
+          estado: 'PENDIENTE' as never,
+        },
+        update: {
+          montoBruto: this.round2decimal(debit),
+          montoNeto: this.round2decimal(debit),
+          externalRef: ext,
+          fechaMp: fecha,
+          raw,
+        },
+      });
+      importados += 1;
+    }
+    return importados;
+  }
+
+  private round2decimal(v: number) {
+    return new Prisma.Decimal(Math.round(v * 100) / 100);
+  }
+
+  // ─── Sync de salidas: genera reporte 12 h + poll 5 min (tope 90) + descarga + upsert ──
+  @Cron('0 */6 * * *')
+  async cronReleaseSync() {
+    try {
+      const s = await this.prisma.setting.findUnique({ where: { id: DEFAULT_SETTING_ID } });
+      const enabled = (s as { releaseReportEnabled?: boolean } | null)?.releaseReportEnabled ?? true;
+      if (!enabled) return;
+      await this.syncOutflows();
+    } catch (e) {
+      this.logger.warn(`release sync cron failed: ${e}`);
+    }
+  }
+
+  async syncOutflows() {
+    if (this.running) return { skipped: true };
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) throw new BadRequestException('MP access token no configurado');
+    const now = new Date();
+    const fromISO = new Date(now.getTime() - this.RELEASE_WINDOW_MS).toISOString();
+    const toISO = now.toISOString();
+    this.running = true;
+    try {
+      await this.ensureReleaseConfig(token);
+      const reportId = await this.generateReleaseReport(token, fromISO, toISO);
+      this.logger.log(`release report solicitado id=${reportId} [${fromISO} -> ${toISO}]`);
+      const fileName = await this.waitReleaseReport(token, fromISO);
+      if (!fileName) {
+        return { reportId, fileName: null, descargado: false, salidasImportadas: 0 };
+      }
+      const csv = await this.downloadReleaseReport(token, fileName);
+      const salidasImportadas = await this.ingestOutflows(csv);
+      await this.prisma.setting.updateMany({ data: { lastOutflowSyncAt: now } });
+      this.logger.log(`release report ${fileName}: ${salidasImportadas} salida(s) importada(s)`);
+      return { reportId, fileName, descargado: true, salidasImportadas };
+    } finally {
+      this.running = false;
+    }
+  }
+
   // ─── Listado + resumen ──
   async list(query: ListMpMovementsDto) {
     const page = query.page ?? 1;

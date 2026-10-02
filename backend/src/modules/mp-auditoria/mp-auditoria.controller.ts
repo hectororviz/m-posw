@@ -53,6 +53,12 @@ export class MpAuditoriaController {
     return this.service.reconcileAll();
   }
 
+  @Post('release-sync')
+  @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
+  releaseSync() {
+    return this.service.syncOutflows();
+  }
+
   @Post(':id/vincular')
   @RequireModule(ModuleKey.TESORERIA, ModuleAccess.FULL)
   vincular(@Param('id', ParseUUIDPipe) id: string, @Body() dto: VincularDto, @Req() req: { user?: { sub?: string; id?: string } }) {

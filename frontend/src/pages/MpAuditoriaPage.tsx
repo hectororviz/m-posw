@@ -32,6 +32,8 @@ const tipoLabel: Record<string, string> = {
   OTRO: 'Otro',
 };
 
+const OUTFLOW_TIPOS = new Set(['RETIRO', 'GASTO', 'FEE', 'REFUND', 'CHARGEBACK']);
+
 export const MpAuditoriaPage: React.FC = () => {
   const access = useModuleAccess('TESORERIA');
   const canWrite = access === 'FULL';
@@ -101,6 +103,26 @@ export const MpAuditoriaPage: React.FC = () => {
     }
   };
 
+  const releaseSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await apiClient.post('/mp-auditoria/release-sync', {});
+      const n = res.data?.salidasImportadas;
+      pushToast(
+        res.data?.descargado
+          ? `Salidas MP sincronizadas (${n ?? 0} importadas)`
+          : 'Salidas MP: reporte pedido, aún no listo; se reintenta en el próximo ciclo',
+        'success',
+      );
+      await refresh();
+    } catch (err) {
+      pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Sync 1× por sesión al abrir la página (navegar entre tabs no re-sincroniza)
   useEffect(() => {
     if (!canWrite) return;
@@ -148,6 +170,9 @@ export const MpAuditoriaPage: React.FC = () => {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-ghost finanzas-fab-btn" disabled={syncing} onClick={() => reconcile()}>
               <span className="finanzas-fab-label">Asociar ventas</span>
+            </button>
+            <button className="btn-ghost finanzas-fab-btn" disabled={syncing} onClick={() => releaseSync()}>
+              <span className="finanzas-fab-label">Sync salidas MP</span>
             </button>
             <button className="btn-primary finanzas-fab-btn" disabled={syncing} onClick={() => doSync(false)}>
               <span className="finanzas-fab-label">{syncing ? 'Sincronizando...' : 'Sincronizar ahora'}</span>
@@ -232,7 +257,7 @@ export const MpAuditoriaPage: React.FC = () => {
                 </div>
               </div>
               <div className="finanzas-card-side">
-                <span className="finanzas-amount in">+{formatCurrency(m.montoNeto)}</span>
+                <span className={`finanzas-amount ${OUTFLOW_TIPOS.has(m.tipo) ? '' : ' in'}`}>{OUTFLOW_TIPOS.has(m.tipo) ? '-' : '+'}{formatCurrency(m.montoNeto)}</span>
                 {m.fee > 0 && <span className="finanzas-card-meta">fee {formatCurrency(m.fee)}</span>}
                 <span className="finanzas-card-badges">{estadoBadge(m.estado)}</span>
               </div>

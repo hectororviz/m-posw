@@ -344,6 +344,8 @@ model Setting {
   mpAuditCursor   DateTime?
   mpBalanceCached Decimal? @db.Decimal(12, 2)
   mpBalanceAt     DateTime?
+  releaseReportEnabled Boolean @default(true)
+  lastOutflowSyncAt     DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
