@@ -29,6 +29,22 @@ interface MPPayment {
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+function parseDayStart(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0));
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function parseDayEnd(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999));
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
 function classify(p: MPPayment): string {
   if (p.status === 'refunded') return 'REFUND';
   if (p.status === 'charged_back' || p.status === 'chargeback') return 'CHARGEBACK';
@@ -565,8 +581,10 @@ export class MpAuditoriaService {
   async list(query: ListMpMovementsDto) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 30, 100);
+    const from = parseDayStart(query.from);
+    const to = parseDayEnd(query.to);
     const where: Prisma.MpAccountMovementWhereInput = {
-      ...(query.from || query.to ? { fechaMp: { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) } } : {}),
+      ...(from || to ? { fechaMp: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
       ...(query.estado ? { estado: query.estado as never } : {}),
       ...(query.tipo ? { tipo: query.tipo as never } : {}),
       ...(query.search ? { OR: [{ pagador: { contains: query.search, mode: 'insensitive' } }, { email: { contains: query.search, mode: 'insensitive' } }, { mpPaymentId: { contains: query.search } }, { externalRef: { contains: query.search } }] } : {}),
@@ -582,7 +600,7 @@ export class MpAuditoriaService {
       this.prisma.mpAccountMovement.count({ where }),
       this.prisma.mpAccountMovement.groupBy({
         by: ['estado'],
-        where: { ...(query.from || query.to ? { fechaMp: { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) } } : {}) },
+        where: { ...(from || to ? { fechaMp: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}) },
         _sum: { montoNeto: true },
         _count: { _all: true },
       }),
