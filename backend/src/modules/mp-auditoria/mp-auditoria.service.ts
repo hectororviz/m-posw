@@ -407,10 +407,12 @@ export class MpAuditoriaService {
   }
 
   private async generateReleaseReport(token: string, beginISO: string, endISO: string): Promise<number> {
+    // MP rechaza ISO con milisegundos (400 invalid_begin_date): normalizar a yyyy-MM-dd'T'HH:mm:ss'Z'
+    const fmt = (iso: string) => new Date(iso).toISOString().replace(/\.\d{3}Z$/, 'Z');
     const res = await fetch(this.releaseBaseUrl, {
       method: 'POST',
       headers: this.releaseHeaders(token),
-      body: JSON.stringify({ begin_date: beginISO, end_date: endISO }),
+      body: JSON.stringify({ begin_date: fmt(beginISO), end_date: fmt(endISO) }),
     });
     if (res.status !== 202) throw new Error(`release generate ${res.status}: ${await res.text()}`);
     const data = (await res.json()) as { id?: number };
