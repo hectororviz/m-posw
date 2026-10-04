@@ -1,0 +1,35 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Fondo verde marca, esquinas redondeadas -->
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M20,4 h68 a16,16 0 0 1 16,16 v68 a16,16 0 0 1 -16,16 h-68 a16,16 0 0 1 -16,-16 v-68 a16,16 0 0 1 16,-16 z" />
+    <!-- Talón de entrada blanco -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,34 h44 a6,6 0 0 1 6,6 v28 a6,6 0 0 1 -6,6 h-44 a6,6 0 0 1 -6,-6 v-28 a6,6 0 0 1 6,-6 z" />
+    <!-- Troquelado lateral -->
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M20,54 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z" />
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M76,54 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0 z" />
+    <!-- Perforado vertical -->
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M62.2,40 a1.8,1.8 0 1 0 3.6,0 a1.8,1.8 0 1 0 -3.6,0 z" />
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M62.2,47 a1.8,1.8 0 1 0 3.6,0 a1.8,1.8 0 1 0 -3.6,0 z" />
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M62.2,54 a1.8,1.8 0 1 0 3.6,0 a1.8,1.8 0 1 0 -3.6,0 z" />
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M62.2,61 a1.8,1.8 0 1 0 3.6,0 a1.8,1.8 0 1 0 -3.6,0 z" />
+    <path
+        android:fillColor="#15803D"
+        android:pathData="M62.2,68 a1.8,1.8 0 1 0 3.6,0 a1.8,1.8 0 1 0 -3.6,0 z" />
+</vector>

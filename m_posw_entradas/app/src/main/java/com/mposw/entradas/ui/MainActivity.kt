@@ -14,9 +14,11 @@ import com.mposw.entradas.printer.SunmiPrinter
 
 class MainActivity : AppCompatActivity() {
     private lateinit var bottomBar: LinearLayout
+    private lateinit var ultimosBar: LinearLayout
     private lateinit var btnConfig: ImageButton
     private lateinit var btnSocioBottom: MaterialButton
     private lateinit var tvTotalBottom: TextView
+    private lateinit var tvUltimosNumeros: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         applySavedTheme()
@@ -24,9 +26,11 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         SunmiPrinter.init(this)
         bottomBar = findViewById(R.id.bottomBar)
+        ultimosBar = findViewById(R.id.ultimosBar)
         btnConfig = findViewById(R.id.btnConfig)
         btnSocioBottom = findViewById(R.id.btnSocioBottom)
         tvTotalBottom = findViewById(R.id.tvTotalBottom)
+        tvUltimosNumeros = findViewById(R.id.tvUltimosNumeros)
 
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
@@ -46,8 +50,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun syncGear() {
-        bottomBar.visibility =
-            if (supportFragmentManager.backStackEntryCount == 0) View.VISIBLE else View.GONE
+        val inVenta = supportFragmentManager.backStackEntryCount == 0
+        bottomBar.visibility = if (inVenta) View.VISIBLE else View.GONE
+        ultimosBar.visibility =
+            if (inVenta && tvUltimosNumeros.text.isNotBlank()) View.VISIBLE else View.GONE
+    }
+
+    fun setUltimosNumeros(text: String) {
+        if (!::tvUltimosNumeros.isInitialized) return
+        tvUltimosNumeros.text = text
+        if (::ultimosBar.isInitialized) {
+            val inVenta = supportFragmentManager.backStackEntryCount == 0
+            ultimosBar.visibility =
+                if (inVenta && text.isNotBlank()) View.VISIBLE else View.GONE
+        }
     }
 
     private fun applySavedTheme() {

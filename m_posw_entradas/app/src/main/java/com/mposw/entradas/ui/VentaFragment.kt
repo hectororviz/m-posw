@@ -79,6 +79,7 @@ class VentaFragment : Fragment() {
             val sec = bundle.getString("sector") ?: return@setFragmentResultListener
             registrarVentaLocal(fixtureId, sec, bundle.getInt("cantidad", 0))
             refrescarUltimas()
+            actualizarUltimos()
         }
 
         refreshSector()
@@ -163,6 +164,7 @@ class VentaFragment : Fragment() {
             actualizarSectores()
             refreshTotal()
             refrescarUltimas()
+            actualizarUltimos()
             (activity as? MainActivity)?.setSocioActive(socioUuid != null)
         }
     }
@@ -175,6 +177,17 @@ class VentaFragment : Fragment() {
 
     private fun actualizarTorneo() {
         b.tvTorneo.text = current()?.torneo.orEmpty()
+    }
+
+    private fun actualizarUltimos() {
+        val f = current()
+        if (f == null) {
+            (activity as? MainActivity)?.setUltimosNumeros("")
+            return
+        }
+        val l = "L-%03d".format(f.vendidosL.coerceAtLeast(0))
+        val v = "V-%03d".format(f.vendidosV.coerceAtLeast(0))
+        (activity as? MainActivity)?.setUltimosNumeros("$l - $v")
     }
 
     private fun registrarVentaLocal(fixtureId: String, sec: String, cant: Int) {
@@ -288,6 +301,7 @@ class VentaFragment : Fragment() {
                     b.spFixture.adapter = null
                     actualizarTorneo()
                     actualizarSectores()
+                    actualizarUltimos()
                 } else {
                     b.spFixture.adapter = ArrayAdapter(
                         requireContext(),
@@ -300,6 +314,7 @@ class VentaFragment : Fragment() {
                             refreshTotal()
                             actualizarTorneo()
                             actualizarSectores()
+                            actualizarUltimos()
                         }
                         override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
                     }
@@ -361,6 +376,7 @@ class VentaFragment : Fragment() {
                         guardarEImprimir(payload)
                         registrarVentaLocal(f.fixtureId, sector, cantidad)
                         refrescarUltimas()
+                        actualizarUltimos()
                         socioUuid = null
                         (activity as? MainActivity)?.setSocioActive(false)
                         PagoExitosoDialogFragment.new(
