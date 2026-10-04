@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
@@ -38,7 +39,11 @@ class VentaFragment : Fragment() {
 
     private val cameraPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val scanSocio = registerForActivityResult(ScanContract()) { result ->
-        val raw = result.contents ?: return@registerForActivityResult
+        val raw = result.contents
+        if (raw == null) {
+            toast("Escaneo cancelado")
+            return@registerForActivityResult
+        }
         lookupSocio(extractUuid(raw))
     }
 
@@ -64,7 +69,7 @@ class VentaFragment : Fragment() {
                 (activity as? MainActivity)?.setSocioActive(false)
                 toast("Socio quitado")
             } else {
-                scanSocio.launch(ScanOptions().setPrompt("Escaneá la credencial del socio").setBeepEnabled(true))
+                scanSocio.launch(ScanOptions().setPrompt("Escaneá la credencial del socio").setBeepEnabled(true).setCaptureActivity(ScannerActivity::class.java))
             }
         })
         b.btnCash.setOnClickListener { cobrar("CASH") }
@@ -73,6 +78,7 @@ class VentaFragment : Fragment() {
             val fixtureId = bundle.getString("fixtureId") ?: return@setFragmentResultListener
             val sec = bundle.getString("sector") ?: return@setFragmentResultListener
             registrarVentaLocal(fixtureId, sec, bundle.getInt("cantidad", 0))
+            refrescarUltimas()
         }
 
         refreshSector()
@@ -156,6 +162,7 @@ class VentaFragment : Fragment() {
             actualizarTorneo()
             actualizarSectores()
             refreshTotal()
+            refrescarUltimas()
             (activity as? MainActivity)?.setSocioActive(socioUuid != null)
         }
     }
@@ -179,6 +186,80 @@ class VentaFragment : Fragment() {
         }
     }
 
+    private fun refrescarUltimas() {
+        lifecycleScope.launch {
+            val ventas = try {
+                AppDb.get(requireContext()).sales().lastFive()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val vb = _b ?: return@launch
+            if (ventas.isEmpty()) {
+                vb.llUltimasSection.visibility = View.GONE
+                return@launch
+            }
+            vb.llUltimasSection.visibility = View.VISIBLE
+            vb.llUltimasFilas.removeAllViews()
+            for (v in ventas) {
+                val p = try {
+                    Gson().fromJson(v.payloadJson, com.mposw.entradas.data.StatusPayload::class.java)
+                } catch (_: Exception) {
+                    null
+                }
+                val sectorRaw = p?.datos?.sector
+                    ?: p?.codigos?.firstOrNull()?.substringBefore("-")
+                val lv = when {
+                    sectorRaw.equals("LOCAL", ignoreCase = true) || sectorRaw == "L" -> "L"
+                    sectorRaw.equals("VISITANTE", ignoreCase = true) || sectorRaw == "V" -> "V"
+                    else -> sectorRaw?.take(1)?.uppercase() ?: "–"
+                }
+                val metodo = when (p?.paymentMethod) {
+                    "CASH" -> "Efectivo"
+                    "MP_QR" -> "QR"
+                    else -> p?.paymentMethod ?: "–"
+                }
+                val row = layoutInflater.inflate(
+                    com.mposw.entradas.R.layout.item_venta_reciente,
+                    vb.llUltimasFilas,
+                    false,
+                )
+                row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaHora).text =
+                    horaDeVenta(p?.datos?.fechaPago, v.createdAt)
+                row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaSector).text = lv
+                row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaCantidad).text =
+                    p?.cantidad?.takeIf { it > 0 }?.toString() ?: "–"
+                row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaMetodo).text = metodo
+                vb.llUltimasFilas.addView(row)
+            }
+        }
+    }
+
+    private fun horaDeVenta(fechaPagoIso: String?, createdAt: Long): String {
+        val out = java.text.SimpleDateFormat("HH:mm", java.util.Locale("es", "AR"))
+        if (!fechaPagoIso.isNullOrBlank()) {
+            val s = fechaPagoIso.trim()
+            val patrones = listOf(
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX" to false,
+                "yyyy-MM-dd'T'HH:mm:ssXXX" to false,
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'" to true,
+                "yyyy-MM-dd'T'HH:mm:ss'Z'" to true,
+            )
+            for ((pat, esZulu) in patrones) {
+                try {
+                    var txt = s
+                    if (!esZulu && txt.endsWith("Z")) txt = txt.dropLast(1) + "+00:00"
+                    if (esZulu && txt.endsWith("+00:00")) txt = txt.dropLast(6) + "Z"
+                    val sdf = java.text.SimpleDateFormat(pat, java.util.Locale.US)
+                    sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    val d = sdf.parse(txt) ?: continue
+                    return out.format(d)
+                } catch (_: Exception) {
+                }
+            }
+        }
+        return out.format(java.util.Date(createdAt))
+    }
+
     private fun current(): FixtureVigente? {
         val pos = if (b.spFixture.adapter == null) -1 else b.spFixture.selectedItemPosition
         return fixtures.getOrNull(if (pos < 0) 0 else pos)
@@ -194,7 +275,7 @@ class VentaFragment : Fragment() {
         val f = current()
         _b?.tvCantidad?.text = cantidad.toString()
         val total = (f?.precioDouble ?: 0.0) * cantidad
-        (activity as? MainActivity)?.setBottomTotal("$$${totalFmt.format(total)}")
+        (activity as? MainActivity)?.setBottomTotal("$${totalFmt.format(total)}")
     }
 
     private fun cargarFixtures() {
@@ -279,6 +360,7 @@ class VentaFragment : Fragment() {
                     if (payload.status == "APPROVED") {
                         guardarEImprimir(payload)
                         registrarVentaLocal(f.fixtureId, sector, cantidad)
+                        refrescarUltimas()
                         socioUuid = null
                         (activity as? MainActivity)?.setSocioActive(false)
                         PagoExitosoDialogFragment.new(

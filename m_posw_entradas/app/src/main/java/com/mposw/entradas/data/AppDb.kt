@@ -26,6 +26,9 @@ interface ApprovedSaleDao {
     @Query("SELECT * FROM approved_sales ORDER BY createdAt DESC LIMIT 1")
     suspend fun last(): ApprovedSale?
 
+    @Query("SELECT * FROM approved_sales ORDER BY createdAt DESC LIMIT 5")
+    suspend fun lastFive(): List<ApprovedSale>
+
     @Query("SELECT * FROM approved_sales WHERE saleId = :id LIMIT 1")
     suspend fun byId(id: String): ApprovedSale?
 }

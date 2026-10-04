@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Override del layout `zxing_capture` de zxing-android-embedded:
+     el CaptureActivity de la librería infla este nombre, y los recursos
+     de la app pisan a los de la librería. El DecoratedBarcodeView debe
+     mantener el id `zxing_barcode_scanner`. Se agrega botón Cancelar
+     visible porque en modo quiosco no hay botón atrás del sistema. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.journeyapps.barcodescanner.DecoratedBarcodeView
+        android:id="@+id/zxing_barcode_scanner"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnCancelarScan"
+        style="@style/Widget.Entradas.Button.Neutral"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="48dp"
+        android:text="✕ Cancelar" />
+</FrameLayout>

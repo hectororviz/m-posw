@@ -27,5 +27,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Escáner QR con botón Cancelar visible (modo quiosco) -->
+        <activity
+            android:name=".ui.ScannerActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Entradas" />
     </application>
 </manifest>

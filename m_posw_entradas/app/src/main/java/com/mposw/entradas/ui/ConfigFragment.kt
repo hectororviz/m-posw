@@ -25,7 +25,11 @@ class ConfigFragment : Fragment() {
 
     private val cameraPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val scanPairing = registerForActivityResult(ScanContract()) { result ->
-        val raw = result.contents ?: return@registerForActivityResult
+        val raw = result.contents
+        if (raw == null) {
+            if (isAdded) android.widget.Toast.makeText(requireContext(), "Escaneo cancelado", android.widget.Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
         try {
             val o = JSONObject(raw)
             val base = o.optString("baseUrl", "")
@@ -57,7 +61,7 @@ class ConfigFragment : Fragment() {
         refreshVersions()
 
         b.btnScanPairing.setOnClickListener {
-            scanPairing.launch(ScanOptions().setPrompt("Escaneá el QR de pairing").setBeepEnabled(true))
+            scanPairing.launch(ScanOptions().setPrompt("Escaneá el QR de pairing").setBeepEnabled(true).setCaptureActivity(ScannerActivity::class.java))
         }
         b.btnSave.setOnClickListener {
             session.baseUrl = SessionManager.normalizeBaseUrl(b.etBaseUrl.text.toString())
