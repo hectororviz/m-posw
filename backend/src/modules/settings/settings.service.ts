@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
 import { PrismaService } from '../common/prisma.service';
+import { SETTINGS_IMAGE_SUBDIR, UPLOADS_DIR } from '../common/upload.constants';
 import { UpdateSettingDto } from './dto/update-setting.dto';
 
 const DEFAULT_SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
@@ -78,6 +81,7 @@ export class SettingsService {
       okAnimationUrl: settings.okAnimationUrl ?? DEFAULT_OK_ANIMATION_URL,
       errorAnimationUrl: settings.errorAnimationUrl ?? DEFAULT_ERROR_ANIMATION_URL,
       accentColor: settings.accentColor,
+      carnetBgUrl: (settings as { carnetBgUrl?: string | null }).carnetBgUrl ?? null,
       enableCashPayment: settings.enableCashPayment,
       enableQrPayment: settings.enableQrPayment,
       enableTransferPayment: settings.enableTransferPayment,
@@ -131,6 +135,22 @@ export class SettingsService {
         delete (dto as Record<string, unknown>)[field];
       }
     }
+    if ((dto as { carnetBgUrl?: string | null }).carnetBgUrl === null) {
+      try {
+        const current = await this.prisma.setting.findUnique({
+          where: { id: DEFAULT_SETTING_ID },
+          select: { carnetBgUrl: true },
+        });
+        const prevUrl = (current as { carnetBgUrl?: string | null } | null)?.carnetBgUrl;
+        if (prevUrl && prevUrl.startsWith(`/uploads/${SETTINGS_IMAGE_SUBDIR}/`)) {
+          const prevName = prevUrl.split('/').pop();
+          if (prevName) {
+            const prevPath = join(UPLOADS_DIR, SETTINGS_IMAGE_SUBDIR, prevName);
+            if (existsSync(prevPath)) unlinkSync(prevPath);
+          }
+        }
+      } catch { /* ignore cleanup errors */ }
+    }
     await this.prisma.setting.upsert({
       where: { id: DEFAULT_SETTING_ID },
       create: {
@@ -172,6 +192,9 @@ export class SettingsService {
         ...(dto.okAnimationUrl !== undefined ? { okAnimationUrl: dto.okAnimationUrl } : {}),
         ...(dto.errorAnimationUrl !== undefined ? { errorAnimationUrl: dto.errorAnimationUrl } : {}),
         ...(dto.accentColor !== undefined ? { accentColor: dto.accentColor } : {}),
+        ...((dto as { carnetBgUrl?: string | null }).carnetBgUrl !== undefined
+          ? { carnetBgUrl: (dto as { carnetBgUrl?: string | null }).carnetBgUrl }
+          : {}),
         ...(dto.enableCashPayment !== undefined ? { enableCashPayment: dto.enableCashPayment } : {}),
         ...(dto.enableQrPayment !== undefined ? { enableQrPayment: dto.enableQrPayment } : {}),
         ...(dto.enableTransferPayment !== undefined ? { enableTransferPayment: dto.enableTransferPayment } : {}),

@@ -20,6 +20,10 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsString()
+  carnetBgUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
   faviconUrl?: string;
 
   @IsOptional()

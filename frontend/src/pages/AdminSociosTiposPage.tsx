@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
-import { apiClient, normalizeApiError } from '../api/client';
-import { useSociosTipos } from '../api/queries';
+import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
+import { useSettings, useSociosTipos } from '../api/queries';
 import type { SocioTipo } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 
@@ -11,6 +11,7 @@ const formatCurrency = (value: number) =>
 
 export const AdminSociosTiposPage: React.FC = () => {
   const { data: tipos = [], isLoading } = useSociosTipos();
+  const { data: settings } = useSettings();
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
@@ -19,6 +20,43 @@ export const AdminSociosTiposPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(false);
+  const [bgUploading, setBgUploading] = useState(false);
+  const [bgError, setBgError] = useState<string | null>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBgUpload = async (file: File | undefined) => {
+    if (!file) return;
+    setBgUploading(true);
+    setBgError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await apiClient.post('/settings/carnet-bg', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      await queryClient.invalidateQueries({ queryKey: ['settings'] });
+      pushToast('Fondo de credencial actualizado', 'success');
+    } catch (err) {
+      setBgError(normalizeApiError(err));
+    } finally {
+      setBgUploading(false);
+      if (bgInputRef.current) bgInputRef.current.value = '';
+    }
+  };
+
+  const handleBgRemove = async () => {
+    setBgUploading(true);
+    setBgError(null);
+    try {
+      await apiClient.patch('/settings', { carnetBgUrl: null });
+      await queryClient.invalidateQueries({ queryKey: ['settings'] });
+      pushToast('Fondo de credencial eliminado', 'success');
+    } catch (err) {
+      setBgError(normalizeApiError(err));
+    } finally {
+      setBgUploading(false);
+    }
+  };
 
   const resetForm = () => {
     setForm({ nombre: '', montoMensual: 0, comentario: '', activo: true });
@@ -101,6 +139,42 @@ export const AdminSociosTiposPage: React.FC = () => {
       <div className="page-header">
         <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Tipos de Socio</h2>
         <p className="page-header-subtitle">Administra las categorias y montos mensuales.</p>
+      </div>
+
+      <div className="settings-section" style={{ marginBottom: '1.25rem' }}>
+        <h3 style={{ margin: '0 0 0.25rem' }}>Fondo de credencial</h3>
+        <p style={{ color: 'var(--color-text-muted)', margin: '0 0 0.75rem', fontSize: '0.85rem' }}>
+          PNG de frente (ideal 1028×650). Se usa como fondo del carnet; los datos y el QR se dibujan encima.
+        </p>
+        {bgError && <p className="error-text">{bgError}</p>}
+        {settings?.carnetBgUrl ? (
+          <img
+            src={buildImageUrl(settings.carnetBgUrl)}
+            alt="Fondo de credencial"
+            style={{ width: '100%', maxWidth: '514px', aspectRatio: '1028 / 650', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+          />
+        ) : (
+          <p style={{ color: 'var(--color-text-faint)', margin: '0 0 0.75rem', fontSize: '0.9rem' }}>
+            Sin fondo cargado: el carnet se genera en blanco.
+          </p>
+        )}
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+          <input
+            ref={bgInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            style={{ display: 'none' }}
+            onChange={(e) => handleBgUpload(e.target.files?.[0])}
+          />
+          <button type="button" className="btn-primary" onClick={() => bgInputRef.current?.click()} disabled={bgUploading}>
+            {bgUploading ? 'Subiendo...' : settings?.carnetBgUrl ? 'Cambiar fondo' : 'Subir fondo'}
+          </button>
+          {settings?.carnetBgUrl && (
+            <button type="button" className="btn-ghost" onClick={handleBgRemove} disabled={bgUploading}>
+              Quitar
+            </button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (

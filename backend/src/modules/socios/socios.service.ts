@@ -301,19 +301,7 @@ export class SociosService {
 
   // ─── Cuotas ──────────────────────────────────────────────
 
-  private async getMontoVigente(socioTipoId: number, fechaInicioMes: Date): Promise<number> {
-    const historial = await this.prisma.socioTipoHistorial.findFirst({
-      where: {
-        socioTipoId,
-        vigenciaDesde: { lte: fechaInicioMes },
-      },
-      orderBy: { vigenciaDesde: 'desc' },
-    });
-
-    if (historial) {
-      return Number(historial.monto);
-    }
-
+  private async getMontoVigente(socioTipoId: number): Promise<number> {
     const tipo = await this.prisma.socioTipo.findUnique({
       where: { id: socioTipoId },
       select: { montoMensual: true },
@@ -326,7 +314,6 @@ export class SociosService {
     generadas: number;
     omitidas: number;
   }> {
-    const primerDia = new Date(Date.UTC(anio, mes - 1, 1, 12, 0, 0));
     const dia10 = new Date(Date.UTC(anio, mes - 1, 10, 12, 0, 0));
 
     const socios = await this.prisma.socio.findMany({
@@ -362,7 +349,7 @@ export class SociosService {
         continue;
       }
 
-      const montoVigente = await this.getMontoVigente(socio.socioTipoId, primerDia);
+      const montoVigente = await this.getMontoVigente(socio.socioTipoId);
 
       await this.prisma.socioCuota.create({
         data: {
@@ -625,121 +612,124 @@ export class SociosService {
     cardY: number,
     socio: { apellido: string; nombre: string; nroSocio: number; fechaAlta: Date; dni: string; uuid: string; socioTipo: { nombre: string } },
     displayName: string,
-    accentColor: string,
+    _accentColor: string,
     logoUrl: string | null | undefined,
     qrBuffer: Buffer,
+    bgUrl?: string | null,
   ) {
     const { CARD_W: cardW, CARD_H: cardH } = SociosService;
+    // Escala HTML 1028x650 -> CR80 pt
+    const sx = cardW / 1028;
+    const sy = cardH / 650;
+    const X = (px: number) => cardX + px * sx;
+    const Y = (py: number) => cardY + py * sy;
+    const W = (px: number) => px * sx;
+    const FS = (px: number) => px * sx;
 
-    // Fondo blanco del recuadro
-    doc.roundedRect(cardX, cardY, cardW, cardH, 6).fill('#ffffff');
+    const resolveUploadPath = (url: string | null | undefined): string | null => {
+      if (!url) return null;
+      const p = url.startsWith('/')
+        ? path.join('/data/uploads', url.replace('/uploads/', ''))
+        : url;
+      if (!p.startsWith('/data/uploads') || !fs.existsSync(p)) return null;
+      return p;
+    };
 
-    // Franja vertical de acento recortada al borde redondeado
-    const stripeW = 8;
+    const truncateToFit = (text: string, maxW: number, font: string, size: number): string => {
+      if (!text) return text;
+      doc.font(font).fontSize(size);
+      if (doc.widthOfString(text) <= maxW) return text;
+      let t = text;
+      while (t.length > 1 && doc.widthOfString(`${t}…`) > maxW) t = t.slice(0, -1);
+      return `${t}…`;
+    };
+
+    // Fondo: imagen o blanco, recortado al borde redondeado
     doc.save();
     doc.roundedRect(cardX, cardY, cardW, cardH, 6).clip();
-    doc.rect(cardX, cardY, stripeW, cardH).fill(accentColor);
+    const bgPath = resolveUploadPath(bgUrl);
+    if (bgPath) {
+      try {
+        doc.image(bgPath, cardX, cardY, { cover: [cardW, cardH] });
+      } catch (_) {
+        doc.rect(cardX, cardY, cardW, cardH).fill('#ffffff');
+      }
+    } else {
+      doc.rect(cardX, cardY, cardW, cardH).fill('#ffffff');
+    }
     doc.restore();
-
-    // Borde del recuadro (encima de la franja)
     doc.roundedRect(cardX, cardY, cardW, cardH, 6).stroke('#cccccc');
 
-    // Margen interno del recuadro
-    const marginX = cardX + stripeW + 12;
-    const marginY = cardY + 10;
-    const contentW = cardW - stripeW - 24;
+    // ─── CABECERA: clubName partido (primera palabra blanco, resto rojo) ───
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
+    const first = (parts[0] ?? 'CSD').toUpperCase();
+    const rest = (parts.slice(1).join(' ') || 'SOLER').toUpperCase();
+    const headSize = FS(84);
+    doc.font('Helvetica-Bold').fontSize(headSize);
+    const firstW = doc.widthOfString(first);
+    doc.fill('#ffffff').text(first, X(92), Y(50), { lineBreak: false });
+    doc.fill('#ff1d25').text(rest, X(92) + firstW + W(18), Y(50), { lineBreak: false });
 
-    const logoSize = 42;
-
-    // Línea separadora bajo el header (se dibuja antes que el logo)
-    const headerBottom = marginY + 20;
-    doc.strokeColor(accentColor)
-      .lineWidth(0.5)
-      .moveTo(marginX, headerBottom)
-      .lineTo(cardX + cardW - 12, headerBottom)
-      .stroke();
-
-    // ─── HEADER: logo (encima de la linea) + nombre ───
-    const logoX = cardX + cardW - 12 - logoSize;
-    const logoY = marginY;
-
-    if (logoUrl) {
-      const logoPath = logoUrl.startsWith('/')
-        ? path.join('/data/uploads', logoUrl.replace('/uploads/', ''))
-        : logoUrl;
-
-      if (logoPath.startsWith('/data/uploads') && fs.existsSync(logoPath)) {
-        try {
-          doc.image(logoPath, logoX, logoY, { fit: [logoSize, logoSize] });
-        } catch (_) {
-          // Ignore logo errors
-        }
+    // ─── LOGO ───
+    const logoPath = resolveUploadPath(logoUrl);
+    if (logoPath) {
+      try {
+        doc.image(logoPath, X(1028 - 72 - 160), Y(34), { fit: [W(160), W(160)] });
+      } catch (_) {
+        // Ignore logo errors
       }
     }
 
-    doc.fill(accentColor)
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text(displayName.toUpperCase(), marginX, marginY, {
-        width: cardW - stripeW - 24 - logoSize - 8,
-        align: 'left',
-        lineBreak: false,
-      });
+    // ─── NOMBRE ───
+    const nombreSize = FS(64);
+    const nombre = truncateToFit(`${socio.apellido} ${socio.nombre}`, W(590), 'Helvetica-Bold', nombreSize);
+    doc.fill('#111111').font('Helvetica-Bold').fontSize(nombreSize).text(nombre, X(62), Y(248), { lineBreak: false });
 
-    // ─── BODY ────────────────────────────────────────
-    const bodyY = headerBottom + 10;
+    // ─── SEPARADOR ───
+    doc.rect(X(62), Y(349), W(560), Math.max(0.75, W(4))).fill('#d71920');
 
-    const nombreCompleto = `${socio.apellido}, ${socio.nombre}`;
+    // ─── SOCIO Nº ───
+    doc.fill('#d71920').font('Helvetica-Bold').fontSize(FS(42)).text('Socio Nº', X(62), Y(374), { lineBreak: false });
+    const nroSize = FS(56);
+    const nro = truncateToFit(String(socio.nroSocio).padStart(6, '0'), W(335), 'Helvetica-Bold', nroSize);
+    doc.fill('#111111').font('Helvetica-Bold').fontSize(nroSize).text(nro, X(245), Y(366), { lineBreak: false });
 
-    doc.fill('#111111')
-      .fontSize(12)
-      .font('Helvetica-Bold')
-      .text(nombreCompleto, marginX, bodyY, {
-        width: contentW,
-        align: 'left',
-      });
+    // ─── FILAS label/valor ───
+    const labelSize = FS(34);
+    const rows: Array<{ label: string; labelX: number; labelY: number; value: string; valueX: number; valueY: number; valueW: number }> = [
+      { label: 'Tipo:', labelX: 62, labelY: 466, value: socio.socioTipo.nombre, valueX: 157, valueY: 462, valueW: 255 },
+      { label: 'DNI:', labelX: 62, labelY: 523, value: socio.dni.replace(/\B(?=(\d{3})+(?!\d))/g, '.'), valueX: 143, valueY: 519, valueW: 300 },
+      {
+        label: 'Socio desde:',
+        labelX: 62,
+        labelY: 580,
+        value: (() => {
+          const f = new Date(socio.fechaAlta);
+          return `${String(f.getUTCDate()).padStart(2, '0')}/${String(f.getUTCMonth() + 1).padStart(2, '0')}/${f.getUTCFullYear()}`;
+        })(),
+        valueX: 276,
+        valueY: 576,
+        valueW: 300,
+      },
+    ];
+    for (const r of rows) {
+      doc.fill('#d71920').font('Helvetica-Bold').fontSize(labelSize).text(r.label, X(r.labelX), Y(r.labelY), { lineBreak: false });
+      const v = truncateToFit(r.value, W(r.valueW), 'Helvetica', labelSize);
+      doc.fill('#111111').font('Helvetica').fontSize(labelSize).text(v, X(r.valueX), Y(r.valueY), { lineBreak: false });
+    }
 
-    doc.fill('#333333')
-      .fontSize(10)
-      .font('Helvetica')
-      .text(`Socio Nº ${String(socio.nroSocio).padStart(6, '0')}`, marginX, bodyY + 18, {
-        width: contentW,
-        align: 'left',
-      });
-
-    const fechaAlta = new Date(socio.fechaAlta);
-    const fechaAltaStr = `${String(fechaAlta.getUTCDate()).padStart(2, '0')}/${String(fechaAlta.getUTCMonth() + 1).padStart(2, '0')}/${fechaAlta.getUTCFullYear()}`;
-    const dniFormateado = socio.dni.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-
-    const infoY = bodyY + 38;
-    const lineH = 14;
-
-    doc.fill('#555555').fontSize(7).font('Helvetica');
-    doc.text(`Tipo: ${socio.socioTipo.nombre}`, marginX, infoY);
-    doc.text(`DNI: ${dniFormateado}`, marginX, infoY + lineH);
-    doc.text(`Socio desde: ${fechaAltaStr}`, marginX, infoY + lineH * 2);
-
-    // ─── FOOTER ──────────────────────────────────────
-    const footerY = cardY + cardH - 14;
-    doc.strokeColor('#dddddd')
-      .lineWidth(0.3)
-      .moveTo(marginX, footerY - 4)
-      .lineTo(cardX + cardW - 12, footerY - 4)
-      .stroke();
-
-    doc.fill('#aaaaaa')
-      .fontSize(5.5)
-      .font('Helvetica')
-      .text(displayName, marginX, footerY, {
-        width: contentW,
-        align: 'center',
-      });
-
-    // QR code en la esquina inferior derecha
-    const qrSize = 60;
-    const qrX = cardX + cardW - qrSize - 8;
-    const qrY = cardY + cardH - qrSize - 8;
-    doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
+    // ─── QR con caja blanca ───
+    const boxSize = W(210);
+    const boxX = cardX + cardW - W(64) - boxSize;
+    const boxY = cardY + cardH - W(63) - boxSize;
+    doc.rect(boxX, boxY, boxSize, boxSize).fill('#ffffff');
+    const pad = W(14);
+    const qrSide = boxSize - pad * 2;
+    try {
+      doc.image(qrBuffer, boxX + pad, boxY + pad, { fit: [qrSide, qrSide] });
+    } catch (_) {
+      // Ignore qr errors
+    }
   }
 
   async generateCarnetPdf(socioId: number): Promise<{ buffer: Buffer; filename: string }> {
@@ -752,7 +742,7 @@ export class SociosService {
 
     const setting = await this.prisma.setting.findUnique({
       where: { id: '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca' },
-      select: { logoUrl: true, storeName: true, clubName: true, accentColor: true },
+      select: { logoUrl: true, storeName: true, clubName: true, accentColor: true, carnetBgUrl: true },
     });
 
     const displayName = setting?.clubName?.trim() || setting?.storeName || 'Club';
@@ -784,7 +774,7 @@ export class SociosService {
       const cardX = (pageW - cardW) / 2;
       const cardY = 40;
 
-      this.drawCard(doc, cardX, cardY, socio, displayName, accentColor, setting?.logoUrl, qrBuffer);
+      this.drawCard(doc, cardX, cardY, socio, displayName, accentColor, setting?.logoUrl, qrBuffer, setting?.carnetBgUrl);
 
       doc.end();
     });
@@ -803,12 +793,13 @@ export class SociosService {
 
     const setting = await this.prisma.setting.findUnique({
       where: { id: '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca' },
-      select: { logoUrl: true, storeName: true, clubName: true, accentColor: true },
+      select: { logoUrl: true, storeName: true, clubName: true, accentColor: true, carnetBgUrl: true },
     });
 
     const displayName = setting?.clubName?.trim() || setting?.storeName || 'Club';
     const accentColor = setting?.accentColor || '#1e3a5f';
     const logoUrl = setting?.logoUrl || null;
+    const carnetBgUrl = setting?.carnetBgUrl || null;
 
     // Pre-generar todos los QR buffers
     const qrMap = new Map<number, Buffer>();
@@ -861,9 +852,9 @@ export class SociosService {
           doc.addPage();
         }
 
-        const socio = socios[i];
-        const qrBuffer = qrMap.get(socio.id)!;
-        this.drawCard(doc, cardX, cardY, socio, displayName, accentColor, logoUrl, qrBuffer);
+          const socio = socios[i];
+          const qrBuffer = qrMap.get(socio.id)!;
+          this.drawCard(doc, cardX, cardY, socio, displayName, accentColor, logoUrl, qrBuffer, carnetBgUrl);
       }
 
       doc.end();

@@ -174,6 +174,7 @@ export interface Setting {
   okAnimationUrl?: string | null;
   errorAnimationUrl?: string | null;
   accentColor?: string | null;
+  carnetBgUrl?: string | null;
   enableCashPayment?: boolean | null;
   enableQrPayment?: boolean | null;
   enableTransferPayment?: boolean | null;

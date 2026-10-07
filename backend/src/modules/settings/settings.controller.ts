@@ -106,6 +106,28 @@ const animationUploadOptions = {
   },
 };
 
+const allowedCarnetBgTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const carnetBgUploadOptions = {
+  storage: diskStorage({
+    destination: uploadDir,
+    filename: (_req, file, cb) => {
+      try {
+        cb(null, safeFilename(file));
+      } catch (err) {
+        cb(err as Error, '');
+      }
+    },
+  }),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req: unknown, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
+    if (!allowedCarnetBgTypes.has(file.mimetype)) {
+      cb(new BadRequestException('Tipo de archivo inválido para fondo. Usar PNG, JPEG o WebP.'), false);
+      return;
+    }
+    cb(null, true);
+  },
+};
+
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
@@ -205,5 +227,42 @@ export class SettingsController {
       throw new BadRequestException('El archivo de animación no contiene JSON válido');
     }
     return this.settingsService.update({ errorAnimationUrl: `/uploads/${SETTINGS_IMAGE_SUBDIR}/${file.filename}` });
+  }
+
+  @Post('carnet-bg')
+  @UseGuards(JwtAuthGuard, ModuleAccessGuard)
+  @RequireModule(ModuleKey.SOCIOS, ModuleAccess.FULL)
+  @UseInterceptors(FileInterceptor('file', carnetBgUploadOptions))
+  async uploadCarnetBg(@UploadedFile() file?: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Fondo requerido');
+    }
+    const originalPath = join(uploadDir, file.filename);
+    const pngName = file.filename.replace(/\.\w+$/, '.png');
+    const pngPath = join(uploadDir, pngName);
+    try {
+      const current = await this.settingsService.get();
+      const buffer = readFileSync(originalPath);
+      await sharp(buffer)
+        .resize({ width: 1028, height: 650, fit: 'cover', position: 'centre' })
+        .png()
+        .toFile(pngPath);
+      if (pngPath !== originalPath) {
+        try { unlinkSync(originalPath); } catch { /* ignore */ }
+      }
+      const prevUrl = (current as { carnetBgUrl?: string | null }).carnetBgUrl;
+      if (prevUrl && prevUrl.startsWith(`/uploads/${SETTINGS_IMAGE_SUBDIR}/`)) {
+        const prevName = prevUrl.split('/').pop();
+        if (prevName && prevName !== pngName) {
+          try { unlinkSync(join(uploadDir, prevName)); } catch { /* ignore */ }
+        }
+      }
+      return this.settingsService.update({ carnetBgUrl: `/uploads/${SETTINGS_IMAGE_SUBDIR}/${pngName}` });
+    } catch (err) {
+      try { unlinkSync(originalPath); } catch { /* ignore */ }
+      try { unlinkSync(pngPath); } catch { /* ignore */ }
+      if (err instanceof BadRequestException) throw err;
+      throw new BadRequestException('Error al procesar el fondo del carnet');
+    }
   }
 }

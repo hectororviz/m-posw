@@ -291,6 +291,7 @@ model Setting {
   okAnimationUrl String?
   errorAnimationUrl String?
   accentColor String?
+  carnetBgUrl String?
   enableCashPayment Boolean @default(true)
   enableQrPayment Boolean @default(true)
   enableTransferPayment Boolean @default(true)
