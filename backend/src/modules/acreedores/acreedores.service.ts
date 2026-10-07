@@ -419,13 +419,13 @@ export class AcreedoresService {
     const ajustes = await this.prisma.ajusteAcreedor.findMany({
       where: { acreedorId: id },
       orderBy: { fecha: 'desc' },
-      select: { id: true, monto: true, fecha: true, descripcion: true },
+      select: { id: true, monto: true, fecha: true, descripcion: true, createdAt: true },
     });
 
     const pagos = await this.prisma.pagoAcreedor.findMany({
       where: { acreedorId: id },
       orderBy: { fecha: 'desc' },
-      select: { id: true, monto: true, medioPago: true, fecha: true, notas: true },
+      select: { id: true, monto: true, medioPago: true, fecha: true, notas: true, createdAt: true },
     });
 
     const totalFiado = fiadoVentas.reduce((sum, fv) => sum + Number(fv.monto), 0);

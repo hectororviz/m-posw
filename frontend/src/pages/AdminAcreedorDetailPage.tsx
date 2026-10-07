@@ -137,9 +137,9 @@ export const AdminAcreedorDetailPage: React.FC = () => {
   });
 
   type HistoryEntry =
-    | { kind: 'venta'; data: FiadoVentaItem; date: string; monto: number }
-    | { kind: 'ajuste'; data: AjusteAcreedorItem; date: string; monto: number }
-    | { kind: 'pago'; data: PagoAcreedorItem; date: string; monto: number };
+    | { kind: 'venta'; data: FiadoVentaItem; date: string; monto: number; saldoTras: number; tieBreak: string; entryId: number }
+    | { kind: 'ajuste'; data: AjusteAcreedorItem; date: string; monto: number; saldoTras: number; tieBreak: string; entryId: number }
+    | { kind: 'pago'; data: PagoAcreedorItem; date: string; monto: number; saldoTras: number; tieBreak: string; entryId: number };
 
   const history = useMemo<HistoryEntry[]>(() => {
     if (!deuda) return [];
@@ -149,21 +149,52 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         data: fv,
         date: fv.createdAt,
         monto: Number(fv.monto),
+        saldoTras: 0,
+        tieBreak: fv.createdAt,
+        entryId: fv.id,
       })),
       ...(deuda.ajustes || []).map((a) => ({
         kind: 'ajuste' as const,
         data: a,
         date: a.fecha,
-        monto: a.monto,
+        monto: Number(a.monto),
+        saldoTras: 0,
+        tieBreak: a.createdAt ?? a.fecha,
+        entryId: a.id,
       })),
       ...deuda.pagos.map((p) => ({
         kind: 'pago' as const,
         data: p,
         date: p.fecha,
         monto: -Number(p.monto),
+        saldoTras: 0,
+        tieBreak: p.createdAt ?? p.fecha,
+        entryId: p.id,
       })),
     ];
-    entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const asc = [...entries].sort((a, b) => {
+      const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (diff !== 0) return diff;
+      const tieDiff = new Date(a.tieBreak).getTime() - new Date(b.tieBreak).getTime();
+      if (tieDiff !== 0) return tieDiff;
+      return a.entryId - b.entryId;
+    });
+    let running = 0;
+    const saldoByKey = new Map<string, number>();
+    for (const e of asc) {
+      running += e.monto;
+      saldoByKey.set(`${e.kind}-${e.entryId}`, Math.round(running * 100) / 100);
+    }
+    for (const e of entries) {
+      e.saldoTras = saldoByKey.get(`${e.kind}-${e.entryId}`) ?? 0;
+    }
+    entries.sort((a, b) => {
+      const diff = new Date(b.date).getTime() - new Date(a.date).getTime();
+      if (diff !== 0) return diff;
+      const tieDiff = new Date(b.tieBreak).getTime() - new Date(a.tieBreak).getTime();
+      if (tieDiff !== 0) return tieDiff;
+      return b.entryId - a.entryId;
+    });
     return entries;
   }, [deuda]);
 
@@ -454,6 +485,11 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                         }}
                       >
                         {amountDisplay}
+                        {isPayment && (
+                          <div style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--color-text-faint)' }}>
+                            Saldo: {formatCurrency(entry.saldoTras)}
+                          </div>
+                        )}
                       </span>
                       <span className="col-method" style={{ whiteSpace: 'nowrap', paddingLeft: '1.5rem' }}>
                         {concepto}

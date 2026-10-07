@@ -519,6 +519,7 @@ export interface PagoAcreedorItem {
   medioPago: string;
   fecha: string;
   notas?: string | null;
+  createdAt?: string;
 }
 
 export interface AjusteAcreedorItem {
@@ -530,6 +531,7 @@ export interface AjusteAcreedorItem {
   esAjuste: true;
   esInteres?: boolean;
   periodo?: string | null;
+  createdAt?: string;
 }
 
 export interface AcreedorDeuda {
