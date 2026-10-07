@@ -37,7 +37,12 @@ export const AdminSociosTiposPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
       pushToast('Fondo de credencial actualizado', 'success');
     } catch (err) {
-      setBgError(normalizeApiError(err));
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      setBgError(
+        status === 413
+          ? 'La imagen es muy pesada (máx 10 MB). Probá con un PNG de 1028×650.'
+          : normalizeApiError(err),
+      );
     } finally {
       setBgUploading(false);
       if (bgInputRef.current) bgInputRef.current.value = '';

@@ -118,7 +118,7 @@ const carnetBgUploadOptions = {
       }
     },
   }),
-  limits: { fileSize: 3 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req: unknown, file: Express.Multer.File, cb: (error: Error | null, acceptFile: boolean) => void) => {
     if (!allowedCarnetBgTypes.has(file.mimetype)) {
       cb(new BadRequestException('Tipo de archivo inválido para fondo. Usar PNG, JPEG o WebP.'), false);
