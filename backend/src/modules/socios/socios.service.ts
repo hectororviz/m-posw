@@ -667,14 +667,22 @@ export class SociosService {
     const headSize = FS(84);
     doc.font('Helvetica-Bold').fontSize(headSize);
     const firstW = doc.widthOfString(first);
-    doc.fill('#ffffff').text(first, X(92), Y(50), { lineBreak: false });
-    doc.fill('#ff1d25').text(rest, X(92) + firstW + W(18), Y(50), { lineBreak: false });
+    const headY = Y(50);
+    const headRestX = X(92) + firstW + W(18);
+    // Sombra para resaltar (desplazada 3px, negra semitransparente)
+    doc.save();
+    doc.fillOpacity(0.45).fill('#000000');
+    doc.text(first, X(92) + W(3), headY + W(3), { lineBreak: false });
+    doc.text(rest, headRestX + W(3), headY + W(3), { lineBreak: false });
+    doc.restore();
+    doc.fill('#ffffff').text(first, X(92), headY, { lineBreak: false });
+    doc.fill('#ff1d25').text(rest, headRestX, headY, { lineBreak: false });
 
     // ─── LOGO ───
     const logoPath = resolveUploadPath(logoUrl);
     if (logoPath) {
       try {
-        doc.image(logoPath, X(1028 - 72 - 160), Y(34), { fit: [W(160), W(160)] });
+        doc.image(logoPath, X(1028 - 72 - 240), Y(34), { fit: [W(240), W(240)] });
       } catch (_) {
         // Ignore logo errors
       }
@@ -686,13 +694,13 @@ export class SociosService {
     doc.fill('#111111').font('Helvetica-Bold').fontSize(nombreSize).text(nombre, X(62), Y(248), { lineBreak: false });
 
     // ─── SEPARADOR ───
-    doc.rect(X(62), Y(349), W(560), Math.max(0.75, W(4))).fill('#d71920');
+    doc.rect(X(62), Y(322), W(560), Math.max(0.75, W(4))).fill('#d71920');
 
     // ─── SOCIO Nº ───
-    doc.fill('#d71920').font('Helvetica-Bold').fontSize(FS(42)).text('Socio Nº', X(62), Y(374), { lineBreak: false });
+    doc.fill('#d71920').font('Helvetica-Bold').fontSize(FS(42)).text('Socio Nº', X(62), Y(340), { lineBreak: false });
     const nroSize = FS(56);
     const nro = truncateToFit(String(socio.nroSocio).padStart(6, '0'), W(335), 'Helvetica-Bold', nroSize);
-    doc.fill('#111111').font('Helvetica-Bold').fontSize(nroSize).text(nro, X(245), Y(366), { lineBreak: false });
+    doc.fill('#111111').font('Helvetica-Bold').fontSize(nroSize).text(nro, X(245), Y(332), { lineBreak: false });
 
     // ─── FILAS label/valor ───
     const labelSize = FS(34);
@@ -718,11 +726,11 @@ export class SociosService {
       doc.fill('#111111').font('Helvetica').fontSize(labelSize).text(v, X(r.valueX), Y(r.valueY), { lineBreak: false });
     }
 
-    // ─── QR con caja blanca ───
-    const boxSize = W(210);
+    // ─── QR con caja blanca redondeada ───
+    const boxSize = W(262);
     const boxX = cardX + cardW - W(64) - boxSize;
     const boxY = cardY + cardH - W(63) - boxSize;
-    doc.rect(boxX, boxY, boxSize, boxSize).fill('#ffffff');
+    doc.roundedRect(boxX, boxY, boxSize, boxSize, 5).fill('#ffffff');
     const pad = W(14);
     const qrSide = boxSize - pad * 2;
     try {
