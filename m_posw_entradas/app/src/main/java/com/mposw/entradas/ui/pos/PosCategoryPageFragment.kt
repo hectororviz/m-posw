@@ -28,13 +28,8 @@ class PosCategoryPageFragment : Fragment() {
             "L" -> 2
             else -> 2
         }
-        val imageHeightDp = when (d.textScaleKey()) {
-            "S" -> 56
-            "L" -> 96
-            else -> 72
-        }
         b.rvProductos.layoutManager = GridLayoutManager(requireContext(), span)
-        val adapter = PosProductAdapter(d.textScaleFactor(), imageHeightDp, d.apiRoot()) { p -> d.onProductTap(p) }
+        val adapter = PosProductAdapter(d.textScaleFactor(), d.imageHeightDp(), d.apiRoot()) { p -> d.onProductTap(p) }
         adapter.items = d.productsOf(categoryId)
         b.rvProductos.adapter = adapter
     }

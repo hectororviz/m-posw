@@ -39,6 +39,7 @@ class PosDashFragment : Fragment() {
 
     private var categories: List<PosCategory> = emptyList()
     private var lastLoad = 0L
+    private var appliedScale = ""
     private val money = NumberFormat.getCurrencyInstance(Locale("es", "AR")).apply {
         maximumFractionDigits = 0
     }
@@ -48,6 +49,12 @@ class PosDashFragment : Fragment() {
         "S" -> 0.85f
         "L" -> 1.2f
         else -> 1.0f
+    }
+
+    fun imageHeightDp(): Int = when (session.textScale) {
+        "S" -> 72
+        "L" -> 120
+        else -> 96
     }
 
     fun productsOf(categoryId: String): List<PosProduct> = catalogRepo.productsOf(categoryId)
@@ -63,11 +70,16 @@ class PosDashFragment : Fragment() {
         session = SessionManager(requireContext())
         catalogRepo = PosCatalogRepo(requireContext(), session)
         salesRepo = PosSalesRepo(requireContext(), session)
-        b.tvPosTotal.textSize = 24f * textScaleFactor()
-        // Deslizar la barra hacia arriba (o tocar el total) abre el carrito.
+        appliedScale = session.textScale
+        applyScaleToChrome()
+        // La franja superior (dragStrip) abre el carrito con swipe-up o tap.
+        // Va en una vista dedicada: la barra está tapada por hijos clicables
+        // que se comerían los toques.
         val gestures = GestureDetector(requireContext(), object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean = true
+
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
-                if (vy < -400) {
+                if (vy < -300) {
                     openCart()
                     return true
                 }
@@ -86,8 +98,13 @@ class PosDashFragment : Fragment() {
                 }
                 return false
             }
+
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                openCart()
+                return true
+            }
         })
-        b.posBottomBar.setOnTouchListener { _, ev -> gestures.onTouchEvent(ev) }
+        b.dragStrip.setOnTouchListener { _, ev -> gestures.onTouchEvent(ev) }
         b.tvPosTotal.setOnClickListener { openCart() }
         b.btnPosConfig.setOnClickListener {
             (activity as? com.mposw.entradas.ui.MainActivity)?.openConfig()
@@ -100,8 +117,31 @@ class PosDashFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // Si cambió la escala en Config, se reaplica (las páginas no se
+        // recrean solas al volver).
+        if (isAdded && ::session.isInitialized && session.textScale != appliedScale) {
+            appliedScale = session.textScale
+            applyScaleToChrome()
+            rebuildPages()
+        }
         refreshTotal()
         if (System.currentTimeMillis() - lastLoad > 5 * 60_000L) loadCatalog()
+    }
+
+    private fun applyScaleToChrome() {
+        if (_b == null || !::session.isInitialized) return
+        b.tvPosTotal.textSize = 24f * textScaleFactor()
+        b.tvPosCount.textSize = 13f * textScaleFactor()
+    }
+
+    /** Recrea las páginas para que tomen span, textos e imágenes nuevos. */
+    private fun rebuildPages() {
+        if (_b == null || categories.isEmpty()) return
+        b.vpCategorias.adapter = object : FragmentStateAdapter(this@PosDashFragment) {
+            override fun getItemCount(): Int = categories.size
+            override fun createFragment(position: Int) =
+                PosCategoryPageFragment.new(categories[position].id)
+        }
     }
 
     private fun loadCatalog() {
@@ -141,6 +181,12 @@ class PosDashFragment : Fragment() {
     fun refreshTotal() {
         if (_b == null) return
         b.tvPosTotal.text = money.format(cart.total)
+        val count = cart.lines.sumOf { it.quantity }
+        b.tvPosCount.text = when (count) {
+            0 -> "Carrito vacío"
+            1 -> "1 producto"
+            else -> "$count productos"
+        }
         val socio = cart.socioNombre
         b.tvPosSocio.visibility = if (socio != null) View.VISIBLE else View.GONE
         if (socio != null) b.tvPosSocio.text = "Socio: $socio ✕"

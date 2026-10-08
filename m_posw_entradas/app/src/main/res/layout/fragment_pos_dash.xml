@@ -47,18 +47,27 @@
         android:layout_height="1dp"
         android:background="?attr/colorOutline" />
 
-    <View
-        android:layout_width="40dp"
-        android:layout_height="4dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="6dp"
-        android:background="?attr/colorOutline" />
+    <LinearLayout
+        android:id="@+id/dragStrip"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="28dp">
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:background="?attr/colorOutline" />
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/posBottomBar"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:padding="8dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
@@ -69,21 +78,39 @@
             android:src="@drawable/ic_settings"
             android:contentDescription="Configuración" />
 
-        <TextView android:id="@+id/tvPosTotal"
+        <LinearLayout
+            android:orientation="vertical"
+            android:gravity="center"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:textAppearance="?attr/textAppearanceHeadlineSmall"
-            android:textStyle="bold"
-            android:text="$0" />
+            android:layout_weight="1">
+
+            <TextView android:id="@+id/tvPosTotal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                android:textStyle="bold"
+                android:text="$0" />
+
+            <TextView android:id="@+id/tvPosCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="Carrito vacío" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton android:id="@+id/btnPosPagar"
             android:layout_width="0dp"
             android:layout_height="56dp"
             android:layout_weight="1"
+            android:minWidth="0dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
             android:text="Pagar" />
     </LinearLayout>
 </LinearLayout>
