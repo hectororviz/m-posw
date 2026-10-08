@@ -7,9 +7,12 @@ on:
       - main
     tags:
       - 'v*'
-    # Los cambios solo-APK no rebuildan imágenes (tienen su propio workflow).
+    # Los cambios solo-APK y solo-docs no rebuildan imágenes.
     paths-ignore:
       - 'm_posw_entradas/**'
+      - 'docs/**'
+      - 'AGENTS.md'
+      - '**/*.md'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
