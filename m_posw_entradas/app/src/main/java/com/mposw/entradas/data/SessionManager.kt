@@ -43,6 +43,11 @@ class SessionManager(context: Context) {
         get() = (prefs.getString("textScale", "M") ?: "M").trim().uppercase().takeIf { it in setOf("S", "M", "L") } ?: "M"
         set(v) = prefs.edit().putString("textScale", v.trim().uppercase()).apply()
 
+    /** El dash lo consume en onResume para reaplicar la escala. */
+    var scaleDirty: Boolean
+        get() = prefs.getBoolean("scaleDirty", false)
+        set(v) = prefs.edit().putBoolean("scaleDirty", v).apply()
+
     var templateVersion: Int
         get() = prefs.getInt("templateVersion", -1)
         set(v) = prefs.edit().putInt("templateVersion", v).apply()

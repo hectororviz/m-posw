@@ -13,8 +13,10 @@ android {
         applicationId = "com.mposw.entradas"
         minSdk = 25
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
+        // SHA corto para el sello de versión en Config (diagnóstico en equipo).
+        buildConfigField("String", "GIT_SHA", "\"${gitSha()}\"")
     }
 
     buildTypes {
@@ -51,7 +53,20 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
+}
+
+// SHA corto del commit (tolerante: "dev" sin git o checkout shallow).
+fun gitSha(): String = try {
+    val out = java.io.ByteArrayOutputStream()
+    exec {
+        commandLine("git", "rev-parse", "--short", "HEAD")
+        standardOutput = out
+    }
+    out.toString().trim().ifEmpty { "dev" }
+} catch (_: Exception) {
+    "dev"
 }
 
 dependencies {

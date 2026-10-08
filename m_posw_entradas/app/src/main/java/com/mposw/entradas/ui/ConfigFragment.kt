@@ -109,11 +109,13 @@ class ConfigFragment : Fragment() {
                 b.btnScaleL.id -> "L"
                 else -> "M"
             }
+            session.scaleDirty = true
         }
     }
 
     private fun refreshVersions() {
-        b.tvVersions.text = "modo ${session.deviceMode} · template v${session.templateVersion} · escudo v${session.logoVersion}"
+        val app = "v${com.mposw.entradas.BuildConfig.VERSION_NAME} (${com.mposw.entradas.BuildConfig.GIT_SHA})"
+        b.tvVersions.text = "$app · modo ${session.deviceMode} · template v${session.templateVersion} · escudo v${session.logoVersion}"
     }
 
     private fun probar() {

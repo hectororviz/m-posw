@@ -20,8 +20,6 @@ import com.mposw.entradas.data.pos.PosSalesRepo
 import com.mposw.entradas.databinding.FragmentPosDashBinding
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 /**
@@ -110,7 +108,6 @@ class PosDashFragment : Fragment() {
             (activity as? com.mposw.entradas.ui.MainActivity)?.openConfig()
         }
         b.btnPosPagar.setOnClickListener { pagar() }
-        b.tvPosFecha.text = SimpleDateFormat("EEE dd/MM · HH:mm", Locale("es", "AR")).format(Date())
         loadCatalog()
         refreshTotal()
     }
@@ -118,9 +115,12 @@ class PosDashFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         // Si cambió la escala en Config, se reaplica (las páginas no se
-        // recrean solas al volver).
-        if (isAdded && ::session.isInitialized && session.textScale != appliedScale) {
+        // recrean solas al volver). Doble condición: comparación + dirty flag.
+        if (isAdded && ::session.isInitialized &&
+            (session.textScale != appliedScale || session.scaleDirty)
+        ) {
             appliedScale = session.textScale
+            session.scaleDirty = false
             applyScaleToChrome()
             rebuildPages()
         }
@@ -137,10 +137,13 @@ class PosDashFragment : Fragment() {
     /** Recrea las páginas para que tomen span, textos e imágenes nuevos. */
     private fun rebuildPages() {
         if (_b == null || categories.isEmpty()) return
-        b.vpCategorias.adapter = object : FragmentStateAdapter(this@PosDashFragment) {
-            override fun getItemCount(): Int = categories.size
-            override fun createFragment(position: Int) =
-                PosCategoryPageFragment.new(categories[position].id)
+        b.vpCategorias.post {
+            if (_b == null || categories.isEmpty()) return@post
+            b.vpCategorias.adapter = object : FragmentStateAdapter(this@PosDashFragment) {
+                override fun getItemCount(): Int = categories.size
+                override fun createFragment(position: Int) =
+                    PosCategoryPageFragment.new(categories[position].id)
+            }
         }
     }
 
@@ -188,6 +191,7 @@ class PosDashFragment : Fragment() {
             else -> "$count productos"
         }
         val socio = cart.socioNombre
+        b.socioBar.visibility = if (socio != null) View.VISIBLE else View.GONE
         b.tvPosSocio.visibility = if (socio != null) View.VISIBLE else View.GONE
         if (socio != null) b.tvPosSocio.text = "Socio: $socio ✕"
         b.tvPosSocio.setOnClickListener { cart.clearSocio(); cart.setEntradaDesc(null); refreshTotal() }
