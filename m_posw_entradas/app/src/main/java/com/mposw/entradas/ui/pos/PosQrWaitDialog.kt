@@ -86,6 +86,12 @@ class PosQrWaitDialog : DialogFragment() {
                         else -> Unit
                     }
                 } catch (e: Exception) {
+                    if (com.mposw.entradas.data.ApiClient.isWrongMode(e)) {
+                        pollJob?.cancel()
+                        dismissAllowingStateLoss()
+                        (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
+                        return@launch
+                    }
                     if (isAdded) b.tvQrHint.text = e.message ?: "Error consultando estado"
                 }
             }

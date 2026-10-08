@@ -14,6 +14,23 @@
         android:layout_height="wrap_content"
         android:minHeight="110dp">
 
+        <FrameLayout
+            android:id="@+id/mediaBox"
+            android:layout_width="match_parent"
+            android:layout_height="72dp">
+
+            <ImageView android:id="@+id/ivProd"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="@null" />
+
+            <TextView android:id="@+id/tvProdIcon"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="36sp" />
+        </FrameLayout>
         <TextView android:id="@+id/tvProdName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

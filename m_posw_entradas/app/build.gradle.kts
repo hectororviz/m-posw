@@ -80,5 +80,7 @@ dependencies {
 
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
+    implementation("io.coil-kt:coil:2.6.0")
+
     implementation("com.sunmi:printerlibrary:1.0.15")
 }

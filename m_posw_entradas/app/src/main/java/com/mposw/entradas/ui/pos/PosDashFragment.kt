@@ -1,7 +1,9 @@
 package com.mposw.entradas.ui.pos
 
 import android.os.Bundle
+import android.view.GestureDetector
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
@@ -50,6 +52,8 @@ class PosDashFragment : Fragment() {
 
     fun productsOf(categoryId: String): List<PosProduct> = catalogRepo.productsOf(categoryId)
 
+    fun apiRoot(): String = session.apiRoot()
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _b = FragmentPosDashBinding.inflate(inflater, container, false)
         return b.root
@@ -60,7 +64,34 @@ class PosDashFragment : Fragment() {
         catalogRepo = PosCatalogRepo(requireContext(), session)
         salesRepo = PosSalesRepo(requireContext(), session)
         b.tvPosTotal.textSize = 24f * textScaleFactor()
-        b.btnPosCart.setOnClickListener { PosCartSheet().show(childFragmentManager, "cart") }
+        // Deslizar la barra hacia arriba (o tocar el total) abre el carrito.
+        val gestures = GestureDetector(requireContext(), object : GestureDetector.SimpleOnGestureListener() {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, vx: Float, vy: Float): Boolean {
+                if (vy < -400) {
+                    openCart()
+                    return true
+                }
+                return false
+            }
+
+            override fun onScroll(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                dx: Float,
+                dy: Float,
+            ): Boolean {
+                if (dy < -60) {
+                    openCart()
+                    return true
+                }
+                return false
+            }
+        })
+        b.posBottomBar.setOnTouchListener { _, ev -> gestures.onTouchEvent(ev) }
+        b.tvPosTotal.setOnClickListener { openCart() }
+        b.btnPosConfig.setOnClickListener {
+            (activity as? com.mposw.entradas.ui.MainActivity)?.openConfig()
+        }
         b.btnPosPagar.setOnClickListener { pagar() }
         b.tvPosFecha.text = SimpleDateFormat("EEE dd/MM · HH:mm", Locale("es", "AR")).format(Date())
         loadCatalog()
@@ -90,7 +121,13 @@ class PosDashFragment : Fragment() {
                 }.attach()
                 if (categories.isEmpty()) toast("Sin categorías activas")
             } catch (e: Exception) {
-                if (isAdded) toast("Sin conexión y sin catálogo cacheado")
+                if (!isAdded) return@launch
+                if (com.mposw.entradas.data.ApiClient.isWrongMode(e)) {
+                    // El servidor cambió el modo: re-resuelve y cambia de pantalla solo.
+                    (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
+                } else {
+                    toast("Sin conexión y sin catálogo cacheado")
+                }
             }
         }
     }
@@ -103,9 +140,7 @@ class PosDashFragment : Fragment() {
 
     fun refreshTotal() {
         if (_b == null) return
-        val count = cart.lines.sumOf { it.quantity }
         b.tvPosTotal.text = money.format(cart.total)
-        b.btnPosCart.text = if (count > 0) "Ver ($count)" else "Ver"
         val socio = cart.socioNombre
         b.tvPosSocio.visibility = if (socio != null) View.VISIBLE else View.GONE
         if (socio != null) b.tvPosSocio.text = "Socio: $socio ✕"
@@ -118,6 +153,13 @@ class PosDashFragment : Fragment() {
             return
         }
         PosPaySheet().show(childFragmentManager, "pay")
+    }
+
+    fun openCart() {
+        if (!isAdded) return
+        if (childFragmentManager.findFragmentByTag("cart") == null) {
+            PosCartSheet().show(childFragmentManager, "cart")
+        }
     }
 
     /** Llamado por sheets/flujos al aprobar: limpia y vuelve al dash. */

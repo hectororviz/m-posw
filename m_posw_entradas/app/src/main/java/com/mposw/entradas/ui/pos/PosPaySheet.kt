@@ -239,6 +239,11 @@ class PosPaySheet : BottomSheetDialogFragment() {
                 finalizeApproved(sale)
             } catch (e: Exception) {
                 busy = false
+                if (com.mposw.entradas.data.ApiClient.isWrongMode(e)) {
+                    dismissAllowingStateLoss()
+                    (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
+                    return@launch
+                }
                 if (isAdded) b.tvPayError.text = e.message ?: "Error cobrando"
             }
         }
@@ -260,6 +265,11 @@ class PosPaySheet : BottomSheetDialogFragment() {
                 PosQrWaitDialog.new(saleId, dash().cart.total.toString()).show(parentFragmentManager, "posqr")
             } catch (e: Exception) {
                 busy = false
+                if (com.mposw.entradas.data.ApiClient.isWrongMode(e)) {
+                    dismissAllowingStateLoss()
+                    (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
+                    return@launch
+                }
                 if (isAdded) b.tvPayError.text = e.message ?: "Error creando QR"
             }
         }

@@ -88,7 +88,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Tamaño de texto (POS)"
+            android:text="Tamaño (POS)"
             android:textSize="18sp"
             android:textStyle="bold" />
 

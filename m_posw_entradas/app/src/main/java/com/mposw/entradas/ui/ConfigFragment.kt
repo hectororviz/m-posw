@@ -141,6 +141,7 @@ class ConfigFragment : Fragment() {
                 if (mode == DeviceMode.POS) {
                     // vigentes()/template son solo de entradas (403 en POS).
                     b.tvConfigStatus.text = "OK. Modo: POS."
+                    (activity as? MainActivity)?.enterModeIfRoot(mode)
                     return@launch
                 }
                 val repo = EntradasRepo(session)
@@ -148,6 +149,7 @@ class ConfigFragment : Fragment() {
                 repo.syncTemplateForce()
                 refreshVersions()
                 b.tvConfigStatus.text = "OK: ${r.fixtures.size} partido(s) vigente(s). Modo: ${mode.name}."
+                (activity as? MainActivity)?.enterModeIfRoot(mode)
             } catch (e: Exception) {
                 val msg = e.message ?: ""
                 if (msg.contains("401") || msg.contains("DEVICE_REVOKED")) {

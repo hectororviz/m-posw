@@ -47,6 +47,13 @@
         android:layout_height="1dp"
         android:background="?attr/colorOutline" />
 
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="6dp"
+        android:background="?attr/colorOutline" />
+
     <LinearLayout
         android:id="@+id/posBottomBar"
         android:orientation="horizontal"
@@ -55,12 +62,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <com.google.android.material.button.MaterialButton android:id="@+id/btnPosCart"
-            style="@style/Widget.Entradas.Button.Neutral"
-            android:layout_width="0dp"
-            android:layout_height="56dp"
-            android:layout_weight="1"
-            android:text="Ver" />
+        <ImageButton android:id="@+id/btnPosConfig"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_settings"
+            android:contentDescription="Configuración" />
 
         <TextView android:id="@+id/tvPosTotal"
             android:layout_width="0dp"

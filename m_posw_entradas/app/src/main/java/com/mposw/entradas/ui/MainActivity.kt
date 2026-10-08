@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         tvUltimosNumeros = findViewById(R.id.tvUltimosNumeros)
 
         if (savedInstanceState == null) {
-            resolveMode()
+            refreshMode()
         }
         btnConfig.setOnClickListener { showConfig() }
         supportFragmentManager.addOnBackStackChangedListener { syncGear() }
@@ -59,12 +59,16 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // Al volver a primer plano, el servidor pudo haber cambiado el modo.
         if (supportFragmentManager.backStackEntryCount == 0 && session.isPaired) {
-            resolveMode()
+            refreshMode()
         }
     }
 
-    /** Consulta GET devices/me y muestra la pantalla del modo asignado. */
-    private fun resolveMode() {
+    /**
+     * Re-consulta GET devices/me y muestra la pantalla del modo asignado.
+     * Pública: los fragments la llaman ante 403 DEVICE_WRONG_MODE para
+     * cambiar de pantalla solos, sin cerrar la app.
+     */
+    fun refreshMode() {
         if (resolving) return
         // Sin servidor que valide el modo, la app queda en Configuración.
         if (!session.isPaired) {
@@ -117,6 +121,20 @@ class MainActivity : AppCompatActivity() {
             .replace(R.id.nav_host, ConfigFragment())
             .addToBackStack(null)
             .commit()
+    }
+
+    /** Abre Config con back (engranaje del dash POS, por ejemplo). */
+    fun openConfig() = showConfig()
+
+    /**
+     * Tras "Probar conexión" exitoso: si Config es raíz (equipo sin modo),
+     * navega a la pantalla del modo. Desde el engranaje no navega.
+     */
+    fun enterModeIfRoot(mode: DeviceMode) {
+        val current = supportFragmentManager.findFragmentById(R.id.nav_host)
+        if (current is ConfigFragment && supportFragmentManager.backStackEntryCount == 0) {
+            showMode(mode)
+        }
     }
 
     private fun syncGear() {

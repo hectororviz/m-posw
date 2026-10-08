@@ -327,7 +327,12 @@ class VentaFragment : Fragment() {
                 }
                 refreshTotal()
             } catch (e: Exception) {
-                toast(ApiClient.parseError(e))
+                if (ApiClient.isWrongMode(e)) {
+                    // El servidor cambió el modo: re-resuelve y cambia de pantalla solo.
+                    (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
+                } else {
+                    toast(ApiClient.parseError(e))
+                }
             }
         }
     }

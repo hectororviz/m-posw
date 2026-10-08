@@ -164,9 +164,22 @@ data class PosProduct(
     val type: String?,
     val iconName: String?,
     val colorHex: String?,
+    val imagePath: String?,
+    val imageUpdatedAt: String?,
     val categoryId: String?,
     val category: PosProductCategory?,
-)
+) {
+    /** URL absoluta de la foto (igual que buildImageUrl web), o null. */
+    fun imageUrl(apiRoot: String): String? {
+        var p = imagePath?.trim().orEmpty()
+        if (p.isEmpty()) return null
+        if (p.startsWith("http")) return p
+        if (!p.startsWith("/")) p = "/$p"
+        val root = apiRoot.trim().trimEnd('/')
+        val ts = imageUpdatedAt?.trim().orEmpty()
+        return root + p + if (ts.isNotEmpty()) "?v=$ts" else ""
+    }
+}
 
 data class PosProductCategory(
     val id: String?,

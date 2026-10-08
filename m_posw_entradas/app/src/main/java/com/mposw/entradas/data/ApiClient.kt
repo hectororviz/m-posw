@@ -39,8 +39,16 @@ object ApiClient {
         return when {
             msg.contains("401") -> "No autorizado (401). Revisá el token o re-vinculá."
             msg.contains("DEVICE_REVOKED") -> "Dispositivo revocado. Re-vinculá."
-            msg.contains("DEVICE_WRONG_MODE") -> "Modo incorrecto para esta terminal. Pedí que lo cambien en el front."
+            isWrongMode(e) -> "Modo incorrecto para esta terminal. Pedí que lo cambien en el front."
             else -> msg
         }
+    }
+
+    /** 403 del guard de dispositivo = el servidor cambió el modo. */
+    fun isWrongMode(e: Exception): Boolean {
+        val code = (e as? retrofit2.HttpException)?.code()
+        if (code == 403) return true
+        val msg = e.message ?: ""
+        return msg.contains("403") || msg.contains("DEVICE_WRONG_MODE")
     }
 }

@@ -57,6 +57,8 @@ export class PosDeviceController {
         type: true,
         iconName: true,
         colorHex: true,
+        imagePath: true,
+        imageUpdatedAt: true,
         categoryId: true,
         category: { select: { id: true, name: true, ticket: true } },
       },
