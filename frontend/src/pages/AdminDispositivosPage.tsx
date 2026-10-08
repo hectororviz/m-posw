@@ -44,14 +44,9 @@ export const AdminDispositivosPage: React.FC = () => {
   return (
     <div style={{ display: 'grid', gap: '1.5rem' }}>
       <section>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-            <MonitorSmartphone size={16} /> Dispositivos
-          </h3>
-          <button type="button" className="btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
-            <Plus size={14} />
-          </button>
-        </div>
+        <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+          <MonitorSmartphone size={16} /> Dispositivos
+        </h3>
         <p><small>Cada terminal necesita su POS de Mercado Pago propio para QR (sin fallback: evita colisiones). CASH opera sin vincular.</small></p>
         <div className="sales-table-wrapper">
           <div className="sales-table">
@@ -111,19 +106,134 @@ export const AdminDispositivosPage: React.FC = () => {
           </div>
         </div>
       </section>
+      <button type="button" className="fab-button-v2" onClick={() => setCreateOpen(true)} aria-label="Nuevo dispositivo" title="Nuevo dispositivo">
+        <Plus size={24} />
+      </button>
       {createOpen && <CreateDeviceModal onClose={() => setCreateOpen(false)} />}
-      {mpDevice && <MpLinkModal device={mpDevice} onClose={() => setMpDevice(null)} />}
+      {mpDevice && <MpLinkModal deviceId={mpDevice.id} deviceNombre={mpDevice.nombre} mpPosId={mpDevice.mpPosId} mpLabel={mpDevice.mpPosId ? `${mpDevice.mpStoreName ?? ''} / ${mpDevice.mpPosName ?? ''}` : null} onClose={() => setMpDevice(null)} />}
     </div>
   );
 };
 
-// ── Modal "+" : alta + QR en el mismo modal ────────────────
+// ── Sección MP reutilizable (modal de alta + modal por fila) ──
+const MpLinkSection: React.FC<{
+  deviceId: string;
+  mpPosId: string | null;
+  mpLabel: string | null;
+  onLinked: (storeId: string, posId: string, storeName: string, posName: string) => void;
+  onUnlinked: () => void;
+}> = ({ deviceId, mpPosId, mpLabel, onLinked, onUnlinked }) => {
+  const { pushToast } = useToast();
+  const invalidate = useInvalidateDispositivos();
+  const { data: mp, refetch, isFetching } = useDispositivosMpStores(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ storeName: '', posName: '', streetName: '', streetNumber: '', cityName: '', stateName: '', zipCode: '' });
+  const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
+
+  const detect = async () => {
+    try {
+      const res = await refetch();
+      if (((res.data?.stores ?? []).length) === 0) pushToast('Sin tiendas/POS en la cuenta MP', 'error');
+    } catch (e) { err(e); }
+  };
+
+  const select = async (storeId: string, posId: string, storeName: string, posName: string) => {
+    try {
+      await apiClient.post(`/dispositivos/${deviceId}/mp-select`, { storeId, posId });
+      pushToast('POS vinculado al dispositivo', 'success');
+      invalidate();
+      onLinked(storeId, posId, storeName, posName);
+    } catch (e) { err(e); }
+  };
+
+  const create = async () => {
+    try {
+      await apiClient.post(`/dispositivos/${deviceId}/mp-setup`, form);
+      pushToast('POS creado en MP y vinculado', 'success');
+      invalidate();
+      onLinked('', '', form.storeName, form.posName);
+    } catch (e) { err(e); }
+  };
+
+  const disconnect = async () => {
+    if (!confirm('¿Desvincular el MP? Su QR dejará de operar.')) return;
+    try {
+      await apiClient.post(`/dispositivos/${deviceId}/mp-disconnect`);
+      invalidate();
+      onUnlinked();
+    } catch (e) { err(e); }
+  };
+
+  return (
+    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
+      <p style={{ margin: '0 0 0.5rem' }}><strong>Mercado Pago</strong><br />
+        <small>{mpPosId ? `Vinculado: ${mpLabel ?? ''}` : 'Sin vincular: el QR no opera hasta vincular un POS propio.'}</small>
+      </p>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <button type="button" className="btn-secondary btn-sm" onClick={detect} disabled={isFetching}>
+          {isFetching ? 'Detectando...' : 'Detectar tiendas/POS'}
+        </button>
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setShowCreate((v) => !v)}>
+          <Plus size={14} /> Crear nuevo en MP
+        </button>
+        {mpPosId && (
+          <button type="button" className="btn-secondary btn-sm" onClick={disconnect}>
+            <Trash2 size={12} /> Desvincular
+          </button>
+        )}
+      </div>
+      {mp && (
+        <div className="sales-table-wrapper" style={{ marginTop: '0.75rem' }}>
+          <div className="sales-table">
+            <div className="sales-table-head">
+              <span className="col-user" style={{ flex: 2 }}>Tienda</span>
+              <span className="col-user" style={{ flex: 2 }}>POS</span>
+              <span className="col-user" style={{ flex: 2 }}>Uso</span>
+              <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>
+            </div>
+            {mp.stores.flatMap((s) => s.pos.map((p) => {
+              const usedBy = usedByFor(mp, s.id, p.id);
+              const mineExact = mpPosId === p.id;
+              return (
+                <div key={`${s.id}-${p.id}`} className="sales-table-row">
+                  <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{s.name}</span>
+                  <span className="col-user" style={{ flex: 2 }}>{p.name}</span>
+                  <span className="col-user" style={{ flex: 2 }}>
+                    {mineExact ? <strong>Este dispositivo</strong> : usedBy ?? <span style={{ color: 'var(--color-success)' }}>Libre</span>}
+                  </span>
+                  <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}>
+                    {!mineExact && (
+                      <button type="button" className="btn-primary btn-sm" onClick={() => select(s.id, p.id, s.name, p.name)}>Usar este</button>
+                    )}
+                  </span>
+                </div>
+              );
+            }))}
+          </div>
+        </div>
+      )}
+      {showCreate && (
+        <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'end', marginTop: '0.75rem' }}>
+          {[['storeName', 'Tienda'], ['posName', 'Caja'], ['streetName', 'Calle'], ['streetNumber', 'Número'], ['cityName', 'Ciudad'], ['stateName', 'Provincia'], ['zipCode', 'CP']].map(([key, label]) => (
+            <div key={key}><label>{label}</label>
+              <input value={form[key as keyof typeof form]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+            </div>
+          ))}
+          <button type="button" className="btn-primary btn-sm" onClick={create}>Crear en MP</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Modal "+" : alta + QR + MP en el mismo modal ────────────
 const CreateDeviceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { pushToast } = useToast();
   const invalidate = useInvalidateDispositivos();
   const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState<PosDeviceTipo>('ENTRADAS');
   const [created, setCreated] = useState<PosDeviceCreated | null>(null);
+  const [mpLinked, setMpLinked] = useState<{ storeId: string; posId: string; storeName: string; posName: string } | null>(null);
 
   const create = async () => {
     if (!nombre.trim()) { pushToast('Nombre del dispositivo requerido', 'error'); return; }
@@ -137,13 +247,14 @@ const CreateDeviceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   const close = () => {
     setCreated(null);
+    setMpLinked(null);
     setNombre('');
     onClose();
   };
 
   return (
     <div className="modal-backdrop" onClick={close}>
-      <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+      <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px' }}>
         <div className="modal-header">
           <h3>{created ? 'Dispositivo vinculado' : 'Nuevo dispositivo'}</h3>
           <button type="button" className="icon-button" onClick={close}><X size={16} /></button>
@@ -171,16 +282,20 @@ const CreateDeviceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             <>
               <p><strong>Token (se muestra una sola vez):</strong></p>
               <code style={{ display: 'block', wordBreak: 'break-all', margin: '0.5rem 0' }}>{created.token}</code>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-                <div style={{ background: '#fff', padding: '0.5rem', borderRadius: 8 }}>
-                  <QRCode value={JSON.stringify(created.pairing)} size={200} />
-                </div>
-                <div style={{ flex: '1 1 220px' }}>
-                  <small>Escaneá este QR desde la app del POS para vincularlo.</small>
-                  <small style={{ display: 'block', marginTop: '0.25rem' }}>Pairing: <code style={{ wordBreak: 'break-all' }}>{JSON.stringify(created.pairing)}</code></small>
-                  <small style={{ display: 'block', marginTop: '0.25rem' }}>Después vinculá su POS de Mercado Pago desde la lista.</small>
-                </div>
+              <div style={{ background: '#fff', padding: '0.5rem', borderRadius: 8, width: 'fit-content' }}>
+                <QRCode value={JSON.stringify(created.pairing)} size={200} />
               </div>
+              <div style={{ marginTop: '0.5rem' }}>
+                <small>Escaneá este QR desde la app del POS para vincularlo.</small>
+                <small style={{ display: 'block', marginTop: '0.25rem' }}>Pairing: <code style={{ wordBreak: 'break-all' }}>{JSON.stringify(created.pairing)}</code></small>
+              </div>
+              <MpLinkSection
+                deviceId={created.id}
+                mpPosId={mpLinked?.posId || null}
+                mpLabel={mpLinked ? `${mpLinked.storeName} / ${mpLinked.posName}` : null}
+                onLinked={(storeId, posId, storeName, posName) => setMpLinked({ storeId, posId, storeName, posName })}
+                onUnlinked={() => setMpLinked(null)}
+              />
             </>
           )}
         </div>
@@ -199,112 +314,32 @@ const CreateDeviceModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-// ── Modal vincular MP por dispositivo ──────────────────────
-const MpLinkModal: React.FC<{ device: PosDevice; onClose: () => void }> = ({ device, onClose }) => {
-  const { pushToast } = useToast();
-  const invalidate = useInvalidateDispositivos();
-  const { data: mp, refetch, isFetching } = useDispositivosMpStores(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ storeName: '', posName: device.nombre, streetName: '', streetNumber: '', cityName: '', stateName: '', zipCode: '' });
-  const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
-
-  const detect = async () => {
-    try { await refetch(); } catch (e) { err(e); }
-  };
-
-  const select = async (storeId: string, posId: string) => {
-    try {
-      await apiClient.post(`/dispositivos/${device.id}/mp-select`, { storeId, posId });
-      pushToast('POS vinculado al dispositivo', 'success');
-      invalidate();
-      onClose();
-    } catch (e) { err(e); }
-  };
-
-  const create = async () => {
-    try {
-      await apiClient.post(`/dispositivos/${device.id}/mp-setup`, form);
-      pushToast('POS creado en MP y vinculado', 'success');
-      invalidate();
-      onClose();
-    } catch (e) { err(e); }
-  };
-
-  const disconnect = async () => {
-    if (!confirm(`¿Desvincular el MP de ${device.nombre}? Su QR dejará de operar.`)) return;
-    try {
-      await apiClient.post(`/dispositivos/${device.id}/mp-disconnect`);
-      invalidate();
-      onClose();
-    } catch (e) { err(e); }
-  };
-
+// ── Modal vincular MP de una fila existente ──────────────────
+const MpLinkModal: React.FC<{
+  deviceId: string;
+  deviceNombre: string;
+  mpPosId: string | null;
+  mpLabel: string | null;
+  onClose: () => void;
+}> = ({ deviceId, deviceNombre, mpPosId, mpLabel, onClose }) => {
+  const [linked, setLinked] = useState<{ posId: string; label: string } | null>(
+    mpPosId ? { posId: mpPosId, label: mpLabel ?? '' } : null,
+  );
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal user-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px' }}>
         <div className="modal-header">
-          <h3>MP de {device.nombre}</h3>
+          <h3>MP de {deviceNombre}</h3>
           <button type="button" className="icon-button" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="modal-body">
-          <p><small>
-            {device.mpPosId
-              ? `Vinculado: ${device.mpStoreName ?? ''} / ${device.mpPosName ?? ''}`
-              : 'Sin vincular: el QR no opera hasta vincular un POS propio.'}
-          </small></p>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button type="button" className="btn-secondary btn-sm" onClick={detect} disabled={isFetching}>
-              {isFetching ? 'Detectando...' : 'Detectar tiendas/POS'}
-            </button>
-            <button type="button" className="btn-secondary btn-sm" onClick={() => setShowCreate((v) => !v)}>
-              <Plus size={14} /> Crear nuevo en MP
-            </button>
-            {device.mpPosId && (
-              <button type="button" className="btn-secondary btn-sm" onClick={disconnect}>
-                <Trash2 size={12} /> Desvincular
-              </button>
-            )}
-          </div>
-          {mp && (
-            <div className="sales-table-wrapper" style={{ marginTop: '0.75rem' }}>
-              <div className="sales-table">
-                <div className="sales-table-head">
-                  <span className="col-user" style={{ flex: 2 }}>Tienda</span>
-                  <span className="col-user" style={{ flex: 2 }}>POS</span>
-                  <span className="col-user" style={{ flex: 2 }}>Uso</span>
-                  <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>
-                </div>
-                {mp.stores.flatMap((s) => s.pos.map((p) => {
-                  const usedBy = usedByFor(mp, s.id, p.id);
-                  const isMine = device.mpStoreId === s.id && device.mpPosId === p.id;
-                  return (
-                    <div key={`${s.id}-${p.id}`} className="sales-table-row">
-                      <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{s.name}</span>
-                      <span className="col-user" style={{ flex: 2 }}>{p.name}</span>
-                      <span className="col-user" style={{ flex: 2 }}>
-                        {isMine ? <strong>Este dispositivo</strong> : usedBy ?? <span style={{ color: 'var(--color-success)' }}>Libre</span>}
-                      </span>
-                      <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}>
-                        {!isMine && (
-                          <button type="button" className="btn-primary btn-sm" onClick={() => select(s.id, p.id)}>Usar este</button>
-                        )}
-                      </span>
-                    </div>
-                  );
-                }))}
-              </div>
-            </div>
-          )}
-          {showCreate && (
-            <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'end', marginTop: '0.75rem' }}>
-              {[['storeName', 'Tienda'], ['posName', 'Caja'], ['streetName', 'Calle'], ['streetNumber', 'Número'], ['cityName', 'Ciudad'], ['stateName', 'Provincia'], ['zipCode', 'CP']].map(([key, label]) => (
-                <div key={key}><label>{label}</label>
-                  <input value={form[key as keyof typeof form]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
-                </div>
-              ))}
-              <button type="button" className="btn-primary btn-sm" onClick={create}>Crear en MP</button>
-            </div>
-          )}
+          <MpLinkSection
+            deviceId={deviceId}
+            mpPosId={linked?.posId ?? null}
+            mpLabel={linked?.label ?? null}
+            onLinked={(_storeId, posId, storeName, posName) => setLinked({ posId, label: `${storeName} / ${posName}` })}
+            onUnlinked={() => setLinked(null)}
+          />
         </div>
         <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button type="button" className="btn-ghost" onClick={onClose}>Cerrar</button>

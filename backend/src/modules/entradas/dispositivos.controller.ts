@@ -82,7 +82,8 @@ export class DispositivosController {
     for (const d of devices) {
       used.push({ storeId: d.mpStoreId, posId: d.mpPosId, usedBy: `Terminal ${d.nombre}` });
     }
-    return { stores: detected, used };
+    // listMpStores devuelve {stores:[...]}: se desanida para el front.
+    return { stores: detected.stores ?? [], used };
   }
 
   @Post(':id/mp-select')
