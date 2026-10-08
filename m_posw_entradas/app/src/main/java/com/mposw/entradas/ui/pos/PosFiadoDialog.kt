@@ -36,6 +36,12 @@ class PosFiadoDialog : DialogFragment() {
         return b.root
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Ancho completo: el default de DialogFragment es angosto y corta nombres.
+        dialog?.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         b.tvFiadoTotal.text = "Total: ${money.format(dash().cart.total)}"
         b.rvAcreedores.layoutManager = LinearLayoutManager(requireContext())
@@ -129,19 +135,20 @@ class PosFiadoDialog : DialogFragment() {
             val a = items[position]
             h.b.tvAcreedorName.text = a.nombre ?: ""
             h.b.tvAcreedorSaldo.text = "Deuda: ${money.format(a.saldo ?: 0.0)}"
-            val st = estado(a)
-            h.b.tvAcreedorEstado.text = when (st) {
-                "LIMITE" -> "LÍMITE"
-                "ADVERTENCIA" -> "ATENCIÓN"
-                else -> "OK"
+            // Solo icono de estado al lado del nombre (el detalle va en el error al tocar).
+            when (estado(a)) {
+                "LIMITE" -> {
+                    h.b.tvAcreedorIcon.visibility = View.VISIBLE
+                    h.b.tvAcreedorIcon.text = "⛔"
+                    h.b.tvAcreedorIcon.contentDescription = "Límite superado"
+                }
+                "ADVERTENCIA" -> {
+                    h.b.tvAcreedorIcon.visibility = View.VISIBLE
+                    h.b.tvAcreedorIcon.text = "⚠️"
+                    h.b.tvAcreedorIcon.contentDescription = "Supera la advertencia"
+                }
+                else -> h.b.tvAcreedorIcon.visibility = View.GONE
             }
-            h.b.tvAcreedorEstado.setTextColor(
-                when (st) {
-                    "LIMITE" -> 0xFFB71C1C.toInt()
-                    "ADVERTENCIA" -> 0xFFE65100.toInt()
-                    else -> 0xFF2E7D32.toInt()
-                },
-            )
         }
     }
 

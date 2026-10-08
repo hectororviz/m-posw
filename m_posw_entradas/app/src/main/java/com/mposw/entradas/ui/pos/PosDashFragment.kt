@@ -159,6 +159,10 @@ class PosDashFragment : Fragment() {
         if (_b == null || !::session.isInitialized) return
         b.tvPosTotal.textSize = 24f * textScaleFactor()
         b.tvPosCount.textSize = 13f * textScaleFactor()
+        // "$" con el color de resaltado del club (más visible); si no hay, queda el primario del tema.
+        com.mposw.entradas.ui.BrandApplier.parse(session.brandColor)?.let { (bg, _) ->
+            b.tvPosPagarSimbolo.setTextColor(bg)
+        }
     }
 
     /** Recrea las páginas para que tomen span, textos e imágenes nuevos. */
