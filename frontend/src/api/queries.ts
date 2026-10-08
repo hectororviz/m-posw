@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo } from './types';
+import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo, MpStoresResponse } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1262,11 +1262,29 @@ export const useEntradaFixtures = (from?: string, to?: string) =>
 
 export const usePosDevices = () =>
   useQuery({
-    queryKey: ['entradas-devices'],
+    queryKey: ['dispositivos'],
     queryFn: async () => {
-      const response = await apiClient.get<PosDevice[]>('/entradas/devices');
+      const response = await apiClient.get<PosDevice[]>('/dispositivos');
       return response.data;
     },
+  });
+
+export const useInvalidateDispositivos = () => {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ['dispositivos'] });
+    queryClient.invalidateQueries({ queryKey: ['dispositivos-mp-stores'] });
+  };
+};
+
+export const useDispositivosMpStores = (enabled = true) =>
+  useQuery({
+    queryKey: ['dispositivos-mp-stores'],
+    queryFn: async () => {
+      const response = await apiClient.get<MpStoresResponse>('/dispositivos/mp-stores');
+      return response.data;
+    },
+    enabled,
   });
 
 export const useTicketSales = (fixtureId?: string) =>

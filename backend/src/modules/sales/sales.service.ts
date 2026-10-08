@@ -9,6 +9,7 @@ import { MercadoPagoInstoreService } from './services/mercadopago-instore.servic
 import { MercadoPagoQueryService } from './services/mercadopago-query.service';
 import { InternetVouchersService } from '../internet-vouchers/internet-vouchers.service';
 import { AcreedoresService } from '../acreedores/acreedores.service';
+import { resolveDeviceMpOrThrow } from '../entradas/device-mp.helper';
 import { FinanzasService } from '../finanzas/finanzas.service';
 import {
   mapMpPaymentToPaymentStatus,
@@ -29,7 +30,7 @@ export class SalesService {
     private finanzasService: FinanzasService,
   ) {}
 
-  async createCashSale(userId: string, dto: CreateCashSaleDto) {
+  async createCashSale(userId: string, dto: CreateCashSaleDto, deviceId?: string) {
     const { items, total: subtotal } = await this.buildSaleItems(dto.items);
     const validatedDiscount = await this.resolveSocioDiscount(dto.items, dto.socioId, dto.discountTotal, dto.canjes);
     const roundedTotal = this.roundToCurrency(subtotal - validatedDiscount);
@@ -44,6 +45,7 @@ export class SalesService {
       const sale = await this.prisma.sale.create({
         data: {
           userId,
+          deviceId: deviceId ?? null,
           total: roundedTotal,
           status: SaleStatus.APPROVED,
           paymentStatus: PaymentStatus.APPROVED,
@@ -76,17 +78,21 @@ export class SalesService {
     }
   }
 
-  async createQrSale(userId: string, dto: CreateQrSaleDto) {
+  async createQrSale(userId: string, dto: CreateQrSaleDto, deviceId?: string) {
     const { items, total: subtotal } = await this.buildSaleItems(dto.items);
     const validatedDiscount = await this.resolveSocioDiscount(dto.items, dto.socioId, dto.discountTotal, dto.canjes);
     const roundedTotal = this.roundToCurrency(subtotal - validatedDiscount);
     this.assertTotal(dto.total, roundedTotal);
+
+    // POS propio del dispositivo (400 MP_POS_NOT_LINKED si no hay). Web = principal.
+    const posOverride = deviceId ? await resolveDeviceMpOrThrow(this.prisma, deviceId) : undefined;
 
     let sale;
     try {
       sale = await this.prisma.sale.create({
         data: {
           userId,
+          deviceId: deviceId ?? null,
           total: roundedTotal,
           status: SaleStatus.PENDING,
           paymentStatus: PaymentStatus.PENDING,
@@ -111,9 +117,12 @@ export class SalesService {
     });
 
     try {
-      await this.mpService.createOrUpdateOrder({
-        sale: saleWithReference,
-      });
+      await this.mpService.createOrUpdateOrder(
+        {
+          sale: saleWithReference,
+        },
+        posOverride,
+      );
     } catch (error) {
       await this.prisma.sale.update({
         where: { id: sale.id },
@@ -448,7 +457,15 @@ export class SalesService {
     }
 
     try {
-      await this.mpService.deleteOrder();
+      // DELETE contra el POS propio de la venta (web = principal).
+      // Si el device se desvinculó, igual se cancela local.
+      const posOverride = sale.deviceId
+        ? await resolveDeviceMpOrThrow(this.prisma, sale.deviceId).catch((e) => {
+            this.logger.warn(`Cancel sale=${saleId}: device sin MP (${e}), cancelando solo local`);
+            return undefined;
+          })
+        : undefined;
+      await this.mpService.deleteOrder('default', posOverride);
     } catch (error) {
       if (!this.isMpOrderGoneError(error)) {
         throw error;

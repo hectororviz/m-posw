@@ -221,8 +221,8 @@ usuario genérico pos-terminal (seed + Setting.posDeviceUserId).
            categoryId,category:{id,name,ticket}}]}
     Solo activos, sin RAW_MATERIAL, respeta toggle Internet.
   GET /pos-device/mp-qr
-    200 {"qrData":"...","linked":true} (QR estático del POS
-    principal; la app lo cachea, igual que entradas).
+    200 {"qrData":"...","linked":true} (QR del POS propio del device;
+    null si no está vinculado → el QR no opera, CASH sí).
   GET /pos-device/settings
     200 {"storeName":"...","clubName":"..."} (encabezado ticket).
   POST /pos-device/sales/cash {items,total,paymentMethod:CASH,

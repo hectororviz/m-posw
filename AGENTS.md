@@ -1087,10 +1087,16 @@ backend/src/modules/entradas/
 ├── entradas.module.ts            # imports: Users, Sales (MP), Socios (QR/descuentos)
 ├── entradas-admin.controller.ts  # CRUD web (JWT + RequireModule ENTRADAS)
 ├── entradas-device.controller.ts # API del terminal (EntradasDeviceGuard, Bearer ent_...)
+├── device-lookup.controller.ts   # Lookups agnósticos (socio/beneficios, ambos modos)
+├── device-me.controller.ts       # GET devices/me (modo del token)
+├── dispositivos.controller.ts    # ABM terminales + MP por device (CONFIGURACION)
+├── pos-device.controller.ts      # API modo POS bufet (@DeviceKind pos)
 ├── entradas-shared.controller.ts # GET ticket-template + escudo (FlexibleGuard: JWT o device)
 ├── entradas-admin.service.ts     # ABMs, devices, template, escudo, defaultWindowFor()
 ├── entradas-sales.service.ts     # vigentes, intent, status, cancel, approveSale, webhook apply
-├── device.guard.ts               # EntradasDeviceGuard (tokenHash SHA256, lastSeenAt)
+├── pos-device.service.ts         # Usuario genérico pos-terminal
+├── device.guard.ts               # DeviceGuard genérico + @DeviceKind (tokenHash SHA256, lastSeenAt)
+├── device-mp.helper.ts           # resolveDeviceMpOrThrow (400 MP_POS_NOT_LINKED)
 ├── entradas-flexible.guard.ts    # Acepta JWT (READ+) o token device
 ├── device-token.util.ts          # generate/hash/ent_ + Bearer parsing
 ├── ticket-template.const.ts      # Layout default 32 cols
@@ -1109,8 +1115,9 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 - **EntradaTorneo**: solo `nombre` + `precio` (precio único, sin L/V).
 - **EntradaRival**: solo `nombre`.
 - **EntradaFixture**: `fecha` + `torneoId` + `rivalId` + `ventanaDesde/Hasta` (default 06:00 → 05:59+1, editable). `@@unique(fecha, torneoId, rivalId)`.
-- **PosDevice**: `tokenHash` SHA256 (el token `ent_...` se muestra una sola vez + pairing `{baseUrl, token}` para QR). Revocable/rotatable.
-- **TicketSale**: `sector` informativo (mismo precio), `cantidad` 1-10, `CASH` aprueba directo, `MP_QR` crea orden Instore con `externalReference=ticket-<id>` en el **POS dedicado** (`Setting.mpEntradas*`, QR **estático** `mpEntradasQrData`, monto en 1 línea `quantity=1`). `requestId` único = idempotencia.
+- **PosDevice**: `tokenHash` SHA256 (el token `ent_...` se muestra una sola vez + pairing `{baseUrl, token}` para QR). Revocable/rotatable. `tipo` ENTRADAS|POS + **MP propio** (`mpStoreId/mpPosId/mpQrData/...`, obligatorio para QR, sin fallback). Se gestiona en Sistema → Dispositivos (`/admin/dispositivos`, CONFIGURACION), no en Entradas.
+- **Sale.deviceId** nullable → terminal de origen (null = web con POS principal). El PUT/DELETE de órdenes MP usa el POS del device (`posOverride`); CASH no exige MP (`400 MP_POS_NOT_LINKED` solo en QR sin vincular).
+- **TicketSale**: `sector` informativo (mismo precio), `cantidad` 1-10, `CASH` aprueba directo, `MP_QR` crea orden Instore con `externalReference=ticket-<id>` en el **POS propio del device** (QR **estático** del device, monto en 1 línea `quantity=1`). `requestId` único = idempotencia.
 - **TicketUnit / EntradaContador**: numeración por partido y sector (`L-001`, `V-001`, series independientes, contador atómico + `updateMany` condicional anti-doble-aprobación).
 - **EntradaBeneficio** (bufet): descuento % estilo socios para canjear en bufet con el QR de la entrada. Global + sector (`LOCAL|VISITANTE|AMBAS`, se asigna automático al aprobar: mayor %). Destino: categoría, producto o plan de internet. `usoUnico` (default true) vs multiuso.
 - **TicketUnit.beneficio**: cada unidad con beneficio lleva `beneficioId` + `benefitCode` corto único (10 chars, QR `ENT:<code>` ~14 chars) + snapshot `beneficioPorcentaje`. Sin beneficio → QR no se imprime.
@@ -1127,15 +1134,25 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 | `GET` | `/entradas/fixtures?from=&to=` | READ | Calendario |
 | `POST` / `PATCH` | `/entradas/fixtures[/:id]` | READ | Crear (ventana default) / editar ventana. Calendario operable con READ |
 | `DELETE` | `/entradas/fixtures/:id` | READ | Eliminar solo si no tiene ventas (409 `FIXTURE_CON_VENTAS`) |
-| `GET` | `/entradas/devices` | READ | Listar terminales (sin token) |
-| `POST` | `/entradas/devices` | FULL | Generar token (respuesta única) |
-| `POST` | `/entradas/devices/:id/revoke` | FULL | Revocar |
-| `POST` | `/entradas/devices/:id/rotate` | FULL | Rotar token |
-| `GET` | `/entradas/mp-pos` | READ | Estado del POS MP dedicado (linked, QR) |
-| `GET` | `/entradas/mp-pos/detect-stores` | READ | Listar tiendas/POS de la cuenta OAuth (siempre lista completa) |
-| `POST` | `/entradas/mp-pos/select` | FULL | Vincular POS existente → solo `mpEntradas*` |
-| `POST` | `/entradas/mp-pos/setup` | FULL | Crear tienda+caja en MP → solo `mpEntradas*` |
-| `POST` | `/entradas/mp-pos/disconnect` | FULL | Desvincular (principal intacto) |
+| `GET` | `/dispositivos` | CONFIG R | Terminales con MP (página Sistema → Dispositivos) |
+| `POST` | `/dispositivos` | CONFIG F | Generar token (respuesta única + pairing) |
+| `PATCH` | `/dispositivos/:id/tipo` | CONFIG F | Cambiar modo (409 si PENDING, `force` lo saltea) |
+| `POST` | `/dispositivos/:id/revoke` | CONFIG F | Revocar |
+| `POST` | `/dispositivos/:id/rotate` | CONFIG F | Rotar token |
+| `GET` | `/dispositivos/mp-stores` | CONFIG R | Tiendas/POS MP + uso (Principal / Terminal X) |
+| `POST` | `/dispositivos/:id/mp-select` | CONFIG F | Vincular POS existente al device |
+| `POST` | `/dispositivos/:id/mp-setup` | CONFIG F | Crear tienda+caja en MP para el device |
+| `POST` | `/dispositivos/:id/mp-disconnect` | CONFIG F | Desvincular (QR deja de operar) |
+| `GET` | `/entradas/mp-pos` | READ | Legacy dedicado (sin lectores; ver Dispositivos) |
+| `GET` | `/pos-device/catalog` | device POS | Categorías + productos activos |
+| `GET` | `/pos-device/mp-qr` | device POS | QR del POS propio (`null` sin vincular) |
+| `POST` | `/pos-device/sales/cash` | device POS | Venta contado (guarda `Sale.deviceId`) |
+| `POST` | `/pos-device/sales/qr` | device POS | Intent QR (400 `MP_POS_NOT_LINKED` sin MP) |
+| `GET` | `/entradas/mp-pos` | READ | Legacy dedicado (sin lectores; ver Dispositivos) |
+| `GET` | `/entradas/mp-pos/detect-stores` | READ | Legacy (ver `/dispositivos/mp-stores`) |
+| `POST` | `/entradas/mp-pos/select` | FULL | Legacy (ver `/dispositivos/:id/mp-select`) |
+| `POST` | `/entradas/mp-pos/setup` | FULL | Legacy (ver `/dispositivos/:id/mp-setup`) |
+| `POST` | `/entradas/mp-pos/disconnect` | FULL | Legacy (ver `/dispositivos/:id/mp-disconnect`) |
 | `GET` | `/entradas/sales?fixtureId=` | READ | Ventas con unidades |
 | `GET` | `/entradas/sales/summary?fixtureId=` | READ | Conteos L/V + recaudado |
 | `GET` | `/entradas/beneficios` | READ | ABM beneficios de bufet |
@@ -1163,10 +1180,11 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 - `Setting.enableEntradasModule` (default `false`): toggle en Configuración → Módulos + sidebar condicionado + `assertModuleEnabled()` en device service.
 
 ### Frontend
-`frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Beneficios | Diseño | Configuración` (subnav `treasury-subnav-link`). Tab Beneficios (FULL: CRUD + toggle) y validador de QR en Ventas (READ: validar/consumir). Tab Diseño con editor de bloques + preview en vivo (datos ejemplo, 32 cols, escudo real) y upload de escudo 1-bit. Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`, `useEntradasMpPos`, `useEntradaBeneficios`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
+`frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Beneficios | Diseño | Configuración` (subnav `treasury-subnav-link`). Tab Beneficios (FULL: CRUD + toggle) y validador de QR en Ventas (READ: validar/consumir). Tab Diseño con editor de bloques + preview en vivo (datos ejemplo, 32 cols, escudo real) y upload de escudo 1-bit. Tab Configuración: link a Sistema → Dispositivos (ahí viven terminales + MP). Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`, `useEntradasMpPos`, `useEntradaBeneficios`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
+`frontend/src/pages/AdminDispositivosPage.tsx` — FAB "+" abre modal de alta (nombre+tipo → token + QR en el mismo modal) + tabla con MP por terminal y modal de vincular (Detectar con badges de uso, Crear, Desvincular). Ruta `/admin/dispositivos` con `ModuleRoute CONFIGURACION`; sidebar Sistema.
 
 ### Límites conocidos (v1)
-- Una sola orden QR activa por POS de MP: con el POS dedicado, web y terminal usan cada uno el suyo y no se pisan. Con N terminales concurrentes se necesita 1 POS MP por terminal.
+- Una sola orden QR activa por POS de MP: con MP propio por terminal, cada una usa el suyo y no se pisan. Sin vincular, el QR no opera (`MP_POS_NOT_LINKED`); CASH sí.
 - `SocioCanje.usuarioId` ahora nullable (`posId` = deviceId) para canjes POS.
 
 ## Important Constraints

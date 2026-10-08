@@ -256,7 +256,19 @@ export class EntradasAdminService {
     return this.prisma.posDevice.findMany({
       where: { revokedAt: null },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, nombre: true, tipo: true, activo: true, revokedAt: true, lastSeenAt: true, createdAt: true },
+      select: {
+        id: true,
+        nombre: true,
+        tipo: true,
+        activo: true,
+        revokedAt: true,
+        lastSeenAt: true,
+        createdAt: true,
+        mpStoreId: true,
+        mpPosId: true,
+        mpStoreName: true,
+        mpPosName: true,
+      },
     });
   }
 

@@ -69,13 +69,25 @@ export class PosDeviceController {
     };
   }
 
-  // ── QR estático del POS principal ────────────────────────
+  // ── QR del POS propio del dispositivo (null = sin vincular, sin fallback) ──
   @Get('mp-qr')
-  async mpQr() {
-    const setting = await this.prisma.setting.findFirst({
-      select: { mpQrData: true, mpLinked: true },
+  async mpQr(@Req() req: Request) {
+    const device = await this.prisma.posDevice.findUnique({
+      where: { id: this.device(req).id },
+      select: { mpQrData: true, mpPosId: true },
     });
-    return { qrData: setting?.mpQrData ?? null, linked: setting?.mpLinked ?? false };
+    return { qrData: device?.mpQrData ?? null, linked: !!device?.mpPosId };
+  }
+
+  // ── Ventas ───────────────────────────────────────────────
+  @Post('sales/cash')
+  async createCash(@Req() req: Request, @Body() dto: CreateCashSaleDto) {
+    return this.sales.createCashSale(await this.posDevices.resolvePosUserId(), dto, this.device(req).id);
+  }
+
+  @Post('sales/qr')
+  async createQr(@Req() req: Request, @Body() dto: CreateQrSaleDto) {
+    return this.sales.createQrSale(await this.posDevices.resolvePosUserId(), dto, this.device(req).id);
   }
 
   // ── Datos para el encabezado del ticket ──────────────────
@@ -88,16 +100,6 @@ export class PosDeviceController {
   }
 
   // ── Ventas ───────────────────────────────────────────────
-  @Post('sales/cash')
-  async createCash(@Body() dto: CreateCashSaleDto) {
-    return this.sales.createCashSale(await this.posDevices.resolvePosUserId(), dto);
-  }
-
-  @Post('sales/qr')
-  async createQr(@Body() dto: CreateQrSaleDto) {
-    return this.sales.createQrSale(await this.posDevices.resolvePosUserId(), dto);
-  }
-
   @Get('sales/:id')
   async getSale(@Param('id') id: string) {
     // Incluye items + vouchers (la app reintenta 1.5s si los vouchers aún no están).

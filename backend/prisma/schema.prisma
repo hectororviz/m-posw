@@ -209,12 +209,16 @@ model Sale {
   mpRaw Json?
   userId    String     @db.Uuid
   user      User       @relation(fields: [userId], references: [id])
+  deviceId  String?    @db.Uuid
+  device    PosDevice? @relation("DeviceSales", fields: [deviceId], references: [id])
   items     SaleItem[]
   mercadoPagoPayments MercadoPagoPayment[]
   movimientosMP MovimientoMP[]
   conciliaciones MpConciliacion[]
   fiadoVenta       FiadoVenta?
   vouchers         SaleVoucher[]
+
+  @@index([deviceId])
 }
 
 model SaleItem {
@@ -1199,6 +1203,15 @@ model PosDevice {
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   sales      TicketSale[]
+  deviceSales Sale[] @relation("DeviceSales")
+  // POS de Mercado Pago propio (obligatorio para QR, sin fallback)
+  mpStoreId         String?
+  mpPosId           String?
+  mpStoreName       String?
+  mpPosName         String?
+  mpQrData          String? @db.Text
+  mpExternalStoreId String?
+  mpExternalPosId   String?
 
   @@index([activo])
   @@index([tipo])

@@ -30,6 +30,13 @@ interface MpPosPersist {
   externalStoreId: string;
 }
 
+interface MpPosDetail {
+  posName: string;
+  qrData: string;
+  externalPosId: string;
+  externalStoreId: string;
+}
+
 // Mapeo destino -> columnas de Setting. El principal NUNCA se toca
 // desde el módulo Entradas: solo target='entradas' escribe mpEntradas*.
 const POS_COLUMNS: Record<
@@ -448,11 +455,32 @@ export class MercadoPagoOauthService {
       mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
     }
 
-    let posName: string;
-    let qrData: string;
-    let externalPosId: string;
-    let externalStoreId: string;
+    const detail = await this.fetchPosDetail(mpHeaders, String(storeId), String(posId));
 
+    await this.persistPos(target, {
+      storeId: String(storeId),
+      posId: String(posId),
+      storeName: `Tienda ${storeId}`,
+      posName: detail.posName,
+      qrData: detail.qrData,
+      externalPosId: detail.externalPosId,
+      externalStoreId: detail.externalStoreId,
+    });
+
+    this.logger.log(`MP store/pos seleccionados [${target}]: storeId=${storeId}, posId=${posId}`);
+
+    return { ok: true, qrUrl: detail.qrData };
+  }
+
+  /**
+   * Detalle de un POS existente en MP (nombre, QR, external ids).
+   * Compartido por select clásico y por-device.
+   */
+  async fetchPosDetail(
+    mpHeaders: Record<string, string>,
+    storeId: string,
+    posId: string,
+  ): Promise<MpPosDetail> {
     try {
       const posRes = await fetch(`https://api.mercadopago.com/pos/${posId}`, {
         method: 'GET',
@@ -470,30 +498,77 @@ export class MercadoPagoOauthService {
         external_id?: string;
         external_store_id?: string;
       };
-      posName = posData.name ?? '';
-      qrData = posData.qr?.image ?? '';
-      externalPosId = posData.external_id ?? posId;
-      externalStoreId = posData.external_store_id ?? storeId;
+      return {
+        posName: posData.name ?? '',
+        qrData: posData.qr?.image ?? '',
+        externalPosId: posData.external_id ?? posId,
+        externalStoreId: posData.external_store_id ?? storeId,
+      };
     } catch (error) {
       if (error instanceof HttpException) throw error;
       this.logger.error(`MP select store - pos network error: ${error}`);
       throw new HttpException('Error de red al obtener el POS de MP', HttpStatus.BAD_GATEWAY);
     }
+  }
 
-      await this.persistPos(target, {
-        storeId: String(storeId),
-        posId: String(posId),
-        storeName: `Tienda ${storeId}`,
-        posName,
-        qrData,
-        externalPosId,
-        externalStoreId,
-      });
-
-      this.logger.log(`MP store/pos seleccionados [${target}]: storeId=${storeId}, posId=${posId}`);
-
-      return { ok: true, qrUrl: qrData };
+  private mpHeaders(token: string): Record<string, string> {
+    const mpHeaders: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+    if (process.env.MP_INTEGRATOR_ID) {
+      mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
     }
+    return mpHeaders;
+  }
+
+  /**
+   * Vincula un POS existente de MP a un dispositivo (escribe PosDevice,
+   * nunca Setting). Sin MP vinculado el QR del terminal no opera.
+   */
+  async selectStoreForDevice(deviceId: string, storeId: string, posId: string) {
+    if (!storeId || !posId) throw new HttpException('storeId y posId requeridos', HttpStatus.BAD_REQUEST);
+    const device = await this.prisma.posDevice.findUnique({ where: { id: deviceId } });
+    if (!device) throw new HttpException('Dispositivo no encontrado', HttpStatus.NOT_FOUND);
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) {
+      throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    const detail = await this.fetchPosDetail(this.mpHeaders(token), String(storeId), String(posId));
+    await this.prisma.posDevice.update({
+      where: { id: deviceId },
+      data: {
+        mpStoreId: String(storeId),
+        mpPosId: String(posId),
+        mpStoreName: `Tienda ${storeId}`,
+        mpPosName: detail.posName,
+        mpQrData: detail.qrData,
+        mpExternalStoreId: detail.externalStoreId,
+        mpExternalPosId: detail.externalPosId,
+      },
+    });
+    this.logger.log(`MP store/pos vinculados a device ${deviceId}: storeId=${storeId}, posId=${posId}`);
+    return { ok: true, qrUrl: detail.qrData };
+  }
+
+  /** Desvincula el MP de un dispositivo (el QR deja de operar). */
+  async disconnectDeviceMp(deviceId: string) {
+    const device = await this.prisma.posDevice.findUnique({ where: { id: deviceId } });
+    if (!device) throw new HttpException('Dispositivo no encontrado', HttpStatus.NOT_FOUND);
+    await this.prisma.posDevice.update({
+      where: { id: deviceId },
+      data: {
+        mpStoreId: null,
+        mpPosId: null,
+        mpStoreName: null,
+        mpPosName: null,
+        mpQrData: null,
+        mpExternalStoreId: null,
+        mpExternalPosId: null,
+      },
+    });
+    return { ok: true };
+  }
 
   async setupPos(
     storeName: string,
@@ -557,6 +632,54 @@ export class MercadoPagoOauthService {
       mpHeaders['X-Integrator-Id'] = process.env.MP_INTEGRATOR_ID;
     }
 
+    const created = await this.createStoreAndPosInMp(mpHeaders, collectorId, {
+      storeName,
+      posName,
+      streetName,
+      streetNumber,
+      cityName: resolvedCityName,
+      stateName: resolvedStateName,
+      zipCode: mpZipCode,
+      latitude,
+      longitude,
+      externalPosId,
+    });
+
+    await this.persistPos(target, {
+      storeId: String(created.storeId),
+      posId: String(created.posId),
+      storeName,
+      posName,
+      qrData: created.qrData,
+      externalPosId,
+      externalStoreId: String(created.storeId),
+    });
+
+    this.logger.log(`MP POS configurado [${target}]: storeId=${created.storeId}, posId=${created.posId}`);
+
+    return { ok: true, qrUrl: created.qrData };
+  }
+
+  /**
+   * Crea tienda + caja en MP. Compartido por setup clásico y por-device.
+   */
+  async createStoreAndPosInMp(
+    mpHeaders: Record<string, string>,
+    collectorId: string,
+    input: {
+      storeName: string;
+      posName: string;
+      streetName: string;
+      streetNumber: string;
+      cityName: string;
+      stateName: string;
+      zipCode: string;
+      latitude?: number;
+      longitude?: number;
+      externalPosId: string;
+    },
+  ): Promise<{ storeId: string; posId: string; qrData: string }> {
+    const { storeName, posName, streetName, streetNumber, cityName, stateName, zipCode, latitude, longitude, externalPosId } = input;
     let storeId: string;
 
     try {
@@ -568,9 +691,9 @@ export class MercadoPagoOauthService {
           location: {
             street_name: streetName,
             street_number: streetNumber,
-            city_name: resolvedCityName,
-            state_name: resolvedStateName,
-            zip_code: mpZipCode,
+            city_name: cityName,
+            state_name: stateName,
+            zip_code: zipCode,
             ...(latitude !== undefined && { latitude }),
             ...(longitude !== undefined && { longitude }),
           },
@@ -643,19 +766,60 @@ export class MercadoPagoOauthService {
       throw new HttpException('Error de red al crear el POS en MP', HttpStatus.BAD_GATEWAY);
     }
 
-    await this.persistPos(target, {
-      storeId: String(storeId),
-      posId: String(posId),
-      storeName,
-      posName,
-      qrData,
+    return { storeId, posId, qrData };
+  }
+
+  /**
+   * Crea tienda + caja en MP y lo vincula a un dispositivo.
+   * El external_id incluye el deviceId para trazabilidad.
+   */
+  async setupPosForDevice(
+    deviceId: string,
+    dto: {
+      storeName: string;
+      posName: string;
+      streetName: string;
+      streetNumber: string;
+      cityName: string;
+      stateName: string;
+      zipCode: string;
+      latitude?: number;
+      longitude?: number;
+    },
+  ) {
+    const device = await this.prisma.posDevice.findUnique({ where: { id: deviceId } });
+    if (!device) throw new HttpException('Dispositivo no encontrado', HttpStatus.NOT_FOUND);
+    const token = await this.mpConfig.getAccessToken();
+    if (!token) {
+      throw new HttpException('Sin access token de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    const collectorId = await this.mpConfig.getCollectorId();
+    if (!collectorId) {
+      throw new HttpException('Sin collectorId de MercadoPago', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    const subdomain = this.config.get<string>('INSTANCE_SUBDOMAIN') || 'default';
+    const safeSubdomain = subdomain.replace(/[^a-zA-Z0-9]/g, '');
+    const shortId = deviceId.replace(/-/g, '').slice(0, 8);
+    const externalPosId = `${safeSubdomain}dev${shortId}${Math.floor(Date.now() / 1000)}`;
+    this.logger.log(`[MpSetup] Generando POS para device ${deviceId} con external_id: ${externalPosId}`);
+    const created = await this.createStoreAndPosInMp(this.mpHeaders(token), collectorId, {
+      ...dto,
       externalPosId,
-      externalStoreId: String(storeId),
     });
-
-    this.logger.log(`MP POS configurado [${target}]: storeId=${storeId}, posId=${posId}`);
-
-    return { ok: true, qrUrl: qrData };
+    await this.prisma.posDevice.update({
+      where: { id: deviceId },
+      data: {
+        mpStoreId: String(created.storeId),
+        mpPosId: String(created.posId),
+        mpStoreName: dto.storeName,
+        mpPosName: dto.posName,
+        mpQrData: created.qrData,
+        mpExternalStoreId: String(created.storeId),
+        mpExternalPosId: externalPosId,
+      },
+    });
+    this.logger.log(`MP POS configurado [device ${deviceId}]: storeId=${created.storeId}, posId=${created.posId}`);
+    return { ok: true, qrUrl: created.qrData };
   }
 
   async getEntradasPosStatus(): Promise<{

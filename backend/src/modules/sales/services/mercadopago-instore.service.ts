@@ -13,6 +13,12 @@ interface CreateOrderInput {
   sale: Sale & { items: (SaleItem & { product: { name: string; price: unknown } })[] };
 }
 
+/** POS explícito del dispositivo (sin fallback: evita colisiones en MP). */
+export interface DevicePosOverride {
+  externalStoreId: string;
+  externalPosId: string;
+}
+
 interface MercadoPagoOrderItem {
   sku_number: string;
   category: string;
@@ -46,8 +52,8 @@ export class MercadoPagoInstoreService {
     private prisma: PrismaService,
   ) {}
 
-  async createOrUpdateOrder(input: CreateOrderInput) {
-    const { externalStoreId, externalPosId } = await this.getPosConfig();
+  async createOrUpdateOrder(input: CreateOrderInput, posOverride?: DevicePosOverride) {
+    const { externalStoreId, externalPosId } = posOverride ?? (await this.getPosConfig());
     const collectorId = await this.getCollectorId();
     const url = this.buildOrdersUrl(collectorId, externalStoreId, externalPosId);
     const payload = this.buildPayload(input.sale);
@@ -118,8 +124,9 @@ export class MercadoPagoInstoreService {
       totalAmount: number;
     },
     origen: 'default' | 'entradas' = 'entradas',
+    posOverride?: DevicePosOverride,
   ) {
-    const { externalStoreId, externalPosId } = await this.getPosConfig(origen);
+    const { externalStoreId, externalPosId } = posOverride ?? (await this.getPosConfig(origen));
     const collectorId = await this.getCollectorId();
     const url = this.buildOrdersUrl(collectorId, externalStoreId, externalPosId);
     const payload = this.buildTicketPayload(input);
@@ -131,8 +138,8 @@ export class MercadoPagoInstoreService {
     await this.request('PUT', url, payload, { idempotencyKey });
   }
 
-  async deleteOrder(origen: 'default' | 'entradas' = 'default') {
-    const { externalPosId } = await this.getPosConfig(origen);
+  async deleteOrder(origen: 'default' | 'entradas' = 'default', posOverride?: DevicePosOverride) {
+    const { externalPosId } = posOverride ?? (await this.getPosConfig(origen));
     const collectorId = await this.getCollectorId();
     const url = this.buildPosOrdersUrl(collectorId, externalPosId);
     this.logger.debug(

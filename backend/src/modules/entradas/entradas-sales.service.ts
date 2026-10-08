@@ -5,6 +5,7 @@ import { SociosQrService } from '../socios/socios-qr.service';
 import { MercadoPagoInstoreService } from '../sales/services/mercadopago-instore.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
 import { makeBenefitCode } from './entradas-beneficios.service';
+import { resolveDeviceMpOrThrow } from './device-mp.helper';
 import type { EntradasDeviceContext } from './device.guard';
 
 const SETTING_ID = '941abb3e-8bf2-4f08-b443-b3c98bd0b5ca';
@@ -148,12 +149,18 @@ export class EntradasSalesService {
 
     const externalReference = `ticket-${sale.id}`;
     try {
-      await this.mpInstore.putTicketOrder({
-        externalReference,
-        title: `Entradas ${fixture.torneo.nombre} vs ${fixture.rival.nombre}`,
-        description: `Entradas ${dto.sector} x${dto.cantidad} ${fixture.torneo.nombre}`,
-        totalAmount: total,
-      });
+      // POS propio del dispositivo (400 MP_POS_NOT_LINKED si no hay).
+      const posOverride = await resolveDeviceMpOrThrow(this.prisma, device.id);
+      await this.mpInstore.putTicketOrder(
+        {
+          externalReference,
+          title: `Entradas ${fixture.torneo.nombre} vs ${fixture.rival.nombre}`,
+          description: `Entradas ${dto.sector} x${dto.cantidad} ${fixture.torneo.nombre}`,
+          totalAmount: total,
+        },
+        'entradas',
+        posOverride,
+      );
     } catch (error) {
       await this.prisma.ticketSale.update({
         where: { id: sale.id },
@@ -165,13 +172,10 @@ export class EntradasSalesService {
       where: { id: sale.id },
       data: { mpExternalReference: externalReference },
     });
-    // El QR Instore es estático por POS (Setting.mpEntradasQrData,
-    // imagen fija del POS dedicado a entradas); el PUT anterior asocia
-    // el monto a esa orden. El POS muestra siempre la misma imagen
-    // mientras haya una sola orden activa en ese POS.
-    const mpSetting = await this.prisma.setting.findUnique({
-      where: { id: SETTING_ID },
-      select: { mpEntradasQrData: true },
+    // El QR es la imagen del POS propio del dispositivo (sin fallback).
+    const deviceMp = await this.prisma.posDevice.findUnique({
+      where: { id: device.id },
+      select: { mpQrData: true },
     });
     const pending = await this.prisma.ticketSale.findUnique({
       where: { id: sale.id },
@@ -180,7 +184,7 @@ export class EntradasSalesService {
     const payload = await this.toStatusPayload(pending!);
     return {
       ...payload,
-      qrImageUrl: mpSetting?.mpEntradasQrData ?? payload.datos.qrImageUrl ?? null,
+      qrImageUrl: deviceMp?.mpQrData ?? payload.datos.qrImageUrl ?? null,
     };
   }
 
@@ -204,7 +208,9 @@ export class EntradasSalesService {
     }
     if (sale.paymentMethod === EntradaPayMethod.MP_QR) {
       try {
-        await this.mpInstore.deleteOrder('entradas');
+        // DELETE contra el POS propio de la venta (si se desvinculó, igual se cancela local).
+        const posOverride = await resolveDeviceMpOrThrow(this.prisma, sale.deviceId).catch(() => null);
+        await this.mpInstore.deleteOrder('entradas', posOverride ?? undefined);
       } catch (error) {
         this.logger.warn(`No se pudo borrar orden MP del ticket ${saleId}: ${error}`);
       }
@@ -389,7 +395,7 @@ export class EntradasSalesService {
     const [template, asset, setting, benefitUnits] = await Promise.all([
       this.prisma.entradaTicketTemplate.findUnique({ where: { id: 'default' } }),
       this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } }),
-      this.prisma.setting.findUnique({ where: { id: SETTING_ID }, select: { clubName: true, mpEntradasQrData: true } }),
+      this.prisma.setting.findUnique({ where: { id: SETTING_ID }, select: { clubName: true } }),
       this.prisma.ticketUnit.findMany({
         where: { saleId: sale.id, beneficioId: { not: null } },
         select: {
@@ -421,7 +427,7 @@ export class EntradasSalesService {
         ventaId: sale.id,
         fechaPago: sale.paidAt ?? null,
         footer: 'Ticket no fiscal',
-        qrImageUrl: setting?.mpEntradasQrData ?? null,
+        qrImageUrl: null,
       },
       // Beneficios de bufet por unidad (QR `ENT:<benefitCode>`). Vacío si no aplica.
       beneficios: benefitUnits.map((u) => ({

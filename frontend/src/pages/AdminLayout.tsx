@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, Megaphone, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Ticket, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi, X } from 'lucide-react';
+import { BarChart2, Boxes, Building2, ChevronDown, ChevronLeft, ChevronRight, House, Landmark, MonitorCog, MonitorSmartphone, Megaphone, Package, PenTool, Receipt, Settings, ShoppingCart, Store, Tag, Ticket, Trophy, UserCog, UserMinus, Users, UsersRound, Wifi, X } from 'lucide-react';
 import { buildImageUrl } from '../api/client';
 import { useSettings } from '../api/queries';
 import { AppLayout } from '../components/AppLayout';
@@ -74,6 +74,7 @@ const navCategories: NavCategoryDef[] = [
     children: [
       { to: '/admin/internet',  icon: <Wifi size={iconSize} />,         label: 'Internet',       moduleKey: 'enableInternetModule', permissionModule: 'INTERNET' },
       { to: '/admin/notificaciones',  icon: <Megaphone size={iconSize} />, label: 'Notificaciones',       moduleKey: 'enableNotificationsModule', permissionModule: 'NOTIFICACIONES' },
+      { to: '/admin/dispositivos',  icon: <MonitorSmartphone size={iconSize} />, label: 'Dispositivos',       permissionModule: 'CONFIGURACION' },
       { to: '/admin/users',     icon: <UserCog size={iconSize} />,       label: 'Usuarios',       permissionModule: 'CONFIGURACION' },
       { to: '/admin/settings',  icon: <Settings size={iconSize} />,      label: 'Configuracion',  permissionModule: 'CONFIGURACION' },
     ],

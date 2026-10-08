@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import QRCode from 'react-qr-code';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Eye, EyeOff, MonitorSmartphone, Pencil, Plus, RefreshCw, Repeat, Ticket, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Ticket, Trash2, Upload, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import {
   useAdminProducts,
@@ -10,17 +9,15 @@ import {
   useEntradaRivales,
   useEntradaTicketTemplate,
   useEntradaTorneos,
-  useEntradasMpPos,
   useEntradasSalesSummary,
   useEntradaBeneficios,
   useInternetPlans,
   useInvalidateEntradas,
-  usePosDevices,
   useTicketSales,
   consumirEntradaBeneficio,
   validarEntradaBeneficio,
 } from '../api/queries';
-import type { EntradaBeneficio, EntradaBeneficioSector, EntradaBeneficioValidation, EntradaFixture, EntradaSaleStatus, MpDetectedStore, PosDeviceCreated } from '../api/types';
+import type { EntradaBeneficio, EntradaBeneficioSector, EntradaBeneficioValidation, EntradaFixture, EntradaSaleStatus } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 
@@ -675,119 +672,6 @@ const AbmTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
 };
 
 // ── POS Mercado Pago dedicado ────────────────────────────────
-const MpPosSection: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
-  const { pushToast } = useToast();
-  const invalidate = useInvalidateEntradas();
-  const queryClient = useQueryClient();
-  const { data: status } = useEntradasMpPos();
-  const [stores, setStores] = useState<MpDetectedStore[] | null>(null);
-  const [detecting, setDetecting] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ storeName: '', posName: 'Entradas', streetName: '', streetNumber: '', cityName: '', stateName: '', zipCode: '' });
-  const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
-  const refresh = () => {
-    invalidate();
-    queryClient.invalidateQueries({ queryKey: ['entradas-mp-pos'] });
-  };
-
-  const detect = async () => {
-    setDetecting(true);
-    try {
-      const res = await apiClient.get<{ stores: MpDetectedStore[] }>('/entradas/mp-pos/detect-stores');
-      setStores(res.data.stores ?? []);
-      if ((res.data.stores ?? []).length === 0) pushToast('Sin tiendas/POS en la cuenta MP', 'error');
-    } catch (e) { err(e); } finally { setDetecting(false); }
-  };
-
-  const select = async (storeId: string, posId: string) => {
-    try {
-      await apiClient.post('/entradas/mp-pos/select', { storeId, posId });
-      pushToast('POS de entradas vinculado', 'success');
-      setStores(null);
-      refresh();
-    } catch (e) { err(e); }
-  };
-
-  const create = async () => {
-    try {
-      await apiClient.post('/entradas/mp-pos/setup', form);
-      pushToast('POS de entradas creado en MP', 'success');
-      setShowCreate(false);
-      refresh();
-    } catch (e) { err(e); }
-  };
-
-  const disconnect = async () => {
-    if (!confirm('¿Desvincular el POS de entradas? El principal no se toca.')) return;
-    try {
-      await apiClient.post('/entradas/mp-pos/disconnect');
-      pushToast('POS de entradas desvinculado', 'success');
-      refresh();
-    } catch (e) { err(e); }
-  };
-
-  return (
-    <section>
-      <h3>POS Mercado Pago de entradas (dedicado)</h3>
-      <p><small>
-        {status?.linked
-          ? `Vinculado: ${status.storeName ?? ''} / ${status.posName ?? ''} ${status.hasQr ? '· QR OK' : '· sin QR'}`
-          : 'No vinculado. El POS principal de la web no se usa ni se modifica.'}
-      </small></p>
-      {canWrite && (
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button type="button" className="btn-secondary btn-sm" onClick={detect} disabled={detecting}>
-            {detecting ? 'Detectando...' : 'Detectar tiendas/POS'}
-          </button>
-          <button type="button" className="btn-secondary btn-sm" onClick={() => setShowCreate((v) => !v)}>
-            <Plus size={14} /> Crear nuevo en MP
-          </button>
-          {status?.linked && (
-            <button type="button" className="btn-secondary btn-sm" onClick={disconnect}>
-              <Trash2 size={12} /> Desvincular
-            </button>
-          )}
-        </div>
-      )}
-      {stores && (
-        <div className="sales-table-wrapper" style={{ marginTop: '0.75rem' }}>
-          <div className="sales-table">
-            <div className="sales-table-head">
-              <span className="col-user" style={{ flex: 2 }}>Tienda</span>
-              <span className="col-user" style={{ flex: 2 }}>POS</span>
-              {canWrite && <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>}
-            </div>
-            {stores.flatMap((s) => s.pos.map((p) => (
-              <div key={`${s.id}-${p.id}`} className="sales-table-row">
-                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{s.name} <small style={{ color: 'var(--color-text-muted)' }}>({s.id})</small></span>
-                <span className="col-user" style={{ flex: 2 }}>{p.name} <small style={{ color: 'var(--color-text-muted)' }}>({p.id})</small></span>
-                {canWrite && (
-                  <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}>
-                    <button type="button" className="btn-primary btn-sm" onClick={() => select(s.id, p.id)}>Usar este</button>
-                  </span>
-                )}
-              </div>
-            )))}
-          </div>
-        </div>
-      )}
-      {showCreate && canWrite && (
-        <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'end', marginTop: '0.75rem' }}>
-          {[
-            ['storeName', 'Tienda'], ['posName', 'Caja'], ['streetName', 'Calle'],
-            ['streetNumber', 'Número'], ['cityName', 'Ciudad'], ['stateName', 'Provincia'], ['zipCode', 'CP'],
-          ].map(([key, label]) => (
-            <div key={key}><label>{label}</label>
-              <input value={form[key as keyof typeof form]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
-            </div>
-          ))}
-          <button type="button" className="btn-primary btn-sm" onClick={create}>Crear en MP</button>
-        </div>
-      )}
-    </section>
-  );
-};
-
 // ── Diseño (editor + preview en vivo) ──────────────────────────
 const PREVIEW_SAMPLE: Record<string, string> = {
   club: 'Club Atlético Soler',
@@ -1315,129 +1199,13 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
 };
 
 // ── Configuración ────────────────────────────────────────────
-const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
-  const { pushToast } = useToast();
-  const invalidate = useInvalidateEntradas();
-  const { data: devices } = usePosDevices();
-  const [deviceName, setDeviceName] = useState('');
-  const [deviceTipo, setDeviceTipo] = useState<'ENTRADAS' | 'POS'>('ENTRADAS');
-  const [newToken, setNewToken] = useState<PosDeviceCreated | null>(null);
-  const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
-
-  const createDevice = async () => {
-    if (!deviceName.trim()) { pushToast('Nombre del dispositivo requerido', 'error'); return; }
-    try {
-      const baseUrl = `${window.location.origin}/api`;
-      const res = await apiClient.post<PosDeviceCreated>('/entradas/devices', { nombre: deviceName.trim(), tipo: deviceTipo, baseUrl });
-      setNewToken(res.data);
-      setDeviceName('');
-      invalidate();
-    } catch (e) { err(e); }
-  };
-
-  const changeTipo = async (id: string, nombre: string, next: 'ENTRADAS' | 'POS', force = false) => {
-    try {
-      await apiClient.patch(`/entradas/devices/${id}/tipo`, { tipo: next, force });
-      invalidate();
-    } catch (e) {
-      const apiErr = e as { response?: { status?: number; data?: { code?: string; pending?: number } } };
-      const data = apiErr.response?.data;
-      if (apiErr.response?.status === 409 && data?.code === 'DEVICE_HAS_PENDING_SALES') {
-        if (confirm(`${nombre} tiene ${data.pending ?? ''} venta(s) pendiente(s) sin sincronizar. ¿Cambiar el modo igual?`)) {
-          await changeTipo(id, nombre, next, true);
-        }
-        return;
-      }
-      err(e);
-    }
-  };
-
+// Dispositivos y MP por terminal viven en /admin/dispositivos (Sistema).
+const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite: _canWrite }) => {
+  void _canWrite;
   return (
     <div style={{ display: 'grid', gap: '1.5rem' }}>
-      <MpPosSection canWrite={canWrite} />
       <section>
-        <h3><MonitorSmartphone size={16} /> Dispositivos POS</h3>
-        {canWrite && (
-          <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', maxWidth: 560, flexWrap: 'wrap' }}>
-            <div><label>Nombre</label><input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="POS puerta 1" /></div>
-            <div>
-              <label>Tipo</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {(['ENTRADAS', 'POS'] as const).map((t) => (
-                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="device-tipo"
-                      checked={deviceTipo === t}
-                      onChange={() => setDeviceTipo(t)}
-                    />
-                    {t === 'POS' ? 'POS' : 'Entradas'}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <button type="button" className="btn-primary btn-sm" onClick={createDevice}><Plus size={14} /> Generar</button>
-          </div>
-        )}
-        {newToken && (
-          <div className="settings-field" style={{ background: 'var(--color-surface-alt)', padding: '0.75rem', borderRadius: 8 }}>
-            <strong>Token (se muestra una sola vez):</strong>
-            <code style={{ display: 'block', wordBreak: 'break-all', margin: '0.5rem 0' }}>{newToken.token}</code>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-              <div style={{ background: '#fff', padding: '0.5rem', borderRadius: 8 }}>
-                <QRCode value={JSON.stringify(newToken.pairing)} size={200} />
-              </div>
-              <div style={{ flex: '1 1 220px' }}>
-                <small>Escaneá este QR desde la app del POS para vincularlo.</small>
-                <small style={{ display: 'block', marginTop: '0.25rem' }}>Pairing: <code style={{ wordBreak: 'break-all' }}>{JSON.stringify(newToken.pairing)}</code></small>
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="sales-table-wrapper">
-          <div className="sales-table">
-            <div className="sales-table-head">
-              <span className="col-user" style={{ flex: 2 }}>Nombre</span>
-              <span className="col-method" style={{ flex: '0 0 90px' }}>Tipo</span>
-              <span className="col-method" style={{ flex: '0 0 90px' }}>Activo</span>
-              <span className="col-date" style={{ flex: '0 0 150px' }}>Última conexión</span>
-              {canWrite && <span className="col-action" style={{ flex: '0 0 150px', textAlign: 'right' }}></span>}
-            </div>
-            {(devices ?? []).length === 0 ? (
-              <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin dispositivos</span></div>
-            ) : (
-              (devices ?? []).map((d) => (
-                <div key={d.id} className="sales-table-row">
-                  <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{d.nombre}</span>
-                  <span className="col-method" style={{ flex: '0 0 90px' }}>{d.tipo === 'POS' ? 'POS' : 'Entradas'}</span>
-                  <span className="col-method" style={{ flex: '0 0 90px' }}>{d.activo ? 'Sí' : 'No'}</span>
-                  <span className="col-date" style={{ flex: '0 0 150px' }}>{fmtDateTime(d.lastSeenAt)}</span>
-                  {canWrite && (
-                    <span className="col-action" style={{ flex: '0 0 150px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
-                      <button className="btn-ghost" onClick={async () => {
-                        const next = d.tipo === 'POS' ? 'ENTRADAS' : 'POS';
-                        if (!confirm(`Cambiar ${d.nombre} a modo ${next === 'POS' ? 'POS' : 'Entradas'}? La terminal lo toma sin re-vincular.`)) return;
-                        await changeTipo(d.id, d.nombre, next);
-                      }} title="Cambiar modo" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Repeat size={14} /></button>
-                      <button className="btn-ghost" onClick={async () => {
-                        try {
-                          const baseUrl = `${window.location.origin}/api`;
-                          const res = await apiClient.post<PosDeviceCreated>(`/entradas/devices/${d.id}/rotate`, { baseUrl });
-                          setNewToken(res.data);
-                          invalidate();
-                        } catch (e) { err(e); }
-                      }} title="Rotar token" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><RefreshCw size={14} /></button>
-                      <button className="btn-ghost" onClick={async () => {
-                        if (!confirm(`Revocar ${d.nombre}?`)) return;
-                        try { await apiClient.post(`/entradas/devices/${d.id}/revoke`); invalidate(); } catch (e) { err(e); }
-                      }} title="Revocar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
-                    </span>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <p><small>La gestión de terminales y su Mercado Pago se hace en Sistema → Dispositivos.</small></p>
       </section>
     </div>
   );

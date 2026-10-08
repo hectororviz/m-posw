@@ -8,6 +8,7 @@ import { EntradasAdminController } from './entradas-admin.controller';
 import { EntradasDeviceController } from './entradas-device.controller';
 import { DeviceLookupController } from './device-lookup.controller';
 import { DeviceMeController } from './device-me.controller';
+import { DispositivosController } from './dispositivos.controller';
 import { PosDeviceController } from './pos-device.controller';
 import { EntradasSharedController } from './entradas-shared.controller';
 import { EntradasAdminService } from './entradas-admin.service';
@@ -18,7 +19,7 @@ import { EntradasDeviceGuard } from './device.guard';
 import { EntradasFlexibleGuard } from './entradas-flexible.guard';
 
 @Module({
-  controllers: [EntradasSharedController, EntradasAdminController, EntradasDeviceController, DeviceLookupController, DeviceMeController, PosDeviceController],
+  controllers: [EntradasSharedController, EntradasAdminController, EntradasDeviceController, DeviceLookupController, DeviceMeController, DispositivosController, PosDeviceController],
   imports: [UsersModule, SalesModule, SociosModule, MercadoPagoOauthModule],
   providers: [EntradasAdminService, EntradasBeneficiosService, EntradasSalesService, PosDeviceService, EntradasDeviceGuard, EntradasFlexibleGuard, PrismaService],
   exports: [EntradasAdminService, EntradasBeneficiosService, EntradasSalesService],

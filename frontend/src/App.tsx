@@ -44,6 +44,7 @@ import { BienesPage } from './pages/patrimonio/BienesPage';
 import { ConfigPage } from './pages/patrimonio/ConfigPage';
 import { PublicInternetPage } from './pages/PublicInternetPage';
 import { AdminNotificacionesPage } from './pages/AdminNotificacionesPage';
+import { AdminDispositivosPage } from './pages/AdminDispositivosPage';
 import { AdminEntradasPage } from './pages/AdminEntradasPage';
 import { useAuth } from './context/AuthContext';
 import type { ModuleKey } from './api/types';
@@ -198,6 +199,11 @@ export const App: React.FC = () => {
         <Route path="notificaciones" element={
           <ModuleRoute module="NOTIFICACIONES">
             <AdminNotificacionesPage />
+          </ModuleRoute>
+        } />
+        <Route path="dispositivos" element={
+          <ModuleRoute module="CONFIGURACION">
+            <AdminDispositivosPage />
           </ModuleRoute>
         } />
         <Route path="entradas" element={

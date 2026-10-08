@@ -1184,11 +1184,26 @@ export interface PosDevice {
   revokedAt: string | null;
   lastSeenAt: string | null;
   createdAt: string;
+  mpStoreId: string | null;
+  mpPosId: string | null;
+  mpStoreName: string | null;
+  mpPosName: string | null;
 }
 
 export interface PosDeviceCreated extends PosDevice {
   token: string;
   pairing: { baseUrl: string; token: string };
+}
+
+export interface MpStoreUsage {
+  storeId: string | null;
+  posId: string | null;
+  usedBy: string;
+}
+
+export interface MpStoresResponse {
+  stores: MpDetectedStore[];
+  used: MpStoreUsage[];
 }
 
 export interface TicketUnit {
