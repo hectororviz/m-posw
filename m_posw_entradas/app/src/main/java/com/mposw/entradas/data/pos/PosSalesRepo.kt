@@ -11,6 +11,7 @@ import com.mposw.entradas.data.PosCanjeInput
 import com.mposw.entradas.data.PosCanjesRequest
 import com.mposw.entradas.data.PosCashRequest
 import com.mposw.entradas.data.PosDb
+import com.mposw.entradas.data.PosFiadoRequest
 import com.mposw.entradas.data.PosQrRequest
 import com.mposw.entradas.data.PosSaleItemInput
 import com.mposw.entradas.data.SessionManager
