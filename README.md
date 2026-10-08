@@ -6,15 +6,15 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 
 ### Punto de venta
 - Interfaz táctil optimizada: **categorías → productos → carrito → venta**.
-- Múltiples métodos de pago en una misma pantalla (efectivo, QR, transferencia).
+- Múltiples métodos de pago en una misma pantalla (efectivo, QR, fiado; transferencia solo web).
 - Impresión de ticket térmico 58mm (automática o manual).
 - Cálculo automático de vuelto en pagos en efectivo.
-- **Zoom de productos**: vista ampliada en el POS táctil.
+- **Tamaños configurables**: S/M/L en terminales Android (texto + fotos + columnas).
 
 ### Pagos
 - **Efectivo**: registro de monto recibido, vuelto calculado.
-- **Mercado Pago QR** (Instore v2): genera un QR dinámico que el cliente escanea con su app de MP. Confirmación instantánea vía webhook.
-- **Transferencia bancaria** (CVU/Alias): el sistema detecta automáticamente la transferencia en la cuenta de MP y confirma la venta.
+- **Mercado Pago QR** (Instore v2): QR estático por punto de venta que el cliente escanea con su app de MP. Confirmación instantánea vía webhook.
+- **Transferencia bancaria** (CVU/Alias, solo web): el sistema detecta automáticamente la transferencia en la cuenta de MP y confirma la venta. Discontinuada en terminales Android.
 - **OAuth Mercado Pago**: vinculá tu cuenta de MP vía OAuth 2.0 sin configurar tokens manualmente. Detección automática de tiendas, creación de POS QR y renovación proactiva de tokens.
 
 ### Tesorería / Libro Diario
@@ -32,7 +32,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 ### Administración
 - **Panel de reportes**: ventas por fecha, totals, métricas con filtros y exportación XLSX.
 - **Dashboard de estadísticas**: KPIs con badges, últimos 15 días, últimos 6 meses, promedios con gráficos.
-- **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia) con movimientos de entrada/salida.
+- **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia, fiado) con movimientos de entrada/salida.
 - **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
 - **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Notificaciones, Ligas, Jugadores, Patrimonio, Internet y Entradas desde Configuración → Módulos.
 
@@ -78,11 +78,11 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Rate limiting**: 1 segundo de espera entre envíos para respetar los límites de WhatsApp Cloud API.
 - **Historial de envíos**: registro completo de cada notificación (destinatario, mensaje, estado, error) en `/admin/notificaciones?tab=history`.
 
-### Entradas / POS externo
-- **Venta de entradas desde terminal Android** (Sunmi V2s, 58mm): app nativa en `m_posw_entradas/` que consume `https://${CADDY_HOST}/api/entradas/...` con token de dispositivo (`ent_...`), sin JWT de usuarios. Contrato congelado en `docs/contrato-pos-entradas.txt`.
-- **Numeración por partido y sector**: series independientes `L-001` / `V-001` con contador atómico. Ventana de venta configurable por fixture.
-- **Cobro en efectivo o QR**: efectivo aprueba directo; QR usa un POS de Mercado Pago dedicado (QR estático) con polling de estado y cancelación.
-- **Beneficios de bufet**: cada entrada puede traer un descuento canjeable en bufet (QR `ENT:<código>`), de uso único o multiuso, validable desde el POS o la web.
+### Entradas / Terminales Android
+- **APK única dual Entradas/POS** (`m_posw_entradas/`, nativa Kotlin, Sunmi V2s 58mm): el servidor define el modo de cada terminal (`GET devices/me` en arranque, al volver, cada 60s y ante 403). Sin modo validado queda en Configuración.
+- **Venta de entradas** con token de dispositivo (`ent_...`), sin JWT: numeración `L-001` / `V-001` por partido y sector, efectivo o QR (MP propio por terminal, QR estático), beneficios de bufet (`ENT:<código>`).
+- **POS bufet** en la misma APK: catálogo con fotos, carrito slide-up, efectivo/QR/Fiado según Setting, descuentos de socio y de entrada, ticket térmico Sunmi.
+- **Dispositivos** (Sistema → Dispositivos): alta con QR de pairing en el modal, cambio de modo sin re-vincular y vinculación de un POS de MP propio por terminal (sin fallback, evita colisiones).
 - **Tickets térmicos versionados**: layout JSON + escudo 1-bit cacheados por versión en el terminal.
 
 ### Personalización
@@ -118,7 +118,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Multiplataforma**: mismo sistema accesible desde navegador web, APK Android con impresión nativa, o cualquier dispositivo con internet.
 - **Despliegue simple**: un solo `docker compose up -d --build` levanta todo el stack. Sin dependencias externas excepto Docker.
 - **Actualización centralizada**: los cambios en el frontend se reflejan inmediatamente en todos los dispositivos sin recompilar nada (ni siquiera la APK).
-- **Múltiples métodos de pago**: efectivo, QR y transferencia en una misma pantalla. No hacen falta terminales POS físicas.
+- **Múltiples métodos de pago**: efectivo, QR y fiado (transferencia solo web). No hacen falta terminales POS físicas.
 - **Control de inventario inteligente**: productos compuestos con recetas que descuentan automáticamente el stock de materias primas.
 - **Impresión sin drivers**: desde el navegador (ticket térmico 58mm estándar) o desde la APK vía Bluetooth nativo. Sin instalar drivers de impresora.
 - **OAuth Mercado Pago**: vinculación en 2 clics sin copiar tokens manualmente. Renovación automática, nunca se vence.
@@ -136,7 +136,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | Pagos | API Mercado Pago (Instore QR v2 + OAuth 2.0 + Search payments) + Fiado |
 | Mensajería | WhatsApp Cloud API (Meta Business) |
 | Comunicación en tiempo real | WebSockets (Socket.IO) |
-| App Android | Flutter + WebView + impresión Bluetooth nativa |
+| App Android | Nativa Kotlin (terminal Sunmi Entradas/POS) + Flutter WebView con Bluetooth (uso general) |
 | Estilos | CSS Variables + Modo Oscuro |
 | Reportes | ExcelJS (exportación XLSX) |
 | Reverse proxy | Nginx (frontend) + Caddy/Nginx externo (opcional) |
@@ -177,9 +177,20 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Mercado Pago**: cuenta de desarrollador (gratuita). Con OAuth, la vinculación es automática. Sin OAuth, se requiere Access Token configurado manualmente.
 - **Proxy reverso con HTTPS**: Caddy o Nginx externo para terminación SSL (no incluido en el docker-compose).
 
-## App Android (APK)
+## Apps Android
 
-### ¿Por qué una APK?
+Hay dos APK con propósitos distintos (ver `TODO.md` para pendientes comunes
+como responsive en tablets y abstracción de impresión):
+
+### Terminal nativa (`m_posw_entradas/`, Kotlin)
+APK única dual **Entradas / POS bufet** para Sunmi V2s (impresora integrada).
+Auth por token de dispositivo (`ent_...`), modo definido por el servidor,
+MP propio por terminal. Detalle en `m_posw_entradas/README.md`.
+
+### WebView genérica (`m_posw_android/`, Flutter)
+Para tablets/celulares con impresora térmica **Bluetooth**.
+
+#### ¿Por qué una APK?
 
 La aplicación web funciona perfectamente desde cualquier navegador móvil. Sin embargo, los navegadores **no tienen acceso a Bluetooth** para imprimir tickets térmicos. La APK resuelve esto proporcionando una capa nativa mínima que:
 

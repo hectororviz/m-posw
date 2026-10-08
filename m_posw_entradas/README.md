@@ -4,7 +4,7 @@ App nativa Android (XML Views + Fragments, sin WebView ni híbridos).
 Consume `https://CLIENTE.mposw.com.ar/api/...` con Retrofit e imprime en la
 impresora integrada del Sunmi V2s con el SDK oficial (`com.sunmi:printerlibrary`).
 
-Contrato válido: `docs/contrato-pos-entradas.txt` del repo principal.
+Contrato válido: sección Entradas/POS de `AGENTS.md` en el repo principal.
 
 Un solo módulo, paquetes `ui/entradas/` y `ui/pos/` que no se importan
 entre sí (verificado en CI con grep). Solo comparten código común:

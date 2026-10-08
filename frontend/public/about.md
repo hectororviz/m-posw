@@ -3,7 +3,13 @@
 **m-POSw** (Mini POS Web) es un sistema de punto de venta diseñado para jornadas, eventos, comercios y clubes.
 
 ## Versión
-Versión 2.1.0
+Versión 2.2.0
+
+## Novedades de la versión 2.2
+- **Terminal Android dual Entradas/POS**: una sola APK nativa (Kotlin) para Sunmi V2s donde el servidor define el modo de cada equipo. Sin modo validado queda en Configuración.
+- **Dispositivos** (Sistema → Dispositivos): alta con QR de pairing, cambio de modo sin re-vincular y un POS de Mercado Pago propio por terminal.
+- **POS bufet en el terminal**: catálogo con fotos, carrito, efectivo/QR/Fiado según configuración, descuentos de socio y de entrada, ticket térmico.
+- **Fiado en terminales**: mismas reglas que la web (límite bloquea, advertencia pide confirmación).
 
 ## Novedades de la versión 2.1
 - **Padrón de Socios**: CRUD de socios, tipos de socio, cuotas mensuales, pagos, control de deuda, reporte de matriz de cuotas y KPIs de tesorería.
@@ -23,7 +29,8 @@ Versión 2.1.0
 
 ## Características principales
 - **POS táctil**: Interfaz intuitiva para tablets y celulares
-- **Múltiples métodos de pago**: Efectivo, Mercado Pago QR, Transferencias y Fiado
+- **Múltiples métodos de pago**: Efectivo, Mercado Pago QR, Transferencias (solo web) y Fiado
+- **App Android**: terminal nativa dual Entradas/POS (Sunmi) + Flutter WebView con Bluetooth
 - **Gestión de productos**: Productos simples, compuestos (recetas) y materia prima
 - **Control de stock**: Seguimiento en tiempo real del inventario
 - **Padrón de socios**: Carnets, cuotas, beneficios y descuentos automáticos en el POS
@@ -38,7 +45,7 @@ Versión 2.1.0
 - **Base de datos**: PostgreSQL
 - **Infraestructura**: Docker Compose
 - **Pagos**: API Mercado Pago (Instore QR v2, OAuth 2.0, Search payments) + Fiado
-- **App Android**: Flutter + WebView + impresión Bluetooth nativa
+- **App Android**: terminal nativa Kotlin (Sunmi) + Flutter WebView con Bluetooth
 
 ## Contacto
 Para soporte o consultas, contactar al administrador del sistema.

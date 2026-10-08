@@ -1079,7 +1079,7 @@ Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} d
 
 ## Entradas / POS Externo Module
 
-Módulo de venta de entradas desde terminal POS Android con impresora térmica (Sunmi V2s, 58mm). El POS opera **fuera del VPS** por HTTPS (`https://${CADDY_HOST}/api/entradas/...` vía Caddy → nginx `/api/` → backend). Contrato congelado en `docs/contrato-pos-entradas.txt`.
+Módulo de venta de entradas desde terminal POS Android con impresora térmica (Sunmi V2s, 58mm). El POS opera **fuera del VPS** por HTTPS (`https://${CADDY_HOST}/api/entradas/...` vía Caddy → nginx `/api/` → backend). Referencia de API: esta sección (el contrato `docs/contrato-pos-entradas.txt` se eliminó por obsoleto).
 
 ### Estructura
 ```
