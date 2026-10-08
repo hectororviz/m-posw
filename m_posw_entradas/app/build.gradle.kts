@@ -1,3 +1,5 @@
+import java.io.ByteArrayOutputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -59,7 +61,7 @@ android {
 
 // SHA corto del commit (tolerante: "dev" sin git o checkout shallow).
 fun gitSha(): String = try {
-    val out = java.io.ByteArrayOutputStream()
+    val out = ByteArrayOutputStream()
     exec {
         commandLine("git", "rev-parse", "--short", "HEAD")
         standardOutput = out
