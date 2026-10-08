@@ -38,6 +38,7 @@ class PosDashFragment : Fragment() {
     private var categories: List<PosCategory> = emptyList()
     private var lastLoad = 0L
     private var appliedScale = ""
+    private var tabMediator: TabLayoutMediator? = null
     private val money = NumberFormat.getCurrencyInstance(Locale("es", "AR")).apply {
         maximumFractionDigits = 0
     }
@@ -108,8 +109,30 @@ class PosDashFragment : Fragment() {
             (activity as? com.mposw.entradas.ui.MainActivity)?.openConfig()
         }
         b.btnPosPagar.setOnClickListener { pagar() }
+        // Enlaza lo que haya en memoria de inmediato (la vista pudo
+        // recrearse al volver de Config); la red refresca después.
+        bindPages()
         loadCatalog()
         refreshTotal()
+        startModeTicker()
+    }
+
+    private var ticker: kotlinx.coroutines.Job? = null
+
+    /** Re-pregunta el modo cada 60s solo con el dash visible. */
+    private fun startModeTicker() {
+        ticker?.cancel()
+        ticker = viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                while (true) {
+                    kotlinx.coroutines.delay(60_000L)
+                    try {
+                        (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -136,15 +159,21 @@ class PosDashFragment : Fragment() {
 
     /** Recrea las páginas para que tomen span, textos e imágenes nuevos. */
     private fun rebuildPages() {
+        bindPages()
+    }
+
+    /** Enlaza el pager con las categorías en memoria (sin red). */
+    private fun bindPages() {
         if (_b == null || categories.isEmpty()) return
-        b.vpCategorias.post {
-            if (_b == null || categories.isEmpty()) return@post
-            b.vpCategorias.adapter = object : FragmentStateAdapter(this@PosDashFragment) {
-                override fun getItemCount(): Int = categories.size
-                override fun createFragment(position: Int) =
-                    PosCategoryPageFragment.new(categories[position].id)
-            }
+        b.vpCategorias.adapter = object : FragmentStateAdapter(this@PosDashFragment) {
+            override fun getItemCount(): Int = categories.size
+            override fun createFragment(position: Int) =
+                PosCategoryPageFragment.new(categories[position].id)
         }
+        tabMediator?.detach()
+        tabMediator = TabLayoutMediator(b.tabCategorias, b.vpCategorias) { tab, pos ->
+            tab.text = categories[pos].name
+        }.also { it.attach() }
     }
 
     private fun loadCatalog() {
@@ -154,14 +183,7 @@ class PosDashFragment : Fragment() {
                 lastLoad = System.currentTimeMillis()
                 categories = c.categories
                 if (!isAdded) return@launch
-                b.vpCategorias.adapter = object : FragmentStateAdapter(this@PosDashFragment) {
-                    override fun getItemCount(): Int = categories.size
-                    override fun createFragment(position: Int) =
-                        PosCategoryPageFragment.new(categories[position].id)
-                }
-                TabLayoutMediator(b.tabCategorias, b.vpCategorias) { tab, pos ->
-                    tab.text = categories[pos].name
-                }.attach()
+                bindPages()
                 if (categories.isEmpty()) toast("Sin categorías activas")
             } catch (e: Exception) {
                 if (!isAdded) return@launch
@@ -248,6 +270,10 @@ class PosDashFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        ticker?.cancel()
+        ticker = null
+        tabMediator?.detach()
+        tabMediator = null
         super.onDestroyView()
         _b = null
     }

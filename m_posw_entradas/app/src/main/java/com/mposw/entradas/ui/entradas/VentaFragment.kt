@@ -93,6 +93,25 @@ class VentaFragment : Fragment() {
         } else {
             cargarFixtures()
         }
+        startModeTicker()
+    }
+
+    private var ticker: kotlinx.coroutines.Job? = null
+
+    /** Re-pregunta el modo cada 60s solo con la venta visible. */
+    private fun startModeTicker() {
+        ticker?.cancel()
+        ticker = viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                while (true) {
+                    kotlinx.coroutines.delay(60_000L)
+                    try {
+                        (activity as? MainActivity)?.refreshMode()
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        }
     }
 
     private fun toast(msg: String) {
@@ -427,6 +446,8 @@ class VentaFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        ticker?.cancel()
+        ticker = null
         (activity as? MainActivity)?.setOnSocioClick(null)
         super.onDestroyView()
         _b = null

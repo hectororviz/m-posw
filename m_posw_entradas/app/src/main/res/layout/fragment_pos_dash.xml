@@ -95,14 +95,20 @@
                 android:text="Carrito vacío" />
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton android:id="@+id/btnPosPagar"
+        <FrameLayout android:id="@+id/btnPosPagar"
             android:layout_width="48dp"
             android:layout_height="56dp"
-            android:minWidth="0dp"
-            android:paddingStart="0dp"
-            android:paddingEnd="0dp"
-            android:textSize="20sp"
-            android:text="$"
-            android:contentDescription="Pagar" />
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Pagar">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="?attr/colorPrimary"
+                android:text="$" />
+        </FrameLayout>
     </LinearLayout>
 </LinearLayout>
