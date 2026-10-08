@@ -21,9 +21,9 @@ import java.util.Locale
 import kotlin.math.round
 
 /**
- * Un único botón de pago: CASH (numpad) o MP_QR + un único escaneo de
- * descuento (carnet de socio o beneficio de entrada, se bifurca por formato
- * con el mecanismo ya existente en el back).
+ * Pago en un tap: total arriba, Efectivo (cobro exacto ya realizado:
+ * registra e imprime), QR (genera directo) y debajo Escanear descuento
+ * (carnet de socio o beneficio de entrada, se bifurca por formato).
  */
 class PosPaySheet : BottomSheetDialogFragment() {
     private var _b: SheetPosPayBinding? = null
@@ -33,7 +33,6 @@ class PosPaySheet : BottomSheetDialogFragment() {
         maximumFractionDigits = 0
     }
 
-    private var cashInput = ""
     private var busy = false
 
     private val cameraPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -54,9 +53,8 @@ class PosPaySheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         cameraPerm.launch(Manifest.permission.CAMERA)
         refreshTotal()
-        selectTabCash()
-        b.btnTabCash.setOnClickListener { selectTabCash() }
-        b.btnTabQr.setOnClickListener { selectTabQr() }
+        b.btnPayCash.setOnClickListener { confirmCash() }
+        b.btnPayQr.setOnClickListener { cobrarQr() }
         b.btnScanDiscount.setOnClickListener {
             scanDiscount.launch(ScanOptions().setPrompt("Escaneá carnet de socio o QR de entrada").setBeepEnabled(true).setCaptureActivity(ScannerActivity::class.java))
         }
@@ -66,9 +64,6 @@ class PosPaySheet : BottomSheetDialogFragment() {
             refreshTotal()
             dash().refreshTotal()
         }
-        numpad()
-        b.btnConfirmCash.setOnClickListener { confirmCash() }
-        b.btnCobrarQr.setOnClickListener { cobrarQr() }
     }
 
     private fun refreshTotal() {
@@ -82,56 +77,6 @@ class PosPaySheet : BottomSheetDialogFragment() {
         b.tvDiscountInfo.visibility = if (parts.isEmpty()) View.GONE else View.VISIBLE
         b.btnClearDiscount.visibility =
             if (cart.socioId != null || cart.entradaDesc != null) View.VISIBLE else View.GONE
-        refreshCash()
-    }
-
-    private fun selectTabCash() {
-        b.btnTabCash.isChecked = true
-        b.btnTabQr.isChecked = false
-        b.cashBox.visibility = View.VISIBLE
-        b.qrBox.visibility = View.GONE
-    }
-
-    private fun selectTabQr() {
-        b.btnTabCash.isChecked = false
-        b.btnTabQr.isChecked = true
-        b.cashBox.visibility = View.GONE
-        b.qrBox.visibility = View.VISIBLE
-    }
-
-    private fun numpad() {
-        val digit = { s: String ->
-            if (cashInput.length < 9) {
-                cashInput += s
-                refreshCash()
-            }
-        }
-        b.k1.setOnClickListener { digit("1") }
-        b.k2.setOnClickListener { digit("2") }
-        b.k3.setOnClickListener { digit("3") }
-        b.k4.setOnClickListener { digit("4") }
-        b.k5.setOnClickListener { digit("5") }
-        b.k6.setOnClickListener { digit("6") }
-        b.k7.setOnClickListener { digit("7") }
-        b.k8.setOnClickListener { digit("8") }
-        b.k9.setOnClickListener { digit("9") }
-        b.k0.setOnClickListener { digit("0") }
-        b.k00.setOnClickListener { digit("00") }
-        b.kBack.setOnClickListener {
-            if (cashInput.isNotEmpty()) {
-                cashInput = cashInput.dropLast(1)
-                refreshCash()
-            }
-        }
-    }
-
-    private fun refreshCash() {
-        if (_b == null) return
-        val received = cashInput.toDoubleOrNull() ?: 0.0
-        val total = dash().cart.total
-        b.tvCashReceived.text = money.format(received)
-        val change = received - total
-        b.tvCashChange.text = if (cashInput.isEmpty()) "" else "Vuelto: ${money.format(change)}"
     }
 
     // ── Descuento unificado ──────────────────────────────
@@ -224,18 +169,14 @@ class PosPaySheet : BottomSheetDialogFragment() {
     }
 
     // ── Cobro ────────────────────────────────────────────
+    /** Efectivo ya cobrado (monto exacto): registra la venta e imprime. */
     private fun confirmCash() {
         if (busy) return
         val cart = dash().cart
-        val received = cashInput.toDoubleOrNull() ?: 0.0
-        if (received < cart.total) {
-            b.tvPayError.text = "Monto insuficiente"
-            return
-        }
         busy = true
         lifecycleScope.launch {
             try {
-                val sale = dash().salesRepo.cash(cart, received, round((received - cart.total) * 100) / 100)
+                val sale = dash().salesRepo.cash(cart, cart.total, 0.0)
                 finalizeApproved(sale)
             } catch (e: Exception) {
                 busy = false
