@@ -4,6 +4,7 @@ import android.content.Context
 import com.mposw.entradas.data.PosSale
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.printer.SunmiPrinter
+import com.mposw.entradas.printer.SunmiPrinter.PrintBlock
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -20,50 +21,49 @@ object PosTicketRenderer {
 
     suspend fun print(ctx: Context, sale: PosSale): Boolean {
         val session = SessionManager(ctx)
-        val blocks = mutableListOf<SunmiPrinter.PrintBlock>()
-        val B = SunmiPrinter.PrintBlock
+        val blocks = mutableListOf<PrintBlock>()
 
         val club = session.clubName.ifBlank { null }
-        if (club != null) blocks.add(B.Text(club.uppercase(), 28f, true))
+        if (club != null) blocks.add(PrintBlock.Text(club.uppercase(), 28f, true))
         val store = session.storeName.ifBlank { null }
-        if (store != null) blocks.add(B.Text(store, 28f, true))
-        blocks.add(B.Line)
+        if (store != null) blocks.add(PrintBlock.Text(store, 28f, true))
+        blocks.add(PrintBlock.Line)
 
         val fecha = formatFecha(sale.paidAt ?: sale.createdAt)
-        if (fecha != null) blocks.add(B.Text(fecha, 24f, false))
-        blocks.add(B.Text("Venta #${sale.orderNumber}", 24f, true))
-        blocks.add(B.Line)
+        if (fecha != null) blocks.add(PrintBlock.Text(fecha, 24f, false))
+        blocks.add(PrintBlock.Text("Venta #${sale.orderNumber}", 24f, true))
+        blocks.add(PrintBlock.Line)
 
         for (item in sale.items) {
             val name = (item.product?.name ?: "").uppercase()
-            blocks.add(B.Text("${item.quantity}x $name", 28f, true))
+            blocks.add(PrintBlock.Text("${item.quantity}x $name", 28f, true))
             val ord = item.orderNumber.toString().padStart(3, '0')
-            blocks.add(B.Text(ord, 24f, false))
-            blocks.add(B.Line)
+            blocks.add(PrintBlock.Text(ord, 24f, false))
+            blocks.add(PrintBlock.Line)
         }
 
         val total = sale.total?.toDoubleOrNull() ?: 0.0
-        blocks.add(B.Text("TOTAL: ${money.format(total)}", 36f, true))
+        blocks.add(PrintBlock.Text("TOTAL: ${money.format(total)}", 36f, true))
         if (sale.paymentMethod == "CASH") {
             val rec = sale.cashReceived?.toDoubleOrNull()
             val vue = sale.changeAmount?.toDoubleOrNull()
-            if (rec != null) blocks.add(B.Text("Efectivo: ${money.format(rec)}", 24f, false))
-            if (vue != null && vue > 0) blocks.add(B.Text("Vuelto: ${money.format(vue)}", 24f, false))
+            if (rec != null) blocks.add(PrintBlock.Text("Efectivo: ${money.format(rec)}", 24f, false))
+            if (vue != null && vue > 0) blocks.add(PrintBlock.Text("Vuelto: ${money.format(vue)}", 24f, false))
         }
-        blocks.add(B.Line)
+        blocks.add(PrintBlock.Line)
 
         if (sale.vouchers.isNotEmpty()) {
-            blocks.add(B.Text("INTERNET WIFI", 28f, true))
+            blocks.add(PrintBlock.Text("INTERNET WIFI", 28f, true))
             for (v in sale.vouchers) {
                 val pin = v.pin ?: continue
-                if (pin.isNotBlank()) blocks.add(B.Text(pin, 36f, true))
+                if (pin.isNotBlank()) blocks.add(PrintBlock.Text(pin, 36f, true))
             }
-            blocks.add(B.Line)
+            blocks.add(PrintBlock.Line)
         }
 
-        blocks.add(B.Text("Gracias por tu compra", 24f, false))
-        blocks.add(B.Text("Ticket no fiscal", 24f, false))
-        blocks.add(B.Feed)
+        blocks.add(PrintBlock.Text("Gracias por tu compra", 24f, false))
+        blocks.add(PrintBlock.Text("Ticket no fiscal", 24f, false))
+        blocks.add(PrintBlock.Feed)
 
         val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
         return SunmiPrinter.printBlocks(ctx, escudo, blocks).isSuccess

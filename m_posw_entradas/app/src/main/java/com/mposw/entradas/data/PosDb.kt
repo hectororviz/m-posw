@@ -29,7 +29,7 @@ data class PosApprovedSale(
 
 @Dao
 interface PosCacheDao {
-    @Insert(onConflictStrategy = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entry: PosCache)
 
     @Query("SELECT * FROM pos_cache WHERE `key` = :key LIMIT 1")
@@ -38,7 +38,7 @@ interface PosCacheDao {
 
 @Dao
 interface PosApprovedSaleDao {
-    @Insert(onConflictStrategy = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(sale: PosApprovedSale)
 
     @Query("SELECT * FROM pos_approved_sales ORDER BY createdAt DESC LIMIT 1")
