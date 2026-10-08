@@ -1320,6 +1320,7 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const invalidate = useInvalidateEntradas();
   const { data: devices } = usePosDevices();
   const [deviceName, setDeviceName] = useState('');
+  const [deviceTipo, setDeviceTipo] = useState<'ENTRADAS' | 'POS'>('ENTRADAS');
   const [newToken, setNewToken] = useState<PosDeviceCreated | null>(null);
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
 
@@ -1327,15 +1328,15 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     if (!deviceName.trim()) { pushToast('Nombre del dispositivo requerido', 'error'); return; }
     try {
       const baseUrl = `${window.location.origin}/api`;
-      // El modo POS aún no está disponible: toda terminal nueva es ENTRADAS.
-      const res = await apiClient.post<PosDeviceCreated>('/entradas/devices', { nombre: deviceName.trim(), tipo: 'ENTRADAS', baseUrl });
+      const res = await apiClient.post<PosDeviceCreated>('/entradas/devices', { nombre: deviceName.trim(), tipo: deviceTipo, baseUrl });
       setNewToken(res.data);
       setDeviceName('');
       invalidate();
     } catch (e) { err(e); }
   };
 
-  const changeTipo = async (id: string, nombre: string, next: 'ENTRADAS' | 'POS', force = false) => {    try {
+  const changeTipo = async (id: string, nombre: string, next: 'ENTRADAS' | 'POS', force = false) => {
+    try {
       await apiClient.patch(`/entradas/devices/${id}/tipo`, { tipo: next, force });
       invalidate();
     } catch (e) {
@@ -1357,8 +1358,24 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
       <section>
         <h3><MonitorSmartphone size={16} /> Dispositivos POS</h3>
         {canWrite && (
-          <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', maxWidth: 420 }}>
+          <div className="settings-field" style={{ display: 'flex', gap: '0.5rem', alignItems: 'end', maxWidth: 560, flexWrap: 'wrap' }}>
             <div><label>Nombre</label><input value={deviceName} onChange={(e) => setDeviceName(e.target.value)} placeholder="POS puerta 1" /></div>
+            <div>
+              <label>Tipo</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {(['ENTRADAS', 'POS'] as const).map((t) => (
+                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="device-tipo"
+                      checked={deviceTipo === t}
+                      onChange={() => setDeviceTipo(t)}
+                    />
+                    {t === 'POS' ? 'POS' : 'Entradas'}
+                  </label>
+                ))}
+              </div>
+            </div>
             <button type="button" className="btn-primary btn-sm" onClick={createDevice}><Plus size={14} /> Generar</button>
           </div>
         )}
