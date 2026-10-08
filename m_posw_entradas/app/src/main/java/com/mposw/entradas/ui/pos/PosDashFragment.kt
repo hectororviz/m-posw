@@ -41,6 +41,8 @@ class PosDashFragment : Fragment() {
     private var lastLoad = 0L
     private var appliedScale = ""
     private var tabMediator: TabLayoutMediator? = null
+
+    fun payFlags() = catalogRepo.payFlags
     private val money = NumberFormat.getCurrencyInstance(Locale("es", "AR")).apply {
         maximumFractionDigits = 0
     }

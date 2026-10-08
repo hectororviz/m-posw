@@ -32,6 +32,15 @@
             android:text="QR" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPayFiado"
+            style="@style/Widget.Entradas.Button.Neutral"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:text="Fiado"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnScanDiscount"
             style="@style/Widget.Entradas.Button.Ghost"
             android:layout_width="match_parent"

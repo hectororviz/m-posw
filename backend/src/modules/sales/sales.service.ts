@@ -142,7 +142,7 @@ export class SalesService {
     };
   }
 
-  async createFiadoSale(userId: string, dto: CreateFiadoSaleDto) {
+  async createFiadoSale(userId: string, dto: CreateFiadoSaleDto, deviceId?: string) {
     const { items, total: subtotal } = await this.buildSaleItems(dto.items);
     const validatedDiscount = await this.resolveSocioDiscount(dto.items, dto.socioId, dto.discountTotal, dto.canjes);
     const roundedTotal = this.roundToCurrency(subtotal - validatedDiscount);
@@ -165,6 +165,7 @@ export class SalesService {
       const sale = await this.prisma.sale.create({
         data: {
           userId,
+          deviceId: deviceId ?? null,
           total: roundedTotal,
           status: SaleStatus.APPROVED,
           paymentStatus: PaymentStatus.APPROVED,

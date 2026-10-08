@@ -195,6 +195,9 @@ data class PosMpQrResponse(
 data class PosSettingsResponse(
     val storeName: String?,
     val clubName: String?,
+    val enableCashPayment: Boolean = true,
+    val enableQrPayment: Boolean = true,
+    val enableFiadoPayment: Boolean = false,
 )
 
 data class PosSaleItemInput(
@@ -281,6 +284,25 @@ data class PosCanjesRequest(
     val socioId: String,
     val ventaId: String,
     val canjes: List<PosCanjeInput>,
+)
+
+data class PosAcreedor(
+    val id: Int = 0,
+    val nombre: String?,
+    val activo: Boolean = true,
+    val saldo: Double?,
+    val limiteDeuda: Double?,
+    val advertenciaDeuda: Double?,
+)
+
+data class PosFiadoRequest(
+    val items: List<PosSaleItemInput>,
+    val total: Double,
+    val paymentMethod: String = "FIADO",
+    val acreedorId: Int,
+    val discountTotal: Double? = null,
+    val socioId: Int? = null,
+    val canjes: List<PosCanjeInput>? = null,
 )
 
 data class PosBenefitValidation(

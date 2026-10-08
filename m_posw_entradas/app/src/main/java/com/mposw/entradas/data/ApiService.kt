@@ -56,6 +56,12 @@ interface ApiService {
     @POST("pos-device/sales/qr")
     suspend fun posQr(@Body body: PosQrRequest): PosQrIntentResponse
 
+    @POST("pos-device/sales/fiado")
+    suspend fun posFiado(@Body body: PosFiadoRequest): PosSale
+
+    @GET("pos-device/acreedores")
+    suspend fun posAcreedores(): List<PosAcreedor>
+
     @GET("pos-device/sales/{id}")
     suspend fun posSale(@Path("id") saleId: String): PosSale
 

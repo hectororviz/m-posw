@@ -2,10 +2,11 @@ import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/comm
 import { ProductType } from '@prisma/client';
 import type { Request } from 'express';
 import { PrismaService } from '../common/prisma.service';
+import { AcreedoresService } from '../acreedores/acreedores.service';
 import { CreateCanjesDto } from '../socios/dto/create-canjes.dto';
 import { SociosBeneficiosService } from '../socios/socios-beneficios.service';
 import { SalesService } from '../sales/sales.service';
-import { CreateCashSaleDto, CreateQrSaleDto } from '../sales/dto/create-sale.dto';
+import { CreateCashSaleDto, CreateFiadoSaleDto, CreateQrSaleDto } from '../sales/dto/create-sale.dto';
 import { DeviceGuard, type DeviceContext } from './device.guard';
 import { DeviceKind } from './device-kind.decorator';
 import { PosDeviceService } from './pos-device.service';
@@ -23,6 +24,7 @@ export class PosDeviceController {
     private readonly prisma: PrismaService,
     private readonly sales: SalesService,
     private readonly canjes: SociosBeneficiosService,
+    private readonly acreedores: AcreedoresService,
     private readonly posDevices: PosDeviceService,
   ) {}
 
@@ -90,13 +92,38 @@ export class PosDeviceController {
     return this.sales.createQrSale(await this.posDevices.resolvePosUserId(), dto, this.device(req).id);
   }
 
-  // ── Datos para el encabezado del ticket ──────────────────
+  @Post('sales/fiado')
+  async createFiado(@Req() req: Request, @Body() dto: CreateFiadoSaleDto) {
+    return this.sales.createFiadoSale(await this.posDevices.resolvePosUserId(), dto, this.device(req).id);
+  }
+
+  // ── Datos para el encabezado del ticket + métodos habilitados ──
   @Get('settings')
   async settings() {
     const setting = await this.prisma.setting.findFirst({
-      select: { storeName: true, clubName: true },
+      select: {
+        storeName: true,
+        clubName: true,
+        enableCashPayment: true,
+        enableQrPayment: true,
+        enableFiadoPayment: true,
+        enableAcreedoresModule: true,
+      },
     });
-    return { storeName: setting?.storeName ?? '', clubName: setting?.clubName ?? '' };
+    // Transferencia discontinuada: no se expone ni se opera desde terminales.
+    return {
+      storeName: setting?.storeName ?? '',
+      clubName: setting?.clubName ?? '',
+      enableCashPayment: setting?.enableCashPayment ?? true,
+      enableQrPayment: setting?.enableQrPayment ?? true,
+      enableFiadoPayment: (setting?.enableFiadoPayment ?? false) && (setting?.enableAcreedoresModule ?? true),
+    };
+  }
+
+  // ── Acreedores para fiado (mismas reglas que la web) ──────
+  @Get('acreedores')
+  async listAcreedores() {
+    return this.acreedores.findAll();
   }
 
   // ── Ventas ───────────────────────────────────────────────

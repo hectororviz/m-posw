@@ -22,6 +22,10 @@ class PosCatalogRepo(ctx: Context, private val session: SessionManager) {
     var catalog: PosCatalogResponse? = null
         private set
 
+    /** Flags de métodos habilitados (Transferencia no existe en terminales). */
+    var payFlags: com.mposw.entradas.data.PosSettingsResponse? = null
+        private set
+
     suspend fun load(): PosCatalogResponse {
         return try {
             val fresh = api.posCatalog()
@@ -31,6 +35,9 @@ class PosCatalogRepo(ctx: Context, private val session: SessionManager) {
             } catch (_: Exception) {}
             try {
                 syncBranding()
+            } catch (_: Exception) {}
+            try {
+                payFlags = api.posSettings()
             } catch (_: Exception) {}
             fresh
         } catch (e: Exception) {

@@ -57,6 +57,22 @@ class PosSalesRepo(ctx: Context, private val session: SessionManager) {
             ),
         )
 
+    suspend fun fiado(cart: PosCart, acreedorId: Int) =
+        api.posFiado(
+            PosFiadoRequest(
+                items = itemsOf(cart),
+                total = cart.total,
+                acreedorId = acreedorId,
+                discountTotal = cart.discountTotal.takeIf { it > 0 },
+                socioId = cart.socioId,
+                canjes = cart.canjes().takeIf { it.isNotEmpty() },
+            ),
+        )
+
+    suspend fun acreedores() = api.posAcreedores().filter { it.activo }
+
+    suspend fun settings() = api.posSettings()
+
     suspend fun sale(saleId: String) = api.posSale(saleId)
     suspend fun status(saleId: String) = api.posStatus(saleId)
     suspend fun cancel(saleId: String) = api.posCancel(saleId)

@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma.service';
 import { UsersModule } from '../users/users.module';
 import { SalesModule } from '../sales/sales.module';
 import { SociosModule } from '../socios/socios.module';
+import { AcreedoresModule } from '../acreedores/acreedores.module';
 import { MercadoPagoOauthModule } from '../mercadopago-oauth/mercadopago-oauth.module';
 import { EntradasAdminController } from './entradas-admin.controller';
 import { EntradasDeviceController } from './entradas-device.controller';
@@ -20,7 +21,7 @@ import { EntradasFlexibleGuard } from './entradas-flexible.guard';
 
 @Module({
   controllers: [EntradasSharedController, EntradasAdminController, EntradasDeviceController, DeviceLookupController, DeviceMeController, DispositivosController, PosDeviceController],
-  imports: [UsersModule, SalesModule, SociosModule, MercadoPagoOauthModule],
+  imports: [UsersModule, SalesModule, SociosModule, AcreedoresModule, MercadoPagoOauthModule],
   providers: [EntradasAdminService, EntradasBeneficiosService, EntradasSalesService, PosDeviceService, EntradasDeviceGuard, EntradasFlexibleGuard, PrismaService],
   exports: [EntradasAdminService, EntradasBeneficiosService, EntradasSalesService],
 })

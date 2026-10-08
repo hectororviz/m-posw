@@ -53,8 +53,21 @@ class PosPaySheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         cameraPerm.launch(Manifest.permission.CAMERA)
         refreshTotal()
+        // Métodos habilitados por Setting (Transferencia no existe en terminales).
+        // Sin ninguno habilitado: solo efectivo (igual que la web).
+        val flags = dash().payFlags()
+        val showCash = flags?.enableCashPayment ?: true
+        val showQr = flags?.enableQrPayment ?: true
+        val showFiado = flags?.enableFiadoPayment ?: false
+        val anyEnabled = showCash || showQr || showFiado
+        b.btnPayCash.visibility = if (showCash || !anyEnabled) View.VISIBLE else View.GONE
+        b.btnPayQr.visibility = if (showQr) View.VISIBLE else View.GONE
+        b.btnPayFiado.visibility = if (showFiado) View.VISIBLE else View.GONE
         b.btnPayCash.setOnClickListener { confirmCash() }
         b.btnPayQr.setOnClickListener { cobrarQr() }
+        b.btnPayFiado.setOnClickListener {
+            PosFiadoDialog().show(parentFragmentManager, "fiado")
+        }
         b.btnScanDiscount.setOnClickListener {
             scanDiscount.launch(ScanOptions().setPrompt("Escaneá carnet de socio o QR de entrada").setBeepEnabled(true).setCaptureActivity(ScannerActivity::class.java))
         }
