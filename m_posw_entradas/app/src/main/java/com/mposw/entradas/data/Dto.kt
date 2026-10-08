@@ -117,12 +117,184 @@ data class SocioInfo(
 
 data class SocioBeneficio(
     val id: String?,
+    val categoriaId: String?,
+    val categoriaNombre: String?,
+    val productoId: String?,
+    val productoNombre: String?,
     val porcentaje: Double = 0.0,
+    val descuentoMaximo: Double?,
+    val limiteDiario: Int?,
     val disponible: Boolean = true,
+    val motivoNoDisponible: String?,
 )
 
 data class ErrorBody(
     @SerializedName("code") val code: String?,
     @SerializedName("message") val message: String?,
     @SerializedName("statusCode") val statusCode: Int?,
+)
+
+/** Identidad y modo del propio dispositivo. El modo lo define el servidor. */
+data class DeviceMeResponse(
+    val id: String?,
+    val nombre: String?,
+    val tipo: String?,
+)
+
+// ── POS bufet (pos-device) ──────────────────────────────────
+
+data class PosCatalogResponse(
+    val categories: List<PosCategory> = emptyList(),
+    val products: List<PosProduct> = emptyList(),
+)
+
+data class PosCategory(
+    val id: String,
+    val name: String,
+    val iconName: String?,
+    val colorHex: String?,
+    val ticket: Boolean = true,
+)
+
+data class PosProduct(
+    val id: String,
+    val name: String,
+    val price: Double = 0.0,
+    val stock: Double = 0.0,
+    val type: String?,
+    val iconName: String?,
+    val colorHex: String?,
+    val categoryId: String?,
+    val category: PosProductCategory?,
+)
+
+data class PosProductCategory(
+    val id: String?,
+    val name: String?,
+    val ticket: Boolean = true,
+)
+
+data class PosMpQrResponse(
+    val qrData: String?,
+    val linked: Boolean = false,
+)
+
+data class PosSettingsResponse(
+    val storeName: String?,
+    val clubName: String?,
+)
+
+data class PosSaleItemInput(
+    val productId: String,
+    val quantity: Int,
+)
+
+data class PosCanjeInput(
+    val socioBeneficioId: String,
+    val montoDescontado: Double,
+)
+
+data class PosCashRequest(
+    val items: List<PosSaleItemInput>,
+    val total: Double,
+    val paymentMethod: String = "CASH",
+    val cashReceived: Double,
+    val changeAmount: Double,
+    val discountTotal: Double? = null,
+    val socioId: Int? = null,
+    val canjes: List<PosCanjeInput>? = null,
+)
+
+data class PosQrRequest(
+    val items: List<PosSaleItemInput>,
+    val total: Double,
+    val paymentMethod: String = "MP_QR",
+    val discountTotal: Double? = null,
+    val socioId: Int? = null,
+    val canjes: List<PosCanjeInput>? = null,
+)
+
+data class PosQrIntentResponse(
+    val saleId: String?,
+    val orderNumber: Int = 0,
+    val status: String?,
+)
+
+data class PosSaleStatus(
+    val saleId: String?,
+    val orderNumber: Int = 0,
+    val status: String?,
+    val updatedAt: String?,
+)
+
+data class PosSale(
+    val id: String?,
+    val orderNumber: Int = 0,
+    val total: String?,
+    val status: String?,
+    val paymentStatus: String?,
+    val paymentMethod: String?,
+    val cashReceived: String?,
+    val changeAmount: String?,
+    val paidAt: String?,
+    val createdAt: String?,
+    val items: List<PosSaleItem> = emptyList(),
+    val vouchers: List<PosSaleVoucher> = emptyList(),
+)
+
+data class PosSaleItem(
+    val quantity: Int = 0,
+    val subtotal: String?,
+    val orderNumber: Int = 0,
+    val product: PosSaleProduct?,
+)
+
+data class PosSaleProduct(
+    val name: String?,
+    val category: PosProductCategory?,
+)
+
+data class PosSaleVoucher(
+    val pin: String?,
+    val plan: PosVoucherPlan?,
+)
+
+data class PosVoucherPlan(
+    val name: String?,
+    val duration: Int = 0,
+)
+
+data class PosCanjesRequest(
+    val socioId: String,
+    val ventaId: String,
+    val canjes: List<PosCanjeInput>,
+)
+
+data class PosBenefitValidation(
+    val code: String?,
+    val codigo: String?,
+    val beneficio: PosBenefitInfo?,
+    val consumido: Boolean = false,
+    val disponible: Boolean = false,
+    val motivoNoDisponible: String?,
+)
+
+data class PosBenefitInfo(
+    val id: String?,
+    val nombre: String?,
+    val porcentaje: String?,
+    val descuentoMaximo: String?,
+    val usoUnico: Boolean = true,
+    val destino: PosBenefitDestino?,
+)
+
+data class PosBenefitDestino(
+    val categoria: PosDestinoRef?,
+    val producto: PosDestinoRef?,
+    val internetPlan: PosDestinoRef?,
+)
+
+data class PosDestinoRef(
+    val id: String?,
+    val name: String?,
 )

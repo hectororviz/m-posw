@@ -1,4 +1,4 @@
-package com.mposw.entradas.ui
+package com.mposw.entradas.ui.entradas
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -14,6 +14,7 @@ import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.databinding.FragmentQrPagoBinding
 import com.mposw.entradas.printer.SunmiPrinter
 import com.mposw.entradas.printer.TicketRenderer
+import com.mposw.entradas.ui.PagoExitosoDialogFragment
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

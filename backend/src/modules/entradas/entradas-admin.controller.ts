@@ -108,11 +108,17 @@ export class EntradasAdminController {
 
   @Post('devices')
   @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
-  createDevice(@Body() body: { nombre: string; baseUrl?: string }) {
-    return this.admin.createDevice(body?.nombre).then((res) => ({
+  createDevice(@Body() body: { nombre: string; tipo?: string; baseUrl?: string }) {
+    return this.admin.createDevice(body?.nombre, body?.tipo).then((res) => ({
       ...res,
       pairing: EntradasAdminService.pairingPayload(body?.baseUrl ?? '', res.token),
     }));
+  }
+
+  @Patch('devices/:id/tipo')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.FULL)
+  updateDeviceTipo(@Param('id') id: string, @Body() body: { tipo: string; force?: boolean }) {
+    return this.admin.updateDeviceTipo(id, body?.tipo, body?.force === true);
   }
 
   @Post('devices/:id/revoke')

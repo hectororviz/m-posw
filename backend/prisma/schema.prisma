@@ -339,6 +339,7 @@ model Setting {
   mpExternalStoreId String?
   mpQrData        String?
   mpLinked        Boolean  @default(false)
+  posDeviceUserId String?  @db.Uuid
   lastMpPollAt    DateTime?
   mpAuditEnabled  Boolean  @default(true)
   mpAuditSince    DateTime?
@@ -1135,6 +1136,11 @@ enum EntradaBeneficioSector {
   AMBAS
 }
 
+enum PosDeviceTipo {
+  ENTRADAS
+  POS
+}
+
 model EntradaTorneo {
   id        String   @id @default(uuid()) @db.Uuid
   nombre    String   @unique
@@ -1183,17 +1189,19 @@ model EntradaFixture {
 }
 
 model PosDevice {
-  id         String    @id @default(uuid()) @db.Uuid
+  id         String        @id @default(uuid()) @db.Uuid
   nombre     String
-  tokenHash  String    @unique
-  activo     Boolean   @default(true)
+  tokenHash  String        @unique
+  tipo       PosDeviceTipo @default(ENTRADAS)
+  activo     Boolean       @default(true)
   revokedAt  DateTime?
   lastSeenAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
   sales      TicketSale[]
 
   @@index([activo])
+  @@index([tipo])
 }
 
 model TicketSale {

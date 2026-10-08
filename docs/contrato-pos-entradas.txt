@@ -31,6 +31,16 @@ Provisioning (una vez, online):
   guarda el token en secure storage. Nunca loguearlo ni imprimirlo.
   401 {"code":"DEVICE_REVOKED"} -> borrar token y pedir re-pairing.
 
+  Modo de terminal (definido por el servidor, nunca por el QR):
+  Cada device tiene tipo ENTRADAS (default) o POS. El servidor impone
+  el alcance por ruta (@DeviceKind): un ENTRADAS no puede llamar rutas
+  POS y viceversa -> 403 {"code":"DEVICE_WRONG_MODE"} (no borra token,
+  solo avisa que el modo se cambia desde el front, sin re-vincular).
+  2.1 GET /entradas/devices/me (cualquier token válido, sin @DeviceKind)
+    200 {"id":"uuid","nombre":"Puerta 1","tipo":"ENTRADAS|POS","activo":true}
+    La app lo consulta en cada arranque y al volver a primer plano;
+    sin conexión usa el último modo conocido.
+
 3. ENDPOINTS (prefijo /entradas)
 --------------------------------
 3.1 GET /entradas/fixtures/vigentes  (alias: /entradas/fixtures/hoy)
@@ -198,3 +208,39 @@ MP en produccion con el mismo Store/POS ya configurado
 ================================================================
 Dudas al backend: mandar X-Request-Id + hora del POS + code.
 ================================================================
+
+7. MODO POS BUFET (pos-device, solo terminales tipo POS)
+--------------------------------------------------------
+Auth: mismo Bearer ent_... Las rutas exigen @DeviceKind('pos'):
+un ENTRADAS recibe 403 DEVICE_WRONG_MODE. Ventas atribuidas al
+usuario genérico pos-terminal (seed + Setting.posDeviceUserId).
+
+  GET /pos-device/catalog
+    200 {"categories":[{id,name,iconName,colorHex,ticket}],
+         "products":[{id,name,price,stock,type,iconName,colorHex,
+           categoryId,category:{id,name,ticket}}]}
+    Solo activos, sin RAW_MATERIAL, respeta toggle Internet.
+  GET /pos-device/mp-qr
+    200 {"qrData":"...","linked":true} (QR estático del POS
+    principal; la app lo cachea, igual que entradas).
+  GET /pos-device/settings
+    200 {"storeName":"...","clubName":"..."} (encabezado ticket).
+  POST /pos-device/sales/cash {items,total,paymentMethod:CASH,
+    cashReceived,changeAmount,discountTotal?,socioId?,canjes?}
+    201 venta completa (items + vouchers). Descuento socio validado
+    ±0.05 como en /sales (mismo SalesService).
+  POST /pos-device/sales/qr {items,total,paymentMethod:MP_QR,...}
+    201 {saleId,orderNumber,status}. Approval por webhook (aplica
+    stock/finanzas/vouchers); la app pullea status cada 2s/120s.
+  GET /pos-device/sales/:id (venta completa con vouchers)
+  GET /pos-device/sales/:id/status
+  POST /pos-device/sales/:id/cancel
+  POST /pos-device/sales/:id/ticket-printed
+  POST /pos-device/socios/canjes {socioId,ventaId,canjes}
+    (no bloquea si falla, igual que la web).
+
+Lookups agnósticos (ambos modos, mismo contrato que antes):
+  GET /entradas/socios/:uuid, GET /entradas/beneficios/:code,
+  POST /entradas/beneficios/:code/consumir.
+El escaneo es único: UUID → camino socio, ENT:código → camino
+entrada (validar + consumir al aprobar). Sin lógica nueva.

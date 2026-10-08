@@ -12,7 +12,10 @@ import androidx.lifecycle.lifecycleScope
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.mposw.entradas.data.ApiClient
+import com.mposw.entradas.data.DeviceMode
 import com.mposw.entradas.data.EntradasRepo
+import com.mposw.entradas.data.ModeResolver
+import com.mposw.entradas.data.ModeResult
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.databinding.FragmentConfigBinding
 import kotlinx.coroutines.launch
@@ -93,21 +96,58 @@ class ConfigFragment : Fragment() {
                 },
             )
         }
+
+        when (session.textScale) {
+            "S" -> b.tgTextScale.check(b.btnScaleS.id)
+            "L" -> b.tgTextScale.check(b.btnScaleL.id)
+            else -> b.tgTextScale.check(b.btnScaleM.id)
+        }
+        b.tgTextScale.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            session.textScale = when (checkedId) {
+                b.btnScaleS.id -> "S"
+                b.btnScaleL.id -> "L"
+                else -> "M"
+            }
+        }
     }
 
     private fun refreshVersions() {
-        b.tvVersions.text = "template v${session.templateVersion} · escudo v${session.logoVersion}"
+        b.tvVersions.text = "modo ${session.deviceMode} · template v${session.templateVersion} · escudo v${session.logoVersion}"
     }
 
     private fun probar() {
         lifecycleScope.launch {
             try {
                 b.tvConfigStatus.text = "Probando…"
+                // El modo lo define el servidor; se guarda sin re-pairing.
+                // Sin conexión y sin modo conocido, la app queda en Config.
+                val mode = when (val m = ModeResolver(session).resolve()) {
+                    is ModeResult.Ok -> m.mode
+                    is ModeResult.Offline -> {
+                        if (m.lastKnown == DeviceMode.UNKNOWN) {
+                            b.tvConfigStatus.text = "Sin conexión y sin modo conocido. Queda en Configuración."
+                            return@launch
+                        }
+                        m.lastKnown
+                    }
+                    ModeResult.Revoked -> {
+                        b.etToken.setText("")
+                        b.tvConfigStatus.text = "Token revocado. Re-vinculá el equipo."
+                        return@launch
+                    }
+                }
+                refreshVersions()
+                if (mode == DeviceMode.POS) {
+                    // vigentes()/template son solo de entradas (403 en POS).
+                    b.tvConfigStatus.text = "OK. Modo: POS."
+                    return@launch
+                }
                 val repo = EntradasRepo(session)
                 val r = repo.vigentes()
                 repo.syncTemplateForce()
                 refreshVersions()
-                b.tvConfigStatus.text = "OK: ${r.fixtures.size} partido(s) vigente(s)."
+                b.tvConfigStatus.text = "OK: ${r.fixtures.size} partido(s) vigente(s). Modo: ${mode.name}."
             } catch (e: Exception) {
                 val msg = e.message ?: ""
                 if (msg.contains("401") || msg.contains("DEVICE_REVOKED")) {

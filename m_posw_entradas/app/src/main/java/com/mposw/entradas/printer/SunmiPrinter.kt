@@ -196,4 +196,59 @@ object SunmiPrinter {
             Result.failure(e)
         }
     }
+
+    /** Bloques genéricos para tickets no-entradas (POS bufet). */
+    sealed interface PrintBlock {
+        data class Text(val line: String, val size: Float = 24f, val bold: Boolean = false) : PrintBlock
+        data class Qr(val content: String) : PrintBlock
+        data object Line : PrintBlock
+        data object Feed : PrintBlock
+    }
+
+    suspend fun printBlocks(ctx: Context, escudo: Bitmap?, blocks: List<PrintBlock>): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            try {
+                val printer = requireService()
+                val logo = prepareEscudo(escudo)
+                logo?.let {
+                    printer.setAlignment(1, noop)
+                    printer.printBitmap(it, noop)
+                }
+                for (bl in blocks) {
+                    when (bl) {
+                        is PrintBlock.Text -> {
+                            if (bl.line.isBlank()) continue
+                            printer.setFontSize(bl.size, noop)
+                            printer.setPrinterStyle(
+                                WoyouConsts.ENABLE_BOLD,
+                                if (bl.bold) WoyouConsts.ENABLE else WoyouConsts.DISABLE,
+                            )
+                            printer.setAlignment(1, noop)
+                            printer.printText("${bl.line}\n", noop)
+                        }
+                        is PrintBlock.Qr -> {
+                            if (bl.content.isBlank()) continue
+                            printer.setAlignment(1, noop)
+                            printer.printQRCode(bl.content, 6, 1, noop)
+                            printer.printText("\n", noop)
+                        }
+                        PrintBlock.Line -> {
+                            printer.setFontSize(24f, noop)
+                            printer.setPrinterStyle(WoyouConsts.ENABLE_BOLD, WoyouConsts.DISABLE)
+                            printer.setAlignment(1, noop)
+                            printer.printText("--------------------------------\n", noop)
+                        }
+                        PrintBlock.Feed -> printer.lineWrap(2, noop)
+                    }
+                }
+                printer.lineWrap(2, noop)
+                printer.cutPaper(noop)
+                Result.success(Unit)
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(ctx, "Sin papel o impresora no lista: ${e.message}. Guardado para reimprimir.", Toast.LENGTH_LONG).show()
+                }
+                Result.failure(e)
+            }
+        }
 }

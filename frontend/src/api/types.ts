@@ -1174,9 +1174,12 @@ export interface EntradaFixture {
   activo: boolean;
 }
 
+export type PosDeviceTipo = 'ENTRADAS' | 'POS';
+
 export interface PosDevice {
   id: string;
   nombre: string;
+  tipo: PosDeviceTipo;
   activo: boolean;
   revokedAt: string | null;
   lastSeenAt: string | null;

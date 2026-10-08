@@ -42,6 +42,7 @@ async function main() {
 
   await seedFinanzas();
   await seedAssetStatuses();
+  await seedPosTerminal();
 }
 
 async function seedFinanzas() {
@@ -75,6 +76,30 @@ async function seedFinanzas() {
   }
 
   console.log('Cuentas y categorías de caja sembradas correctamente.');
+}
+
+async function seedPosTerminal() {
+  // Usuario genérico para atribuir ventas de terminales POS (auth por token
+  // de dispositivo, sin login). Password aleatorio desconocido: no puede loguearse.
+  const username = 'pos-terminal';
+  let user = await prisma.user.findUnique({ where: { username } });
+  if (!user) {
+    const passwordHash = await bcrypt.hash(`pos-terminal:${Date.now()}:${Math.random()}`, 10);
+    user = await prisma.user.create({
+      data: { username, password: passwordHash, role: Role.USER, active: true },
+    });
+    console.log('Usuario genérico "pos-terminal" creado.');
+  }
+  await prisma.userModulePermission.upsert({
+    where: { userId_module: { userId: user.id, module: 'POS' } },
+    create: { userId: user.id, module: 'POS', access: 'FULL' },
+    update: { access: 'FULL' },
+  });
+  const setting = await prisma.setting.findFirst();
+  if (setting && setting.posDeviceUserId !== user.id) {
+    await prisma.setting.update({ where: { id: setting.id }, data: { posDeviceUserId: user.id } });
+  }
+  console.log('posDeviceUserId configurado en Setting.');
 }
 
 async function seedAssetStatuses() {

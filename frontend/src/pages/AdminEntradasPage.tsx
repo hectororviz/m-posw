@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import QRCode from 'react-qr-code';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Eye, EyeOff, MonitorSmartphone, Pencil, Plus, RefreshCw, Ticket, Trash2, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, MonitorSmartphone, Pencil, Plus, RefreshCw, Repeat, Ticket, Trash2, Upload, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import {
   useAdminProducts,
@@ -1327,11 +1327,28 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     if (!deviceName.trim()) { pushToast('Nombre del dispositivo requerido', 'error'); return; }
     try {
       const baseUrl = `${window.location.origin}/api`;
-      const res = await apiClient.post<PosDeviceCreated>('/entradas/devices', { nombre: deviceName.trim(), baseUrl });
+      // El modo POS aún no está disponible: toda terminal nueva es ENTRADAS.
+      const res = await apiClient.post<PosDeviceCreated>('/entradas/devices', { nombre: deviceName.trim(), tipo: 'ENTRADAS', baseUrl });
       setNewToken(res.data);
       setDeviceName('');
       invalidate();
     } catch (e) { err(e); }
+  };
+
+  const changeTipo = async (id: string, nombre: string, next: 'ENTRADAS' | 'POS', force = false) => {    try {
+      await apiClient.patch(`/entradas/devices/${id}/tipo`, { tipo: next, force });
+      invalidate();
+    } catch (e) {
+      const apiErr = e as { response?: { status?: number; data?: { code?: string; pending?: number } } };
+      const data = apiErr.response?.data;
+      if (apiErr.response?.status === 409 && data?.code === 'DEVICE_HAS_PENDING_SALES') {
+        if (confirm(`${nombre} tiene ${data.pending ?? ''} venta(s) pendiente(s) sin sincronizar. ¿Cambiar el modo igual?`)) {
+          await changeTipo(id, nombre, next, true);
+        }
+        return;
+      }
+      err(e);
+    }
   };
 
   return (
@@ -1364,9 +1381,10 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
           <div className="sales-table">
             <div className="sales-table-head">
               <span className="col-user" style={{ flex: 2 }}>Nombre</span>
+              <span className="col-method" style={{ flex: '0 0 90px' }}>Tipo</span>
               <span className="col-method" style={{ flex: '0 0 90px' }}>Activo</span>
               <span className="col-date" style={{ flex: '0 0 150px' }}>Última conexión</span>
-              {canWrite && <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right' }}></span>}
+              {canWrite && <span className="col-action" style={{ flex: '0 0 150px', textAlign: 'right' }}></span>}
             </div>
             {(devices ?? []).length === 0 ? (
               <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin dispositivos</span></div>
@@ -1374,10 +1392,16 @@ const ConfigTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
               (devices ?? []).map((d) => (
                 <div key={d.id} className="sales-table-row">
                   <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{d.nombre}</span>
+                  <span className="col-method" style={{ flex: '0 0 90px' }}>{d.tipo === 'POS' ? 'POS' : 'Entradas'}</span>
                   <span className="col-method" style={{ flex: '0 0 90px' }}>{d.activo ? 'Sí' : 'No'}</span>
                   <span className="col-date" style={{ flex: '0 0 150px' }}>{fmtDateTime(d.lastSeenAt)}</span>
                   {canWrite && (
-                    <span className="col-action" style={{ flex: '0 0 110px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                    <span className="col-action" style={{ flex: '0 0 150px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
+                      <button className="btn-ghost" onClick={async () => {
+                        const next = d.tipo === 'POS' ? 'ENTRADAS' : 'POS';
+                        if (!confirm(`Cambiar ${d.nombre} a modo ${next === 'POS' ? 'POS' : 'Entradas'}? La terminal lo toma sin re-vincular.`)) return;
+                        await changeTipo(d.id, d.nombre, next);
+                      }} title="Cambiar modo" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Repeat size={14} /></button>
                       <button className="btn-ghost" onClick={async () => {
                         try {
                           const baseUrl = `${window.location.origin}/api`;

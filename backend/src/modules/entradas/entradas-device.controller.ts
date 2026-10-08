@@ -1,22 +1,21 @@
 import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { EntradasAdminService } from './entradas-admin.service';
-import { EntradasBeneficiosService } from './entradas-beneficios.service';
 import { EntradasSalesService } from './entradas-sales.service';
 import { EntradasDeviceGuard, type EntradasDeviceContext } from './device.guard';
+import { DeviceKind } from './device-kind.decorator';
 import { CreateIntentDto } from './dto/create-intent.dto';
 
 /**
  * API del terminal POS externo. Auth por token de dispositivo (Bearer ent_...).
  * Pensada para llamarse desde fuera del VPS por HTTPS (vía Caddy → /api/).
+ * Solo terminales tipo ENTRADAS (@DeviceKind): el servidor impone el alcance.
  */
 @Controller('entradas')
 @UseGuards(EntradasDeviceGuard)
+@DeviceKind('entradas')
 export class EntradasDeviceController {
-  constructor(
-    private readonly sales: EntradasSalesService,
-    private readonly beneficios: EntradasBeneficiosService,
-  ) {}
+  constructor(private readonly sales: EntradasSalesService) {}
 
   private device(req: Request): EntradasDeviceContext {
     return (req as unknown as { entradasDevice: EntradasDeviceContext }).entradasDevice;
@@ -57,21 +56,6 @@ export class EntradasDeviceController {
   // (GET ticket-template y ticket-assets/escudo viven en
   // EntradasSharedController: misma ruta para JWT y device token)
 
-  // Beneficios de bufet: validación y consumo desde el terminal.
-  // Mismo contrato que la web (`ENT:<code>` o código pelado).
-  @Get('beneficios/:code')
-  validarBeneficio(@Param('code') code: string) {
-    return this.beneficios.validate(code, 'POS_DEVICE');
-  }
-
-  @Post('beneficios/:code/consumir')
-  consumirBeneficio(@Req() req: Request, @Param('code') code: string) {
-    return this.beneficios.consume(code, { canal: 'POS_DEVICE', deviceId: this.device(req).id });
-  }
-
-  // Reservado futuro: escaneo QR de socio para descuentos. Implementado pero sin uso en prueba.
-  @Get('socios/:uuid')
-  socio(@Param('uuid') uuid: string) {
-    return this.sales.resolveSocioForDevice(uuid);
-  }
+  // (GET socios/:uuid y beneficios/:code viven en
+  // DeviceLookupController: misma ruta para ambos modos de terminal)
 }

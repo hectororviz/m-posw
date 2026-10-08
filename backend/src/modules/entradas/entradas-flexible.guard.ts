@@ -27,12 +27,14 @@ export class EntradasFlexibleGuard implements CanActivate {
     if (token?.startsWith(DEVICE_TOKEN_PREFIX)) {
       const device = await this.prisma.posDevice.findUnique({
         where: { tokenHash: hashDeviceToken(token) },
-        select: { id: true, nombre: true, activo: true, revokedAt: true },
+        select: { id: true, nombre: true, tipo: true, activo: true, revokedAt: true },
       });
       if (!device || !device.activo || device.revokedAt) {
         throw new UnauthorizedException({ code: 'DEVICE_REVOKED', message: 'Dispositivo no autorizado o revocado' });
       }
-      request.entradasDevice = { id: device.id, nombre: device.nombre };
+      const ctx = { id: device.id, nombre: device.nombre, tipo: device.tipo };
+      request.device = ctx;
+      request.entradasDevice = ctx;
       await this.prisma.posDevice.update({
         where: { id: device.id },
         data: { lastSeenAt: new Date() },

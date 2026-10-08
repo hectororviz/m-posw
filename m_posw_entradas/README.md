@@ -11,6 +11,10 @@ Contrato válido: `docs/contrato-pos-entradas.txt` del repo principal.
 2. En la app: Config → Escanear QR (o pegar `baseUrl` + `token` manual) → Probar conexión.
 3. El token se guarda en `EncryptedSharedPreferences`, nunca se loguea ni imprime.
 4. `401 DEVICE_REVOKED` → se borra el token y pide re-pairing.
+5. El modo (ENTRADAS/POS) lo define el servidor (`GET /entradas/devices/me`,
+   consultado en cada arranque y al volver a primer plano; offline usa el
+   último conocido). El QR nunca lleva el modo. `403 DEVICE_WRONG_MODE` →
+   avisar sin borrar el token.
 
 ## Uso
 - Venta: elige partido (spinner solo si hay >1), sector con nombres de clubes (LOCAL = `clubName`, VISITANTE = rival del fixture), cantidad 1–10 con +/−, opcional Botón Socio (escanea credencial → `GET socios/:uuid`, exige `AL_DIA`; la ✕ para quitarlo aparece solo con socio aplicado). Debajo del cobro hay contador de vendidas por sector; Reimprimir queda último. Al aprobarse (CASH o QR) se muestra un diálogo de éxito con animación nativa + códigos y total.
@@ -48,3 +52,16 @@ El APK sale en `app/build/outputs/apk/debug/`. Probado en Sunmi V2s
 - [ ] CASH 1x LOCAL imprime L-001 con escudo
 - [ ] MP_QR muestra imagen, pago con teléfono, poll aprueba e imprime
 - [ ] Cancel libera PENDING; EXPIRED a los ~10 min sin pago
+
+## Modo POS (bufet)
+Misma APK, `ui/pos/` (no importa `ui/entradas`, solo común). El servidor
+define el modo (`GET /entradas/devices/me`); sin modo validado la app
+queda en Configuración.
+- Dash con tabs por categoría (swipe), total abajo, carrito slide-up
+  (+/−/eliminar), botón único PAGAR → CASH (numpad) o QR + un único
+  escaneo de descuento (UUID socio o `ENT:código`, se bifurca por formato
+  con los endpoints ya existentes).
+- QR: imagen estática `pos-device/mp-qr` + polling 2s/120s, misma
+  animación de éxito que Entradas e impresión Sunmi del ticket bufet.
+- Sin pinch-to-zoom: tamaño de texto S/M/L en Config.
+- Ventas atribuidas al usuario genérico `pos-terminal` (seed).

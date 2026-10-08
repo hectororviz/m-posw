@@ -256,19 +256,60 @@ export class EntradasAdminService {
     return this.prisma.posDevice.findMany({
       where: { revokedAt: null },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, nombre: true, activo: true, revokedAt: true, lastSeenAt: true, createdAt: true },
+      select: { id: true, nombre: true, tipo: true, activo: true, revokedAt: true, lastSeenAt: true, createdAt: true },
     });
   }
 
-  async createDevice(nombre: string) {
+  async createDevice(nombre: string, tipo?: string) {
     const clean = (nombre ?? '').trim();
     if (!clean) throw new BadRequestException('Nombre requerido');
+    const kind = this.parseDeviceTipo(tipo);
     const token = generateDeviceToken();
     const device = await this.prisma.posDevice.create({
-      data: { nombre: clean, tokenHash: hashDeviceToken(token) },
-      select: { id: true, nombre: true, activo: true, createdAt: true },
+      data: { nombre: clean, tipo: kind, tokenHash: hashDeviceToken(token) },
+      select: { id: true, nombre: true, tipo: true, activo: true, createdAt: true },
     });
     return { ...device, token };
+  }
+
+  private parseDeviceTipo(tipo: string | undefined, field = 'tipo'): 'ENTRADAS' | 'POS' {
+    if (!tipo) return 'ENTRADAS';
+    const upper = tipo.trim().toUpperCase();
+    if (upper !== 'ENTRADAS' && upper !== 'POS') {
+      throw new BadRequestException(`Tipo de dispositivo inválido en ${field}: use ENTRADAS o POS`);
+    }
+    return upper;
+  }
+
+  /**
+   * Cambio de modo sin re-pairing (el token no cambia).
+   * Se bloquea si la terminal tiene ventas PENDING sin sincronizar,
+   * salvo force explícito del admin.
+   */
+  async updateDeviceTipo(id: string, tipo: string, force = false) {
+    const kind = this.parseDeviceTipo(tipo);
+    const device = await this.prisma.posDevice.findUnique({ where: { id } });
+    if (!device) throw new NotFoundException('Dispositivo no encontrado');
+    if (device.tipo === kind) {
+      return { id: device.id, nombre: device.nombre, tipo: device.tipo };
+    }
+    if (!force) {
+      const pending = await this.prisma.ticketSale.count({
+        where: { deviceId: id, status: 'PENDING' },
+      });
+      if (pending > 0) {
+        throw new ConflictException({
+          code: 'DEVICE_HAS_PENDING_SALES',
+          message: `La terminal tiene ${pending} venta(s) pendiente(s) sin sincronizar`,
+          pending,
+        });
+      }
+    }
+    return this.prisma.posDevice.update({
+      where: { id },
+      data: { tipo: kind },
+      select: { id: true, nombre: true, tipo: true },
+    });
   }
 
   async revokeDevice(id: string) {

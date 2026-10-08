@@ -39,6 +39,7 @@ object ApiClient {
         return when {
             msg.contains("401") -> "No autorizado (401). Revisá el token o re-vinculá."
             msg.contains("DEVICE_REVOKED") -> "Dispositivo revocado. Re-vinculá."
+            msg.contains("DEVICE_WRONG_MODE") -> "Modo incorrecto para esta terminal. Pedí que lo cambien en el front."
             else -> msg
         }
     }

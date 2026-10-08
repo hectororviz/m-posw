@@ -29,6 +29,20 @@ class SessionManager(context: Context) {
 
     val isPaired: Boolean get() = baseUrl.isNotBlank() && token.startsWith("ent_")
 
+    /**
+     * Último modo conocido asignado por el servidor (ENTRADAS | POS).
+     * UNKNOWN = aún no consultado. Solo el servidor define el modo;
+     * el QR de pairing nunca lo lleva.
+     */
+    var deviceMode: String
+        get() = prefs.getString("deviceMode", "UNKNOWN") ?: "UNKNOWN"
+        set(v) = prefs.edit().putString("deviceMode", v.trim().uppercase()).apply()
+
+    /** Tamaño de texto del POS (S/M/L). Sin pinch-to-zoom a propósito. */
+    var textScale: String
+        get() = (prefs.getString("textScale", "M") ?: "M").trim().uppercase().takeIf { it in setOf("S", "M", "L") } ?: "M"
+        set(v) = prefs.edit().putString("textScale", v.trim().uppercase()).apply()
+
     var templateVersion: Int
         get() = prefs.getInt("templateVersion", -1)
         set(v) = prefs.edit().putInt("templateVersion", v).apply()
@@ -52,6 +66,10 @@ class SessionManager(context: Context) {
     var clubName: String
         get() = prefs.getString("clubName", "") ?: ""
         set(v) = prefs.edit().putString("clubName", v.trim()).apply()
+
+    var storeName: String
+        get() = prefs.getString("storeName", "") ?: ""
+        set(v) = prefs.edit().putString("storeName", v.trim()).apply()
 
     var logoPath: String
         get() = prefs.getString("logoPath", "") ?: ""

@@ -1,4 +1,4 @@
-package com.mposw.entradas.ui
+package com.mposw.entradas.ui.entradas
 
 import android.Manifest
 import android.os.Bundle
@@ -23,6 +23,10 @@ import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.databinding.FragmentVentaBinding
 import com.mposw.entradas.printer.SunmiPrinter
 import com.mposw.entradas.printer.TicketRenderer
+import com.mposw.entradas.ui.BrandApplier
+import com.mposw.entradas.ui.MainActivity
+import com.mposw.entradas.ui.PagoExitosoDialogFragment
+import com.mposw.entradas.ui.ScannerActivity
 import kotlinx.coroutines.launch
 
 class VentaFragment : Fragment() {

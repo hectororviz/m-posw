@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView android:id="@+id/tvPayTotal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnScanDiscount"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Escanear descuento" />
+
+            <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnClearDiscount"
+                style="@style/Widget.Entradas.Button.Ghost"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="×"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView android:id="@+id/tvDiscountInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTabCash"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:text="Efectivo" />
+
+            <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTabQr"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:text="QR" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/cashBox"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <TextView android:id="@+id/tvCashReceived"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:text="$0" />
+
+            <TextView android:id="@+id/tvCashChange"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginTop="4dp"
+                android:textSize="16sp" />
+
+            <LinearLayout android:id="@+id/numpad"
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k1" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="1" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k2" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="2" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k3" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="3" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k4" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="4" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k5" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="5" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k6" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="6" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k7" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="7" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k8" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="8" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k9" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="9" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp">
+
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k0" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="0" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/k00" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="00" />
+                    <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/kBack" style="@style/Widget.Entradas.Button.Neutral" android:layout_width="0dp" android:layout_height="56dp" android:layout_weight="1" android:text="⌫" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnConfirmCash"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:text="Confirmar efectivo" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/qrBox"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCobrarQr"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Cobrar con QR" />
+        </LinearLayout>
+
+        <TextView android:id="@+id/tvPayError"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+</ScrollView>
