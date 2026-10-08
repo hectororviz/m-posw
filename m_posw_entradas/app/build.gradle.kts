@@ -37,7 +37,8 @@ android {
             reset()
             // Sunmi V2s y la mayoría de terminales son ARM.
             include("armeabi-v7a", "arm64-v8a")
-            isUniversalApk = false
+            // Universal para el APK instalable de cada release/tag.
+            isUniversalApk = true
         }
     }
 

@@ -65,7 +65,7 @@ jobs:
         run: ./gradlew :app:assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp m_posw_entradas/app/build/outputs/apk/debug/app-debug.apk mposw-terminal.apk
+        run: cp m_posw_entradas/app/build/outputs/apk/debug/app-universal-debug.apk mposw-terminal.apk
 
       - name: Publish rolling release
         uses: softprops/action-gh-release@v2

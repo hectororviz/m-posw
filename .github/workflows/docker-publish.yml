@@ -7,6 +7,9 @@ on:
       - main
     tags:
       - 'v*'
+    # Los cambios solo-APK no rebuildan imágenes (tienen su propio workflow).
+    paths-ignore:
+      - 'm_posw_entradas/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
