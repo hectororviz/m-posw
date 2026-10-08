@@ -120,7 +120,7 @@ export class UsersService {
   async update(id: string, dto: UpdateUserDto, requesterId?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { role: true },
+      select: { role: true, username: true },
     });
 
     if (!user) {
@@ -129,6 +129,15 @@ export class UsersService {
 
     if (user.role === 'ADMIN') {
       throw new BadRequestException('No se puede modificar al administrador');
+    }
+
+    if (user.username === 'pos-terminal') {
+      if (dto.active === false) {
+        throw new BadRequestException('No se puede desactivar al usuario pos-terminal (lo usan las terminales)');
+      }
+      if (dto.username !== undefined && dto.username !== 'pos-terminal') {
+        throw new BadRequestException('No se puede renombrar al usuario pos-terminal');
+      }
     }
 
     if (requesterId && id === requesterId && dto.active === false) {
@@ -189,6 +198,10 @@ export class UsersService {
 
     if (user.role === 'ADMIN') {
       throw new BadRequestException('No se puede eliminar al administrador');
+    }
+
+    if (user.username === 'pos-terminal') {
+      throw new BadRequestException('No se puede eliminar al usuario pos-terminal (lo usan las terminales)');
     }
 
     if (requesterId && id === requesterId) {

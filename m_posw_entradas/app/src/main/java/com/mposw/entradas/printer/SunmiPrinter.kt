@@ -197,9 +197,9 @@ object SunmiPrinter {
         }
     }
 
-    /** Bloques genéricos para tickets no-entradas (POS bufet). */
+    /** Bloques genéricos para tickets no-entradas (POS bufet). align: 0 izq, 1 centro, 2 der. */
     sealed interface PrintBlock {
-        data class Text(val line: String, val size: Float = 24f, val bold: Boolean = false) : PrintBlock
+        data class Text(val line: String, val size: Float = 24f, val bold: Boolean = false, val align: Int = 1) : PrintBlock
         data class Qr(val content: String) : PrintBlock
         data object Line : PrintBlock
         data object Feed : PrintBlock
@@ -223,7 +223,7 @@ object SunmiPrinter {
                                 WoyouConsts.ENABLE_BOLD,
                                 if (bl.bold) WoyouConsts.ENABLE else WoyouConsts.DISABLE,
                             )
-                            printer.setAlignment(1, noop)
+                            printer.setAlignment(bl.align.coerceIn(0, 2), noop)
                             printer.printText("${bl.line}\n", noop)
                         }
                         is PrintBlock.Qr -> {
