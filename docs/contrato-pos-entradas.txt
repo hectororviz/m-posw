@@ -1,7 +1,11 @@
 ================================================================
-CONTRATO API POS ENTRADAS - m-posw (v2, beneficios de bufet)
+CONTRATO API TERMINALES - m-posw (v3, APK única dual ENTRADAS/POS)
 ================================================================
-Estado: implementado en backend. No usar en produccion hasta aviso.
+Estado: implementado y en producción (Soler).
+v3 agrega: modo POS bufet (sección 7: catálogo, cash/QR/fiado, flags de
+pago, MP propio por terminal), página Sistema → Dispositivos (ABM +
+vinculación MP por device), Sale.deviceId. Sin fallback de MP: cada
+terminal con QR necesita su POS propio (400 MP_POS_NOT_LINKED si no).
 v2 agrega: beneficios de bufet por unidad (QR `ENT:<code>`) + endpoints
 de validacion/consumo. v1 sigue compatible (beneficios: [] si no aplica).
 
@@ -25,7 +29,8 @@ Header en TODAS las llamadas:
     el POST intent por timeout, manda el MISMO id)
 
 Provisioning (una vez, online):
-  Admin (web) genera device -> muestra token UNA vez + pairing:
+  Admin (web) genera device en Sistema → Dispositivos ("+": nombre +
+  tipo) -> muestra token UNA vez + pairing:
     {"baseUrl":"https://CLIENTE.mposw.com.ar/api","token":"ent_..."}
   El POS escanea el QR de pairing (o carga manual en prueba),
   guarda el token en secure storage. Nunca loguearlo ni imprimirlo.
@@ -38,8 +43,15 @@ Provisioning (una vez, online):
   solo avisa que el modo se cambia desde el front, sin re-vincular).
   2.1 GET /entradas/devices/me (cualquier token válido, sin @DeviceKind)
     200 {"id":"uuid","nombre":"Puerta 1","tipo":"ENTRADAS|POS","activo":true}
-    La app lo consulta en cada arranque y al volver a primer plano;
-    sin conexión usa el último modo conocido.
+    La app lo consulta en cada arranque, al volver a primer plano, cada
+    60s visible y ante cualquier 403; sin conexión usa el último modo
+    conocido. Sin modo validado la app queda en Configuración.
+
+  2.2 MP PROPIO POR TERMINAL (sin fallback, anti-colisiones)
+    Cada device con QR necesita su POS de MP vinculado (sección 7.1).
+    Sin vincular: MP_QR -> 400 {"code":"MP_POS_NOT_LINKED"}; CASH opera.
+    PUT/DELETE de órdenes usan el POS del device (posOverride); las
+    ventas web (deviceId null) usan el principal.
 
 3. ENDPOINTS (prefijo /entradas)
 --------------------------------
@@ -74,19 +86,16 @@ Provisioning (una vez, online):
    El beneficio NO descuenta la entrada: es para canjear en bufet.)
   201 MP_QR (pendiente):
     {"saleId":"uuid","status":"PENDING",
-     "qrImageUrl":"https://.../qr.png (o null si no configurado)",
+     "qrImageUrl":"https://.../qr.png (o null si no vinculado)",
      "templateVersion":7,"logoVersion":3}
     IMPORTANTE: el QR Instore es ESTATICO por POS (la misma imagen
-    para todas las ventas). Entradas usa su PROPIO POS de Mercado
-    Pago (se vincula en web: Entradas -> Configuracion -> POS
-    Mercado Pago de entradas, con la misma cuenta OAuth, sin tocar
-    el POS principal). El intent (PUT order) asocia el MONTO de esta
-    venta a esa orden; el cliente escanea el QR fijo y paga el
-    monto. El POS descarga la imagen UNA vez y la reutiliza.
-    Solo puede haber UNA orden QR activa por POS a la vez: con el
-    POS dedicado, la web y el terminal ya no se pisan (cada uno usa
-    el suyo). Si a futuro hay N terminales concurrentes, se necesita
-    1 POS MP por terminal.
+    para todas las ventas). Cada terminal usa su PROPIO POS de Mercado
+    Pago (se vincula en web: Sistema → Dispositivos → Zap, con la misma
+    cuenta OAuth; sin vincular el QR no opera). El intent (PUT order)
+    asocia el MONTO de esta venta a esa orden; el cliente escanea el QR
+    fijo y paga el monto. El POS descarga la imagen UNA vez y la reutiliza.
+    Solo puede haber UNA orden QR activa por POS a la vez: con 1 POS MP
+    por terminal concurrente no se pisan (compartir uno = colisiones).
     El monto se cobra en UNA sola linea (quantity 1): total =
     precio x cantidad - descuento.
   Errores: 409 SIN_STOCK / 410 FUERA_DE_VENTANA / 400 validacion
@@ -131,7 +140,8 @@ Provisioning (una vez, online):
   144px -> impreso ~145x160px ≈ 18x20mm. El admin muestra el calculo
   px->mm antes de subir.)
 
-3.7 GET /entradas/socios/:uuid -> FUTURO, en prueba no llamar.
+  3.7 GET /entradas/socios/:uuid (device Bearer, ambos modos)
+  Resuelve socio + beneficios para descuento (exige AL_DIA en app).
 
 3.8 BENEFICIOS DE BUFET (QR por unidad, validacion + consumo)
   La entrada puede traer un beneficio para bufet/cantina (ej: dto en
@@ -189,21 +199,23 @@ Reglas POS:
 -----------------------
 Formato Nest: {"statusCode":N,"message":"..."} o
 {"code":"...","message":"..."}. Cods propios: DEVICE_REVOKED(401),
-DEVICE_TOKEN_MISSING(401), ENTRADAS_DISABLED(403),
+DEVICE_TOKEN_MISSING(401), DEVICE_WRONG_MODE(403), MP_POS_NOT_LINKED(400),
+DEVICE_HAS_PENDING_SALES(409), ENTRADAS_DISABLED(403),
 FIXTURE_NO_DISPONIBLE(404), VENTA_NO_ENCONTRADA(404),
-FUERA_DE_VENTANA(410), SIN_BENEFICIO/SOCIO_NO_AL_DIA(400 futuro),
-RATE_LIMIT, NO_CANCELABLE, NO_APROBABLE.
-Polling: 2-3s hasta 5min, luego cancel + nuevo intent.
-MP en produccion con el mismo Store/POS ya configurado
-(OAuth/.env); externalReference=ticket-<saleId>.
+FUERA_DE_VENTANA(410), YA_CONSUMIDO(409), RATE_LIMIT, NO_CANCELABLE,
+NO_APROBABLE.
+Polling entradas: 2-3s hasta 5min, luego cancel + nuevo intent.
+MP en produccion con OAuth; externalReference=ticket-<saleId> (entradas)
+o sale-<saleId> (bufet). Columnas legacy mpEntradas* de Setting sin
+lectores (no usar).
 
-6. CHECKLIST PRIMERA PRUEBA (1 terminal Sunmi V2s)
+  6. CHECKLIST PRIMERA PRUEBA (1 terminal Sunmi V2s)
 --------------------------------------------------
 [ ] HTTPS a /api/ responde (GET vigentes con token)
 [ ] Pairing guarda token en el equipo
 [ ] Fixtures vigentes aparecen en su ventana 06:00-05:59
 [ ] Venta CASH 1x LOCAL imprime L-001 con escudo
-[ ] Venta MP_QR muestra QR, pago con telefono, poll aprueba
+[ ] Venta MP_QR muestra QR, pago con teléfono, poll aprueba
 [ ] Cancel libera PENDING; EXPIRED a los ~10min sin pago
 ================================================================
 Dudas al backend: mandar X-Request-Id + hora del POS + code.
@@ -213,25 +225,52 @@ Dudas al backend: mandar X-Request-Id + hora del POS + code.
 --------------------------------------------------------
 Auth: mismo Bearer ent_... Las rutas exigen @DeviceKind('pos'):
 un ENTRADAS recibe 403 DEVICE_WRONG_MODE. Ventas atribuidas al
-usuario genérico pos-terminal (seed + Setting.posDeviceUserId).
+usuario genérico pos-terminal (seed + Setting.posDeviceUserId) y
+ligadas por Sale.deviceId. Transferencia discontinuada: no existe
+en terminales (solo CASH / MP_QR / FIADO según Setting).
+
+  7.0 ADMIN (web, Sistema → Dispositivos, CONFIGURACION)
+    GET /dispositivos (lista con MP + última conexión)
+    POST /dispositivos {nombre,tipo} (token + pairing únicos)
+    PATCH /dispositivos/:id/tipo {tipo,force?} (409 si PENDING)
+    POST /dispositivos/:id/rotate|revoke
+    GET /dispositivos/mp-stores → {stores,[...],used:[{storeId,posId,
+      usedBy:"Principal (...)"|"Terminal <nombre>"}]}
+    POST /dispositivos/:id/mp-select {storeId,posId} (POS existente)
+    POST /dispositivos/:id/mp-setup {storeName,posName,dirección...}
+      (crea tienda+caja en MP, external_id con id del device)
+    POST /dispositivos/:id/mp-disconnect (el QR deja de operar)
 
   GET /pos-device/catalog
     200 {"categories":[{id,name,iconName,colorHex,ticket}],
          "products":[{id,name,price,stock,type,iconName,colorHex,
+           imagePath,imageUpdatedAt,
            categoryId,category:{id,name,ticket}}]}
     Solo activos, sin RAW_MATERIAL, respeta toggle Internet.
+    imagePath relativo a /uploads (resolver contra origen sin /api).
   GET /pos-device/mp-qr
     200 {"qrData":"...","linked":true} (QR del POS propio del device;
     null si no está vinculado → el QR no opera, CASH sí).
   GET /pos-device/settings
-    200 {"storeName":"...","clubName":"..."} (encabezado ticket).
+    200 {"storeName":"...","clubName":"...","enableCashPayment":true,
+      "enableQrPayment":true,"enableFiadoPayment":false}
+    (la app muestra solo los habilitados; sin ninguno → solo efectivo).
   POST /pos-device/sales/cash {items,total,paymentMethod:CASH,
     cashReceived,changeAmount,discountTotal?,socioId?,canjes?}
     201 venta completa (items + vouchers). Descuento socio validado
-    ±0.05 como en /sales (mismo SalesService).
+    ±0.05 como en /sales (mismo SalesService). Guarda Sale.deviceId.
   POST /pos-device/sales/qr {items,total,paymentMethod:MP_QR,...}
-    201 {saleId,orderNumber,status}. Approval por webhook (aplica
-    stock/finanzas/vouchers); la app pullea status cada 2s/120s.
+    201 {saleId,orderNumber,status}. Sin MP vinculado → 400
+    MP_POS_NOT_LINKED. PUT contra el POS propio; approval por webhook
+    (aplica stock/finanzas/vouchers); la app pullea status cada 2s/120s.
+  POST /pos-device/sales/fiado {items,total,paymentMethod:FIADO,
+    acreedorId,discountTotal?,socioId?,canjes?}
+    201 venta completa. Límite validado en servidor
+    (assertLimiteNoSuperado); guarda Sale.deviceId + FiadoVenta.
+  GET /pos-device/acreedores
+    200 [{id,nombre,activo,saldo,limiteDeuda,advertenciaDeuda,...}]
+    (misma forma que GET /acreedores; la app filtra activos y calcula
+    OK/ADVERTENCIA/LIMITE con total proyectado = saldo + total).
   GET /pos-device/sales/:id (venta completa con vouchers)
   GET /pos-device/sales/:id/status
   POST /pos-device/sales/:id/cancel
@@ -244,3 +283,13 @@ Lookups agnósticos (ambos modos, mismo contrato que antes):
   POST /entradas/beneficios/:code/consumir.
 El escaneo es único: UUID → camino socio, ENT:código → camino
 entrada (validar + consumir al aprobar). Sin lógica nueva.
+
+  8. CHECKLIST MODO POS (misma APK, Sistema → Dispositivos)
+  [ ] Device creado con tipo + MP propio vinculado (badge, no "Sin vincular")
+  [ ] Cambio ENTRADAS↔POS cambia la pantalla sola (≤60s, sin cerrar app)
+  [ ] Catálogo con fotos; S/M/L cambia texto+foto+columnas al volver
+  [ ] CASH exacto imprime ticket bufet; QR aprueba e imprime; Fiado con
+      acreedor OK/ADVERTENCIA(segundo tap)/LÍMITE(bloquea)
+  [ ] Socio AL_DIA aplica descuento; ATRASADO no; ENT: válido descuenta
+      y consume al aprobar
+  [ ] Sin papel: "Reimprimir última" reimprime

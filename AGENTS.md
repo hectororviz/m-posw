@@ -1084,7 +1084,7 @@ Módulo de venta de entradas desde terminal POS Android con impresora térmica (
 ### Estructura
 ```
 backend/src/modules/entradas/
-├── entradas.module.ts            # imports: Users, Sales (MP), Socios (QR/descuentos)
+├── entradas.module.ts            # imports: Users, Sales (MP), Socios (QR/descuentos), Acreedores (fiado POS)
 ├── entradas-admin.controller.ts  # CRUD web (JWT + RequireModule ENTRADAS)
 ├── entradas-device.controller.ts # API del terminal (EntradasDeviceGuard, Bearer ent_...)
 ├── device-lookup.controller.ts   # Lookups agnósticos (socio/beneficios, ambos modos)
@@ -1109,13 +1109,15 @@ EntradaTorneo ──1:N──> EntradaFixture <──N:1── EntradaRival
 EntradaFixture ──1:N──> TicketSale ──1:N──> TicketUnit
 EntradaFixture ──1:N──> EntradaContador (uno por sector)
 PosDevice ──1:N──> TicketSale
-SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; futuro)
+PosDevice ──1:N──> Sale (deviceId, ventas bufet; null = web)
+Sale ──1:N──> FiadoVenta (POS: vía pos-terminal + acreedorId)
 ```
 
 - **EntradaTorneo**: solo `nombre` + `precio` (precio único, sin L/V).
 - **EntradaRival**: solo `nombre`.
 - **EntradaFixture**: `fecha` + `torneoId` + `rivalId` + `ventanaDesde/Hasta` (default 06:00 → 05:59+1, editable). `@@unique(fecha, torneoId, rivalId)`.
-- **PosDevice**: `tokenHash` SHA256 (el token `ent_...` se muestra una sola vez + pairing `{baseUrl, token}` para QR). Revocable/rotatable. `tipo` ENTRADAS|POS + **MP propio** (`mpStoreId/mpPosId/mpQrData/...`, obligatorio para QR, sin fallback). Se gestiona en Sistema → Dispositivos (`/admin/dispositivos`, CONFIGURACION), no en Entradas.
+- **PosDevice**: `tokenHash` SHA256 (el token `ent_...` se muestra una sola vez + pairing `{baseUrl, token}` para QR). Revocable/rotatable. `tipo` ENTRADAS|POS + **MP propio** (`mpStoreId/mpPosId/mpQrData/...`, obligatorio para QR, sin fallback). Se gestiona en Sistema → Dispositivos (`/admin/dispositivos`, CONFIGURACION ─ FAB "+", modal con QR apilado + vinculación MP), no en Entradas.
+- **Usuario pos-terminal** (seed, password aleatorio, POS FULL): atribuye ventas de terminales (`Sale.userId`). Sin login posible.
 - **Sale.deviceId** nullable → terminal de origen (null = web con POS principal). El PUT/DELETE de órdenes MP usa el POS del device (`posOverride`); CASH no exige MP (`400 MP_POS_NOT_LINKED` solo en QR sin vincular).
 - **TicketSale**: `sector` informativo (mismo precio), `cantidad` 1-10, `CASH` aprueba directo, `MP_QR` crea orden Instore con `externalReference=ticket-<id>` en el **POS propio del device** (QR **estático** del device, monto en 1 línea `quantity=1`). `requestId` único = idempotencia.
 - **TicketUnit / EntradaContador**: numeración por partido y sector (`L-001`, `V-001`, series independientes, contador atómico + `updateMany` condicional anti-doble-aprobación).
@@ -1148,7 +1150,14 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 | `GET` | `/pos-device/mp-qr` | device POS | QR del POS propio (`null` sin vincular) |
 | `POST` | `/pos-device/sales/cash` | device POS | Venta contado (guarda `Sale.deviceId`) |
 | `POST` | `/pos-device/sales/qr` | device POS | Intent QR (400 `MP_POS_NOT_LINKED` sin MP) |
-| `GET` | `/entradas/mp-pos` | READ | Legacy dedicado (sin lectores; ver Dispositivos) |
+| `POST` | `/pos-device/sales/fiado` | device POS | Fiado con `acreedorId` (límite validado en servidor) |
+| `GET` | `/pos-device/acreedores` | device POS | Acreedores con saldo/límite/advertencia |
+| `GET` | `/pos-device/sales/:id` | device POS | Venta completa con vouchers |
+| `GET` | `/pos-device/sales/:id/status` | device POS | Polling QR (2s/120s) |
+| `POST` | `/pos-device/sales/:id/cancel` | device POS | Cancelar PENDING (DELETE en su POS) |
+| `POST` | `/pos-device/sales/:id/ticket-printed` | device POS | Marca impreso (anti-duplicado) |
+| `POST` | `/pos-device/socios/canjes` | device POS | Canjes post-venta (no bloquea) |
+| `GET` | `/pos-device/settings` | device POS | Tienda/club + flags `enableCash/Qr/FiadoPayment` (sin transfer) |
 | `GET` | `/entradas/mp-pos/detect-stores` | READ | Legacy (ver `/dispositivos/mp-stores`) |
 | `POST` | `/entradas/mp-pos/select` | FULL | Legacy (ver `/dispositivos/:id/mp-select`) |
 | `POST` | `/entradas/mp-pos/setup` | FULL | Legacy (ver `/dispositivos/:id/mp-setup`) |
@@ -1170,7 +1179,7 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 | `POST` | `/entradas/sales/:id/cancel` | device | Cancelar PENDING (+ `deleteOrder` MP) |
 | `GET` | `/entradas/beneficios/:code` | device | Validar QR bufet |
 | `POST` | `/entradas/beneficios/:code/consumir` | device | Consumir uso único (409 `YA_CONSUMIDO`) |
-| `GET` | `/entradas/socios/:uuid` | device | Socio + beneficios (futuro, sin uso en prueba) |
+| `GET` | `/entradas/socios/:uuid` | device | Socio + beneficios (descuentos POS y entradas) |
 
 ### Webhook MP
 `MercadoPagoWebhookProcessorService` deriva `externalReference` con prefijo `ticket-` a `EntradasSalesService` (vía `ModuleRef` lazy, sin ciclo de módulos): aprueba y genera `L-/V-`, registra `SocioCanje` si hubo descuento. `normalizeSaleId` no se tocó (solo `sale-`).
@@ -1181,10 +1190,19 @@ SocioBeneficio ──N:1──> EntradaTorneo (entradaTorneoId null = todos; fut
 
 ### Frontend
 `frontend/src/pages/AdminEntradasPage.tsx` — tabs `Ventas | Calendario | ABM | Beneficios | Diseño | Configuración` (subnav `treasury-subnav-link`). Tab Beneficios (FULL: CRUD + toggle) y validador de QR en Ventas (READ: validar/consumir). Tab Diseño con editor de bloques + preview en vivo (datos ejemplo, 32 cols, escudo real) y upload de escudo 1-bit. Tab Configuración: link a Sistema → Dispositivos (ahí viven terminales + MP). Hooks en `api/queries.ts` (`useEntradaTorneos`, `useEntradaRivales`, `useEntradaFixtures`, `usePosDevices`, `useTicketSales`, `useEntradasSalesSummary`, `useEntradaTicketTemplate`, `useEntradaEscudoInfo`, `useEntradasMpPos`, `useEntradaBeneficios`). Ruta `/admin/entradas` con `ModuleRoute ENTRADAS`; sidebar Ventas con ícono Ticket.
-`frontend/src/pages/AdminDispositivosPage.tsx` — FAB "+" abre modal de alta (nombre+tipo → token + QR en el mismo modal) + tabla con MP por terminal y modal de vincular (Detectar con badges de uso, Crear, Desvincular). Ruta `/admin/dispositivos` con `ModuleRoute CONFIGURACION`; sidebar Sistema.
+`frontend/src/pages/AdminDispositivosPage.tsx` — FAB "+" abre modal de alta (nombre+tipo → token + QR apilado + vinculación MP en el mismo modal) + tabla con MP por terminal y modal de vincular (Detectar con badges Libre/Principal/Terminal X, Crear, Desvincular). Ruta `/admin/dispositivos` con `ModuleRoute CONFIGURACION`; sidebar Sistema.
+
+### APK Terminal (`m_posw_entradas/`, dual ENTRADAS/POS, README propio)
+Un módulo, paquetes `ui/entradas/` y `ui/pos/` sin imports cruzados (CI lo verifica con grep). Común: `data/` (ApiClient/SessionManager/ModeResolver), `printer/`, Scanner, Config, `PagoExitosoDialogFragment`.
+- **Modo**: `GET devices/me` en arranque, `onResume`, ticker 60s (solo visible) y ante 403 → cambia de pantalla solo. Sin modo validado queda en Config. Offline usa último conocido. `SessionManager.deviceMode`.
+- **Room**: `entradas.db` (`approved_sales`) solo en ENTRADAS; `pos.db` (cache catálogo + aprobadas) solo en POS. Sin `Application` custom (RAM 1GB).
+- **POS UI**: dash `TabLayout+ViewPager2` con fotos (Coil, `imagePath` de catalog, fallback color/emoji), total+count, botón `$` (acento) + gear a Config; carrito en franja slide-up; pay-sheet con métodos por Setting (CASH exacto/QR/Fiado, sin transferencia); escaneo único (UUID→socio, `ENT:`→beneficio con tope, consume al aprobar); Fiado con estados OK/⛔/⚠️ (límite bloquea, advertencia doble-tap); ticket Sunmi = contenido `TicketPayload` web; S/M/L (texto+foto+columnas, `scaleDirty`).
+- **Config**: sello `vX.Y.Z (sha)` (`BuildConfig.GIT_SHA`, versionCode 2+) para confirmar build en equipo.
+- **CI**: `.github/workflows/build-apk.yml` (tag único `terminal-latest`, package-separation check, `assembleRelease` + debug universal). `docker-publish.yml` ignora `m_posw_entradas/**`.
 
 ### Límites conocidos (v1)
 - Una sola orden QR activa por POS de MP: con MP propio por terminal, cada una usa el suyo y no se pisan. Sin vincular, el QR no opera (`MP_POS_NOT_LINKED`); CASH sí.
+- Transferencia discontinuada en terminales (solo web).
 - `SocioCanje.usuarioId` ahora nullable (`posId` = deviceId) para canjes POS.
 
 ## Important Constraints
