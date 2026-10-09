@@ -1,10 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, Liga, LigaCategoria, LigaEquipo, LigaPosicion, LigaProximoPartido, LigaResultado, LigaMatchdayGroup, LigasConfig, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo, MpStoresResponse } from './types';
+import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo, MpStoresResponse } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
-const tenMinutes = 10 * 60 * 1000;
 const posStaleTime = 60 * 1000;
 
 export const useCategories = () =>
@@ -448,125 +447,6 @@ export const useStaffVouchers = (enabled = true) =>
     enabled,
     staleTime: 30000,
   });
-
-// --- Ligas ---
-
-export const useLigasLeagues = () =>
-  useQuery({
-    queryKey: ['ligas-leagues'],
-    queryFn: async () => {
-      const response = await apiClient.get<Liga[]>('/ligas/leagues');
-      return response.data;
-    },
-    staleTime: tenMinutes,
-  });
-
-export const useLigasCategories = (leagueId?: string) =>
-  useQuery({
-    queryKey: ['ligas-categories', leagueId],
-    queryFn: async () => {
-      const response = await apiClient.get<LigaCategoria[]>(`/ligas/leagues/${leagueId}/categories`);
-      return response.data;
-    },
-    enabled: !!leagueId,
-  });
-
-export const useLigasTeams = (leagueId?: string) =>
-  useQuery({
-    queryKey: ['ligas-teams', leagueId],
-    queryFn: async () => {
-      const response = await apiClient.get<LigaEquipo[]>(`/ligas/leagues/${leagueId}/teams`);
-      return response.data;
-    },
-    enabled: !!leagueId,
-  });
-
-export const useLigasStandings = (leagueId?: string, categoryId?: string) =>
-  useQuery({
-    queryKey: ['ligas-standings', leagueId, categoryId],
-    queryFn: async () => {
-      const params = new URLSearchParams({ leagueId: leagueId! });
-      if (categoryId) params.set('categoryId', categoryId);
-      const response = await apiClient.get<LigaPosicion[]>(`/ligas/standings?${params}`);
-      return response.data;
-    },
-    enabled: !!leagueId,
-    staleTime: fiveMinutes,
-  });
-
-export const useLigasNextMatches = (teamId?: string, leagueId?: string) =>
-  useQuery({
-    queryKey: ['ligas-next', teamId, leagueId],
-    queryFn: async () => {
-      const response = await apiClient.get<LigaProximoPartido[]>(
-        `/ligas/teams/${teamId}/next-matches?leagueId=${leagueId}`,
-      );
-      return response.data;
-    },
-    enabled: !!teamId && !!leagueId,
-  });
-
-export const useLigasResults = (teamId?: string, leagueId?: string, categoryId?: string) =>
-  useQuery({
-    queryKey: ['ligas-results', teamId, leagueId, categoryId],
-    queryFn: async () => {
-      const params = new URLSearchParams({ leagueId: leagueId! });
-      if (categoryId) params.set('categoryId', categoryId);
-      const response = await apiClient.get<LigaResultado[]>(
-        `/ligas/teams/${teamId}/results?${params}`,
-      );
-      return response.data;
-    },
-    enabled: !!teamId && !!leagueId,
-    staleTime: fiveMinutes,
-  });
-
-export const useLigasAllMatches = (teamId?: string, leagueId?: string) =>
-  useQuery({
-    queryKey: ['ligas-all', teamId, leagueId],
-    queryFn: async () => {
-      const response = await apiClient.get<LigaMatchdayGroup[]>(
-        `/ligas/teams/${teamId}/all-matches?leagueId=${leagueId}`,
-      );
-      return response.data;
-    },
-    enabled: !!teamId && !!leagueId,
-    staleTime: fiveMinutes,
-  });
-
-export const useLigasConfigs = () =>
-  useQuery({
-    queryKey: ['ligas-configs'],
-    queryFn: async () => {
-      const response = await apiClient.get<LigasConfig[]>('/ligas/configs');
-      return response.data;
-    },
-  });
-
-export const useLigasCreateConfig = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (data: { nombre?: string; leagueId: string; leagueName: string; teamId: string; teamName: string }) => {
-      const response = await apiClient.post<LigasConfig>('/ligas/configs', data);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ligas-configs'] });
-    },
-  });
-};
-
-export const useLigasDeleteConfig = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await apiClient.delete(`/ligas/configs/${id}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ligas-configs'] });
-    },
-  });
-};
 
 // ─── Players / Jugadores ─────────────────────────────────
 

@@ -24,7 +24,7 @@ interface NavItem {
   to: string;
   icon: ReactNode;
   label: string;
-  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enableLigasModule' | 'enablePlayersModule' | 'enablePatrimonioModule' | 'enableNotificationsModule' | 'enableEntradasModule';
+  moduleKey?: 'enableSociosModule' | 'enableTreasuryModule' | 'enableAcreedoresModule' | 'enableInternetModule' | 'enablePlayersModule' | 'enablePatrimonioModule' | 'enableNotificationsModule' | 'enableEntradasModule';
   permissionModule?: string;
 }
 
@@ -64,7 +64,6 @@ const navCategories: NavCategoryDef[] = [
     label: 'Deportes',
     icon: <Trophy size={iconSize} />,
     children: [
-      { to: '/admin/ligas',     icon: <Trophy size={iconSize} />,       label: 'Ligas',          moduleKey: 'enableLigasModule',    permissionModule: 'LIGAS' },
       { to: '/admin/players',   icon: <UsersRound size={iconSize} />,   label: 'Jugadores',      moduleKey: 'enablePlayersModule',  permissionModule: 'PLAYERS' },
     ],
   },

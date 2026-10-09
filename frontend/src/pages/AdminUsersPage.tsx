@@ -17,7 +17,6 @@ const ALL_MODULES: { key: ModuleKey; label: string }[] = [
   { key: 'SOCIOS', label: 'Socios' },
   { key: 'TESORERIA', label: 'Tesorería' },
   { key: 'PATRIMONIO', label: 'Patrimonio' },
-  { key: 'LIGAS', label: 'Ligas' },
   { key: 'PLAYERS', label: 'Jugadores' },
   { key: 'INTERNET', label: 'Internet' },
   { key: 'ENTRADAS', label: 'Entradas' },

@@ -73,10 +73,6 @@ export class UpdateSettingDto {
 
   @IsOptional()
   @IsBoolean()
-  enableLigasModule?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
   enablePlayersModule?: boolean;
 
   @IsOptional()

@@ -25,7 +25,6 @@ enum ModuleKey {
   CONFIGURACION
   PLAYERS
   PATRIMONIO
-  LIGAS
   NOTIFICACIONES
   ENTRADAS
 }
@@ -307,7 +306,6 @@ model Setting {
   tasaInteresMensualAcreedores Decimal? @db.Decimal(5, 2)
   interesFechaAmnistia DateTime?
   enableInternetModule        Boolean @default(false)
-  enableLigasModule           Boolean @default(false)
   enablePlayersModule         Boolean @default(false)
   enablePatrimonioModule      Boolean @default(true)
   enableNotificationsModule   Boolean  @default(false)
@@ -356,18 +354,6 @@ model Setting {
   mpDisponibleAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
-
-model LigasConfig {
-  id        String   @id @default(uuid()) @db.Uuid
-  nombre    String   @default("")
-  leagueId  String
-  leagueName String
-  teamId    String
-  teamName  String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model ProductOrderCounter {

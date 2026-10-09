@@ -19,7 +19,6 @@ import { InternetVouchersModule } from './internet-vouchers/internet-vouchers.mo
 import { SociosModule } from './socios/socios.module';
 import { UsersModule } from './users/users.module';
 import { HomeModule } from './home/home.module';
-import { LigasModule } from './ligas/ligas.module';
 import { PlayersModule } from './players/players.module';
 import { PlayerCategoriesModule } from './player-categories/player-categories.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
@@ -42,7 +41,6 @@ import { EntradasModule } from './entradas/entradas.module';
     CategoriesModule,
     IconsModule,
     InternetVouchersModule,
-    LigasModule,
     MercadoPagoOauthModule,
     PaymentsModule,
     ProductsModule,

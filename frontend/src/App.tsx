@@ -30,9 +30,6 @@ import { CheckoutQrPage } from './pages/CheckoutQrPage';
 import { OAuthReturnPage } from './pages/OAuthReturnPage';
 import { PrintTicketPage } from './pages/PrintTicketPage';
 import { SalesPage } from './pages/SalesPage';
-import { LigasLayout } from './pages/LigasLayout';
-import { LigasStandingsPage } from './pages/LigasStandingsPage';
-import { LigasConfigPage } from './pages/LigasConfigPage';
 import { PlayersLayout } from './pages/players/PlayersLayout';
 import { PlayersDashboardPage } from './pages/players';
 import { PlayersPage } from './pages/players/PlayersPage';
@@ -211,15 +208,6 @@ export const App: React.FC = () => {
             <AdminEntradasPage />
           </ModuleRoute>
         } />
-        <Route path="ligas" element={
-          <ModuleRoute module="LIGAS">
-            <LigasLayout />
-          </ModuleRoute>
-        }>
-          <Route index element={<Navigate to="/admin/ligas/configuracion" replace />} />
-          <Route path=":configId" element={<LigasStandingsPage />} />
-          <Route path="configuracion" element={<LigasConfigPage />} />
-        </Route>
         <Route path="players" element={
           <ModuleRoute module="PLAYERS">
             <PlayersLayout />

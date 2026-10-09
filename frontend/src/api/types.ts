@@ -10,7 +10,6 @@ export type ModuleKey =
   | 'ACREEDORES'
   | 'PRODUCTOS'
   | 'INTERNET'
-  | 'LIGAS'
   | 'PLAYERS'
   | 'REPORTES'
   | 'CONFIGURACION'
@@ -186,7 +185,6 @@ export interface Setting {
   tasaInteresMensualAcreedores?: number | null;
   interesFechaAmnistia?: string | null;
   enableInternetModule?: boolean | null;
-  enableLigasModule?: boolean | null;
   enablePlayersModule?: boolean | null;
   enablePatrimonioModule?: boolean | null;
   enableNotificationsModule?: boolean | null;
@@ -207,95 +205,6 @@ export interface Setting {
   mpTokenExpiresAt?: string | null;
   mpPosId?: string | null;
   mpQrData?: string | null;
-}
-
-export interface Liga {
-  id: string;
-  name: string;
-  active: boolean;
-}
-
-export interface LigaCategoria {
-  id: string;
-  name: string;
-  league_id: string;
-}
-
-export interface LigaEquipo {
-  id: string;
-  name: string;
-  short_name: string;
-  logo_url: string | null;
-  city: string;
-}
-
-export interface LigaPosicion {
-  position: number;
-  teamId: string;
-  teamName: string;
-  teamShortName: string;
-  pj: number;
-  pg: number;
-  pe: number;
-  pp: number;
-  gf: number;
-  gc: number;
-  dg: number;
-  pts: number;
-}
-
-export interface LigaProximoPartido {
-  id: string;
-  matchday: number | null;
-  match_date: string | null;
-  categoryName: string;
-  opponentName: string;
-  isLocal: boolean;
-  isPast: boolean;
-}
-
-export interface LigaResultado {
-  id: string;
-  matchday: number | null;
-  match_date: string | null;
-  categoryName: string;
-  localName: string;
-  localGoals: number | null;
-  awayGoals: number | null;
-  awayName: string;
-  isWon: boolean;
-  isDraw: boolean;
-}
-
-export interface LigaMatchdayMatch {
-  id: string;
-  categoryName: string;
-  status: string;
-  localGoals: number | null;
-  awayGoals: number | null;
-  isLocal: boolean;
-  isWon: boolean;
-  isDraw: boolean;
-}
-
-export interface LigaMatchdayGroup {
-  matchday: number;
-  match_date: string | null;
-  opponentName: string;
-  isLocal: boolean;
-  matches: LigaMatchdayMatch[];
-}
-
-export interface LigasConfig {
-  id: string;
-  nombre: string;
-  leagueId: string;
-  leagueName: string;
-  teamId: string;
-  teamName: string;
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface MpOauthStatus {

@@ -61,7 +61,6 @@ export const AdminSettingsPage: React.FC = () => {
     tasaInteresMensualAcreedores: '',
     interesFechaAmnistia: '',
     enableInternetModule: false,
-    enableLigasModule: false,
     enablePlayersModule: false,
     enablePatrimonioModule: true,
     enableNotificationsModule: false,
@@ -162,7 +161,6 @@ export const AdminSettingsPage: React.FC = () => {
         tasaInteresMensualAcreedores: settings.tasaInteresMensualAcreedores != null ? String(settings.tasaInteresMensualAcreedores) : '',
         interesFechaAmnistia: settings.interesFechaAmnistia != null ? String(settings.interesFechaAmnistia).slice(0, 10) : '',
         enableInternetModule: settings.enableInternetModule ?? false,
-        enableLigasModule: settings.enableLigasModule ?? false,
         enablePlayersModule: settings.enablePlayersModule ?? false,
         enablePatrimonioModule: settings.enablePatrimonioModule ?? true,
         enableNotificationsModule: settings.enableNotificationsModule ?? false,
@@ -1003,19 +1001,6 @@ export const AdminSettingsPage: React.FC = () => {
                   <strong>Módulo de Internet / Vouchers WiFi</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Agrega la categoria "Internet" en el POS y permite vender vouchers de acceso WiFi</small>
-                </span>
-              </label>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={form.enableLigasModule}
-                  onChange={(e) => setForm({ ...form, enableLigasModule: e.target.checked })}
-                />
-                <span className="toggle-switch-track" />
-                <span>
-                  <strong>Módulo de Ligas Deportivas</strong>
-                  <br />
-                  <small style={{ color: 'var(--color-text-faint)' }}>Muestra tablas de posiciones y partidos de ligas de futbol</small>
                 </span>
               </label>
               <label className="toggle-switch">
