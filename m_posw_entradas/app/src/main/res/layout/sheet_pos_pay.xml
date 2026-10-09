@@ -22,6 +22,9 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="12dp"
+            app:icon="@drawable/ic_cash"
+            app:iconSize="24dp"
+            app:iconGravity="textStart"
             android:text="Efectivo" />
 
         <com.google.android.material.button.MaterialButton
@@ -30,6 +33,9 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="8dp"
+            app:icon="@drawable/ic_qr"
+            app:iconSize="24dp"
+            app:iconGravity="textStart"
             android:text="QR" />
 
         <com.google.android.material.button.MaterialButton
@@ -38,6 +44,9 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="8dp"
+            app:icon="@drawable/ic_fiado"
+            app:iconSize="24dp"
+            app:iconGravity="textStart"
             android:text="Fiado"
             android:visibility="gone" />
 

@@ -26,7 +26,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnConfig: ImageButton
     private lateinit var btnSocioBottom: MaterialButton
     private lateinit var tvTotalBottom: TextView
-    private lateinit var tvUltimosNumeros: TextView
+    private lateinit var tvChipLocal: TextView
+    private lateinit var tvChipVisitante: TextView
     private lateinit var session: SessionManager
 
     private var currentMode: DeviceMode? = null
@@ -45,7 +46,8 @@ class MainActivity : AppCompatActivity() {
         btnConfig = findViewById(R.id.btnConfig)
         btnSocioBottom = findViewById(R.id.btnSocioBottom)
         tvTotalBottom = findViewById(R.id.tvTotalBottom)
-        tvUltimosNumeros = findViewById(R.id.tvUltimosNumeros)
+        tvChipLocal = findViewById(R.id.tvChipLocal)
+        tvChipVisitante = findViewById(R.id.tvChipVisitante)
 
         if (savedInstanceState == null) {
             refreshMode()
@@ -144,17 +146,25 @@ class MainActivity : AppCompatActivity() {
         val isEntradas = currentMode == DeviceMode.ENTRADAS
         bottomBar.visibility = if (inHome && isEntradas) View.VISIBLE else View.GONE
         ultimosBar.visibility =
-            if (inHome && isEntradas && tvUltimosNumeros.text.isNotBlank()) View.VISIBLE else View.GONE
+            if (inHome && isEntradas && (tvChipLocal.text.isNotBlank() || tvChipVisitante.text.isNotBlank())) View.VISIBLE else View.GONE
     }
 
-    fun setUltimosNumeros(text: String) {
-        if (!::tvUltimosNumeros.isInitialized) return
-        tvUltimosNumeros.text = text
+    fun setUltimosNumeros(local: Int, visitante: Int) {
+        if (!::tvChipLocal.isInitialized) return
+        tvChipLocal.text = "Local $local"
+        tvChipVisitante.text = "Visitante $visitante"
         if (::ultimosBar.isInitialized) {
             val inHome = supportFragmentManager.backStackEntryCount == 0
             ultimosBar.visibility =
-                if (inHome && currentMode == DeviceMode.ENTRADAS && text.isNotBlank()) View.VISIBLE else View.GONE
+                if (inHome && currentMode == DeviceMode.ENTRADAS) View.VISIBLE else View.GONE
         }
+    }
+
+    fun clearUltimosNumeros() {
+        if (!::tvChipLocal.isInitialized) return
+        tvChipLocal.text = ""
+        tvChipVisitante.text = ""
+        if (::ultimosBar.isInitialized) ultimosBar.visibility = View.GONE
     }
 
     private fun applySavedTheme() {
@@ -177,5 +187,8 @@ class MainActivity : AppCompatActivity() {
         if (!::btnSocioBottom.isInitialized) return
         btnSocioBottom.isChecked = active
         btnSocioBottom.alpha = if (active) 1f else 0.85f
+        val desc = if (active) getString(R.string.socio_quitar) else getString(R.string.socio_escanear)
+        btnSocioBottom.contentDescription = desc
+        if (android.os.Build.VERSION.SDK_INT >= 26) btnSocioBottom.tooltipText = desc
     }
 }

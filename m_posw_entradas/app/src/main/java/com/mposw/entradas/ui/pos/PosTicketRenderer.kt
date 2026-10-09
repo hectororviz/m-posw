@@ -1,11 +1,11 @@
 package com.mposw.entradas.ui.pos
 
 import android.content.Context
+import com.mposw.entradas.util.MoneyFormat
 import com.mposw.entradas.data.PosSale
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.printer.SunmiPrinter
 import com.mposw.entradas.printer.SunmiPrinter.PrintBlock
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -20,10 +20,6 @@ import java.util.TimeZone
  * efectivo/vuelto y sin escudo: la web no los imprime.
  */
 object PosTicketRenderer {
-    private val money = NumberFormat.getCurrencyInstance(Locale("es", "AR")).apply {
-        minimumFractionDigits = 2
-        maximumFractionDigits = 2
-    }
 
     suspend fun print(ctx: Context, sale: PosSale): Boolean {
         val session = SessionManager(ctx)
@@ -63,7 +59,7 @@ object PosTicketRenderer {
 
         val total = sale.total?.toDoubleOrNull()
             ?: items.sumOf { it.subtotal?.toDoubleOrNull() ?: 0.0 }
-        blocks.add(PrintBlock.Text("Total  ${money.format(total)}", 28f, true))
+        blocks.add(PrintBlock.Text("Total  ${MoneyFormat.format(total)}", 28f, true))
 
         for (item in items) {
             blocks.add(PrintBlock.Line)

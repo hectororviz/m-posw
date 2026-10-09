@@ -2,42 +2,53 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="16dp">
+    android:layout_height="match_parent">
 
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:padding="16dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnVolver"
-            style="@style/Widget.Entradas.Button.Ghost"
-            android:layout_width="wrap_content"
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbarConfig"
+            style="@style/Widget.Entradas.Toolbar"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/volver" />
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:title="@string/config_titulo" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="Vinculación con la app principal"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
 
-        <EditText android:id="@+id/etBaseUrl"
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="https://CLIENTE.mposw.com.ar/api"
-            android:inputType="textUri" />
+            android:hint="URL del servidor">
 
-        <EditText android:id="@+id/etToken"
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/etBaseUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textUri" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="ent_..."
-            android:inputType="textPassword" />
+            android:hint="Token de acceso"
+            app:endIconMode="password_toggle">
+
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/etToken"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textPassword" />
+        </com.google.android.material.textfield.TextInputLayout>
 
         <LinearLayout
             android:orientation="horizontal"
@@ -47,7 +58,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScanPairing"
-                style="@style/Widget.Entradas.Button.Neutral"
+                style="@style/Widget.Entradas.Button.Secondary"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -56,49 +67,48 @@
             <Space android:layout_width="8dp" android:layout_height="wrap_content" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSave"
+                android:id="@+id/btnTest"
+                style="@style/Widget.Entradas.Button.Secondary"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:minHeight="52dp"
-                android:text="Guardar" />
+                android:text="@string/probar_conexion" />
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnTest"
-            style="@style/Widget.Entradas.Button.Ghost"
+            android:id="@+id/btnSave"
+            style="@style/Widget.Entradas.Button.Primary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="@string/probar_conexion" />
+            android:text="@string/guardar" />
 
         <TextView android:id="@+id/tvConfigStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:textSize="14sp" />
+            android:textAppearance="@style/TextAppearance.Entradas.Label" />
 
         <TextView android:id="@+id/tvVersions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:textSize="13sp" />
+            android:gravity="end"
+            android:textAppearance="@style/TextAppearance.Entradas.Support" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="Tamaño (POS)"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/tgTextScale"
+            style="@style/Widget.Entradas.ToggleGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:singleSelection="true"
-            app:selectionRequired="true">
+            android:layout_marginTop="8dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScaleS"
@@ -107,7 +117,9 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:checkable="true"
-                android:text="Chico" />
+                android:text="Chico"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScaleM"
@@ -116,7 +128,9 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:checkable="true"
-                android:text="Medio" />
+                android:text="Medio"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScaleL"
@@ -125,7 +139,9 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:checkable="true"
-                android:text="Grande" />
+                android:text="Grande"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <TextView
@@ -133,16 +149,14 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/apariencia"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/tgTheme"
+            style="@style/Widget.Entradas.ToggleGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            app:singleSelection="true"
-            app:selectionRequired="true">
+            android:layout_marginTop="8dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnThemeSystem"
@@ -153,7 +167,9 @@
                 android:checkable="true"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:text="@string/tema_sistema" />
+                android:text="@string/tema_sistema"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnThemeLight"
@@ -164,7 +180,9 @@
                 android:checkable="true"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:text="@string/tema_claro" />
+                android:text="@string/tema_claro"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnThemeDark"
@@ -175,7 +193,9 @@
                 android:checkable="true"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:text="@string/tema_oscuro" />
+                android:text="@string/tema_oscuro"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 </ScrollView>

@@ -23,6 +23,18 @@
     <color name="surface_variant">#E2E8F0</color>
     <color name="on_surface_variant">#475569</color>
     <color name="outline">#94A3B8</color>
+    <color name="outline_variant">#CBD5E1</color>
     <color name="surface_alt">#FFFFFF</color>
+    <color name="surface_container_lowest">#FFFFFF</color>
+    <color name="surface_container_low">#F1F5F9</color>
+    <color name="surface_container">#E9EEF4</color>
+    <color name="surface_container_high">#E2E8F0</color>
+    <color name="surface_container_highest">#CBD5E1</color>
+    <color name="surface_bright">#F8FAFC</color>
+    <color name="surface_dim">#DCE3EC</color>
+    <color name="inverse_surface">#0F172A</color>
+    <color name="inverse_on_surface">#F1F5F9</color>
+    <color name="inverse_primary">#166534</color>
+    <color name="scrim">#000000</color>
     <color name="cobro_on">#FFFFFF</color>
 </resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Escala de espaciado -->
+    <dimen name="space_4">4dp</dimen>
+    <dimen name="space_8">8dp</dimen>
+    <dimen name="space_12">12dp</dimen>
+    <dimen name="space_16">16dp</dimen>
+    <dimen name="space_24">24dp</dimen>
+
+    <!-- Alturas de control -->
+    <dimen name="control_h">48dp</dimen>
+    <dimen name="btn_h">56dp</dimen>
+    <dimen name="btn_h_cobro">64dp</dimen>
+    <dimen name="touch_sm">40dp</dimen>
+
+    <!-- Radios -->
+    <dimen name="corner_card">12dp</dimen>
+    <dimen name="corner_button">12dp</dimen>
+    <dimen name="corner_dialog">24dp</dimen>
+
+    <!-- Bordes e íconos -->
+    <dimen name="stroke_card">1dp</dimen>
+    <dimen name="icon_sm">20dp</dimen>
+    <dimen name="icon_md">24dp</dimen>
+</resources>

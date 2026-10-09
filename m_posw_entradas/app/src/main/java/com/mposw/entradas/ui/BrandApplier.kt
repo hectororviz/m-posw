@@ -27,6 +27,14 @@ object BrandApplier {
         }
     }
 
+    /** Tiñe un MaterialButton con la semilla (fondo + texto + ícono). No-op sin semilla válida. */
+    fun tintButton(hex: String?, button: com.google.android.material.button.MaterialButton) {
+        val (bg, on) = parse(hex) ?: return
+        button.backgroundTintList = ColorStateList.valueOf(bg)
+        button.setTextColor(on)
+        button.iconTint = ColorStateList.valueOf(on)
+    }
+
     fun apply(
         hex: String?,
         header: MaterialCardView?,

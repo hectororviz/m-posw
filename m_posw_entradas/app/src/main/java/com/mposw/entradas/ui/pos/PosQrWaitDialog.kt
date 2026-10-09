@@ -1,6 +1,8 @@
 package com.mposw.entradas.ui.pos
 
 import android.graphics.Bitmap
+import com.mposw.entradas.util.DialogStyle
+import com.mposw.entradas.util.MoneyFormat
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.util.Base64
@@ -32,9 +34,14 @@ class PosQrWaitDialog : DialogFragment() {
         return b.root
     }
 
+    override fun onStart() {
+        super.onStart()
+        DialogStyle.round(dialog?.window)
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val total = requireArguments().getString("total") ?: ""
-        b.tvQrMonto.text = "$$total"
+        b.tvQrMonto.text = MoneyFormat.formatRaw(total)
         b.btnCancelQr.setOnClickListener { cancelar() }
         lifecycleScope.launch {
             val bmp = loadQrImage()

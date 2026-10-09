@@ -3,6 +3,8 @@
     android:orientation="horizontal"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:minHeight="48dp"
+    android:gravity="center_vertical"
     android:paddingVertical="4dp">
 
     <TextView android:id="@+id/tvFilaHora"

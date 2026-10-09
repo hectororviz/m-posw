@@ -1,6 +1,7 @@
 package com.mposw.entradas.ui.entradas
 
 import android.Manifest
+import com.mposw.entradas.util.MoneyFormat
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -154,6 +155,25 @@ class VentaFragment : Fragment() {
             emptyList(),
             listOf(b.btnCash, b.btnQr),
         )
+        applySectorTint()
+    }
+
+    private fun applySectorTint() {
+        val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val roles = com.mposw.entradas.ui.AccentTheme.resolve(session.brandColor, night) ?: return
+        val bg = android.content.res.ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(roles.primary, android.graphics.Color.TRANSPARENT),
+        )
+        val fg = android.content.res.ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(roles.onPrimary, com.google.android.material.color.MaterialColors.getColor(b.btnLocal, com.google.android.material.R.attr.colorOnSurface)),
+        )
+        b.btnLocal.backgroundTintList = bg
+        b.btnVisitante.backgroundTintList = bg
+        b.btnLocal.setTextColor(fg)
+        b.btnVisitante.setTextColor(fg)
     }
 
     private suspend fun refreshClubLogo(
@@ -207,12 +227,10 @@ class VentaFragment : Fragment() {
     private fun actualizarUltimos() {
         val f = current()
         if (f == null) {
-            (activity as? MainActivity)?.setUltimosNumeros("")
+            (activity as? MainActivity)?.clearUltimosNumeros()
             return
         }
-        val l = "L-%03d".format(f.vendidosL.coerceAtLeast(0))
-        val v = "V-%03d".format(f.vendidosV.coerceAtLeast(0))
-        (activity as? MainActivity)?.setUltimosNumeros("$l - $v")
+        (activity as? MainActivity)?.setUltimosNumeros(f.vendidosL.coerceAtLeast(0), f.vendidosV.coerceAtLeast(0))
     }
 
     private fun registrarVentaLocal(fixtureId: String, sec: String, cant: Int) {
@@ -247,9 +265,9 @@ class VentaFragment : Fragment() {
                 val sectorRaw = p?.datos?.sector
                     ?: p?.codigos?.firstOrNull()?.substringBefore("-")
                 val lv = when {
-                    sectorRaw.equals("LOCAL", ignoreCase = true) || sectorRaw == "L" -> "L"
-                    sectorRaw.equals("VISITANTE", ignoreCase = true) || sectorRaw == "V" -> "V"
-                    else -> sectorRaw?.take(1)?.uppercase() ?: "–"
+                    sectorRaw.equals("LOCAL", ignoreCase = true) || sectorRaw == "L" -> "Local"
+                    sectorRaw.equals("VISITANTE", ignoreCase = true) || sectorRaw == "V" -> "Visitante"
+                    else -> sectorRaw?.uppercase() ?: "–"
                 }
                 val metodo = when (p?.paymentMethod) {
                     "CASH" -> "Efectivo"
@@ -263,7 +281,15 @@ class VentaFragment : Fragment() {
                 )
                 row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaHora).text =
                     horaDeVenta(p?.datos?.fechaPago, v.createdAt)
-                row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaSector).text = lv
+                val tvSector = row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaSector)
+                tvSector.text = lv
+                tvSector.setTextColor(
+                    when (lv) {
+                        "Local" -> androidx.core.content.ContextCompat.getColor(requireContext(), com.mposw.entradas.R.color.primary)
+                        "Visitante" -> androidx.core.content.ContextCompat.getColor(requireContext(), com.mposw.entradas.R.color.tertiary)
+                        else -> androidx.core.content.ContextCompat.getColor(requireContext(), com.mposw.entradas.R.color.on_surface_variant)
+                    }
+                )
                 row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaCantidad).text =
                     p?.cantidad?.takeIf { it > 0 }?.toString() ?: "–"
                 row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaMetodo).text = metodo
@@ -303,17 +329,13 @@ class VentaFragment : Fragment() {
         return fixtures.getOrNull(if (pos < 0) 0 else pos)
     }
 
-    private val totalFmt =
-        java.text.NumberFormat.getNumberInstance(java.util.Locale("es", "AR")).apply {
-            minimumFractionDigits = 2
-            maximumFractionDigits = 2
-        }
 
     private fun refreshTotal() {
         val f = current()
         _b?.tvCantidad?.text = cantidad.toString()
         val total = (f?.precioDouble ?: 0.0) * cantidad
-        (activity as? MainActivity)?.setBottomTotal("$${totalFmt.format(total)}")
+        _b?.tvTotalVenta?.text = MoneyFormat.format(total)
+        (activity as? MainActivity)?.setBottomTotal(MoneyFormat.format(total))
     }
 
     private fun cargarFixtures() {
@@ -409,10 +431,6 @@ class VentaFragment : Fragment() {
                         actualizarUltimos()
                         socioUuid = null
                         (activity as? MainActivity)?.setSocioActive(false)
-                        PagoExitosoDialogFragment.new(
-                            (payload.codigos ?: emptyList()).joinToString(", "),
-                            payload.total,
-                        ).show(parentFragmentManager, "ok")
                     } else {
                         toast("Estado inesperado: ${payload.status}")
                     }
@@ -421,7 +439,7 @@ class VentaFragment : Fragment() {
                     if (payload.saleId == null || qrUrl.isNullOrBlank()) {
                         toast("QR no configurado en el servidor (qrImageUrl vacío).")
                     } else {
-                        val total = payload.total ?: totalFmt.format(f.precioDouble * cantidad)
+                        val total = payload.total?.let { MoneyFormat.formatRaw(it) } ?: MoneyFormat.format(f.precioDouble * cantidad)
                         QrPagoFragment.new(payload.saleId, qrUrl, total, f.fixtureId, sector, cantidad)
                             .show(parentFragmentManager, "qr")
                     }
@@ -440,11 +458,12 @@ class VentaFragment : Fragment() {
         val elements = TicketRenderer.parseTemplate(session.templateJson)
         val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
         val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
-        if (res.isSuccess) {
-            toast("APROBADA ${(payload.codigos ?: emptyList()).joinToString(", ")} · $${payload.total}")
-        } else {
-            toast("APROBADA pero sin imprimir: ${(payload.codigos ?: emptyList()).joinToString(", ")}")
-        }
+        if (!isAdded) return
+        com.mposw.entradas.ui.PagoExitosoDialogFragment.new(
+            (payload.codigos ?: emptyList()).joinToString(", "),
+            payload.total,
+            res.isSuccess,
+        ).show(parentFragmentManager, "ok")
     }
 
     override fun onDestroyView() {

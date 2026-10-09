@@ -22,8 +22,25 @@
         <item name="colorSurfaceVariant">@color/surface_variant</item>
         <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
         <item name="colorOutline">@color/outline</item>
+        <item name="colorOnBackground">@color/on_background</item>
+        <item name="colorOutlineVariant">@color/outline_variant</item>
+        <item name="colorSurfaceContainerLowest">@color/surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_container_highest</item>
+        <item name="colorSurfaceBright">@color/surface_bright</item>
+        <item name="colorSurfaceDim">@color/surface_dim</item>
+        <item name="colorInverseSurface">@color/inverse_surface</item>
+        <item name="colorInverseOnSurface">@color/inverse_on_surface</item>
+        <item name="colorInversePrimary">@color/inverse_primary</item>
         <item name="android:windowBackground">@color/background</item>
         <item name="materialButtonStyle">@style/Widget.Entradas.Button</item>
+        <item name="textInputStyle">@style/Widget.Entradas.TextInput</item>
+        <item name="materialCardViewStyle">@style/Widget.Entradas.Card</item>
+        <item name="toolbarStyle">@style/Widget.Entradas.Toolbar</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.Entradas.Dialog</item>
+        <item name="bottomSheetDialogTheme">@style/Theme.Entradas.BottomSheet</item>
     </style>
 
     <style name="Widget.Entradas.Button" parent="Widget.Material3.Button" />
@@ -32,7 +49,7 @@
     <style name="Widget.Entradas.Button.Cobro" parent="Widget.Material3.Button">
         <item name="android:minHeight">64dp</item>
         <item name="android:textSize">15sp</item>
-        <item name="cornerRadius">20dp</item>
+        <item name="cornerRadius">12dp</item>
         <item name="iconSize">24dp</item>
         <item name="iconTint">@color/cobro_on</item>
         <item name="android:textStyle">bold</item>
@@ -42,29 +59,29 @@
     <style name="Widget.Entradas.Button.Sector" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:minHeight">56dp</item>
         <item name="android:textSize">17sp</item>
-        <item name="cornerRadius">18dp</item>
+        <item name="cornerRadius">12dp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
     <!-- Stepper -/+ -->
     <style name="Widget.Entradas.Button.Stepper" parent="Widget.Material3.Button.TonalButton">
-        <item name="android:minHeight">60dp</item>
-        <item name="android:minWidth">60dp</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:minWidth">56dp</item>
         <item name="android:textSize">28sp</item>
-        <item name="cornerRadius">20dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
     <!-- Neutras: Socio -->
     <style name="Widget.Entradas.Button.Neutral" parent="Widget.Material3.Button.TonalButton">
-        <item name="android:minHeight">52dp</item>
+        <item name="android:minHeight">56dp</item>
         <item name="android:textSize">15sp</item>
-        <item name="cornerRadius">14dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
     <!-- Secundarias: Quitar, Reimprimir, Test -->
     <style name="Widget.Entradas.Button.Ghost" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="android:minHeight">52dp</item>
+        <item name="android:minHeight">56dp</item>
         <item name="android:textSize">15sp</item>
-        <item name="cornerRadius">14dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 </resources>

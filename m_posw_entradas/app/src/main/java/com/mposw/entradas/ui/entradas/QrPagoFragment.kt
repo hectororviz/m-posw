@@ -1,6 +1,8 @@
 package com.mposw.entradas.ui.entradas
 
 import android.os.Bundle
+import com.mposw.entradas.util.DialogStyle
+import com.mposw.entradas.util.MoneyFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -38,10 +40,15 @@ class QrPagoFragment : DialogFragment() {
         return b.root
     }
 
+    override fun onStart() {
+        super.onStart()
+        DialogStyle.round(dialog?.window)
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         session = SessionManager(requireContext())
         repo = EntradasRepo(session)
-        b.tvQrMonto.text = "$$total"
+        b.tvQrMonto.text = MoneyFormat.formatRaw(total)
         b.btnCancelQr.setOnClickListener { cancelar() }
         lifecycleScope.launch {
             val bmp = repo.downloadBitmap(qrUrl)
@@ -67,7 +74,7 @@ class QrPagoFragment : DialogFragment() {
                             AppDb.get(requireContext()).sales().upsert(ApprovedSale(saleId, json))
                             val elements = TicketRenderer.parseTemplate(session.templateJson)
                             val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
-                            SunmiPrinter.printSale(requireContext(), p, elements, escudo)
+                            val printedOk = SunmiPrinter.printSale(requireContext(), p, elements, escudo).isSuccess
                             parentFragmentManager.setFragmentResult(
                                 "qr_aprobado",
                                 androidx.core.os.bundleOf(
@@ -77,7 +84,7 @@ class QrPagoFragment : DialogFragment() {
                                 ),
                             )
                             dismissAllowingStateLoss()
-                            PagoExitosoDialogFragment.new((p.codigos ?: emptyList()).joinToString(", "), p.total)
+                            PagoExitosoDialogFragment.new((p.codigos ?: emptyList()).joinToString(", "), p.total, printedOk)
                                 .show(parentFragmentManager, "ok")
                             return@launch
                         }

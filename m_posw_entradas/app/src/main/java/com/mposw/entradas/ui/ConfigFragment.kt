@@ -73,7 +73,7 @@ class ConfigFragment : Fragment() {
             refreshVersions()
         }
         b.btnTest.setOnClickListener { probar() }
-        b.btnVolver.setOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
+        b.toolbarConfig.setNavigationOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
 
         when (session.themeMode) {
             "light" -> b.tgTheme.check(b.btnThemeLight.id)

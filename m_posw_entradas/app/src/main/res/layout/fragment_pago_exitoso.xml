@@ -30,7 +30,25 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:textAppearance="?attr/textAppearanceHeadlineSmall" />
+        android:textAppearance="@style/TextAppearance.Entradas.Price"
+        android:textSize="28sp" />
+
+    <TextView android:id="@+id/tvOkPrint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textAppearance="@style/TextAppearance.Entradas.Label"
+        android:visibility="gone" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnOkReprint"
+        style="@style/Widget.Entradas.Button.Secondary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Reintentar impresión"
+        android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnOkCerrar"

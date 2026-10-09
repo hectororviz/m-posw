@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Entradas.Card"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="3dp"
-    app:cardElevation="2dp">
+    android:layout_margin="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
 
     <LinearLayout
         android:orientation="vertical"
@@ -19,17 +22,30 @@
             android:layout_width="match_parent"
             android:layout_height="72dp">
 
-            <ImageView android:id="@+id/ivProd"
+            <com.google.android.material.imageview.ShapeableImageView android:id="@+id/ivProd"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
-                android:contentDescription="@null" />
+                android:contentDescription="@null"
+                app:shapeAppearanceOverlay="@style/Shape.Entradas.ImageTop" />
 
             <TextView android:id="@+id/tvProdIcon"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:gravity="center"
-                android:textSize="36sp" />
+                android:textAppearance="@style/TextAppearance.Entradas.Price" />
+
+            <TextView android:id="@+id/tvProdBadge"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="4dp"
+                android:gravity="center"
+                android:background="@drawable/badge_qty"
+                android:textColor="?attr/colorOnPrimary"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:visibility="gone" />
         </FrameLayout>
         <TextView android:id="@+id/tvProdName"
             android:layout_width="match_parent"
@@ -37,12 +53,13 @@
             android:gravity="center"
             android:maxLines="2"
             android:ellipsize="end"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.Entradas.ProductName" />
 
         <TextView android:id="@+id/tvProdPrice"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:layout_marginTop="4dp" />
+            android:layout_marginTop="4dp"
+            android:textAppearance="@style/TextAppearance.Entradas.Price" />
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

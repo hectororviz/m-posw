@@ -1,6 +1,7 @@
 package com.mposw.entradas.ui.pos
 
 import android.Manifest
+import com.mposw.entradas.util.MoneyFormat
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -16,8 +17,6 @@ import com.mposw.entradas.data.pos.PosCart
 import com.mposw.entradas.databinding.SheetPosPayBinding
 import com.mposw.entradas.ui.ScannerActivity
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Locale
 import kotlin.math.round
 
 /**
@@ -29,9 +28,6 @@ class PosPaySheet : BottomSheetDialogFragment() {
     private var _b: SheetPosPayBinding? = null
     private val b get() = _b!!
     private fun dash(): PosDashFragment = parentFragment as PosDashFragment
-    private val money = NumberFormat.getCurrencyInstance(Locale("es", "AR")).apply {
-        maximumFractionDigits = 0
-    }
 
     private var busy = false
 
@@ -82,10 +78,10 @@ class PosPaySheet : BottomSheetDialogFragment() {
     private fun refreshTotal() {
         if (_b == null) return
         val cart = dash().cart
-        b.tvPayTotal.text = money.format(cart.total)
+        b.tvPayTotal.text = MoneyFormat.format(cart.total)
         val parts = mutableListOf<String>()
-        cart.socioNombre?.let { parts.add("Socio: $it (−${money.format(cart.discounts.sumOf { d -> d.monto })})") }
-        cart.entradaDesc?.let { parts.add("${it.nombre} (−${money.format(it.monto)})") }
+        cart.socioNombre?.let { parts.add("Socio: $it (−${MoneyFormat.format(cart.discounts.sumOf { d -> d.monto })})") }
+        cart.entradaDesc?.let { parts.add("${it.nombre} (−${MoneyFormat.format(it.monto)})") }
         b.tvDiscountInfo.text = parts.joinToString("\n")
         b.tvDiscountInfo.visibility = if (parts.isEmpty()) View.GONE else View.VISIBLE
         b.btnClearDiscount.visibility =
@@ -216,7 +212,7 @@ class PosPaySheet : BottomSheetDialogFragment() {
                     return@launch
                 }
                 dismissAllowingStateLoss()
-                PosQrWaitDialog.new(saleId, dash().cart.total.toString()).show(parentFragmentManager, "posqr")
+                PosQrWaitDialog.new(saleId, MoneyFormat.format(dash().cart.total)).show(parentFragmentManager, "posqr")
             } catch (e: Exception) {
                 busy = false
                 if (com.mposw.entradas.data.ApiClient.isWrongMode(e)) {

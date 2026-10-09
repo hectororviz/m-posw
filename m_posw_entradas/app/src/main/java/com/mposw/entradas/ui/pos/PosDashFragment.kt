@@ -1,6 +1,7 @@
 package com.mposw.entradas.ui.pos
 
 import android.os.Bundle
+import com.mposw.entradas.util.MoneyFormat
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -21,8 +22,6 @@ import com.mposw.entradas.data.pos.PosCatalogRepo
 import com.mposw.entradas.data.pos.PosSalesRepo
 import com.mposw.entradas.databinding.FragmentPosDashBinding
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Locale
 
 /**
  * Dash del modo POS: tabs por categoría con swipe lateral, total abajo,
@@ -43,9 +42,6 @@ class PosDashFragment : Fragment() {
     private var tabMediator: TabLayoutMediator? = null
 
     fun payFlags() = catalogRepo.payFlags
-    private val money = NumberFormat.getCurrencyInstance(Locale("es", "AR")).apply {
-        maximumFractionDigits = 0
-    }
 
     fun textScaleKey(): String = session.textScale
     fun textScaleFactor(): Float = when (session.textScale) {
@@ -108,7 +104,12 @@ class PosDashFragment : Fragment() {
             }
         })
         b.dragStrip.setOnTouchListener { _, ev -> gestures.onTouchEvent(ev) }
-        b.tvPosTotal.setOnClickListener { openCart() }
+        b.btnPosVerCarrito.setOnClickListener { openCart() }
+        b.tabCategorias.addOnTabSelectedListener(object : com.google.android.material.tabs.TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: com.google.android.material.tabs.TabLayout.Tab) = setTabWeight(tab, true)
+            override fun onTabUnselected(tab: com.google.android.material.tabs.TabLayout.Tab) = setTabWeight(tab, false)
+            override fun onTabReselected(tab: com.google.android.material.tabs.TabLayout.Tab) = Unit
+        })
         b.btnPosConfig.setOnClickListener {
             (activity as? com.mposw.entradas.ui.MainActivity)?.openConfig()
         }
@@ -157,12 +158,14 @@ class PosDashFragment : Fragment() {
 
     private fun applyScaleToChrome() {
         if (_b == null || !::session.isInitialized) return
-        b.tvPosTotal.textSize = 24f * textScaleFactor()
-        b.tvPosCount.textSize = 13f * textScaleFactor()
-        // "$" con el color de resaltado del club (más visible); si no hay, queda el primario del tema.
-        com.mposw.entradas.ui.BrandApplier.parse(session.brandColor)?.let { (bg, _) ->
-            b.tvPosPagarSimbolo.setTextColor(bg)
-        }
+        b.btnPosPagar.textSize = 15f * textScaleFactor()
+        // Botón de cobro con el color del club; si no hay, queda el primario del tema.
+        com.mposw.entradas.ui.BrandApplier.tintButton(session.brandColor, b.btnPosPagar)
+    }
+
+    private fun setTabWeight(tab: com.google.android.material.tabs.TabLayout.Tab?, bold: Boolean) {
+        val tv = tab?.view?.getChildAt(1) as? android.widget.TextView ?: return
+        tv.setTypeface(null, if (bold) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
     }
 
     /** Recrea las páginas para que tomen span, textos e imágenes nuevos. */
@@ -182,6 +185,9 @@ class PosDashFragment : Fragment() {
         tabMediator = TabLayoutMediator(b.tabCategorias, b.vpCategorias) { tab, pos ->
             tab.text = categories[pos].name
         }.also { it.attach() }
+        for (i in 0 until b.tabCategorias.tabCount) {
+            setTabWeight(b.tabCategorias.getTabAt(i), i == b.tabCategorias.selectedTabPosition)
+        }
     }
 
     private fun loadCatalog() {
@@ -200,26 +206,52 @@ class PosDashFragment : Fragment() {
                     (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
                 } else {
                     toast("Sin conexión y sin catálogo cacheado")
+                    if (isAdded) {
+                        childFragmentManager.fragments
+                            .filterIsInstance<PosCategoryPageFragment>()
+                            .forEach { it.showLoadError() }
+                    }
                 }
             }
         }
     }
 
+    fun reloadCatalog() {
+        loadCatalog()
+    }
+
     fun onProductTap(p: PosProduct) {
         cart.add(p)
         refreshTotal()
+        haptic()
         toast("${p.name} agregado")
+    }
+
+    private fun haptic() {
+        if (_b == null) return
+        b.btnPosPagar.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+    }
+
+    private fun cartQty(): Map<String, Int> = cart.lines.associate { it.product.id to it.quantity }
+
+    fun cartQtyOf(productId: String): Int = cart.lines.firstOrNull { it.product.id == productId }?.quantity ?: 0
+
+    private fun refreshBadges() {
+        if (_b == null) return
+        val tag = "f" + b.vpCategorias.currentItem
+        (childFragmentManager.findFragmentByTag(tag) as? PosCategoryPageFragment)?.refreshQty(cartQty())
     }
 
     fun refreshTotal() {
         if (_b == null) return
-        b.tvPosTotal.text = money.format(cart.total)
         val count = cart.lines.sumOf { it.quantity }
-        b.tvPosCount.text = when (count) {
+        b.btnPosPagar.isEnabled = count > 0
+        b.btnPosPagar.text = when (count) {
             0 -> "Carrito vacío"
-            1 -> "1 producto"
-            else -> "$count productos"
+            1 -> "Cobrar · 1 ítem · ${MoneyFormat.format(cart.total)}"
+            else -> "Cobrar · $count ítems · ${MoneyFormat.format(cart.total)}"
         }
+        refreshBadges()
         val socio = cart.socioNombre
         b.socioBar.visibility = if (socio != null) View.VISIBLE else View.GONE
         b.tvPosSocio.visibility = if (socio != null) View.VISIBLE else View.GONE
@@ -259,14 +291,14 @@ class PosDashFragment : Fragment() {
      */
     suspend fun finalizeApproved(sale: com.mposw.entradas.data.PosSale) {
         salesRepo.markPrinted(sale.id ?: "")
-        PosTicketRenderer.print(requireContext(), sale)
+        val printedOk = PosTicketRenderer.print(requireContext(), sale)
         salesRepo.saveApproved(sale.id ?: "", salesRepo.saleToJson(sale))
         salesRepo.registerCanjes(cart, sale.id ?: "")
         cart.entradaDesc?.let {
             try { salesRepo.consumeEntradaBenefit(it.benefitCode) } catch (_: Exception) {}
         }
         if (isAdded) {
-            com.mposw.entradas.ui.PagoExitosoDialogFragment.new("Venta #${sale.orderNumber}", sale.total ?: "")
+            com.mposw.entradas.ui.PagoExitosoDialogFragment.new("Venta #${sale.orderNumber}", sale.total ?: "", printedOk)
                 .show(childFragmentManager, "ok")
         }
         onSaleApproved()

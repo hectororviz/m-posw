@@ -15,11 +15,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="end"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
+            android:textAppearance="@style/TextAppearance.Entradas.Support" />
 
         <ImageView android:id="@+id/ivEscudo"
-            android:layout_width="108dp"
-            android:layout_height="108dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:layout_gravity="center"
             android:layout_marginTop="4dp"
             android:scaleType="fitCenter"
@@ -32,10 +32,9 @@
             android:layout_marginTop="6dp"
             android:gravity="center"
             android:textAlignment="center"
-            android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end"
-            android:textAppearance="?attr/textAppearanceTitleLarge" />
+            android:textAppearance="@style/TextAppearance.Entradas.ScreenTitle" />
 
         <Spinner android:id="@+id/spFixture"
             android:layout_width="match_parent"
@@ -44,11 +43,10 @@
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/tgSector"
+            style="@style/Widget.Entradas.ToggleGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            app:singleSelection="true"
-            app:selectionRequired="true">
+            android:layout_marginTop="10dp">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLocal"
@@ -59,7 +57,9 @@
                 android:checkable="true"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:text="@string/sector_local" />
+                android:text="@string/sector_local"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVisitante"
@@ -70,7 +70,9 @@
                 android:checkable="true"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:text="@string/sector_visitante" />
+                android:text="@string/sector_visitante"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <LinearLayout
@@ -88,11 +90,13 @@
                 android:text="−" />
 
             <TextView android:id="@+id/tvCantidad"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="28dp"
+                android:gravity="center"
                 android:text="1"
-                android:textAppearance="?attr/textAppearanceDisplaySmall" />
+                android:textSize="36sp"
+                android:textStyle="bold" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnPlus"
@@ -101,6 +105,17 @@
                 android:layout_height="wrap_content"
                 android:text="+" />
         </LinearLayout>
+
+        <TextView android:id="@+id/tvTotalVenta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textAppearance="@style/TextAppearance.Entradas.Price"
+            android:textSize="28sp"
+            android:text="$ 0" />
 
         <LinearLayout
             android:orientation="horizontal"
@@ -118,6 +133,7 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 app:icon="@drawable/ic_cash"
+                app:iconGravity="textStart"
                 android:text="@string/pagar_efectivo" />
 
             <Space android:layout_width="12dp" android:layout_height="wrap_content" />
@@ -131,6 +147,7 @@
                 android:maxLines="1"
                 android:ellipsize="end"
                 app:icon="@drawable/ic_qr"
+                app:iconGravity="textStart"
                 android:text="@string/pagar_qr" />
         </LinearLayout>
 
@@ -145,9 +162,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:text="Últimas ventas"
-                android:textStyle="bold"
-                android:textAppearance="?attr/textAppearanceTitleMedium" />
+                android:text="@string/ultimas_ventas"
+                android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
 
             <LinearLayout
                 android:orientation="horizontal"
@@ -160,7 +176,15 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="2"
                     android:gravity="center"
-                    android:text="Hora"
+                    android:text="@string/col_hora"
+                    android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/col_sector"
                     android:textStyle="bold"
                     android:textAppearance="?attr/textAppearanceBodyMedium" />
 
@@ -169,16 +193,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:gravity="center"
-                    android:text="L/V"
-                    android:textStyle="bold"
-                    android:textAppearance="?attr/textAppearanceBodyMedium" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:text="Cant."
+                    android:text="@string/col_cantidad"
                     android:textStyle="bold"
                     android:textAppearance="?attr/textAppearanceBodyMedium" />
 
@@ -187,7 +202,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="2"
                     android:gravity="center"
-                    android:text="Pago"
+                    android:text="@string/col_pago"
                     android:textStyle="bold"
                     android:textAppearance="?attr/textAppearanceBodyMedium" />
             </LinearLayout>

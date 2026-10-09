@@ -17,15 +17,18 @@
         <TextView android:id="@+id/tvPosSocio"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.Entradas.Label" />
     </LinearLayout>
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabCategorias"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:tabMode="scrollable" />
+        android:minHeight="48dp"
+        app:tabMode="scrollable"
+        app:tabIndicatorColor="?attr/colorPrimary"
+        app:tabSelectedTextColor="?attr/colorPrimary"
+        app:tabTextAppearance="@style/TextAppearance.Entradas.Label" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/vpCategorias"
@@ -63,53 +66,28 @@
         android:layout_height="wrap_content">
 
         <ImageButton android:id="@+id/btnPosConfig"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="10dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_settings"
             android:contentDescription="Configuración" />
 
-        <LinearLayout
-            android:orientation="vertical"
-            android:gravity="center"
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnPosPagar"
+            style="@style/Widget.Entradas.Button.Cobro"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:enabled="false"
+            android:text="Carrito vacío" />
 
-            <TextView android:id="@+id/tvPosTotal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textAppearance="?attr/textAppearanceHeadlineSmall"
-                android:textStyle="bold"
-                android:text="$0" />
-
-            <TextView android:id="@+id/tvPosCount"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:text="Carrito vacío" />
-        </LinearLayout>
-
-        <FrameLayout android:id="@+id/btnPosPagar"
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnPosVerCarrito"
+            style="?attr/materialIconButtonOutlinedStyle"
             android:layout_width="48dp"
-            android:layout_height="56dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Pagar">
-
-            <TextView
-                android:id="@+id/tvPosPagarSimbolo"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:textColor="?attr/colorPrimary"
-                android:text="$" />
-        </FrameLayout>
+            android:layout_height="48dp"
+            android:contentDescription="Ver carrito"
+            app:icon="@drawable/ic_cart" />
     </LinearLayout>
 </LinearLayout>

@@ -1,6 +1,8 @@
 package com.mposw.entradas.ui.pos
 
 import android.os.Bundle
+import com.mposw.entradas.util.DialogStyle
+import com.mposw.entradas.util.MoneyFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,8 +15,6 @@ import com.mposw.entradas.data.PosAcreedor
 import com.mposw.entradas.databinding.DialogPosFiadoBinding
 import com.mposw.entradas.databinding.ItemPosAcreedorBinding
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Locale
 
 /**
  * Fiado con las mismas reglas que la web: lista de acreedores activos con
@@ -25,9 +25,6 @@ class PosFiadoDialog : DialogFragment() {
     private var _b: DialogPosFiadoBinding? = null
     private val b get() = _b!!
     private fun dash(): PosDashFragment = parentFragment as PosDashFragment
-    private val money = NumberFormat.getCurrencyInstance(Locale("es", "AR")).apply {
-        maximumFractionDigits = 0
-    }
 
     private var warnAckFor: Int? = null
 
@@ -40,10 +37,11 @@ class PosFiadoDialog : DialogFragment() {
         super.onStart()
         // Ancho completo: el default de DialogFragment es angosto y corta nombres.
         dialog?.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        DialogStyle.round(dialog?.window)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        b.tvFiadoTotal.text = "Total: ${money.format(dash().cart.total)}"
+        b.tvFiadoTotal.text = "Total: ${MoneyFormat.format(dash().cart.total)}"
         b.rvAcreedores.layoutManager = LinearLayoutManager(requireContext())
         b.rvAcreedores.adapter = AcreedorAdapter()
         b.btnFiadoCancel.setOnClickListener { dismissAllowingStateLoss() }
@@ -74,12 +72,12 @@ class PosFiadoDialog : DialogFragment() {
             "LIMITE" -> {
                 val proyectado = (a.saldo ?: 0.0) + dash().cart.total
                 b.tvFiadoError.text =
-                    "Monto máximo superado: llegaría a ${money.format(proyectado)} y el límite es ${money.format(a.limiteDeuda ?: 0.0)}."
+                    "Monto máximo superado: llegaría a ${MoneyFormat.format(proyectado)} y el límite es ${MoneyFormat.format(a.limiteDeuda ?: 0.0)}."
             }
             "ADVERTENCIA" -> {
                 if (warnAckFor != a.id) {
                     warnAckFor = a.id
-                    b.tvFiadoError.text = "Supera la advertencia (${money.format(a.advertenciaDeuda ?: 0.0)}). Tocá de nuevo para confirmar."
+                    b.tvFiadoError.text = "Supera la advertencia (${MoneyFormat.format(a.advertenciaDeuda ?: 0.0)}). Tocá de nuevo para confirmar."
                 } else {
                     confirm(a)
                 }
@@ -134,7 +132,7 @@ class PosFiadoDialog : DialogFragment() {
         override fun onBindViewHolder(h: Holder, position: Int) {
             val a = items[position]
             h.b.tvAcreedorName.text = a.nombre ?: ""
-            h.b.tvAcreedorSaldo.text = "Deuda: ${money.format(a.saldo ?: 0.0)}"
+            h.b.tvAcreedorSaldo.text = "Deuda: ${MoneyFormat.format(a.saldo ?: 0.0)}"
             // Solo icono de estado al lado del nombre (el detalle va en el error al tocar).
             when (estado(a)) {
                 "LIMITE" -> {
