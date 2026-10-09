@@ -14,7 +14,7 @@ import LightboxModal from './notificaciones/LightboxModal';
 import TemplateModal from './notificaciones/TemplateModal';
 import { formatDateTime } from '../utils/format';
 
-const formatDateTimeLabel = (value: string | null): string => (value ? formatDateTimeLabel(value) : '--');
+const formatDateTimeLabel = (value: string | null): string => (value ? formatDateTime(value) : '--');
 
 const formatTime = (value: string): string => formatDateTime(value).slice(11);
 
