@@ -44,10 +44,11 @@
     </style>
 
     <style name="Widget.Entradas.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
-        <item name="boxCornerTopLeft">12dp</item>
-        <item name="boxCornerTopRight">12dp</item>
-        <item name="boxCornerBottomLeft">12dp</item>
-        <item name="boxCornerBottomRight">12dp</item>
+        <item name="shapeAppearanceOverlay">@style/Shape.Entradas.TextInput</item>
+    </style>
+    <style name="Shape.Entradas.TextInput" parent="ShapeAppearance.Material3.SmallComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
     </style>
 
     <style name="Shape.Entradas.ImageTop" parent="ShapeAppearance.Material3.SmallComponent">
