@@ -2,8 +2,8 @@ package com.mposw.entradas.util
 
 import android.content.Context
 import com.google.gson.Gson
+import com.mposw.entradas.data.PosSale
 import com.mposw.entradas.data.SessionManager
-import com.mposw.entradas.data.pos.PosSale
 import com.mposw.entradas.data.pos.PosSalesRepo
 import com.mposw.entradas.ui.pos.PosTicketRenderer
 
