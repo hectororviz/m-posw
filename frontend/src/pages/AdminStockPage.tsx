@@ -5,6 +5,7 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useSettings, useStock } from '../api/queries';
 import type { StockProduct } from '../api/types';
 import type { TicketPayload } from '../utils/ticketPrinting';
+import { formatMoney } from '../utils/format';
 
 type StockFilter = 'todos' | 'bajo' | 'sin-stock';
 
@@ -144,7 +145,7 @@ export const AdminStockPage: React.FC = () => {
         }))
       ),
       itemsStyle: 'summary',
-      title: 'STOCK',
+      title: 'Stock',
       thanks: '',
       footer: 'Ticket de Stock',
     };
@@ -232,7 +233,7 @@ export const AdminStockPage: React.FC = () => {
                         <span className="stock-product-name">{product.name}</span>
                         {badge && <span className={badge.className}>{badge.label}</span>}
                         <span className="stock-product-price">
-                          ${product.price.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          {formatMoney(product.price)}
                         </span>
                       </div>
                       <div className="stock-qty-group">

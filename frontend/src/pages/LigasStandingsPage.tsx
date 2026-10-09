@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type { LigaMatchdayGroup, LigaMatchdayMatch } from '../api/types';
 import { useLigasAllMatches, useLigasCategories, useLigasConfigs, useLigasStandings } from '../api/queries';
+import { formatDate } from '../utils/format';
 
 const sortCategories = (matches: LigaMatchdayMatch[]): LigaMatchdayMatch[] => {
   const extractNum = (name: string): number => {
@@ -21,14 +22,7 @@ const ResultModal: React.FC<{
   teamName: string;
   onClose: () => void;
 }> = ({ group, teamName, onClose }) => {
-  const formatDate = (d: string | null) =>
-    d
-      ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })
-      : '';
+  const formatDateLabel = (d: string | null): string => (d ? formatDate(d + 'T00:00:00') : '');
 
   const played = group.matches.filter((m) => m.status !== 'pendiente');
   const sorted = sortCategories(played);
@@ -39,7 +33,7 @@ const ResultModal: React.FC<{
         <div className="ligas-modal-header">
           <h3>
             Jornada {group.matchday}
-            {group.match_date ? ` — ${formatDate(group.match_date)}` : ''}
+            {group.match_date ? ` — ${formatDateLabel(group.match_date)}` : ''}
           </h3>
           <button className="ligas-modal-close" onClick={onClose}>
             ✕
@@ -106,14 +100,7 @@ export const LigasStandingsPage: React.FC = () => {
 
   const [modalGroup, setModalGroup] = useState<LigaMatchdayGroup | null>(null);
 
-  const formatDate = (d: string | null) =>
-    d
-      ? new Date(d + 'T00:00:00').toLocaleDateString('es-AR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })
-      : '—';
+  const formatDateLabel = (d: string | null): string => (d ? formatDate(d + 'T00:00:00') : '—');
 
   if (!config) {
     return <p className="text-muted">Torneo no encontrado</p>;
@@ -223,7 +210,7 @@ export const LigasStandingsPage: React.FC = () => {
                     style={hasPlayed ? { cursor: 'pointer' } : undefined}
                   >
                     <span className="col-date">
-                      {sameDate ? '' : formatDate(g.match_date)}
+                      {sameDate ? '' : formatDateLabel(g.match_date)}
                     </span>
                     <span className="col-product">
                       {g.matchday}

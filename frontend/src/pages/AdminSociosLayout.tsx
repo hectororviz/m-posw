@@ -11,7 +11,7 @@ export const AdminSociosLayout: React.FC = () => {
           Matriz
         </NavLink>
         <NavLink to="/admin/socios/configuracion" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Configuracion
+          Configuración
         </NavLink>
         <NavLink to="/admin/socios/beneficios" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
           Beneficios

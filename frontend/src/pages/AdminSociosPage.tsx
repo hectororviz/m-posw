@@ -5,12 +5,10 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useSocios, useSociosTipos, useSociosTesoreriaResumen, useSocio, useSocioCuotas, useMoneyAccounts } from '../api/queries';
 import type { Socio, SocioCuotaItem } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { formatDate, formatMoney } from '../utils/format';
 
-const formatCurrency = (value: number) =>
-  `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const formatCurrency = (value: number) => formatMoney(value);
 
-const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
 const MONTH_NAMES = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
@@ -481,7 +479,7 @@ export const AdminSociosPage: React.FC = () => {
     <div>
       <div className="page-header">
         <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Socios</h2>
-        <p className="page-header-subtitle">Gestion del padron de socios del club.</p>
+        <p className="page-header-subtitle">Gestión del padrón de socios del club.</p>
       </div>
 
       {resumen && (
@@ -563,7 +561,7 @@ export const AdminSociosPage: React.FC = () => {
               </span>
               <span className="col-date" style={{ flex: '0 0 70px' }}>Nº</span>
               <span className="col-user" style={{ flex: 1 }}>Apellido y Nombre</span>
-              <span className="col-method" style={{ flex: '0 0 100px' }}>Tipo</span>
+              <span className="col-method" style={{ flex: '0 0 100px' }}>Categoría</span>
               <span className="col-method" style={{ flex: '0 0 90px' }}>Estado</span>
               <span className="col-total" style={{ flex: '0 0 100px' }}>Deuda</span>
               <span className="col-action" style={{ flex: '0 0 180px' }}></span>
@@ -585,9 +583,9 @@ export const AdminSociosPage: React.FC = () => {
                 </span>
                 <span className="col-total" style={{ flex: '0 0 100px' }}>
                   {(s.deudaTotal ?? 0) > 0 ? (
-                    <span className="warning-text" style={{ fontWeight: 600 }}>{formatCurrency(s.deudaTotal ?? 0)}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--color-warning)', whiteSpace: 'nowrap' }}>{formatCurrency(s.deudaTotal ?? 0)}</span>
                   ) : (
-                    <span style={{ color: 'var(--color-text-muted)' }}>$0</span>
+                    <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{formatCurrency(0)}</span>
                   )}
                 </span>
                 <span className="col-action" style={{ flex: '0 0 160px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
@@ -700,7 +698,7 @@ export const AdminSociosPage: React.FC = () => {
               {formTab === 2 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div className="settings-field">
-                    <label>Telefono</label>
+                    <label>Teléfono</label>
                     <input type="text" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} placeholder="Telefono" />
                   </div>
                   <div className="settings-field">
@@ -796,7 +794,7 @@ export const AdminSociosPage: React.FC = () => {
                                 <span className="col-method" style={{ flex: '0 0 80px' }}>{cuotaEstadoBadge(c.estado)}</span>
                                 <span className="col-user" style={{ flex: 1, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                                   {c.pagos && c.pagos.length > 0
-                                    ? c.pagos.map((p) => `${formatDate(p.fecha)} $${p.monto}`).join(' · ')
+                                    ? c.pagos.map((p) => `${formatDate(p.fecha)} ${formatMoney(p.monto)}`).join(' · ')
                                     : '--'}
                                 </span>
                                 <span className="col-action" style={{ flex: '0 0 70px' }}>

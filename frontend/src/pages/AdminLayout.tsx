@@ -44,14 +44,14 @@ const navCategories: NavCategoryDef[] = [
       { to: '/pos',              icon: <ShoppingCart size={iconSize} />, label: 'POS',            permissionModule: 'POS' },
       { to: '/admin/sales',      icon: <Receipt size={iconSize} />,      label: 'Ventas',         permissionModule: 'VENTAS' },
       { to: '/admin/entradas',   icon: <Ticket size={iconSize} />,       label: 'Entradas',       moduleKey: 'enableEntradasModule', permissionModule: 'ENTRADAS' },
-      { to: '/admin/stats',      icon: <BarChart2 size={iconSize} />,    label: 'Estadisticas',   permissionModule: 'REPORTES' },
-      { to: '/admin/categories', icon: <Tag size={iconSize} />,          label: 'Categorias',     permissionModule: 'PRODUCTOS' },
+      { to: '/admin/stats',      icon: <BarChart2 size={iconSize} />,    label: 'Estadísticas',   permissionModule: 'REPORTES' },
+      { to: '/admin/categories', icon: <Tag size={iconSize} />,          label: 'Categorías',     permissionModule: 'PRODUCTOS' },
       { to: '/admin/products',   icon: <Package size={iconSize} />,      label: 'Productos',      permissionModule: 'PRODUCTOS' },
       { to: '/admin/stock',      icon: <Boxes size={iconSize} />,        label: 'Stock',          permissionModule: 'PRODUCTOS' },
     ],
   },
   {
-    label: 'Administracion',
+    label: 'Administración',
     icon: <Building2 size={iconSize} />,
     children: [
       { to: '/admin/acreedores', icon: <UserMinus size={iconSize} />,   label: 'Acreedores',     moduleKey: 'enableAcreedoresModule', permissionModule: 'ACREEDORES' },
@@ -76,7 +76,7 @@ const navCategories: NavCategoryDef[] = [
       { to: '/admin/notificaciones',  icon: <Megaphone size={iconSize} />, label: 'Notificaciones',       moduleKey: 'enableNotificationsModule', permissionModule: 'NOTIFICACIONES' },
       { to: '/admin/dispositivos',  icon: <MonitorSmartphone size={iconSize} />, label: 'Dispositivos',       permissionModule: 'CONFIGURACION' },
       { to: '/admin/users',     icon: <UserCog size={iconSize} />,       label: 'Usuarios',       permissionModule: 'CONFIGURACION' },
-      { to: '/admin/settings',  icon: <Settings size={iconSize} />,      label: 'Configuracion',  permissionModule: 'CONFIGURACION' },
+      { to: '/admin/settings',  icon: <Settings size={iconSize} />,      label: 'Configuración',  permissionModule: 'CONFIGURACION' },
     ],
   },
 ];
@@ -249,7 +249,7 @@ export const AdminLayout: React.FC = () => {
   const collapsedOnDesktop = !isMobile && isCollapsed;
 
   return (
-    <AppLayout title="" showMenuButton onMenuClick={openDrawer}>
+    <AppLayout title="" showMenuButton onMenuClick={openDrawer} hideBrand>
       <div className="admin-layout">
         {isMobile && drawerOpen && (
           <div className="sidebar-backdrop" onClick={closeDrawer} aria-hidden="true" />
@@ -260,7 +260,7 @@ export const AdminLayout: React.FC = () => {
         >
           <div className="sidebar-header">
             <div className="sidebar-brand">
-              {showLogo ? (
+              {showLogo && !collapsedOnDesktop ? (
                 <img
                   src={logoUrl}
                   alt={storeName}

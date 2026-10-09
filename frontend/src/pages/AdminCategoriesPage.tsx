@@ -4,6 +4,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
 import { useAdminCategories } from '../api/queries';
 import type { Category } from '../api/types';
+import { ConfirmDialog } from '../components/ui/Modal';
+import { IconPicker } from '../components/ui/Field';
+import { useToast } from '../components/ToastProvider';
 
 interface CategoryForm {
   name: string;
@@ -23,6 +26,7 @@ const EMPTY_FORM: CategoryForm = {
 
 export const AdminCategoriesPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const { data: categories } = useAdminCategories();
   const [error, setError] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -65,20 +69,30 @@ export const AdminCategoriesPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
       await queryClient.invalidateQueries({ queryKey: ['products'] });
+      pushToast(editingCategory ? 'Categoría actualizada' : 'Categoría creada', 'success');
     } catch (err) {
-      setError(normalizeApiError(err));
+      const msg = normalizeApiError(err);
+      setError(msg);
+      pushToast(msg, 'error');
     }
   };
 
-  const handleDelete = async (categoryId: string) => {
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     setError(null);
+    setDeleting(true);
     try {
-      await apiClient.delete(`/categories/${categoryId}`);
+      await apiClient.delete(`/categories/${deleteTarget.id}`);
       await queryClient.invalidateQueries({ queryKey: ['admin-categories'] });
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
       await queryClient.invalidateQueries({ queryKey: ['products'] });
+      setDeleteTarget(null);
     } catch (err) {
       setError(normalizeApiError(err));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -105,7 +119,7 @@ export const AdminCategoriesPage: React.FC = () => {
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Categorias</h2>
+            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Categorías</h2>
             <p className="page-header-subtitle">Organiza los productos en categorias para el punto de venta.</p>
           </div>
         </div>
@@ -125,11 +139,11 @@ export const AdminCategoriesPage: React.FC = () => {
             <div className="modal-body">
               <div className="settings-field">
                 <label htmlFor="cat-name">Nombre</label>
-                <input id="cat-name" type="text" placeholder="Nombre de la categoria" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <input id="cat-name" type="text" placeholder="Nombre de la categoría" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               </div>
               <div className="settings-field">
-                <label htmlFor="cat-icon">Icono</label>
-                <input id="cat-icon" type="text" placeholder="Emoji de la categoria" value={form.iconName} onChange={(e) => setForm({ ...form, iconName: e.target.value })} />
+                <label htmlFor="cat-icon">Ícono</label>
+                <IconPicker id="cat-icon" value={form.iconName} onChange={(v) => setForm({ ...form, iconName: v })} />
               </div>
               <div className="settings-field">
                 <label htmlFor="cat-color">Color</label>
@@ -178,12 +192,22 @@ export const AdminCategoriesPage: React.FC = () => {
               </div>
               <div className="product-card-v2-actions">
                 <button type="button" className="btn-ghost" onClick={() => openEdit(category)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${category.name}`}>{<Pencil size={16} />}</button>
-                <button type="button" className="btn-ghost" onClick={() => handleDelete(category.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${category.name}`}>{<X size={16} />}</button>
+                <button type="button" className="btn-ghost" onClick={() => setDeleteTarget(category)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${category.name}`}>{<X size={16} />}</button>
               </div>
             </div>
           );
         })}
       </div>
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar la categoría"
+          message={`Se eliminará "${deleteTarget.name}" con sus productos. Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          busy={deleting}
+          onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 };

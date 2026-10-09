@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useSociosMatriz } from '../api/queries';
 import type { SocioMatrizFilas } from '../api/types';
+import { formatMoney } from '../utils/format';
 
 const MONTH_NAMES = [
   'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
   'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
 ];
 
-const formatCurrency = (value: number) =>
-  `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const formatCurrency = (value: number) => formatMoney(value);
 
 const EstadoEmoji: React.FC<{ estado: string; pendiente?: number }> = ({ estado, pendiente }) => {
   if (estado === 'PAGADO') return <span title="Pagado" style={{ color: 'var(--color-success)', fontWeight: 600, fontSize: '1.1rem' }}>&#10003;</span>;

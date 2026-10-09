@@ -7,6 +7,7 @@ import { CategoryHeader } from '../components/CategoryHeader';
 import { useToast } from '../components/ToastProvider';
 import { useCart } from '../context/CartContext';
 import type { Product } from '../api/types';
+import { formatMoney } from '../utils/format';
 
 export const CategoryPage: React.FC = () => {
   const { id } = useParams();
@@ -50,11 +51,7 @@ export const CategoryPage: React.FC = () => {
                       </span>
                     )}
                     <span className="price-badge">
-                      $
-                      {product.price.toLocaleString('es-AR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {formatMoney(product.price)}
                     </span>
                     {showStockBadge && (
                       <span className="stock-badge">{product.stock}</span>

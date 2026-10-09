@@ -6,15 +6,14 @@ import { useAdminSales, useCashCloses, useManualMovements, useRetryWebhook, useS
 import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
+import { formatDate, formatDateTime, formatMoney } from '../utils/format';
 
 const DEFAULT_IN_REASONS = ['Apertura de Caja', 'Otro'];
 const DEFAULT_OUT_REASONS = ['Retiro de caja', 'Otro'];
 
-const formatCurrency = (value: number | string) => {
-  const n = Number(value);
-  return `$ ${(Number.isFinite(n) ? n : 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+const formatCurrency = (value: number | string) => formatMoney(value);
 
 const toAmount = (value: unknown): number => {
   if (typeof value === 'string') {
@@ -27,8 +26,8 @@ const toAmount = (value: unknown): number => {
   return Number.isFinite(a) ? a : 0;
 };
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
-const formatTime = (value: string) => new Date(value).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+const formatDateLabel = (value: string) => formatDate(value);
+const formatTime = (value: string) => formatDateTime(value).slice(11);
 const getPaymentMethodLabel = (method?: string) => {
   if (method === 'MP_QR') return 'QR';
   if (method === 'TRANSFER') return 'Transf.';
@@ -295,15 +294,15 @@ export const AdminSalesPage: React.FC = () => {
     !selectedSale?.refundedAt &&
     selectedSale?.status === 'APPROVED';
 
+  const [showRefundConfirm, setShowRefundConfirm] = useState(false);
   const handleRefundSale = async () => {
     if (!selectedSale || !canRefundSelected || isRefunding) return;
-    const ok = window.confirm(`¿Reembolsar el total de ${formatCurrency(selectedSale.total)} a Mercado Pago? Esta acción devuelve el dinero al cliente y revierte stock y vouchers.`);
-    if (!ok) return;
     setIsRefunding(true);
     try {
       await apiClient.post(`/sales/${selectedSale.id}/refund`, {});
       pushToast('Reembolso acreditado en Mercado Pago.', 'success');
       setSelectedSaleId(null);
+      setShowRefundConfirm(false);
       await queryClient.invalidateQueries({ queryKey: ['admin-sales'] });
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
@@ -314,7 +313,7 @@ export const AdminSalesPage: React.FC = () => {
 
   const handleReprintCashCloseTicket = (cc: typeof selectedCashClose) => {
     if (!cc) return;
-    const payload: TicketPayload = { clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: cc.closedAt, itemsStyle: 'summary', items: [], criteria: [{ label: 'Desde:', value: `${formatDate(cc.from)} ${formatTime(cc.from)}` }, { label: 'Hasta:', value: `${formatDate(cc.to)} ${formatTime(cc.to)}` }], summary: [{ label: 'Ventas:', value: formatCurrency(cc.salesTotal) }, { label: 'Efectivo:', value: formatCurrency(cc.salesCashTotal) }, { label: 'QR:', value: formatCurrency(cc.salesQrTotal) }, { label: 'Transferencia:', value: formatCurrency(cc.salesTransferTotal ?? 0) }, { label: '', value: '' }, { label: 'Entradas:', value: formatCurrency(cc.movementsInTotal) }, { label: 'Salidas:', value: formatCurrency(cc.movementsOutTotal) }, { label: 'Neto caja:', value: formatCurrency(cc.netCashDelta) }], title: 'CIERRE DE CAJA', footer: cc.note || 'Cierre de caja' };
+    const payload: TicketPayload = { clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: cc.closedAt, itemsStyle: 'summary', items: [], criteria: [{ label: 'Desde:', value: `${formatDateLabel(cc.from)} ${formatTime(cc.from)}` }, { label: 'Hasta:', value: `${formatDateLabel(cc.to)} ${formatTime(cc.to)}` }], summary: [{ label: 'Ventas:', value: formatCurrency(cc.salesTotal) }, { label: 'Efectivo:', value: formatCurrency(cc.salesCashTotal) }, { label: 'QR:', value: formatCurrency(cc.salesQrTotal) }, { label: 'Transferencia:', value: formatCurrency(cc.salesTransferTotal ?? 0) }, { label: '', value: '' }, { label: 'Entradas:', value: formatCurrency(cc.movementsInTotal) }, { label: 'Salidas:', value: formatCurrency(cc.movementsOutTotal) }, { label: 'Neto caja:', value: formatCurrency(cc.netCashDelta) }], title: 'Cierre de caja', footer: cc.note || 'Cierre de caja' };
     pushToast('Enviando ticket de cierre a impresion.', 'success');
     window.location.href = `/printticket?data=${encodeURIComponent(encodeBase64(JSON.stringify(payload)))}`;
   };
@@ -495,7 +494,19 @@ export const AdminSalesPage: React.FC = () => {
               <div className="modal-footer" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
                 <button type="button" className="btn-ghost" onClick={() => setSelectedSaleId(null)}>Cerrar</button>
                 {canRefundSelected && (
-                  <button type="button" className="btn-danger" onClick={handleRefundSale} disabled={isRefunding}>{isRefunding ? 'Reembolsando...' : 'Reembolsar'}</button>
+                  <>
+                  <button type="button" className="btn-danger" onClick={() => setShowRefundConfirm(true)} disabled={isRefunding}>{isRefunding ? 'Reembolsando...' : 'Reembolsar'}</button>
+                  {showRefundConfirm && selectedSale && (
+                    <ConfirmDialog
+                      title="Reembolsar la venta"
+                      message={`Se reembolsará el total de ${formatCurrency(selectedSale.total)} a Mercado Pago. Esta acción devuelve el dinero al cliente y revierte stock y vouchers.`}
+                      confirmLabel="Reembolsar"
+                      busy={isRefunding}
+                      onCancel={() => { if (!isRefunding) setShowRefundConfirm(false); }}
+                      onConfirm={handleRefundSale}
+                    />
+                  )}
+                  </>
                 )}
                 <button type="button" className="btn-secondary" onClick={() => handleReprintTicket(selectedSale.id)}>Reimprimir ticket</button>
               </div>

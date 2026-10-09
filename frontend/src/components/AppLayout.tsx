@@ -1,31 +1,26 @@
 import { useEffect } from 'react';
 import { useSettings } from '../api/queries';
 import { AppHeader } from './AppHeader';
+import { applyAccent } from '../utils/accent';
 
 interface AppLayoutProps {
   title?: string;
   children: React.ReactNode;
   showMenuButton?: boolean;
   onMenuClick?: () => void;
+  hideBrand?: boolean;
 }
 
-const DEFAULT_ACCENT_COLOR = 'var(--color-accent)';
-
-export const AppLayout: React.FC<AppLayoutProps> = ({ title, children, showMenuButton, onMenuClick }) => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ title, children, showMenuButton, onMenuClick, hideBrand }) => {
   const { data: settings, isLoading } = useSettings();
 
   useEffect(() => {
-    const accentColor = settings?.accentColor?.trim();
-    if (accentColor) {
-      document.documentElement.style.setProperty('--accent-color', accentColor);
-      return;
-    }
-    document.documentElement.style.setProperty('--accent-color', DEFAULT_ACCENT_COLOR);
+    applyAccent(settings?.accentColor?.trim() ?? '');
   }, [settings?.accentColor]);
 
   return (
     <div className="app-shell">
-      <AppHeader settings={settings} isLoading={isLoading} showMenuButton={showMenuButton} onMenuClick={onMenuClick} />
+      <AppHeader settings={settings} isLoading={isLoading} showMenuButton={showMenuButton} onMenuClick={onMenuClick} hideBrand={hideBrand} />
       <main className="app-main">
         {title && (
           <div className="page-title">

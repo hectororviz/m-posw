@@ -1,6 +1,7 @@
 import { useAsset, useAssetEvents } from '../../../api/queries';
 import { AssetStatusBadge, EventTypeBadge } from './AssetStatusBadge';
 import { X } from 'lucide-react';
+import { formatDate, formatDateTime, formatMoney } from '../../../utils/format';
 
 interface Props {
   assetId: number;
@@ -46,11 +47,11 @@ export const AssetDetail: React.FC<Props> = ({ assetId, onClose }) => {
                   </tr>
                   <tr>
                     <td style={{ padding: '4px 12px 4px 0', fontWeight: 600, color: 'var(--color-text-faint)' }}>Fecha adquisición</td>
-                    <td>{asset.acquisitionDate ? new Date(asset.acquisitionDate).toLocaleDateString('es-AR') : '-'}</td>
+                    <td>{asset.acquisitionDate ? formatDate(asset.acquisitionDate) : '-'}</td>
                   </tr>
                   <tr>
                     <td style={{ padding: '4px 12px 4px 0', fontWeight: 600, color: 'var(--color-text-faint)' }}>Valor adquisición</td>
-                    <td>{asset.acquisitionValue != null ? `$${Number(asset.acquisitionValue).toFixed(2)}` : '-'}</td>
+                    <td>{asset.acquisitionValue != null ? formatMoney(asset.acquisitionValue, { cents: true }) : '-'}</td>
                   </tr>
                   <tr>
                     <td style={{ padding: '4px 12px 4px 0', fontWeight: 600, color: 'var(--color-text-faint)' }}>Notas</td>
@@ -77,7 +78,7 @@ export const AssetDetail: React.FC<Props> = ({ assetId, onClose }) => {
                 {events.map((ev) => (
                   <div key={ev.id} className="sales-table-row">
                     <span className="col-date" style={{ flex: '0 0 160px', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                      {new Date(ev.eventDate).toLocaleString('es-AR')}
+                      {formatDateTime(ev.eventDate)}
                     </span>
                     <span className="col-method" style={{ flex: '0 0 130px' }}>
                       <EventTypeBadge type={ev.eventType} />

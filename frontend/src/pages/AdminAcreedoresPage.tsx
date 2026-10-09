@@ -1,30 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, Clock, Eye, Loader, Megaphone, Pencil, Plus, Send, Slash, X, XCircle } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Eye, Loader, Megaphone, Pencil, Plus, Send, Slash, X, XCircle } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useAcreedores, useAcreedorNotificaciones, useAcreedoresResumen, useNotificarDeudaBatch, useNotificationStatus, useSettings } from '../api/queries';
 import type { Acreedor, NotifJobUpdatedEvent, NotificacionesJob, NotificationStatusMap } from '../api/types';
 import { useSocketContext } from '../socket/SocketProvider';
 import { useToast } from '../components/ToastProvider';
+import { ListError } from '../components/ui/Card';
 import { buildWhatsAppWebLink } from '../utils/whatsappLink';
+import { formatDateTime, formatMoney } from '../utils/format';
 
-const formatCurrency = (value: number) =>
-  `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const formatCurrency = (value: number) => formatMoney(value);
 
-const formatDateTime = (value: string) =>
-  new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 
 
 type SortMode = 'alpha' | 'deuda';
 
-const getAntiguedadColor = (dias: number | null | undefined, saldo: number | undefined): string => {
-  if (dias == null || !saldo) return '';
-  if (dias >= 30) return 'var(--color-danger)';
-  if (dias >= 15) return 'var(--color-warning, #f59e0b)';
-  return 'var(--color-success)';
-};
+const ANTIGUEDAD_UMBRAL_DIAS = 30;
 
 const getNotificationIcon = (
   statusInfo: NotificationStatusMap[number],
@@ -89,7 +83,7 @@ const getNotificationIcon = (
 };
 
 export const AdminAcreedoresPage: React.FC = () => {
-  const { data: acreedores = [], isLoading } = useAcreedores();
+  const { data: acreedores = [], isLoading, isError, error: queryError, refetch } = useAcreedores();
   const { data: resumen } = useAcreedoresResumen();
   const { data: settings } = useSettings();
   const batchMutation = useNotificarDeudaBatch();
@@ -307,27 +301,41 @@ export const AdminAcreedoresPage: React.FC = () => {
     const s = a.saldo ?? 0;
     const sf = a.saldoFavor ?? 0;
     const ti = a.totalIntereses ?? 0;
-    const badge = s > 0 && ti > 0 ? (
-      <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--color-text-faint)', fontWeight: 400 }}>
-        incluye {formatCurrency(ti)} interés
-      </span>
-    ) : null;
+    const nivel = a.estadoDeuda ?? 'OK';
+    const interesTitle = s > 0 && ti > 0 ? `Incluye ${formatCurrency(ti)} de interés` : undefined;
     if (sf > 0) {
-      return <span className="success-text" style={{ fontWeight: 600 }}>{`A favor: ${formatCurrency(sf)}`}</span>;
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+          <span className="badge badge-success">A favor</span>
+          <span style={{ fontWeight: 600 }}>{formatCurrency(sf)}</span>
+        </span>
+      );
     }
-    if (s > 0 && a.alertaDeuda) {
-      return <span className="error-text" style={{ fontWeight: 600 }}>{formatCurrency(s)}{badge}</span>;
+    if (s > 0 && nivel === 'LIMITE') {
+      return <span title={interesTitle} style={{ fontWeight: 600, color: 'var(--color-danger)', whiteSpace: 'nowrap' }}>{formatCurrency(s)}</span>;
+    }
+    if (s > 0 && nivel === 'ADVERTENCIA') {
+      return <span title={interesTitle} style={{ fontWeight: 600, color: 'var(--color-warning)', whiteSpace: 'nowrap' }}>{formatCurrency(s)}</span>;
     }
     if (s > 0) {
-      return <span className="warning-text">{formatCurrency(s)}{badge}</span>;
+      return <span title={interesTitle} style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatCurrency(s)}</span>;
     }
-    return <span style={{ color: 'var(--color-text-muted)' }}>$0</span>;
+    return <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{formatCurrency(0)}</span>;
   };
 
   const getAntiguedadDisplay = (a: Acreedor) => {
     const s = a.saldo ?? 0;
-    if (s <= 0) return '--';
-    return `${a.diasSinPagar ?? 0}d`;
+    if (s <= 0) return <span style={{ color: 'var(--color-text-muted)' }}>--</span>;
+    const dias = a.diasSinPagar ?? 0;
+    if (dias >= ANTIGUEDAD_UMBRAL_DIAS) {
+      return (
+        <span title={`${dias} días sin pagar`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: 'var(--color-danger)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+          <AlertTriangle size={14} aria-hidden="true" />
+          {dias}d
+        </span>
+      );
+    }
+    return <span style={{ whiteSpace: 'nowrap' }}>{dias}d</span>;
   };
 
   const allEligibleCount = useMemo(
@@ -368,7 +376,7 @@ export const AdminAcreedoresPage: React.FC = () => {
           )}
           {resumen.acreedoresConCredito > 0 && (
             <div className="sales-kpi-card">
-              <span className="sales-kpi-label">Con crédito a favor</span>
+              <span className="sales-kpi-label">Acreedores con crédito</span>
               <span className="sales-kpi-value">{resumen.acreedoresConCredito}</span>
             </div>
           )}
@@ -406,11 +414,17 @@ export const AdminAcreedoresPage: React.FC = () => {
           <div className="spinner" aria-hidden="true" />
           <p style={{ color: 'var(--color-text-faint)', margin: '0.75rem 0 0', fontSize: '0.95rem' }}>Cargando...</p>
         </div>
+      ) : isError ? (
+        <div className="settings-section">
+          <ListError message={queryError instanceof Error ? queryError.message : undefined} onRetry={() => refetch()} />
+        </div>
       ) : filtered.length === 0 ? (
         <div className="settings-section" style={{ textAlign: 'center', padding: '2.5rem 1.5rem' }}>
-          <p style={{ color: 'var(--color-text-faint)', margin: 0, fontSize: '0.95rem' }}>
-            {search ? 'Sin resultados para la búsqueda.' : 'No hay acreedores registrados.'}
-          </p>
+          <div className="ui-empty">
+            <h3>{search ? 'Sin resultados' : 'No hay acreedores registrados'}</h3>
+            <p>{search ? 'Probá con otra búsqueda.' : 'Creá el primero para llevar el fiado.'}</p>
+            {!search && <button type="button" className="ui-btn ui-btn--primary" onClick={openCreate}>Crear el primer acreedor</button>}
+          </div>
         </div>
       ) : (
         <div className="sales-table-wrapper">
@@ -444,14 +458,7 @@ export const AdminAcreedoresPage: React.FC = () => {
                 <div
                   key={a.id}
                   className="sales-table-row"
-                  style={{
-                    cursor: 'pointer',
-                    ...(estadoLimite === 'LIMITE'
-                      ? { background: 'color-mix(in srgb, var(--color-danger) 8%, transparent)' }
-                      : estadoLimite === 'ADVERTENCIA'
-                        ? { background: 'color-mix(in srgb, var(--color-warning, #f59e0b) 8%, transparent)' }
-                        : {}),
-                  }}
+                  style={{ cursor: 'pointer' }}
                   onClick={() => navigate(`/admin/acreedores/${a.id}`)}
                 >
                   {notificationsEnabled && whatsappUseApi && (
@@ -477,12 +484,6 @@ export const AdminAcreedoresPage: React.FC = () => {
                   )}
                   <span className="col-date" style={{ fontWeight: 500 }}>
                     {a.nombre}
-                    {estadoLimite === 'LIMITE' && (
-                      <span className="badge badge-error" style={{ marginLeft: '0.4rem' }} title={a.limiteDeuda != null ? `Límite: ${formatCurrency(a.limiteDeuda)}` : 'Límite superado'}>LÍMITE</span>
-                    )}
-                    {estadoLimite === 'ADVERTENCIA' && (
-                      <span className="badge badge-warning" style={{ marginLeft: '0.4rem' }} title={a.advertenciaDeuda != null ? `Advertencia: ${formatCurrency(a.advertenciaDeuda)}` : 'Advertencia superada'}>AVISO</span>
-                    )}
                   </span>
                   <span className="col-user">{a.telefono || '--'}</span>
                   <span className="col-total" style={{ flex: '0 0 110px' }}>{getSaldoDisplay(a)}</span>
@@ -490,17 +491,20 @@ export const AdminAcreedoresPage: React.FC = () => {
                     className="col-total"
                     style={{
                       flex: '0 0 90px',
-                      color: getAntiguedadColor(a.diasSinPagar, a.saldo),
                       fontWeight: 500,
                     }}
                   >
                     {getAntiguedadDisplay(a)}
                   </span>
                   <span className="col-method" style={{ flex: '0 0 70px' }}>
-                    {a.activo ? (
-                      <span className="badge badge-success">Activo</span>
-                    ) : (
+                    {!a.activo ? (
                       <span className="badge badge-neutral">Inactivo</span>
+                    ) : estadoLimite === 'LIMITE' ? (
+                      <span className="badge badge-danger" title={a.limiteDeuda != null ? `Límite: ${formatCurrency(a.limiteDeuda)}` : 'Límite superado'}>Límite</span>
+                    ) : estadoLimite === 'ADVERTENCIA' ? (
+                      <span className="badge badge-warning" title={a.advertenciaDeuda != null ? `Advertencia: ${formatCurrency(a.advertenciaDeuda)}` : 'Advertencia superada'}>Aviso</span>
+                    ) : (
+                      <span className="badge badge-success">Activo</span>
                     )}
                   </span>
                   <span className="col-action" style={{ flex: '0 0 130px', display: 'flex', gap: '0.15rem', justifyContent: 'flex-end', alignItems: 'center' }}>

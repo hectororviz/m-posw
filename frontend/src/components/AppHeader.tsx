@@ -13,6 +13,7 @@ interface AppHeaderProps {
   isLoading: boolean;
   showMenuButton?: boolean;
   onMenuClick?: () => void;
+  hideBrand?: boolean;
 }
 
 const getInitials = (name?: string | null) => {
@@ -29,7 +30,7 @@ const getInitials = (name?: string | null) => {
   return `${words[0][0]}${words[1][0]}`.toUpperCase();
 };
 
-export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showMenuButton, onMenuClick }) => {
+export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showMenuButton, onMenuClick, hideBrand }) => {
   const { user, logout, permissions } = useAuth();
   const { resolved, toggle: toggleTheme } = useTheme();
   const location = useLocation();
@@ -73,24 +74,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showM
             <Menu size={18} />
           </button>
         )}
-        <div className="brand-block">
-          {showLogo ? (
-            <img src={logoUrl} alt={storeName} className="brand-logo" onError={() => setLogoError(true)} />
-          ) : (
-            <div className="logo-placeholder" aria-hidden="true">
-              {initials}
-            </div>
-          )}
-          <div className="brand-text">
-            {showSkeleton ? (
-              <span className="text-skeleton" aria-hidden="true" />
+        {!hideBrand && (
+          <div className="brand-block">
+            {showLogo ? (
+              <img src={logoUrl} alt={storeName} className="brand-logo" onError={() => setLogoError(true)} />
             ) : (
-              <span className="store-name" title={storeName}>
-                {storeName}
-              </span>
+              <div className="logo-placeholder" aria-hidden="true">
+                {initials}
+              </div>
             )}
+            <div className="brand-text">
+              {showSkeleton ? (
+                <span className="text-skeleton" aria-hidden="true" />
+              ) : (
+                <span className="store-name" title={storeName}>
+                  {storeName}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        )}
         <div className="header-user">
           <span className="user-name" title={user?.username ?? 'Usuario'}>
             {user?.username ?? 'Usuario'}
@@ -153,6 +156,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showM
             <NavLink
               to={isPosScreen || isHomeScreen ? '/admin/settings' : '/pos'}
               className="ghost-button header-toggle-button"
+              aria-label={isPosScreen || isHomeScreen ? 'Ir a Configuración' : 'Ir al POS'}
+              title={isPosScreen || isHomeScreen ? 'Ir a Configuración' : 'Ir al POS'}
             >
               {isPosScreen || isHomeScreen ? <Settings size={18} /> : <DollarSign size={18} />}
             </NavLink>

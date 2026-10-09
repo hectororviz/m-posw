@@ -36,6 +36,11 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
 - **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Notificaciones, Ligas, Jugadores, Patrimonio, Internet y Entradas desde Configuración → Módulos.
 
+### Interfaz y accesibilidad
+- **Sistema de diseño** (`DESIGN.md`): acento configurable, tokens y componentes UI unificados (`frontend/src/components/ui/`).
+- **Formato único** (`utils/format.ts`): montos, porcentajes y fechas en `es-AR` en toda la app.
+- **Accesibilidad**: contraste 4,5:1, táctil 44px en tablet, foco visible solo por teclado, confirmación antes de eliminar y avisos de resultado con reintento ante fallas de red.
+
 ### Padrón de Socios
 - **CRUD de socios**: datos personales, tipo de socio, estado (activo/inactivo/suspendido), fecha de alta.
 - **Cuotas mensuales**: generación masiva por mes/año, registro de pagos individuales, control de deuda.

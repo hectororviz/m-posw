@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFinanzasMonthly, useFinanzasSummary, useMpAuditoriaStatus } from '../api/queries';
+import { formatDate, formatMoney } from '../utils/format';
 
-const formatCurrency = (n: number) =>
-  n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
+const formatCurrency = (n: number) => formatMoney(n);
 
 export const FinanzasResumenPage: React.FC = () => {
   const navigate = useNavigate();
@@ -71,7 +71,7 @@ export const FinanzasResumenPage: React.FC = () => {
                 <span className="summary-card__label">Saldo disponible MP</span>
                 <span className="summary-card__value">{formatCurrency(mpStatus.disponible)}</span>
                 {mpStatus?.disponibleAt ? (
-                  <span className="summary-card__meta">al {new Date(mpStatus.disponibleAt).toLocaleDateString('es-AR')}</span>
+                  <span className="summary-card__meta">al {formatDate(mpStatus.disponibleAt)}</span>
                 ) : null}
               </div>
             )}

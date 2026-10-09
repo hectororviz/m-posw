@@ -5,7 +5,9 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useInternetHealth, useInternetPlans, useInternetVoucherDetail, useInternetVouchers, useInternetStats, useStaffVouchers } from '../api/queries';
 import type { ComputedVoucherStatus, InternetPlan } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
 import { useModuleAccess } from '../hooks/useModuleAccess';
+import { formatDateTime, formatMoney } from '../utils/format';
 
 type TabId = 'vouchers' | 'planes' | 'staff';
 type VoucherFilter = 'todos' | ComputedVoucherStatus;
@@ -74,18 +76,11 @@ const formatRemaining = (seconds: number | null) => {
   return `${m}min`;
 };
 
-const formatDateTime = (iso: string) => {
-  const d = new Date(iso);
-  const day = d.getDate().toString().padStart(2, '0');
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const hours = d.getHours().toString().padStart(2, '0');
-  const minutes = d.getMinutes().toString().padStart(2, '0');
-  return `${day}/${month} ${hours}:${minutes}`;
-};
+const formatDateTimeLabel = (iso: string): string => formatDateTime(iso);
 
 const formatOptDateTime = (iso: string | null, emptyLabel: string) => {
   if (!iso) return emptyLabel;
-  return formatDateTime(iso);
+  return formatDateTimeLabel(iso);
 };
 
 const formatUpdatedAgo = (updatedAt: number) => {
@@ -226,8 +221,9 @@ export const AdminInternetPage: React.FC = () => {
     setEditingPlan(null);
   };
 
+  const [confirmTarget, setConfirmTarget] = useState<{ kind: 'voucher' | 'staff' | 'plan'; id: string; label: string } | null>(null);
+
   const handleDeactivate = async (voucherId: string) => {
-    if (!confirm('¿Anular este voucher? El PIN dejara de funcionar.')) return;
     setDeactivatingId(voucherId);
     try {
       await apiClient.delete(`/internet/vouchers/id/${voucherId}`);
@@ -274,7 +270,7 @@ export const AdminInternetPage: React.FC = () => {
 
   const getPriceDisplay = (price: number | string) => {
     const num = typeof price === 'string' ? Number(price) : price;
-    return `$${num.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return formatMoney(num);
   };
 
   const handleCreateStaff = async () => {
@@ -297,7 +293,6 @@ export const AdminInternetPage: React.FC = () => {
   };
 
   const handleDeactivateStaff = async (id: string) => {
-    if (!confirm('¿Anular este pin? Dejará de funcionar.')) return;
     setDeactivatingStaffId(id);
     try {
       await apiClient.delete(`/internet/staff-vouchers/${id}`);
@@ -450,7 +445,7 @@ export const AdminInternetPage: React.FC = () => {
                 </div>
                 {(visibleVouchers ?? []).map((v) => (
                   <div key={v.id} className="sales-table-row voucher-row-clickable" onClick={() => setDetailPin(v.pin)}>
-                    <span className="col-date">{formatDateTime(v.saleCreatedAt)}</span>
+                    <span className="col-date">{formatDateTimeLabel(v.saleCreatedAt)}</span>
                     <span className="col-type vcol-venta">#{v.saleOrderNumber}</span>
                     <span className="col-user vcol-plan">{v.planName}</span>
                     <span className="col-user vcol-pin">
@@ -477,7 +472,7 @@ export const AdminInternetPage: React.FC = () => {
                           className="btn-ghost btn-sm"
                           style={{ color: 'var(--color-danger-text)' }}
                           disabled={deactivatingId === v.id}
-                          onClick={(e) => { e.stopPropagation(); handleDeactivate(v.id); }}
+                          onClick={(e) => { e.stopPropagation(); setConfirmTarget({ kind: 'voucher', id: v.id, label: 'el voucher' }); }}
                         >
                           {deactivatingId === v.id ? '...' : 'Anular'}
                         </button>
@@ -534,7 +529,7 @@ export const AdminInternetPage: React.FC = () => {
                       )}
                       <div className="settings-field">
                         <label>Creado por</label>
-                        <p style={{ margin: 0 }}>{selectedStaff.createdBy} · {formatDateTime(selectedStaff.createdAt)}</p>
+                        <p style={{ margin: 0 }}>{selectedStaff.createdBy} · {formatDateTimeLabel(selectedStaff.createdAt)}</p>
                       </div>
                     </>
                   )}
@@ -542,7 +537,7 @@ export const AdminInternetPage: React.FC = () => {
                     <>
                       <div className="settings-field">
                         <label>Venta</label>
-                        <p style={{ margin: 0 }}>#{selectedVoucher.saleOrderNumber} · {formatDateTime(selectedVoucher.saleCreatedAt)}</p>
+                        <p style={{ margin: 0 }}>#{selectedVoucher.saleOrderNumber} · {formatDateTimeLabel(selectedVoucher.saleCreatedAt)}</p>
                       </div>
                       <div className="settings-field">
                         <label>Plan</label>
@@ -681,7 +676,7 @@ export const AdminInternetPage: React.FC = () => {
                     </span>
                     <span className="col-action" style={{ flex: '0 0 80px', display: 'flex', gap: '0.25rem' }}>
                       <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(plan)} aria-label={`Editar ${plan.name}`}>{<Pencil size={16} />}</button>
-                      <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => handleDelete(plan)} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : <X size={16} />}</button>
+                      <button type="button" className="btn-ghost btn-sm" disabled={deletingId === plan.id} onClick={() => setConfirmTarget({ kind: 'plan', id: plan.id, label: 'el plan' })} style={{ color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${plan.name}`}>{deletingId === plan.id ? '...' : <X size={16} />}</button>
                     </span>
                   </div>
                 ))}
@@ -780,7 +775,7 @@ export const AdminInternetPage: React.FC = () => {
                           className="btn-ghost btn-sm"
                           style={{ color: 'var(--color-danger-text)' }}
                           disabled={deactivatingStaffId === s.id}
-                          onClick={(e) => { e.stopPropagation(); handleDeactivateStaff(s.id); }}
+                          onClick={(e) => { e.stopPropagation(); setConfirmTarget({ kind: 'staff', id: s.id, label: 'el pin de personal' }); }}
                         >
                           {deactivatingStaffId === s.id ? '...' : 'Anular'}
                         </button>
@@ -792,6 +787,26 @@ export const AdminInternetPage: React.FC = () => {
             </div>
           )}
         </>
+      )}
+      {confirmTarget && (
+        <ConfirmDialog
+          title={confirmTarget.kind === 'plan' ? 'Eliminar el plan' : 'Anular'}
+          message={confirmTarget.kind === 'plan'
+            ? 'Se eliminará el plan de internet y su producto asociado.'
+            : confirmTarget.kind === 'voucher'
+              ? 'Se anulará el voucher. El PIN dejará de funcionar.'
+              : 'Se anulará el pin. Dejará de funcionar.'}
+          confirmLabel={confirmTarget.kind === 'plan' ? 'Eliminar' : 'Anular'}
+          busy={deletingId === confirmTarget.id || deactivatingId === confirmTarget.id || deactivatingStaffId === confirmTarget.id}
+          onCancel={() => setConfirmTarget(null)}
+          onConfirm={async () => {
+            const target = confirmTarget;
+            setConfirmTarget(null);
+            if (target.kind === 'voucher') await handleDeactivate(target.id);
+            else if (target.kind === 'staff') await handleDeactivateStaff(target.id);
+            else await handleDelete({ id: target.id } as InternetPlan);
+          }}
+        />
       )}
     </div>
   );

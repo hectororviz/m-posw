@@ -7,6 +7,7 @@ import { AssetForm } from './components/AssetForm';
 import { AssetDetail } from './components/AssetDetail';
 import { ChangeStatusModal } from './components/ChangeStatusModal';
 import { BajaConfirmModal } from './components/BajaConfirmModal';
+import { formatDate } from '../../utils/format';
 
 const LIMITS = [10, 25, 50, 100];
 
@@ -124,7 +125,7 @@ export const BienesPage: React.FC = () => {
                 <AssetStatusBadge name={asset.status?.name ?? ''} />
               </span>
               <span className="col-date" style={{ flex: '0 0 110px', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                {asset.acquisitionDate ? new Date(asset.acquisitionDate).toLocaleDateString('es-AR') : new Date(asset.createdAt).toLocaleDateString('es-AR')}
+                {asset.acquisitionDate ? formatDate(asset.acquisitionDate) : formatDate(asset.createdAt)}
               </span>
               <span className="col-action" style={{ flex: '0 0 100px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
                 <button className="btn-ghost" onClick={() => setDetailId(asset.id)} title="Ver detalle" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>

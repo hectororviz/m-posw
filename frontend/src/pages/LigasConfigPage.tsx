@@ -1,6 +1,9 @@
 import { useState } from 'react';
+import { useToast } from '../components/ToastProvider';
 import { X } from 'lucide-react';
 import { useLigasConfigs, useLigasCreateConfig, useLigasDeleteConfig, useLigasLeagues, useLigasTeams } from '../api/queries';
+import type { LigasConfig } from '../api/types';
+import { ConfirmDialog } from '../components/ui/Modal';
 
 export const LigasConfigPage: React.FC = () => {
   const { data: configs, isLoading: configsLoading } = useLigasConfigs();
@@ -14,15 +17,18 @@ export const LigasConfigPage: React.FC = () => {
     selectedLeagueId || undefined,
   );
 
+  const { pushToast } = useToast();
   const createConfig = useLigasCreateConfig();
   const deleteConfig = useLigasDeleteConfig();
+  const [deleteTarget, setDeleteTarget] = useState<LigasConfig | null>(null);
 
   const selectedLeague = leagues?.find((l) => l.id === selectedLeagueId);
   const selectedTeam = teams?.find((t) => t.id === selectedTeamId);
 
   const handleAdd = async () => {
     if (!selectedLeague || !selectedTeam) return;
-    await createConfig.mutateAsync({
+    try {
+      await createConfig.mutateAsync({
       nombre: nombre.trim() || undefined,
       leagueId: selectedLeague.id,
       leagueName: selectedLeague.name,
@@ -32,6 +38,10 @@ export const LigasConfigPage: React.FC = () => {
     setNombre('');
     setSelectedLeagueId('');
     setSelectedTeamId('');
+      pushToast('Torneo asociado', 'success');
+    } catch {
+      pushToast('No se pudo asociar el torneo', 'error');
+    }
   };
 
   return (
@@ -58,7 +68,7 @@ export const LigasConfigPage: React.FC = () => {
                   <button
                     className="btn-ghost btn-sm"
                     title="Eliminar asociación"
-                    onClick={() => deleteConfig.mutate(cfg.id)}
+                    onClick={() => setDeleteTarget(cfg)}
                   >
                     <X size={14} />
                   </button>
@@ -142,6 +152,17 @@ export const LigasConfigPage: React.FC = () => {
         <p className="text-danger" style={{ marginTop: '0.5rem' }}>
           Error al agregar: {String(createConfig.error)}
         </p>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar la asociación"
+          message={`Se dejará de seguir a "${deleteTarget.teamName}" en "${deleteTarget.leagueName}".`}
+          confirmLabel="Eliminar"
+          busy={deleteConfig.isPending}
+          onCancel={() => { if (!deleteConfig.isPending) setDeleteTarget(null); }}
+          onConfirm={() => deleteConfig.mutate(deleteTarget.id, { onSuccess: () => { setDeleteTarget(null); pushToast('Asociación eliminada', 'success'); }, onError: () => pushToast('No se pudo eliminar', 'error') })}
+        />
       )}
     </div>
   );

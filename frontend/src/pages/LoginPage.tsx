@@ -67,7 +67,6 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="login-page">
-      <div className="login-bg" />
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="login-brand">
           {logoUrl ? (

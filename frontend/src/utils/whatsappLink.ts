@@ -1,3 +1,5 @@
+import { formatNumber } from './format';
+
 export const DEFAULT_WEB_MESSAGE = 'Hola {{nombre}}, tenés un saldo pendiente de ${{saldo}} en {{club}} ({{dias}} días).';
 
 export const normalizePhoneForWa = (phone: string): string => {
@@ -18,7 +20,7 @@ export const buildWhatsAppWebLink = (params: {
   template?: string | null;
   club?: string | null;
 }): string => {
-  const saldo = (params.saldo ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const saldo = formatNumber(params.saldo ?? 0);
   const dias = String(params.diasSinPagar ?? 0);
   const clubName = params.club || 'nuestro club';
   const message = (params.template || DEFAULT_WEB_MESSAGE)

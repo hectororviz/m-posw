@@ -3,6 +3,8 @@ import { Pencil, Plus, Power, Trash2, X } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useSociosTipos } from '../api/queries';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
+import { formatMoney } from '../utils/format';
 
 interface Beneficio {
   id: string;
@@ -19,14 +21,15 @@ interface Beneficio {
   createdAt: string;
 }
 
-const formatCurrency = (value: number) =>
-  `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const formatCurrency = (value: number) => formatMoney(value);
 
 export const AdminSociosBeneficiosPage: React.FC = () => {
   const { pushToast } = useToast();
   const { data: tipos = [] } = useSociosTipos();
   const [beneficios, setBeneficios] = useState<Beneficio[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Beneficio | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [filterTipo, setFilterTipo] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
-  const [categorias, setCategorias] = useState<any[]>([]);
+  const [categorias, setCategorías] = useState<any[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
 
   useEffect(() => {
@@ -55,10 +58,10 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
       .finally(() => setLoading(false));
   }, [filterTipo, refresh]);
 
-  const fetchCategorias = async () => {
+  const fetchCategorías = async () => {
     try {
       const res = await apiClient.get<any[]>('/categories');
-      setCategorias(res.data.filter((c: any) => c.active));
+      setCategorías(res.data.filter((c: any) => c.active));
     } catch (_) {}
   };
 
@@ -77,7 +80,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
 
   const openCreate = () => {
     resetForm();
-    fetchCategorias();
+    fetchCategorías();
     fetchProductos();
     setModalOpen(true);
   };
@@ -94,7 +97,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
       limiteDiario: b.limiteDiario ? String(b.limiteDiario) : '',
       activo: b.activo,
     });
-    fetchCategorias();
+    fetchCategorías();
     fetchProductos();
     setError(null);
     setModalOpen(true);
@@ -141,13 +144,18 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await apiClient.delete(`/socios/beneficios/${id}`);
+      await apiClient.delete(`/socios/beneficios/${deleteTarget.id}`);
       pushToast('Beneficio eliminado', 'success');
       setRefresh((r) => r + 1);
+      setDeleteTarget(null);
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -221,7 +229,7 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
                 <span className="col-action" style={{ flex: '0 0 120px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(b)} title="Editar">{<Pencil size={16} />}</button>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => handleToggle(b)} title={b.activo ? 'Desactivar' : 'Activar'} style={{ color: b.activo ? 'var(--color-danger-text)' : 'var(--color-success)' }}>{b.activo ? <Power size={16} /> : <Power size={16} />}</button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => handleDelete(b.id)} title="Eliminar" style={{ color: 'var(--color-danger-text)' }}>{<Trash2 size={16} />}</button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => setDeleteTarget(b)} title="Eliminar" style={{ color: 'var(--color-danger-text)' }}>{<Trash2 size={16} />}</button>
                 </span>
               </div>
             ))}
@@ -230,6 +238,17 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
       )}
 
       <button type="button" className="fab-button-v2" onClick={openCreate} aria-label="Nuevo beneficio"><Plus size={24} /></button>
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar el beneficio"
+          message={`Se eliminará el beneficio de ${deleteTarget.porcentaje}% para "${deleteTarget.socioTipo.nombre}". Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          busy={deleting}
+          onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+          onConfirm={handleDelete}
+        />
+      )}
 
       {modalOpen && (
         <div className="modal-backdrop" onClick={() => { setModalOpen(false); resetForm(); }}>
@@ -253,13 +272,13 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
                 <div className="settings-field">
                   <label>Tipo de destino</label>
                   <select value={form.tipoBeneficio} onChange={(e) => setForm({ ...form, tipoBeneficio: e.target.value as 'categoria' | 'producto', categoriaProdId: '', productoId: '' })}>
-                    <option value="categoria">Categoria</option>
+                    <option value="categoria">Categoría</option>
                     <option value="producto">Producto</option>
                   </select>
                 </div>
                 {form.tipoBeneficio === 'categoria' ? (
                   <div className="settings-field">
-                    <label>Categoria *</label>
+                    <label>Categoría *</label>
                     <select value={form.categoriaProdId} onChange={(e) => setForm({ ...form, categoriaProdId: e.target.value })}>
                       <option value="">Seleccionar categoria</option>
                       {categorias.map((c: any) => (

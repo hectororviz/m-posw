@@ -876,6 +876,19 @@ Sistema de theming con CSS variables (`data-theme` attribute en `<html>`):
 - **Detección automática**: respeta `prefers-color-scheme` del sistema.
 - **CSS Variables**: todos los colores tokenizados (primary, surface, text, border, etc.).
 
+## UI/UX — Sistema de diseño (DESIGN.md)
+
+`DESIGN.md` (en la raíz) es la fuente de verdad de la UI web. Implementación actual:
+
+- **Tokens** (`frontend/src/styles/tokens.css`): `--color-primary` (acento configurable desde Configuración, inyectado por `AppLayout` vía `utils/accent.ts` con `on-primary` por luminancia) + derivados `color-mix` (`hover/active/soft/border/text`), semánticos `*-soft`, tipografía por rol (`text-*`), espaciado (`space-*`), radios, sombras, `--control-h` (40px, 44px en `pointer:coarse`), `--content-max: 1400px`.
+- **Componentes** (`frontend/src/components/ui/`): `PageLayout/PageHeader`, `Tabs`, `KpiGrid/KpiCard` (`tone`, `loading`), `Badge`, `Button` (`busy`)/`Fab`, `Input/Select/DateInput/Textarea/MoneyInput/SearchInput/SegmentedControl/FormField/FormGrid/IconPicker`, `DataTable` (`density`, `priority="low"`, `loading`, `error`+`onRetry`, `emptyState` con acción), `Modal` (`dirty` con confirmación, trampa de foco, Esc, retorno de foco)/`ConfirmDialog`, `Card/Toolbar/ListError/Delta`.
+- **Formato** (`frontend/src/utils/format.ts`, `es-AR`): `formatMoney` (`$ 1.200`, `cents: true` → `$ 1.200,00`), `formatPercent` (`500,0%`), `formatDate` (`dd/MM/yyyy`), `formatDateTime` (`dd/MM/yyyy HH:mm`), `formatDateLong`, `formatNumber`. Prohibido formatear fuera de ahí.
+- **Accesibilidad**: contraste texto 4,5:1 / iconos 3:1 (verificado), táctil 44px en coarse, foco solo con `:focus-visible`, `aria-label` en botones de ícono de la topbar, `ConfirmDialog` antes de eliminar, `ListError` + Reintentar, `Toast` (success/error/warning/info, `aria-live`).
+- **Reglas al tocar UI**: un `primary` por zona, estados con color semántico + texto (nunca solo color), sidebar activo = `primary-soft` + barra 3px (sin outline), logo solo en sidebar (versión corta al colapsar).
+- **Probar cambios de UI** con 3 acentos (claro, oscuro, saturado) en modo claro y oscuro. Verificar `npm run build` en `frontend/`.
+
+Pendientes conocidos: migrar tablas legacy (`.sales-table`) a `DataTable` (con `priority="low"` en secundarias) y modales legacy a `ui/Modal` (+ `useDirtyForm`); filtros por URL en Socios/Acreedores/Internet para enlaces profundos del Home; endpoint dedicado de últimos movimientos (hoy deriva de `GET /sales`, ver TODO en `HomePage`).
+
 ## Notificaciones / WhatsApp Módulo
 
 Módulo de notificaciones genérico con WhatsApp Cloud API (Meta) como proveedor. Diseñado para ser extensible a otros canales (SMS, email) en el futuro.

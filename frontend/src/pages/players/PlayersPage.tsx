@@ -5,6 +5,7 @@ import { usePlayers, usePlayer } from '../../api/queries';
 import { useToast } from '../../components/ToastProvider';
 import { Download, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import type { Player as PlayerType } from '../../api/types';
+import { formatDate } from '../../utils/format';
 
 const LIMITS = [10, 25, 50, 100];
 
@@ -107,7 +108,6 @@ export const PlayersPage: React.FC = () => {
     } catch (err: any) { pushToast(normalizeApiError(err) || 'Error al exportar', 'error'); }
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('es-AR');
   const totalPages = Math.ceil((playersData?.total ?? 0) / limit);
   const birthYears = Array.from({ length: new Date().getFullYear() - 2009 }, (_, i) => new Date().getFullYear() - i);
 

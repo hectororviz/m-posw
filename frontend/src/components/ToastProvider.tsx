@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
-type ToastVariant = 'success' | 'error';
+type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
 interface Toast {
   id: string;

@@ -5,6 +5,7 @@ import { useCoaches, useCoach, useTournaments } from '../../api/queries';
 import { useToast } from '../../components/ToastProvider';
 import { Download, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import type { Coach as CoachType, Tournament } from '../../api/types';
+import { formatDate } from '../../utils/format';
 
 const LIMITS = [10, 25, 50, 100];
 
@@ -114,7 +115,6 @@ export const CoachesPage: React.FC = () => {
       .catch(() => pushToast('Error al generar el informe PDF', 'error'));
   };
 
-  const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('es-AR') : '—';
   const totalPages = Math.ceil((coachesData?.total ?? 0) / limit);
 
   const tournaments = (allTournaments as any)?.data ?? (allTournaments as Tournament[] | undefined) ?? [];

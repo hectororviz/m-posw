@@ -5,13 +5,13 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useFinanzasMovements, useMoneyAccounts, useMoneyCategories, useResponsables } from '../api/queries';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
 import type { FinanzasMovement } from '../api/types';
+import { formatDate, formatMoney } from '../utils/format';
 
-const formatCurrency = (n: number) =>
-  n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
+const formatCurrency = (n: number) => formatMoney(n);
 
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+const formatDateLabel = (d: string) => formatDate(d).slice(0, 5);
 
 const sourceBadge = (m: FinanzasMovement) => {
   if (m.source === 'VENTA_GRUPO') return <span className="badge badge-success">Ventas del día ({m.salesCount})</span>;
@@ -169,15 +169,21 @@ export const FinanzasMovimientosPage: React.FC<{
     }
   };
 
-  const handleVoid = async (id: string) => {
-    if (!window.confirm('¿Anular este movimiento?')) return;
+  const [voidTarget, setVoidTarget] = useState<string | null>(null);
+  const [voiding, setVoiding] = useState(false);
+  const handleVoid = async () => {
+    if (!voidTarget || voiding) return;
+    setVoiding(true);
     try {
-      await apiClient.post(`/finanzas/movements/${id}/anular`, {});
+      await apiClient.post(`/finanzas/movements/${voidTarget}/anular`, {});
       pushToast('Movimiento anulado', 'success');
       queryClient.invalidateQueries({ queryKey: ['finanzas-movements'] });
       queryClient.invalidateQueries({ queryKey: ['finanzas-summary'] });
+      setVoidTarget(null);
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setVoiding(false);
     }
   };
 
@@ -260,7 +266,7 @@ export const FinanzasMovimientosPage: React.FC<{
                 onClick={m.source === 'VENTA_GRUPO' ? () => setExpandedGroup(expandedGroup === m.id ? null : m.id) : undefined}
               >
                 <div className="finanzas-card-main">
-                  <span className="finanzas-card-date">{formatDate(m.date)}</span>
+                  <span className="finanzas-card-date">{formatDateLabel(m.date)}</span>
                   <div className="finanzas-card-body">
                     <strong className="finanzas-card-desc">
                       {m.source === 'VENTA_GRUPO' ? `${expandedGroup === m.id ? '▾' : '▸'} ` : ''}{m.concepto || m.description}
@@ -286,7 +292,7 @@ export const FinanzasMovimientosPage: React.FC<{
                     <button
                       className="btn-ghost finanzas-void"
                       title="Anular"
-                      onClick={(e) => { e.stopPropagation(); handleVoid(m.id); }}
+                      onClick={(e) => { e.stopPropagation(); setVoidTarget(m.id); }}
                     >
                       <Ban size={15} />
                     </button>
@@ -298,7 +304,7 @@ export const FinanzasMovimientosPage: React.FC<{
                   {groupChildren.data.map((c) => (
                     <div key={c.id} className="finanzas-card">
                       <div className="finanzas-card-main">
-                        <span className="finanzas-card-date">{formatDate(c.date)}</span>
+                        <span className="finanzas-card-date">{formatDateLabel(c.date)}</span>
                         <div className="finanzas-card-body">
                           <strong className="finanzas-card-desc">{c.concepto || c.description}</strong>
                           <span className="finanzas-card-meta">{c.categoryName}</span>
@@ -511,6 +517,16 @@ export const FinanzasMovimientosPage: React.FC<{
             </div>
           </div>
         </div>
+      )}
+      {voidTarget && (
+        <ConfirmDialog
+          title="Anular el movimiento"
+          message="Se anulará el movimiento. Esta acción no se puede deshacer."
+          confirmLabel="Anular"
+          busy={voiding}
+          onCancel={() => { if (!voiding) setVoidTarget(null); }}
+          onConfirm={handleVoid}
+        />
       )}
     </div>
   );

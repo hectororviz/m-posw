@@ -8,7 +8,9 @@ import { X } from 'lucide-react';
 import { useMpOauthStatus, useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
+import { formatDate } from '../utils/format';
 
 type TabId = 'general' | 'ventas' | 'mercadopago' | 'caja' | 'modulos' | 'sistema';
 
@@ -38,6 +40,7 @@ export const AdminSettingsPage: React.FC = () => {
   const { pushToast } = useToast();
   const { showEmbeddedKeyboard, setShowEmbeddedKeyboard } = useEmbeddedKeyboard();
   const [activeTab, setActiveTab] = useState<TabId>('general');
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -218,7 +221,7 @@ export const AdminSettingsPage: React.FC = () => {
       });
       queryClient.setQueryData(['settings'], response.data);
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
-      pushToast('Configuracion actualizada', 'success');
+      pushToast('Configuración actualizada', 'success');
     } catch (err) {
       setError(normalizeApiError(err));
     } finally {
@@ -343,7 +346,7 @@ export const AdminSettingsPage: React.FC = () => {
       await apiClient.delete('/mp-oauth/setup-pos');
       await refetchMpStatus();
       setMpSetupMode('setup_required');
-      pushToast('Configuracion de POS eliminada. Podes volver a configurarlo.', 'success');
+      pushToast('Configuración de POS eliminada. Podés volver a configurarlo.', 'success');
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
     }
@@ -433,7 +436,7 @@ export const AdminSettingsPage: React.FC = () => {
   return (
     <div>
       <div className="page-header">
-        <h2 className="page-header-title">Configuracion</h2>
+        <h2 className="page-header-title">Configuración</h2>
         <p className="page-header-subtitle">Gestiona los parametros del sistema</p>
       </div>
 
@@ -457,7 +460,7 @@ export const AdminSettingsPage: React.FC = () => {
         {/* TAB: General */}
         {activeTab === 'general' && (
           <div className="settings-section">
-            <h3 className="settings-section-header">Informacion del negocio</h3>
+            <h3 className="settings-section-header">Información del negocio</h3>
             <div className="settings-field">
               <label htmlFor="store-name">Nombre del local</label>
               <input
@@ -490,15 +493,24 @@ export const AdminSettingsPage: React.FC = () => {
               <span className="field-hint">Alias del club usado en el envio de notificaciones por WhatsApp. Aparece como variable 'alias' en las plantillas.</span>
             </div>
             <div className="settings-field">
-              <label htmlFor="accent-color">Color de personalizacion</label>
-              <input
-                id="accent-color"
-                type="text"
-                value={form.accentColor}
-                onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
-                placeholder="#0ea5e9"
-              />
-              <span className="field-hint">Codigo hexadecimal (ej: #0ea5e9). Define el color principal del sistema.</span>
+              <label htmlFor="accent-color">Color de personalización</label>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                <input
+                  id="accent-color"
+                  type="color"
+                  value={/^#[0-9a-fA-F]{6}$/.test(form.accentColor) ? form.accentColor : '#2563eb'}
+                  onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
+                  style={{ width: 44, height: 'var(--control-h)', padding: 0, border: '1px solid var(--color-border-strong)', borderRadius: 'var(--radius-sm)' }}
+                />
+                <input
+                  type="text"
+                  value={form.accentColor}
+                  onChange={(e) => setForm({ ...form, accentColor: e.target.value })}
+                  placeholder="#2563eb"
+                  style={{ flex: 1 }}
+                />
+              </div>
+              <span className="field-hint">Color principal del sistema (acento). Se valida contraste mínimo 3:1; el texto sobre el acento se ajusta solo.</span>
             </div>
             <div className="settings-field">
               <label htmlFor="logo-upload">Logo</label>
@@ -518,7 +530,7 @@ export const AdminSettingsPage: React.FC = () => {
                 accept="image/png,image/svg+xml,image/x-icon"
                 onChange={(e) => handleUpload('favicon', e.target.files?.[0])}
               />
-              <span className="field-hint">Icono que aparece en la pestana del navegador.</span>
+              <span className="field-hint">Ícono que aparece en la pestaña del navegador.</span>
             </div>
           </div>
         )}
@@ -696,7 +708,7 @@ export const AdminSettingsPage: React.FC = () => {
                       <button
                         type="button"
                         className="btn-ghost"
-                        onClick={handleDisconnectMp}
+                        onClick={() => setShowDisconnectConfirm(true)}
                         disabled={mpDisconnecting}
                       >
                         {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
@@ -797,7 +809,7 @@ export const AdminSettingsPage: React.FC = () => {
                       </div>
                       {mpSelectedCity && (
                         <div className="settings-field">
-                          <label htmlFor="mp-zip-select">Codigo Postal</label>
+                          <label htmlFor="mp-zip-select">Código postal</label>
                           <select
                             id="mp-zip-select"
                             value={mpSelectedZip}
@@ -863,7 +875,7 @@ export const AdminSettingsPage: React.FC = () => {
                       <button
                         type="button"
                         className="btn-ghost"
-                        onClick={handleDisconnectMp}
+                        onClick={() => setShowDisconnectConfirm(true)}
                         disabled={mpDisconnecting}
                       >
                         {mpDisconnecting ? 'Desconectando...' : 'Desconectar'}
@@ -877,7 +889,7 @@ export const AdminSettingsPage: React.FC = () => {
                     <span className="mp-status-label">Vencimiento del token</span>
                     <span className="mp-status-value">
                       {mpStatus?.expiresAt
-                        ? new Date(mpStatus.expiresAt).toLocaleDateString('es-AR')
+                        ? formatDate(mpStatus.expiresAt)
                         : '—'}
                     </span>
                   </div>
@@ -907,7 +919,7 @@ export const AdminSettingsPage: React.FC = () => {
                     <button
                       type="button"
                       className="btn-ghost"
-                      onClick={handleDisconnectMp}
+                      onClick={() => setShowDisconnectConfirm(true)}
                       disabled={mpDisconnecting}
                     >
                       {mpDisconnecting ? 'Desconectando...' : 'Desconectar cuenta'}
@@ -950,7 +962,7 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Socios</strong>
+                  <strong>Módulo de Socios</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu y el boton QR de la pantalla POS</small>
                 </span>
@@ -963,7 +975,7 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Tesoreria</strong>
+                  <strong>Módulo de Tesorería</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu</small>
                 </span>
@@ -976,7 +988,7 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Acreedores</strong>
+                  <strong>Módulo de Acreedores</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Oculta la entrada del menu, la opcion Fiado del checkout y el toggle de Fiado en Ventas</small>
                 </span>
@@ -999,7 +1011,7 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Internet / Vouchers WiFi</strong>
+                  <strong>Módulo de Internet / Vouchers WiFi</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Agrega la categoria "Internet" en el POS y permite vender vouchers de acceso WiFi</small>
                 </span>
@@ -1012,7 +1024,7 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Ligas Deportivas</strong>
+                  <strong>Módulo de Ligas Deportivas</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Muestra tablas de posiciones y partidos de ligas de futbol</small>
                 </span>
@@ -1025,7 +1037,7 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Jugadores</strong>
+                  <strong>Módulo de Jugadores</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Gestion de jugadores, categorias y torneos deportivos</small>
                 </span>
@@ -1038,7 +1050,7 @@ export const AdminSettingsPage: React.FC = () => {
                 />
                 <span className="toggle-switch-track" />
                 <span>
-                  <strong>Modulo de Patrimonio</strong>
+                  <strong>Módulo de Patrimonio</strong>
                   <br />
                   <small style={{ color: 'var(--color-text-faint)' }}>Registro y gestion de bienes, activos e historial</small>
                 </span>
@@ -1077,7 +1089,7 @@ export const AdminSettingsPage: React.FC = () => {
         {/* TAB: Sistema */}
         {activeTab === 'sistema' && (
           <div className="settings-section">
-            <h3 className="settings-section-header">Informacion del sistema</h3>
+            <h3 className="settings-section-header">Información del sistema</h3>
             <div className="system-info-list">
               <div className="system-info-row">
                 <span className="system-info-label">Aplicacion</span>
@@ -1326,6 +1338,16 @@ export const AdminSettingsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {showDisconnectConfirm && (
+        <ConfirmDialog
+          title="Desconectar Mercado Pago"
+          message="Se desvinculará la cuenta de Mercado Pago. El cobro por QR dejará de funcionar hasta volver a conectar."
+          confirmLabel="Desconectar"
+          busy={mpDisconnecting}
+          onCancel={() => { if (!mpDisconnecting) setShowDisconnectConfirm(false); }}
+          onConfirm={async () => { setShowDisconnectConfirm(false); await handleDisconnectMp(); }}
+        />
       )}
     </div>
   );

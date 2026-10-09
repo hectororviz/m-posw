@@ -5,11 +5,13 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useDispositivosMpStores, useInvalidateDispositivos, usePosDevices } from '../api/queries';
 import type { MpStoresResponse, PosDevice, PosDeviceCreated, PosDeviceTipo } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
+import { formatDateTime } from '../utils/format';
 
 const fmtDateTime = (iso: string | null) => {
   if (!iso) return '—';
   const d = new Date(iso);
-  return `${d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+  return formatDateTime(d);
 };
 
 const usedByFor = (mp: MpStoresResponse | undefined, storeId: string, posId: string) =>
@@ -20,6 +22,8 @@ export const AdminDispositivosPage: React.FC = () => {
   const invalidate = useInvalidateDispositivos();
   const { data: devices } = usePosDevices();
   const [createOpen, setCreateOpen] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<PosDevice | null>(null);
+  const [revoking, setRevoking] = useState(false);
   const [mpDevice, setMpDevice] = useState<PosDevice | null>(null);
 
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
@@ -95,10 +99,7 @@ export const AdminDispositivosPage: React.FC = () => {
                         invalidate();
                       } catch (e) { err(e); }
                     }} title="Rotar token" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><RefreshCw size={14} /></button>
-                    <button className="btn-ghost" onClick={async () => {
-                      if (!confirm(`Revocar ${d.nombre}?`)) return;
-                      try { await apiClient.post(`/dispositivos/${d.id}/revoke`); invalidate(); } catch (e) { err(e); }
-                    }} title="Revocar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
+                    <button className="btn-ghost" onClick={() => setRevokeTarget(d)} title="Revocar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
                   </span>
                 </div>
               ))
@@ -111,6 +112,20 @@ export const AdminDispositivosPage: React.FC = () => {
       </button>
       {createOpen && <CreateDeviceModal onClose={() => setCreateOpen(false)} />}
       {mpDevice && <MpLinkModal deviceId={mpDevice.id} deviceNombre={mpDevice.nombre} mpPosId={mpDevice.mpPosId} mpLabel={mpDevice.mpPosId ? `${mpDevice.mpStoreName ?? ''} / ${mpDevice.mpPosName ?? ''}` : null} onClose={() => setMpDevice(null)} />}
+      {revokeTarget && (
+        <ConfirmDialog
+          title="Revocar el dispositivo"
+          message={`Se revocará "${revokeTarget.nombre}". La terminal quedará sin acceso hasta generar un nuevo token.`}
+          confirmLabel="Revocar"
+          busy={revoking}
+          onCancel={() => { if (!revoking) setRevokeTarget(null); }}
+          onConfirm={async () => {
+            setRevoking(true);
+            try { await apiClient.post(`/dispositivos/${revokeTarget.id}/revoke`); invalidate(); setRevokeTarget(null); }
+            catch (e) { err(e); } finally { setRevoking(false); }
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -155,13 +170,16 @@ const MpLinkSection: React.FC<{
     } catch (e) { err(e); }
   };
 
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const disconnect = async () => {
-    if (!confirm('¿Desvincular el MP? Su QR dejará de operar.')) return;
+    setUnlinking(true);
     try {
       await apiClient.post(`/dispositivos/${deviceId}/mp-disconnect`);
       invalidate();
       onUnlinked();
-    } catch (e) { err(e); }
+      setShowUnlinkConfirm(false);
+    } catch (e) { err(e); } finally { setUnlinking(false); }
   };
 
   return (
@@ -177,11 +195,21 @@ const MpLinkSection: React.FC<{
           <Plus size={14} /> Crear nuevo en MP
         </button>
         {mpPosId && (
-          <button type="button" className="btn-secondary btn-sm" onClick={disconnect}>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setShowUnlinkConfirm(true)}>
             <Trash2 size={12} /> Desvincular
           </button>
         )}
       </div>
+      {showUnlinkConfirm && (
+        <ConfirmDialog
+          title="Desvincular Mercado Pago"
+          message="Se desvinculará el POS. Su QR dejará de operar hasta volver a vincular."
+          confirmLabel="Desvincular"
+          busy={unlinking}
+          onCancel={() => { if (!unlinking) setShowUnlinkConfirm(false); }}
+          onConfirm={disconnect}
+        />
+      )}
       {mp && (
         <div className="sales-table-wrapper" style={{ marginTop: '0.75rem' }}>
           <div className="sales-table">

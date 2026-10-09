@@ -5,6 +5,7 @@ import { useEligiblePlayers, useTournamentPlayers, usePlayerCategories, useTourn
 import { useToast } from '../../components/ToastProvider';
 import { AlertTriangle, Search, X } from 'lucide-react';
 import type { EligiblePlayer, FichadoPlayer, Tournament, TournamentCoachCategory } from '../../api/types';
+import { formatDate } from '../../utils/format';
 
 interface Props { tournament: Tournament; onClose: () => void; }
 
@@ -119,7 +120,6 @@ export const TournamentPlayersModal: React.FC<Props> = ({ tournament, onClose })
     }
   };
 
-  const formatDate = (d: string) => new Date(d).toLocaleDateString('es-AR');
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

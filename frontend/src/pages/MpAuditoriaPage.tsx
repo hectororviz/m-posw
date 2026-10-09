@@ -5,14 +5,13 @@ import { useMpAuditoria, useMpAuditoriaDetail, useMpAuditoriaStatus, useMoneyCat
 import { useModuleAccess } from '../hooks/useModuleAccess';
 import { useToast } from '../components/ToastProvider';
 import type { MpAuditEstado, MpAuditoriaItem } from '../api/types';
+import { formatDate, formatDateTime, formatMoney } from '../utils/format';
 
 const SESSION_KEY = 'mp-audit-synced';
 
-const formatCurrency = (n: number) =>
-  n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
+const formatCurrency = (n: number) => formatMoney(n);
 
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+const formatDateLabel = (d: string) => formatDate(d).slice(0, 5);
 
 const estadoBadge = (e: MpAuditEstado) => {
   if (e === 'CONCILIADO') return <span className="badge badge-success">Conciliado</span>;
@@ -163,8 +162,8 @@ export const MpAuditoriaPage: React.FC = () => {
           <h2>Auditoría Mercado Pago</h2>
           <p className="page-subtitle">
             Movimientos de la cuenta MP y su vínculo con el sistema
-            {status?.cursor ? ` · actualizado ${new Date(status.cursor).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
-            {status?.disponible != null ? ` · disponible ${formatCurrency(status.disponible)}${status?.disponibleAt ? ` (${new Date(status.disponibleAt).toLocaleDateString('es-AR')})` : ''}` : ''}
+            {status?.cursor ? ` · actualizado ${formatDateTime(status.cursor)}` : ''}
+            {status?.disponible != null ? ` · disponible ${formatCurrency(status.disponible)}${status?.disponibleAt ? ` (${formatDate(status.disponibleAt)})` : ''}` : ''}
           </p>
         </div>
         {canWrite && (
@@ -248,7 +247,7 @@ export const MpAuditoriaPage: React.FC = () => {
           {(onlyPending ? data.data.filter((m: MpAuditoriaItem) => m.estado === 'PENDIENTE' || m.estado === 'SUGERIDO') : data.data).map((m) => (
             <div key={m.id} className="finanzas-card" style={{ cursor: 'pointer' }} onClick={() => setSelectedId(m.id)}>
               <div className="finanzas-card-main">
-                <span className="finanzas-card-date">{formatDate(m.fechaMp)}</span>
+                <span className="finanzas-card-date">{formatDateLabel(m.fechaMp)}</span>
                 <div className="finanzas-card-body">
                   <strong className="finanzas-card-desc">{m.pagador || `MP ${m.mpPaymentId}`}</strong>
                   <span className="finanzas-card-meta">
@@ -281,7 +280,7 @@ export const MpAuditoriaPage: React.FC = () => {
             <h3>{detail.pagador || `MP ${detail.mpPaymentId}`}</h3>
             <p className="page-subtitle">
               {formatCurrency(detail.montoNeto)} neto (bruto {formatCurrency(detail.montoBruto)}{detail.fee > 0 ? `, fee ${formatCurrency(detail.fee)}` : ''})
-              {' · '}{new Date(detail.fechaMp).toLocaleString('es-AR')}
+              {' · '}{formatDateTime(detail.fechaMp)}
             </p>
             <p className="page-subtitle">ID {detail.mpPaymentId}{detail.externalRef ? ` · ref ${detail.externalRef}` : ''}{detail.email ? ` · ${detail.email}` : ''}</p>
             <div style={{ marginBottom: 12 }}>{estadoBadge(detail.estado)}</div>

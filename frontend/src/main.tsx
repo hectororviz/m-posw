@@ -9,6 +9,7 @@ import { ToastProvider } from './components/ToastProvider';
 import { ThemeProvider } from './context/ThemeContext';
 import { SocketProvider } from './socket/SocketProvider';
 import './styles/tokens.css';
+import './components/ui/ui.css';
 import './styles/global.css';
 
 const queryClient = new QueryClient({

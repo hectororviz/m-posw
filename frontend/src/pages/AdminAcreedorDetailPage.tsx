@@ -7,15 +7,11 @@ import { useAcreedor, useAcreedorDeuda, useAcreedorNotificaciones, useSettings, 
 import type { FiadoVentaItem, AjusteAcreedorItem, PagoAcreedorItem, NotificacionesJob, Sale } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { buildWhatsAppWebLink } from '../utils/whatsappLink';
+import { formatDate, formatDateTime, formatMoney } from '../utils/format';
 
-const formatCurrency = (value: number) =>
-  `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const formatCurrency = (value: number) => formatMoney(value);
 
-const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
-const formatDateTime = (value: string) =>
-  new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 const getPaymentMethodLabel = (method?: string) => {
   if (method === 'MP_QR') return 'QR';
@@ -339,7 +335,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
         <div className="alerta-deuda-banner">
           <AlertTriangle size={16} className="alerta-deuda-icon" /> Deuda pendiente desde hace {deuda.diasSinPagar} dias.
           {deuda.deudaMasAntigua && (
-            <> Ultima venta sin saldar: {formatDate(deuda.deudaMasAntigua)}.</>
+            <> Última venta sin saldar: {formatDate(deuda.deudaMasAntigua)}.</>
           )}
         </div>
       )}
@@ -642,7 +638,7 @@ export const AdminAcreedorDetailPage: React.FC = () => {
                 <>
                   <div className="sales-detail-row">
                     <span>Fecha</span>
-                    <span>{formatDate(selectedSale.createdAt)} {new Date(selectedSale.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                    <span>{formatDateTime(selectedSale.createdAt)}</span>
                   </div>
                   <div className="sales-detail-row">
                     <span>Total</span>

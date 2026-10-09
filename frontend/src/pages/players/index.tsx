@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { usePlayersDashboard, useTournaments } from '../../api/queries';
 import { Cake, Download } from 'lucide-react';
 import { useToast } from '../../components/ToastProvider';
+import { formatDate } from '../../utils/format';
 
 export const PlayersDashboardPage: React.FC = () => {
   const { data: d, isLoading } = usePlayersDashboard();
@@ -38,10 +39,7 @@ export const PlayersDashboardPage: React.FC = () => {
     return acc;
   }, {} as Record<string, typeof bars>);
 
-  const formatDateLong = (iso: string) => {
-    const date = new Date(iso);
-    return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
-  };
+  const formatBirthday = (iso: string) => formatDate(iso).slice(0, 5);
 
   const birthdayBorderColor = (daysUntil: number) => {
     const ratio = Math.max(0, Math.min(1, (20 - daysUntil) / 20));
@@ -169,7 +167,7 @@ export const PlayersDashboardPage: React.FC = () => {
                   {p.firstName}
                 </div>
                 <div style={{ fontSize: '1rem', color: '#444', lineHeight: 1.2, marginBottom: 0 }}>
-                  {formatDateLong(p.birthDate)}
+                  {formatBirthday(p.birthDate)}
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#444', lineHeight: 1.2, marginBottom: '1.2rem' }}>
                   ({p.daysUntil === 0 ? 'hoy' : `${p.daysUntil} dias`})

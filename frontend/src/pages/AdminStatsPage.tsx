@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useSettings, useStatsSummary } from '../api/queries';
 import type { TicketPayload } from '../utils/ticketPrinting';
+import { formatDate, formatMoney, formatPercent } from '../utils/format';
 
-const formatCurrency = (value: number) =>
-  value.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
+const formatCurrency = (value: number) => formatMoney(value);
 
-const formatDateLabel = (value: string) =>
-  new Date(value + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+const formatDateLabel = (value: string) => formatDate(value + 'T00:00:00').slice(0, 5);
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -58,11 +57,11 @@ export const AdminStatsPage: React.FC = () => {
 
   const handlePrintStats = () => {
     if (totals.salesCount === 0) return;
-    const fmt = (d: string) => { const dt = new Date(d + 'T00:00:00'); return dt.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }); };
+    const fmt = (d: string) => formatDate(d + 'T00:00:00').slice(0, 5) + '/' + formatDate(d + 'T00:00:00').slice(8);
     const paymentLines: { label: string; value: string }[] = [];
-    paymentSummary.segments.forEach((s) => { paymentLines.push({ label: paymentLabels[s.method] ?? s.method, value: `${s.percent.toFixed(1)}%` }); paymentLines.push({ label: '', value: formatCurrency(s.total) }); });
-    const productLines = totals.byProduct.slice(0, 10).map((p) => ({ label: p.name.substring(0, 18), value: `${p.quantity} (${totals.totalProducts ? ((p.quantity / totals.totalProducts) * 100).toFixed(1) : 0}%)` }));
-    const payload: TicketPayload = { clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: new Date().toISOString(), itemsStyle: 'summary', items: [], criteria: [{ label: 'Desde:', value: fmt(startDate) }, { label: 'Hasta:', value: fmt(endDate) }, { label: 'Total ventas:', value: formatCurrency(totals.totalSales) }, { label: 'Total productos:', value: totals.totalProducts.toString() }], summary: [{ label: 'MEDIOS DE PAGO', value: '' }, ...paymentLines, { label: '', value: '' }, { label: 'PRODUCTOS', value: '' }, ...productLines], title: 'ESTADISTICAS', footer: 'Resumen de ventas' };
+    paymentSummary.segments.forEach((s) => { paymentLines.push({ label: paymentLabels[s.method] ?? s.method, value: formatPercent(s.percent) }); paymentLines.push({ label: '', value: formatCurrency(s.total) }); });
+    const productLines = totals.byProduct.slice(0, 10).map((p) => ({ label: p.name.substring(0, 18), value: `${p.quantity} (${formatPercent(totals.totalProducts ? (p.quantity / totals.totalProducts) * 100 : 0)})` }));
+    const payload: TicketPayload = { clubName: settings?.clubName ?? '', storeName: settings?.storeName ?? '', dateTimeISO: new Date().toISOString(), itemsStyle: 'summary', items: [], criteria: [{ label: 'Desde:', value: fmt(startDate) }, { label: 'Hasta:', value: fmt(endDate) }, { label: 'Total ventas:', value: formatCurrency(totals.totalSales) }, { label: 'Total productos:', value: totals.totalProducts.toString() }], summary: [{ label: 'Medios de pago', value: '' }, ...paymentLines, { label: '', value: '' }, { label: 'Productos', value: '' }, ...productLines], title: 'Estadísticas', footer: 'Resumen de ventas' };
     window.location.href = `/printticket?data=${encodeURIComponent(encodeBase64(JSON.stringify(payload)))}`;
   };
 
@@ -71,7 +70,7 @@ export const AdminStatsPage: React.FC = () => {
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
           <div>
-            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Estadisticas</h2>
+            <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Estadísticas</h2>
             <p className="page-header-subtitle">Analiza ventas, productos y medios de pago por periodo.</p>
           </div>
           <button type="button" className="btn-ghost" onClick={handlePrintStats} disabled={totals.salesCount === 0}>Imprimir reporte</button>
@@ -101,7 +100,7 @@ export const AdminStatsPage: React.FC = () => {
               <span className="stats-kpi-value">{totals.totalProducts}</span>
             </div>
             <div className="stats-kpi-card">
-              <span className="stats-kpi-label">Mas vendido</span>
+              <span className="stats-kpi-label">Más vendido</span>
               <span className="stats-kpi-value">{totals.topProduct}</span>
             </div>
           </div>
@@ -148,7 +147,7 @@ export const AdminStatsPage: React.FC = () => {
                           <span className="stats-donut-dot" style={{ background: s.color }} />
                           <span className="stats-donut-label">{paymentLabels[s.method] ?? s.method}</span>
                           <span className="stats-donut-value">{formatCurrency(s.total)}</span>
-                          <span className="stats-donut-pct">{s.percent.toFixed(1)}%</span>
+                          <span className="stats-donut-pct">{formatPercent(s.percent)}</span>
                         </div>
                       ))}
                     </div>

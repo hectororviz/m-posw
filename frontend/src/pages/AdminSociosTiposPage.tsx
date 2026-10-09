@@ -5,9 +5,10 @@ import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
 import { useSettings, useSociosTipos } from '../api/queries';
 import type { SocioTipo } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
+import { formatMoney } from '../utils/format';
 
-const formatCurrency = (value: number) =>
-  `$ ${value.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const formatCurrency = (value: number) => formatMoney(value);
 
 export const AdminSociosTiposPage: React.FC = () => {
   const { data: tipos = [], isLoading } = useSociosTipos();
@@ -20,6 +21,8 @@ export const AdminSociosTiposPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showWarning, setShowWarning] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SocioTipo | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [bgUploading, setBgUploading] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
@@ -129,13 +132,18 @@ export const AdminSociosTiposPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await apiClient.delete(`/socios/tipos/${id}`);
+      await apiClient.delete(`/socios/tipos/${deleteTarget.id}`);
       await queryClient.invalidateQueries({ queryKey: ['socios-tipos'] });
       pushToast('Tipo de socio desactivado', 'success');
+      setDeleteTarget(null);
     } catch (err) {
       pushToast(normalizeApiError(err), 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -220,7 +228,7 @@ export const AdminSociosTiposPage: React.FC = () => {
                 <span className="col-action" style={{ flex: '0 0 80px', display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
                   <button type="button" className="btn-ghost btn-sm" onClick={() => openEdit(t.id)} title="Editar">{<Pencil size={16} />}</button>
                   {t.activo && (
-                    <button type="button" className="btn-ghost btn-sm" onClick={() => handleDelete(t.id)} title="Baja" style={{ color: 'var(--color-danger-text)' }}>{<Trash2 size={16} />}</button>
+                    <button type="button" className="btn-ghost btn-sm" onClick={() => setDeleteTarget(t)} title="Baja" style={{ color: 'var(--color-danger-text)' }}>{<Trash2 size={16} />}</button>
                   )}
                 </span>
               </div>
@@ -238,6 +246,17 @@ export const AdminSociosTiposPage: React.FC = () => {
       >
         <Plus size={24} />
       </button>
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Dar de baja el tipo"
+          message={`Se desactivará "${deleteTarget.nombre}". Los socios existentes conservan su tipo.`}
+          confirmLabel="Dar de baja"
+          busy={deleting}
+          onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+          onConfirm={handleDelete}
+        />
+      )}
 
       {modalOpen && (
         <div className="modal-backdrop" onClick={() => { setModalOpen(false); resetForm(); }}>

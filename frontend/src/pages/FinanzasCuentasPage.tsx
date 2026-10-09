@@ -5,6 +5,7 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useMoneyAccounts, useMoneyCategories, useResponsables, useMpAuditoriaStatus, useSettings } from '../api/queries';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 import { useToast } from '../components/ToastProvider';
+import { formatDate, formatMoney } from '../utils/format';
 
 type Entity = 'accounts' | 'categories' | 'responsables';
 type ModalMode = 'view' | 'edit' | 'new';
@@ -282,7 +283,7 @@ export const FinanzasCuentasPage: React.FC = () => {
           <div className="finanzas-simple-list">
             {accounts.map((a) => (
               <div key={a.id} className={`finanzas-simple-row${a.active ? '' : ' inactive'}`} onClick={() => openViewAccount(a)} style={{ cursor: 'pointer' }}>
-                <span><strong>{a.name}</strong> <small>· {a.kind} · inicial ${Number(a.initialBalance).toLocaleString('es-AR')}</small></span>
+                <span><strong>{a.name}</strong> <small>· {a.kind} · inicial {formatMoney(a.initialBalance)}</small></span>
                 {canWrite && (
                   <span className="finanzas-row-actions" onClick={(e) => e.stopPropagation()}>
                     <button className="btn-ghost" title="Editar" onClick={() => openViewAccount(a)}>
@@ -362,12 +363,12 @@ export const FinanzasCuentasPage: React.FC = () => {
           <h3>Mercado Pago</h3>
           <p className="page-subtitle">
             Corte: {(settings as { mpAuditSince?: string | null } | undefined)?.mpAuditSince
-              ? new Date((settings as { mpAuditSince: string }).mpAuditSince).toLocaleDateString('es-AR')
+              ? formatDate((settings as { mpAuditSince: string }).mpAuditSince)
               : '01/09/2026'}
             {' · '}pendientes: {mpStatus?.pendientes ?? '—'}
-            {mpStatus?.balance != null ? ` · saldo vivo $${Number(mpStatus.balance).toLocaleString('es-AR')}` : ''}
+            {mpStatus?.balance != null ? ` · saldo vivo ${formatMoney(mpStatus.balance)}` : ''}
             {mpStatus?.disponible != null
-              ? ` · disponible $${Number(mpStatus.disponible).toLocaleString('es-AR')}${mpStatus?.disponibleAt ? ` (${new Date(mpStatus.disponibleAt).toLocaleDateString('es-AR')})` : ''}`
+              ? ` · disponible ${formatMoney(mpStatus.disponible)}${mpStatus?.disponibleAt ? ` (${formatDate(mpStatus.disponibleAt)})` : ''}`
               : ''}
           </p>
           {canWrite && (

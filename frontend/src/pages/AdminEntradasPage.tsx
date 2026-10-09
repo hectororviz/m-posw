@@ -19,7 +19,9 @@ import {
 } from '../api/queries';
 import type { EntradaBeneficio, EntradaBeneficioSector, EntradaBeneficioValidation, EntradaFixture, EntradaSaleStatus } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
 import { useModuleAccess } from '../hooks/useModuleAccess';
+import { formatDate, formatDateTime, formatMoney } from '../utils/format';
 
 type TabId = 'ventas' | 'calendario' | 'abm' | 'beneficios' | 'diseno' | 'config';
 
@@ -34,16 +36,9 @@ const TABS: { id: TabId; label: string }[] = [
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-const fmtDateTime = (iso: string | null) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return `${d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
-};
+const fmtDateTime = (iso: string | null): string => (iso ? formatDateTime(iso).slice(0, 16) : '—');
 
-const fmtFecha = (iso: string) => {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: '2-digit' });
-};
+const fmtFecha = (iso: string): string => formatDate(iso).slice(0, 5);
 
 export const AdminEntradasPage: React.FC = () => {
   const access = useModuleAccess('ENTRADAS');
@@ -124,7 +119,7 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
             { label: 'Entradas visitantes', value: `${summary.visitante} entrada${summary.visitante === 1 ? '' : 's'}` },
             {
               label: 'Recaudado',
-              value: `$${Number(summary.recaudado || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              value: formatMoney(summary.recaudado || 0),
             },
           ].map((s) => (
             <div key={s.label} style={{ background: 'var(--color-surface-alt)', borderRadius: 8, padding: '0.6rem 1rem', minWidth: 150 }}>
@@ -287,10 +282,7 @@ const fixtureEstado = (f: EntradaFixture, now: number): FixtureEstado => {
   return 'JUGADO';
 };
 
-const fmtHora = (iso: string) => {
-  const d = new Date(iso);
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-};
+const fmtHora = (iso: string): string => formatDateTime(iso).slice(11);
 
 const toLocalInput = (iso: string) => {
   const d = new Date(iso);
@@ -311,6 +303,8 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ fecha: todayISO(), torneoId: '', rivalId: '' });
   const [editing, setEditing] = useState<EntradaFixture | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EntradaFixture | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [ventana, setVentana] = useState({ desde: '', hasta: '' });
 
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
@@ -407,14 +401,7 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
                     <span className="col-action" style={{ flex: '0 0 120px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
                       <button className="btn-ghost" disabled={jugado} onClick={() => openEdit(f)} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
                       <button className="btn-ghost" disabled={jugado} onClick={() => toggleActive(f)} title={f.activo ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>{f.activo ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-                      <button className="btn-ghost" onClick={async () => {
-                        if (!confirm(`Eliminar ${f.torneo.nombre} vs ${f.rival.nombre} (${fmtFecha(f.fecha)})? Solo se puede si aún no tiene ventas.`)) return;
-                        try {
-                          await apiClient.delete(`/entradas/fixtures/${f.id}`);
-                          pushToast('Partido eliminado', 'success');
-                          invalidate();
-                        } catch (e) { err(e); }
-                      }} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
+                      <button className="btn-ghost" onClick={() => setDeleteTarget(f)} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
                     </span>
                   )}
                 </div>
@@ -484,6 +471,24 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
             </div>
           </div>
         </div>
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar el partido"
+          message={`Se eliminará ${deleteTarget.torneo.nombre} vs ${deleteTarget.rival.nombre} (${fmtFecha(deleteTarget.fecha)}). Solo es posible si aún no tiene ventas.`}
+          confirmLabel="Eliminar"
+          busy={deleting}
+          onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+          onConfirm={async () => {
+            setDeleting(true);
+            try {
+              await apiClient.delete(`/entradas/fixtures/${deleteTarget.id}`);
+              pushToast('Partido eliminado', 'success');
+              invalidate();
+              setDeleteTarget(null);
+            } catch (e) { err(e); } finally { setDeleting(false); }
+          }}
+        />
       )}
     </div>
   );
@@ -831,13 +836,17 @@ const BeneficiosTab: React.FC<{ canWrite: boolean }> = () => {
     } catch (e) { err(e); }
   };
 
-  const remove = async (b: EntradaBeneficio) => {
-    if (!window.confirm(`¿Eliminar "${b.nombre}"? (con historial se desactiva)`)) return;
+  const [removeTarget, setRemoveTarget] = useState<EntradaBeneficio | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const remove = async () => {
+    if (!removeTarget) return;
+    setRemoving(true);
     try {
-      await apiClient.delete(`/entradas/beneficios/${b.id}`);
+      await apiClient.delete(`/entradas/beneficios/${removeTarget.id}`);
       pushToast('Beneficio eliminado', 'success');
       invalidate();
-    } catch (e) { err(e); }
+      setRemoveTarget(null);
+    } catch (e) { err(e); } finally { setRemoving(false); }
   };
 
   return (
@@ -881,7 +890,7 @@ const BeneficiosTab: React.FC<{ canWrite: boolean }> = () => {
                   <button type="button" className="btn-ghost btn-sm" onClick={() => toggle(b)} title={b.activo ? 'Desactivar' : 'Activar'}>
                     {b.activo ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
-                  <button type="button" className="btn-ghost btn-sm" onClick={() => remove(b)} title="Eliminar" style={{ color: 'var(--color-danger-text)' }}><Trash2 size={16} /></button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => setRemoveTarget(b)} title="Eliminar" style={{ color: 'var(--color-danger-text)' }}><Trash2 size={16} /></button>
                 </span>
               </div>
             ))
@@ -987,6 +996,16 @@ const BeneficiosTab: React.FC<{ canWrite: boolean }> = () => {
             </div>
           </div>
         </div>
+      )}
+      {removeTarget && (
+        <ConfirmDialog
+          title="Eliminar el beneficio"
+          message={`Se eliminará "${removeTarget.nombre}". Con historial se desactiva.`}
+          confirmLabel="Eliminar"
+          busy={removing}
+          onCancel={() => { if (!removing) setRemoveTarget(null); }}
+          onConfirm={remove}
+        />
       )}
     </div>
   );

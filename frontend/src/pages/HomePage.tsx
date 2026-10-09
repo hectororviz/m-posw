@@ -1,140 +1,122 @@
-import { AlertCircle, CalendarDays, CalendarX, Clock, FolderOpen, Package, ShoppingCart, Ticket, TrendingDown, TrendingUp, UserMinus, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertCircle, CalendarDays, CalendarX, Clock, FolderOpen, Package, ShoppingCart, Ticket, UserMinus, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useSettings } from '../api/queries';
+import { useAdminSales, useSettings } from '../api/queries';
 import { useHomeMetrics } from '../hooks/useHomeMetrics';
 import { useAuth } from '../context/AuthContext';
+import { Delta, ListError } from '../components/ui/Card';
+import { formatDate, formatDateLong, formatDateTime, formatMoney } from '../utils/format';
 
-const formatCurrency = (value: number) =>
-  value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Base mínima (en $) para mostrar una variación porcentual con contexto.
+const UMBRAL_BASE_VARIACION = 1000;
 
-const formatDate = () => {
-  const now = new Date();
-  return now.toLocaleDateString('es-AR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-};
+const formatTodayLong = () => formatDateLong(new Date());
 
-interface CardData {
+function comparable(variacion: number | null, base: number): number | null {
+  if (variacion === null) return null;
+  if (!Number.isFinite(variacion)) return null;
+  if (Math.abs(base) < UMBRAL_BASE_VARIACION) return null;
+  return variacion;
+}
+
+interface ActionData {
   icon: ReactNode;
   label: string;
   value: string;
-  key: string;
-  level: 'primary' | 'standard' | 'secondary';
-  alert?: 'danger' | 'warning';
-  trend?: { direction: 'up' | 'down' | 'flat'; pct: string } | null;
+  to: string;
+  alert: 'danger' | 'warning';
 }
+
+interface ActivityData {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  delta: number | null;
+}
+
+interface SummaryData {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}
+
+const PAYMENT_LABELS: Record<string, string> = { CASH: 'Efectivo', MP_QR: 'QR', TRANSFER: 'Transf.', FIADO: 'Fiado' };
 
 export const HomePage: React.FC = () => {
   const { data: settings } = useSettings();
-  const { data: metrics, isLoading } = useHomeMetrics();
+  const { data: metrics, isLoading, isError, refetch } = useHomeMetrics();
+  const { data: sales } = useAdminSales();
   const { user } = useAuth();
 
   const clubName = settings?.clubName || settings?.storeName || 'm-POSw';
   const username = user?.username || 'Usuario';
-  const today = formatDate();
+  const today = formatTodayLong();
   const cardIconSize = 24;
 
-  const primaryCards: CardData[] = [];
-  const standardCards: CardData[] = [];
-  const secondaryCards: CardData[] = [];
+  const actions: ActionData[] = [];
+  if (metrics?.socios && metrics.socios.cuotasVencidas > 0) {
+    actions.push({
+      icon: <CalendarX size={cardIconSize} />, label: 'Cuotas vencidas',
+      value: String(metrics.socios.cuotasVencidas), to: '/admin/socios', alert: 'danger',
+    });
+  }
+  if (metrics?.internet && metrics.internet.vouchersVencenHoy > 0) {
+    actions.push({
+      icon: <AlertCircle size={cardIconSize} />, label: 'Vencen hoy',
+      value: String(metrics.internet.vouchersVencenHoy), to: '/admin/internet', alert: 'warning',
+    });
+  }
+  if (metrics?.acreedores && metrics.acreedores.activos > 0) {
+    actions.push({
+      icon: <UserMinus size={cardIconSize} />, label: 'Acreedores con deuda',
+      value: String(metrics.acreedores.activos), to: '/admin/acreedores', alert: 'warning',
+    });
+  }
+  if (metrics?.acreedores && metrics.acreedores.deudaTotal > 0) {
+    actions.push({
+      icon: <Clock size={cardIconSize} />, label: 'Deuda total',
+      value: formatMoney(metrics.acreedores.deudaTotal), to: '/admin/acreedores', alert: 'danger',
+    });
+  }
 
+  const activity: ActivityData[] = [];
   if (metrics?.pos) {
     const variacionHoy = metrics.pos.ventasAyer === 0
       ? null
       : ((metrics.pos.ventasHoy - metrics.pos.ventasAyer) / metrics.pos.ventasAyer) * 100;
-
     const variacionSemana = metrics.pos.ventasSemanaPasada === 0
       ? null
       : ((metrics.pos.ventasSemana - metrics.pos.ventasSemanaPasada) / metrics.pos.ventasSemanaPasada) * 100;
-
-    const trendHoy = variacionHoy === null ? null
-      : variacionHoy > 0 ? { direction: 'up' as const, pct: variacionHoy.toFixed(1) }
-      : variacionHoy < 0 ? { direction: 'down' as const, pct: Math.abs(variacionHoy).toFixed(1) }
-      : { direction: 'flat' as const, pct: '0.0' };
-
-    const trendSemana = variacionSemana === null ? null
-      : variacionSemana > 0 ? { direction: 'up' as const, pct: variacionSemana.toFixed(1) }
-      : variacionSemana < 0 ? { direction: 'down' as const, pct: Math.abs(variacionSemana).toFixed(1) }
-      : { direction: 'flat' as const, pct: '0.0' };
-
-    primaryCards.push(
-      { icon: <ShoppingCart size={28} />, label: 'Ventas hoy', value: `$${formatCurrency(metrics.pos.ventasHoy)}`, key: 'pos-hoy', level: 'primary', trend: trendHoy },
-      { icon: <CalendarDays size={28} />, label: 'Ventas 7 días', value: `$${formatCurrency(metrics.pos.ventasSemana)}`, key: 'pos-semana', level: 'primary', trend: trendSemana },
+    activity.push(
+      {
+        icon: <ShoppingCart size={28} />, label: 'Ventas hoy',
+        value: formatMoney(metrics.pos.ventasHoy),
+        delta: comparable(variacionHoy, metrics.pos.ventasAyer),
+      },
+      {
+        icon: <CalendarDays size={28} />, label: 'Ventas 7 días',
+        value: formatMoney(metrics.pos.ventasSemana),
+        delta: comparable(variacionSemana, metrics.pos.ventasSemanaPasada),
+      },
     );
   }
 
+  const summary: SummaryData[] = [];
   if (metrics?.socios) {
-    const cuotasVencidas = metrics.socios.cuotasVencidas;
-    standardCards.push(
-      { icon: <Users size={cardIconSize} />, label: 'Socios activos', value: String(metrics.socios.activos), key: 'socios', level: 'standard' },
-      { icon: <CalendarX size={cardIconSize} />, label: 'Cuotas vencidas', value: String(cuotasVencidas), key: 'cuotas', level: 'standard', alert: cuotasVencidas > 0 ? 'danger' : undefined },
-    );
+    summary.push({ icon: <Users size={cardIconSize} />, label: 'Socios activos', value: String(metrics.socios.activos) });
   }
-
-  if (metrics?.acreedores) {
-    const deudaTotal = metrics.acreedores.deudaTotal;
-    standardCards.push(
-      { icon: <UserMinus size={cardIconSize} />, label: 'Acreedores con deuda', value: String(metrics.acreedores.activos), key: 'acreedores', level: 'standard' },
-      { icon: <Clock size={cardIconSize} />, label: 'Deuda total', value: `$${formatCurrency(deudaTotal)}`, key: 'deuda', level: 'standard', alert: deudaTotal > 0 ? 'warning' : undefined },
-    );
-    if (metrics.acreedores.conCredito > 0) {
-      standardCards.push(
-        { icon: <UserMinus size={cardIconSize} />, label: 'Con crédito a favor', value: String(metrics.acreedores.conCredito), key: 'acreedores-credito', level: 'standard' },
-      );
-    }
-  }
-
-  if (metrics?.internet) {
-    const vencenHoy = metrics.internet.vouchersVencenHoy;
-    standardCards.push(
-      { icon: <Ticket size={cardIconSize} />, label: 'Vouchers activos', value: String(metrics.internet.vouchersActivos), key: 'vouchers', level: 'standard' },
-      { icon: <AlertCircle size={cardIconSize} />, label: 'Vencen hoy', value: String(vencenHoy), key: 'vouchers-hoy', level: 'standard', alert: vencenHoy > 0 ? 'warning' : undefined },
-    );
-  }
-
   if (metrics?.stock) {
-    secondaryCards.push(
-      { icon: <Package size={cardIconSize} />, label: 'Productos', value: String(metrics.stock.productos), key: 'productos', level: 'secondary' },
-      { icon: <FolderOpen size={cardIconSize} />, label: 'Categorías', value: String(metrics.stock.categorias), key: 'categorias', level: 'secondary' },
+    summary.push(
+      { icon: <Package size={cardIconSize} />, label: 'Productos', value: String(metrics.stock.productos) },
+      { icon: <FolderOpen size={cardIconSize} />, label: 'Categorías', value: String(metrics.stock.categorias) },
     );
   }
+  if (metrics?.internet) {
+    summary.push({ icon: <Ticket size={cardIconSize} />, label: 'Vouchers activos', value: String(metrics.internet.vouchersActivos) });
+  }
 
-  const renderTrend = (trend?: CardData['trend']) => {
-    if (!trend) return null;
-    if (trend.direction === 'flat') {
-      return (
-        <span className="home-card-trend home-card-trend--flat">
-          Sin cambios
-        </span>
-      );
-    }
-    const isUp = trend.direction === 'up';
-    return (
-      <span className={`home-card-trend ${isUp ? 'home-card-trend--up' : 'home-card-trend--down'}`}>
-        {isUp ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-        {trend.pct}%
-      </span>
-    );
-  };
-
-  const renderCard = (card: CardData) => (
-    <div
-      key={card.key}
-      className={`home-card home-card--${card.level}${card.alert ? ` home-card--alert-${card.alert}` : ''}`}
-    >
-      <span className={`home-card-icon${card.alert ? ` home-card-icon--alert-${card.alert}` : ''}`}>
-        {card.icon}
-      </span>
-      <span className={`home-card-value${card.alert ? ` home-card-value--alert-${card.alert}` : ''}`}>
-        {card.value}
-      </span>
-      {renderTrend(card.trend)}
-      <span className="home-card-label">{card.label}</span>
-    </div>
-  );
+  // TODO: reemplazar por un endpoint de últimos movimientos cuando exista (hoy se deriva de GET /sales).
+  const ultimos = (sales ?? []).slice(0, 5);
 
   return (
     <div className="home-page">
@@ -151,28 +133,88 @@ export const HomePage: React.FC = () => {
         </p>
       )}
 
-      {!isLoading && primaryCards.length === 0 && standardCards.length === 0 && secondaryCards.length === 0 && (
+      {!isLoading && isError && <ListError onRetry={() => refetch()} />}
+
+      {!isLoading && actions.length > 0 && (
+        <section aria-label="Atención">
+          <h2 className="home-section-title">Atención</h2>
+          <div className="home-grid home-grid--attention">
+            {actions.map((a) => (
+              <Link
+                key={a.label}
+                to={a.to}
+                className={`home-card home-card--action home-card--alert-${a.alert}`}
+              >
+                <span className={`home-card-icon home-card-icon--alert-${a.alert}`}>
+                  {a.icon}
+                </span>
+                <span className={`home-card-value home-card-value--alert-${a.alert}`}>
+                  {a.value}
+                </span>
+                <span className="home-card-label">{a.label}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!isLoading && activity.length > 0 && (
+        <section aria-label="Actividad">
+          <h2 className="home-section-title">Actividad</h2>
+          <div className="home-grid home-grid--primary">
+            {activity.map((c) => (
+              <div key={c.label} className="home-card home-card--primary">
+                <span className="home-card-icon">{c.icon}</span>
+                <span className="home-card-value">{c.value}</span>
+                {c.delta !== null && <Delta value={c.delta} />}
+                <span className="home-card-label">{c.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!isLoading && summary.length > 0 && (
+        <section aria-label="Resumen">
+          <h2 className="home-section-title">Resumen</h2>
+          <div className="home-grid home-grid--secondary">
+            {summary.map((c) => (
+              <div key={c.label} className="home-card home-card--secondary">
+                <span className="home-card-icon">{c.icon}</span>
+                <span className="home-card-value">{c.value}</span>
+                <span className="home-card-label">{c.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!isLoading && ultimos.length > 0 && (
+        <section aria-label="Últimos movimientos">
+          <div className="home-section-head">
+            <h2 className="home-section-title">Últimos movimientos</h2>
+            <Link to="/admin/sales" className="home-section-link">Ver ventas</Link>
+          </div>
+          <div className="home-movements">
+            {ultimos.map((s) => (
+              <Link key={s.id} to="/admin/sales" className="home-movement-row">
+                <span className="home-movement-main">
+                  <strong>#{s.orderNumber}</strong>
+                  <span className="home-movement-meta">
+                    {formatDate(s.createdAt)} {formatDateTime(s.createdAt).slice(11)} · {PAYMENT_LABELS[s.paymentMethod ?? ''] ?? s.paymentMethod ?? '—'}
+                  </span>
+                </span>
+                <span className="home-movement-amount">{formatMoney(s.total)}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!isLoading && actions.length === 0 && activity.length === 0 && summary.length === 0 && (
         <p style={{ color: 'var(--color-text-faint)', textAlign: 'center', padding: '2rem' }}>
           No hay información disponible
         </p>
-      )}
-
-      {!isLoading && primaryCards.length > 0 && (
-        <div className="home-grid home-grid--primary">
-          {primaryCards.map(renderCard)}
-        </div>
-      )}
-
-      {!isLoading && standardCards.length > 0 && (
-        <div className="home-grid home-grid--standard">
-          {standardCards.map(renderCard)}
-        </div>
-      )}
-
-      {!isLoading && secondaryCards.length > 0 && (
-        <div className="home-grid home-grid--secondary">
-          {secondaryCards.map(renderCard)}
-        </div>
       )}
     </div>
   );

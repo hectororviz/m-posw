@@ -4,6 +4,8 @@ import { Lock, Pencil, Plus, Power, PowerOff, Trash2 } from 'lucide-react';
 import { apiClient, normalizeApiError } from '../../../api/client';
 import { useAssetStatuses } from '../../../api/queries';
 import { useToast } from '../../../components/ToastProvider';
+import type { AssetStatus } from '../../../api/types';
+import { ConfirmDialog } from '../../../components/ui/Modal';
 
 export const StatusManager: React.FC = () => {
   const queryClient = useQueryClient();
@@ -57,16 +59,23 @@ export const StatusManager: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const [deleteTarget, setDeleteTarget] = useState<AssetStatus | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     setError(null);
+    setDeleting(true);
     try {
-      await apiClient.delete(`/asset-statuses/${id}`);
+      await apiClient.delete(`/asset-statuses/${deleteTarget.id}`);
       pushToast('Estado eliminado', 'success');
       queryClient.invalidateQueries({ queryKey: ['asset-statuses'] });
+      setDeleteTarget(null);
     } catch (err: any) {
       const msg = normalizeApiError(err);
       setError(typeof msg === 'string' ? msg : 'Error al eliminar');
       pushToast(typeof msg === 'string' ? msg : 'Error al eliminar', 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -143,7 +152,7 @@ export const StatusManager: React.FC = () => {
                     <button className="btn-ghost" onClick={() => handleToggle(st.id)} title={st.isActive ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>
                       {st.isActive ? <PowerOff size={14} /> : <Power size={14} />}
                     </button>
-                    <button className="btn-ghost" onClick={() => handleDelete(st.id)} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>
+                    <button className="btn-ghost" onClick={() => setDeleteTarget(st)} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}>
                       <Trash2 size={14} />
                     </button>
                   </>
@@ -168,6 +177,16 @@ export const StatusManager: React.FC = () => {
           Agregar
         </button>
       </div>
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar el estado"
+          message={`Se eliminará el estado "${deleteTarget.name}". Solo es posible si ningún bien lo usa.`}
+          confirmLabel="Eliminar"
+          busy={deleting}
+          onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+          onConfirm={handleDelete}
+        />
+      )}
     </div>
   );
 };

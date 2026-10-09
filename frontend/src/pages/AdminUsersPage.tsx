@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Pencil, Plus, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../components/ToastProvider';
 import { apiClient, normalizeApiError } from '../api/client';
 import { useUsers } from '../api/queries';
 import type { ModuleAccess, ModuleKey, ModulePermission, User } from '../api/types';
+import { ConfirmDialog } from '../components/ui/Modal';
+import { ListError } from '../components/ui/Card';
 
 const ALL_MODULES: { key: ModuleKey; label: string }[] = [
   { key: 'POS', label: 'POS' },
   { key: 'VENTAS', label: 'Ventas' },
-  { key: 'REPORTES', label: 'Estadisticas' },
-  { key: 'PRODUCTOS', label: 'Categorias / Productos / Stock' },
+  { key: 'REPORTES', label: 'Estadísticas' },
+  { key: 'PRODUCTOS', label: 'Categorías / Productos / Stock' },
   { key: 'ACREEDORES', label: 'Acreedores' },
   { key: 'SOCIOS', label: 'Socios' },
   { key: 'TESORERIA', label: 'Tesorería' },
@@ -40,7 +43,8 @@ const defaultPermissions = (): ModulePermission[] =>
 
 export const AdminUsersPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const { data: users } = useUsers();
+  const { pushToast } = useToast();
+  const { data: users, isError, error: queryError, refetch } = useUsers();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
@@ -105,6 +109,7 @@ export const AdminUsersPage: React.FC = () => {
           permissions,
         });
         setSuccess('Usuario creado exitosamente');
+        pushToast('Usuario creado', 'success');
       } else if (editingUser) {
         const payload: Record<string, unknown> = {
           username: form.username,
@@ -115,6 +120,7 @@ export const AdminUsersPage: React.FC = () => {
         if (form.password) payload.password = form.password;
         await apiClient.patch(`/users/${editingUser.id}`, payload);
         setSuccess('Usuario actualizado exitosamente');
+        pushToast('Usuario actualizado', 'success');
       }
       closeModal();
       await queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -129,14 +135,18 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (user: User) => {
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     setError(null);
     setSuccess(null);
-    setDeletingId(user.id);
+    setDeletingId(deleteTarget.id);
     try {
-      await apiClient.delete(`/users/${user.id}`);
-      setSuccess(`Usuario "${user.username}" eliminado`);
+      await apiClient.delete(`/users/${deleteTarget.id}`);
+      setSuccess(`Usuario "${deleteTarget.username}" eliminado`);
+      pushToast('Usuario eliminado', 'success');
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+      setDeleteTarget(null);
     } catch (err) {
       setError(normalizeApiError(err));
     } finally {
@@ -156,8 +166,14 @@ export const AdminUsersPage: React.FC = () => {
       {error && <p className="error-text">{error}</p>}
       {success && <p className="success-text">{success}</p>}
 
-      {rendered.length === 0 ? (
-        <p className="text-muted">No hay usuarios registrados.</p>
+      {isError ? (
+        <ListError message={queryError instanceof Error ? queryError.message : undefined} onRetry={() => refetch()} />
+      ) : rendered.length === 0 ? (
+        <div className="ui-empty">
+          <h3>No hay usuarios registrados</h3>
+          <p>Creá el primero para dar acceso al sistema.</p>
+          <button type="button" className="ui-btn ui-btn--primary" onClick={openCreate}>Crear el primer usuario</button>
+        </div>
       ) : (
         <table className="users-table">
           <thead>
@@ -187,7 +203,7 @@ export const AdminUsersPage: React.FC = () => {
                       <button
                         type="button"
                         className="btn-ghost"
-                        onClick={() => handleDelete(user)}
+                        onClick={() => setDeleteTarget(user)}
                         disabled={deletingId === user.id}
                         style={{ color: 'var(--color-danger-text)' }}
                         title="Eliminar"
@@ -324,6 +340,16 @@ export const AdminUsersPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar el usuario"
+          message={`Se eliminará al usuario "${deleteTarget.username}". Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          busy={deletingId === deleteTarget.id}
+          onCancel={() => { if (deletingId !== deleteTarget.id) setDeleteTarget(null); }}
+          onConfirm={handleDelete}
+        />
       )}
     </section>
   );

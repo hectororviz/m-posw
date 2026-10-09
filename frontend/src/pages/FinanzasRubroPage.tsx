@@ -3,12 +3,11 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useFinanzasRubroDetail, useMoneyAccounts } from '../api/queries';
 import type { FinanzasMovement } from '../api/types';
+import { formatDate, formatMoney } from '../utils/format';
 
-const formatCurrency = (n: number) =>
-  n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
+const formatCurrency = (n: number) => formatMoney(n);
 
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+const formatDateLabel = (d: string) => formatDate(d).slice(0, 5);
 
 const sourceBadge = (m: FinanzasMovement) => {
   if (m.source === 'VENTA_DIARIA') return <span className="badge badge-success">Venta diaria</span>;
@@ -117,7 +116,7 @@ export const FinanzasRubroPage: React.FC = () => {
               {data.movements.data.map((m) => (
                 <div key={m.id} className={`finanzas-card${m.voided ? ' is-voided' : ''}`}>
                   <div className="finanzas-card-main">
-                    <span className="finanzas-card-date">{formatDate(m.date)}</span>
+                    <span className="finanzas-card-date">{formatDateLabel(m.date)}</span>
                     <div className="finanzas-card-body">
                       <strong className="finanzas-card-desc">{m.description}</strong>
                       <span className="finanzas-card-meta">{m.accountName}</span>

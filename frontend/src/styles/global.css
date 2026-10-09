@@ -648,7 +648,7 @@ button {
   flex-shrink: 0;
   padding: 0.5rem;
   border-right: 1px solid var(--color-border-light);
-  background: var(--color-bg);
+  background: var(--color-surface);
   transition: width 0.25s ease;
   overflow-x: hidden;
 }
@@ -673,10 +673,22 @@ button {
 }
 
 .admin-sidebar a.active {
-  background: var(--color-hover);
-  color: var(--color-text);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-text);
   font-weight: 600;
-  border-left-color: var(--accent-color);
+  border-left-color: var(--color-primary);
+  outline: none;
+  box-shadow: none;
+}
+
+.admin-sidebar a:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.admin-sidebar a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .admin-sidebar a .nav-icon {
@@ -723,7 +735,7 @@ button {
 }
 
 .admin-sidebar.is-collapsed a.active {
-  border-left-color: var(--accent-color);
+  border-left-color: var(--color-primary);
   border-bottom: none;
 }
 
@@ -883,7 +895,7 @@ button {
 }
 
 .sidebar-category-header.active-category {
-  color: var(--accent-color);
+  color: var(--color-primary-text);
   font-weight: 600;
 }
 
@@ -957,7 +969,6 @@ button {
   z-index: 5;
   background: var(--color-bg);
   padding-top: 0.15rem;
-  backdrop-filter: blur(8px);
 }
 
 .pos-category-bar::-webkit-scrollbar {
@@ -2140,6 +2151,16 @@ button {
 
 .toast.error {
   background: var(--color-danger-text);
+  color: var(--color-primary-contrast);
+}
+
+.toast.warning {
+  background: var(--color-warning-text);
+  color: var(--color-primary-contrast);
+}
+
+.toast.info {
+  background: var(--color-info-text);
   color: var(--color-primary-contrast);
 }
 
@@ -5459,14 +5480,6 @@ button {
   position: relative;
 }
 
-.login-bg {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 30%, var(--color-accent-glow) 0%, transparent 60%),
-              linear-gradient(180deg, var(--color-bg) 0%, var(--color-hover) 100%);
-  pointer-events: none;
-}
-
 .login-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border-light);
@@ -6762,8 +6775,89 @@ button {
 
 /* ─── Home Page ───────────────────────────────────────────── */
 .home-page {
-  padding: 2rem 1.5rem;
-  max-width: 960px;
+  padding: 0;
+  max-width: none;
+}
+
+.home-page section {
+  margin-bottom: var(--space-6);
+}
+
+.home-section-title {
+  font: var(--text-h3);
+  margin: 0 0 var(--space-4);
+  color: var(--color-text);
+}
+
+.home-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.home-section-head .home-section-title {
+  margin: 0;
+}
+
+.home-section-link {
+  font: var(--text-body-strong);
+  color: var(--color-primary-text);
+  white-space: nowrap;
+}
+
+.home-grid--attention {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.home-card--action {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.home-movements {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.home-movement-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.home-movement-row:last-child {
+  border-bottom: none;
+}
+
+.home-movement-row:hover {
+  background: var(--color-surface-alt);
+}
+
+.home-movement-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.home-movement-meta {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.home-movement-amount {
+  font: var(--text-body-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .home-welcome {
@@ -7005,3 +7099,104 @@ button {
 .finanzas-bar-row.as-link:hover .finanzas-bar-label { text-decoration: underline; }
 .finanzas-bar-fill--in { background: var(--color-success, #16a34a); }
 .finanzas-back { display: inline-flex; align-items: center; gap: 0.3rem; margin-bottom: 0.5rem; text-decoration: none; }
+
+/* ─── DESIGN.md capa de cumplimiento ─────────────────────────────── */
+/* Contenido: max 1400px alineado a la izquierda, padding-bottom anti-FAB. */
+.app-main { max-width: var(--content-max); padding: var(--space-6); padding-bottom: 96px; }
+.app-main > * { max-width: var(--content-max); }
+
+/* Sidebar activo según §4: soft + primary-text + barra 3px primary. */
+.admin-sidebar a.active { background: var(--color-primary-soft); color: var(--color-primary-text); font-weight: 600; border-left: 3px solid var(--color-primary); }
+.admin-sidebar.is-collapsed a.active { border-left-color: var(--color-primary); }
+.sidebar-category-header.active-category { color: var(--color-primary-text); }
+/* Foco teclado: anillo 2px solo :focus-visible. */
+.admin-sidebar a:focus-visible, .ui-btn:focus-visible, .ui-input:focus-visible, .ui-select:focus-visible, .ui-tabs button:focus-visible {
+  outline: 2px solid var(--color-primary); outline-offset: 2px;
+}
+/* Logo una sola vez: si hay brand en sidebar, ocultar duplicado del header. */
+.admin-sidebar .sidebar-brand + .brand-block { display: none; }
+
+/* Compat: legacy mapped a tokens (transición §9 sin romper pantallas). */
+.page-header-title { font: var(--text-h1); }
+.page-header-subtitle { font: var(--text-body); color: var(--color-text-secondary); }
+.sales-kpi-label, .summary-card__label { font: var(--text-label); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.sales-kpi-value, .summary-card__value { font: var(--text-kpi); font-variant-numeric: tabular-nums; }
+.sales-table-head, .product-table-header { font: var(--text-label); text-transform: uppercase; letter-spacing: 0.04em; background: var(--color-surface-alt); }
+.sales-table-row td, .product-table-row td, .table-row > * { font: var(--text-body); }
+.num, .col-total, .col-num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.badge { display: inline-flex; align-items: center; height: 22px; border-radius: var(--radius-sm); font: var(--text-caption); }
+.badge-success { background: var(--color-success-soft); color: var(--color-success); }
+.badge-warning { background: var(--color-warning-soft); color: var(--color-warning); }
+.badge-danger { background: var(--color-danger-soft); color: var(--color-danger); }
+.badge-info { background: var(--color-info-soft); color: var(--color-info-text); }
+.badge-neutral { background: var(--color-neutral-soft); color: var(--color-text-secondary); }
+.primary-button, .cart-checkout-btn { background: var(--color-primary); color: var(--color-on-primary); min-height: var(--control-h); border-radius: var(--radius-md); }
+.treasury-subnav-link.active, .pos-category-chip.active { background: var(--color-primary-soft); color: var(--color-primary-text); border-color: var(--color-primary-border); }
+/* Controles misma altura por fila. */
+.ui-toolbar .ui-input, .ui-toolbar .ui-select, .form-grid input, .form-grid select { min-height: var(--control-h); }
+/* Tablet: targets 44px. */
+@media (pointer: coarse) {
+  .icon-button, .header-toggle-button, .sidebar-toggle { min-width: 44px; min-height: 44px; }
+  input, select, button, textarea { min-height: 44px; }
+}
+
+/* Nativos siempre estilizados (§0.5/§5.6): ningún select/date sin estilo. */
+select, input[type="date"], input[type="datetime-local"] {
+  height: var(--control-h); border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm); background: var(--color-surface);
+  color: var(--color-text); font: var(--text-body); padding: 0 var(--space-3);
+  max-width: 100%;
+}
+select:focus, input[type="date"]:focus, input[type="datetime-local"]:focus {
+  outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-soft);
+}
+/* Títulos/columnas en oración: los literales MAYÚSCULOS se bajan por CSS. */
+.ui-table th, .sales-table-head, .product-table-header { text-transform: uppercase; }
+
+/* ─── FASE 2: táctil, foco y separación de eliminar ─────────────────── */
+/* Anillo de foco solo por teclado, nunca en clic de mouse. */
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--color-primary); outline-offset: 2px;
+}
+/* Separación visual de la acción eliminar en filas. */
+.col-action button[title="Eliminar"], .col-action button[title="Baja"], .col-action button[title="Eliminar asociación"],
+.row-actions button[title="Eliminar"], button[aria-label^="Eliminar"] {
+  margin-left: var(--space-3); color: var(--color-danger);
+}
+@media (pointer: coarse) {
+  .icon-button, .ui-btn--icon { width: 44px; height: 44px; }
+  .btn-ghost, .btn-primary { min-height: 44px; }
+  .row-actions button, .col-action button, .product-actions button { min-width: 44px; min-height: 44px; }
+}
+
+/* ─── FASE 3: tablas y filtros en tablet ───────────────────────────── */
+/* La página nunca scrollea horizontal; el scroll vive dentro de la tabla. */
+.admin-content { min-width: 0; overflow-x: clip; }
+.sales-table-wrapper, .table-responsive { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+@media (max-width: 900px) {
+  .sales-table { min-width: 640px; }
+  /* Encabezado sticky en scroll vertical. */
+  .sales-table-head { position: sticky; top: 0; z-index: 2; }
+  /* Primera columna sticky en scroll horizontal. */
+  .sales-table-head > :first-child, .sales-table-row > :first-child {
+    position: sticky; left: 0; z-index: 1;
+    background: var(--color-surface);
+    box-shadow: 1px 0 0 var(--color-border);
+  }
+  .sales-table-head > :first-child { background: var(--color-surface-alt); }
+  .admin-sales .table-row:not(.table-header):nth-child(even) > :first-child { background: var(--color-bg); }
+  /* Columnas secundarias opt-in: data-priority="low" se ocultan en angosto. */
+  .sales-table [data-priority="low"] { display: none; }
+}
+/* Filtros: envuelven ordenados sin desbordar. */
+.filter-bar, .sales-filters, .admin-sales__filters { flex-wrap: wrap; max-width: 100%; }
+.filter-bar > *, .sales-filters > * { min-width: 0; }
+.filter-bar input, .filter-bar select, .sales-filters input, .sales-filters select { max-width: 100%; }
+@media (max-width: 600px) {
+  .filter-bar > *, .sales-filters > * { flex: 1 1 100%; }
+}
+/* El FAB nunca tapa la última fila (también en móvil). */
+@media (max-width: 900px) {
+  .app-main { padding-bottom: 96px; }
+}

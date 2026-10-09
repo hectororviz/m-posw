@@ -4,6 +4,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, buildImageUrl, normalizeApiError } from '../api/client';
 import { useAdminCategories, useAdminProducts, useRawMaterials } from '../api/queries';
 import type { Product, ProductType } from '../api/types';
+import { ConfirmDialog } from '../components/ui/Modal';
+import { IconPicker } from '../components/ui/Field';
+import { formatMoney } from '../utils/format';
+import { useToast } from '../components/ToastProvider';
 
 const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
   SIMPLE: 'Simple',
@@ -42,6 +46,7 @@ const EMPTY_FORM: ProductForm = {
 
 export const AdminProductsPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const { data: categories } = useAdminCategories();
   const { data: products } = useAdminProducts();
   const { data: rawMaterials } = useRawMaterials();
@@ -54,9 +59,7 @@ export const AdminProductsPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<ProductType | 'all'>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
-  const formatCurrencyInput = (value: number) => {
-    return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const formatCurrencyInput = (value: number) => formatMoney(value, { cents: true }).replace('$ ', '');
 
   const parseCurrencyInput = (value: string): number => {
     if (!value) return 0;
@@ -121,20 +124,33 @@ export const AdminProductsPage: React.FC = () => {
       await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await queryClient.invalidateQueries({ queryKey: ['stock'] });
+      pushToast(editingProduct ? 'Producto actualizado' : 'Producto creado', 'success');
     } catch (err) {
-      setError(normalizeApiError(err));
+      const msg = normalizeApiError(err);
+      setError(msg);
+      pushToast(msg, 'error');
     }
   };
 
-  const handleDelete = async (productId: string) => {
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
     setError(null);
+    setDeleting(true);
     try {
-      await apiClient.delete(`/products/${productId}`);
+      await apiClient.delete(`/products/${deleteTarget.id}`);
       await queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await queryClient.invalidateQueries({ queryKey: ['stock'] });
+      setDeleteTarget(null);
+      pushToast('Producto eliminado', 'success');
     } catch (err) {
-      setError(normalizeApiError(err));
+      const msg = normalizeApiError(err);
+      setError(msg);
+      pushToast(msg, 'error');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -262,7 +278,7 @@ export const AdminProductsPage: React.FC = () => {
                 </select>
               </div>
               <div className="settings-field">
-                <label htmlFor="prod-category">Categoria</label>
+                <label htmlFor="prod-category">Categoría</label>
                 <select id="prod-category" value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>
                   <option value="">Seleccionar categoria</option>
                   {categories?.filter((c) => c.name !== 'Internet').map((c) => (
@@ -280,8 +296,8 @@ export const AdminProductsPage: React.FC = () => {
                 </div>
               )}
               <div className="settings-field">
-                <label htmlFor="prod-icon">Icono</label>
-                <input id="prod-icon" type="text" placeholder="Emoji o texto corto" value={form.iconName} onChange={(e) => setForm({ ...form, iconName: e.target.value })} />
+                <label htmlFor="prod-icon">Ícono</label>
+                <IconPicker id="prod-icon" value={form.iconName} onChange={(v) => setForm({ ...form, iconName: v })} />
               </div>
               <div className="settings-field" style={{ marginBottom: 0 }}>
                 <label className="toggle-switch">
@@ -354,7 +370,7 @@ export const AdminProductsPage: React.FC = () => {
                     <span className="product-list-row-stock">{product.stock}</span>
                     <div className="product-list-actions">
                       <button type="button" className="btn-ghost" onClick={() => openEdit(product)} aria-label={`Editar ${product.name}`}>{<Pencil size={16} />}</button>
-                      <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} aria-label={`Eliminar ${product.name}`}>{<X size={16} />}</button>
+                      <button type="button" className="btn-ghost" onClick={() => setDeleteTarget(product)} aria-label={`Eliminar ${product.name}`}>{<X size={16} />}</button>
                     </div>
                   </div>
                 );
@@ -391,7 +407,7 @@ export const AdminProductsPage: React.FC = () => {
                       )}
                       <div className="product-card-v2-actions">
                         <button type="button" className="btn-ghost" onClick={() => openEdit(product)} style={{ padding: '0.3rem 0.5rem' }} aria-label={`Editar ${product.name}`}>{<Pencil size={16} />}</button>
-                        <button type="button" className="btn-ghost" onClick={() => handleDelete(product.id)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${product.name}`}>{<X size={16} />}</button>
+                        <button type="button" className="btn-ghost" onClick={() => setDeleteTarget(product)} style={{ padding: '0.3rem 0.5rem', color: 'var(--color-danger-text)' }} aria-label={`Eliminar ${product.name}`}>{<X size={16} />}</button>
                       </div>
                     </div>
                   );
@@ -400,6 +416,16 @@ export const AdminProductsPage: React.FC = () => {
             </div>
           ))}
         </div>
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Eliminar el producto"
+          message={`Se eliminará "${deleteTarget.name}". Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          busy={deleting}
+          onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+          onConfirm={handleDelete}
+        />
       )}
     </div>
   );

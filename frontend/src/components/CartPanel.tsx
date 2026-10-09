@@ -7,11 +7,12 @@ import { useCart } from '../context/CartContext';
 import { useToast } from './ToastProvider';
 import { CheckoutModal } from './CheckoutModal';
 import { SocioQrModal } from './SocioQrModal';
+import { formatMoney } from '../utils/format';
 
 const STORAGE_KEY = 'pos-cart-collapsed';
 
 const formatAmount = (amount: number) =>
-  `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  formatMoney(amount);
 
 const DEFAULT_IN_REASONS = ['Apertura de Caja', 'Otro'];
 const DEFAULT_OUT_REASONS = ['Retiro de caja', 'Otro'];

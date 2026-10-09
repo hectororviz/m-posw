@@ -9,6 +9,7 @@ import { CartPanel } from '../components/CartPanel';
 import { useCart } from '../context/CartContext';
 import { useToast } from '../components/ToastProvider';
 import type { Product } from '../api/types';
+import { formatMoney } from '../utils/format';
 
 const prefetchCategories = async (queryClient: ReturnType<typeof useQueryClient>) => {
   await queryClient.prefetchQuery({
@@ -105,7 +106,7 @@ export const PosPage: React.FC = () => {
                         <span className="pos-product-icon" aria-hidden="true">{iconName}</span>
                       )}
                       <span className="pos-product-price">
-                        ${product.price.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatMoney(product.price)}
                       </span>
                       {showStockBadge && (
                         <span className="pos-product-stock">{product.stock}</span>

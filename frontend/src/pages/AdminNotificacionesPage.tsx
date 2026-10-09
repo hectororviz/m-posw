@@ -6,17 +6,15 @@ import { apiClient, normalizeApiError } from '../api/client';
 import { useConversationMessages, useConversations, useNotificacionesHistory, useNotificacionesConfig, useSendConversationMessage, useDeleteConversationMessage, useDeleteConversation, useTestNotificacionesConnection, useSettings, useMarkAllConversationsRead } from '../api/queries';
 import type { NotificacionesJob, WhatsAppMessage } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { ConfirmDialog } from '../components/ui/Modal';
 import AuthenticatedMediaBubble from './notificaciones/AuthenticatedMediaBubble';
 import LightboxModal from './notificaciones/LightboxModal';
 import TemplateModal from './notificaciones/TemplateModal';
+import { formatDateTime } from '../utils/format';
 
-const formatDateTime = (value: string | null) =>
-  value ? new Date(value).toLocaleDateString('es-AR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--';
+const formatDateTimeLabel = (value: string | null): string => (value ? formatDateTimeLabel(value) : '--');
 
-const formatTime = (value: string) => {
-  const d = new Date(value);
-  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-};
+const formatTime = (value: string): string => formatDateTime(value).slice(11);
 
 const getNotifBadge = (status: string) => {
   switch (status) {
@@ -210,9 +208,12 @@ export const AdminNotificacionesPage: React.FC = () => {
     }
   };
 
-  const handleDeleteMessage = async (msgId: number) => {
-    if (!selectedConvId) return;
-    if (!window.confirm('¿Eliminar este mensaje?')) return;
+  const [deleteMsgTarget, setDeleteMsgTarget] = useState<number | null>(null);
+  const [deleteConvTarget, setDeleteConvTarget] = useState<number | null>(null);
+  const handleDeleteMessage = async () => {
+    if (!selectedConvId || deleteMsgTarget == null) return;
+    const msgId = deleteMsgTarget;
+    setDeleteMsgTarget(null);
     try {
       await deleteMsgMutation.mutateAsync({ conversationId: selectedConvId, messageId: msgId });
       pushToast('Mensaje eliminado', 'success');
@@ -221,9 +222,10 @@ export const AdminNotificacionesPage: React.FC = () => {
     }
   };
 
-  const handleDeleteConversation = async (e: React.MouseEvent, convId: number) => {
-    e.stopPropagation();
-    if (!window.confirm('¿Eliminar esta conversación y todos sus mensajes?')) return;
+  const handleDeleteConversation = async () => {
+    if (deleteConvTarget == null) return;
+    const convId = deleteConvTarget;
+    setDeleteConvTarget(null);
     try {
       await deleteConvMutation.mutateAsync(convId);
       if (selectedConvId === convId) setSelectedConvId(null);
@@ -429,7 +431,7 @@ export const AdminNotificacionesPage: React.FC = () => {
                 ) : (
                   history.jobs.map((job: NotificacionesJob) => (
                     <div key={job.id} className="sales-table-row" style={{ cursor: 'default' }}>
-                      <span className="col-date">{formatDateTime(job.createdAt)}</span>
+                      <span className="col-date">{formatDateTimeLabel(job.createdAt)}</span>
                       <span className="col-method">{job.recipientName || job.phoneNumber}{job.attempts > 1 && <span style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)', marginLeft: '0.35rem' }}> (×{job.attempts})</span>}</span>
                       <span className="col-total" style={{ flex: '0 0 110px' }}>{getNotifBadge(job.status)}</span>
                       <span className="col-user" style={{ fontSize: '0.85rem' }}>{job.error ? <span style={{ color: 'var(--color-danger)' }} title={job.error}>{job.error.length > 60 ? job.error.slice(0, 60) + '...' : job.error}</span> : <span style={{ color: 'var(--color-text-faint)' }}>--</span>}</span>
@@ -474,7 +476,7 @@ export const AdminNotificacionesPage: React.FC = () => {
                     >
                       <button
                         type="button"
-                        onClick={(e) => handleDeleteConversation(e, conv.id)}
+                        onClick={(e) => { e.stopPropagation(); setDeleteConvTarget(conv.id); }}
                         title="Eliminar conversación"
                         style={{
                           position: 'absolute',
@@ -565,7 +567,7 @@ export const AdminNotificacionesPage: React.FC = () => {
                         >
                           <button
                             type="button"
-                            onClick={() => handleDeleteMessage(msg.id)}
+                            onClick={() => setDeleteMsgTarget(msg.id)}
                             title="Eliminar mensaje"
                             style={{
                               position: 'absolute',
@@ -642,6 +644,26 @@ export const AdminNotificacionesPage: React.FC = () => {
         </div>
       )}
     </div>
+    {deleteMsgTarget != null && (
+      <ConfirmDialog
+        title="Eliminar el mensaje"
+        message="Se eliminará el mensaje. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        busy={deleteMsgMutation.isPending}
+        onCancel={() => { if (!deleteMsgMutation.isPending) setDeleteMsgTarget(null); }}
+        onConfirm={handleDeleteMessage}
+      />
+    )}
+    {deleteConvTarget != null && (
+      <ConfirmDialog
+        title="Eliminar la conversación"
+        message="Se eliminará la conversación con todos sus mensajes. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        busy={deleteConvMutation.isPending}
+        onCancel={() => { if (!deleteConvMutation.isPending) setDeleteConvTarget(null); }}
+        onConfirm={handleDeleteConversation}
+      />
+    )}
     {lightbox && <LightboxModal url={lightbox.url} onClose={() => { setLightbox(null); if (lightboxBlobUrl) { URL.revokeObjectURL(lightboxBlobUrl); setLightboxBlobUrl(null); } }} />}
     </>
   );
