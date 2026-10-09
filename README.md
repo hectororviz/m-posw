@@ -34,7 +34,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Dashboard de estadísticas**: KPIs con badges, últimos 15 días, últimos 6 meses, promedios con gráficos.
 - **Cierre de caja**: desglose por método de pago (efectivo, QR, transferencia, fiado) con movimientos de entrada/salida.
 - **Gestión de usuarios**: creación, edición y eliminación de usuarios desde la pestaña de Configuración.
-- **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Notificaciones, Ligas, Jugadores, Patrimonio, Internet y Entradas desde Configuración → Módulos.
+- **Módulos configurables**: activar/desactivar Socios, Tesorería, Acreedores, Notificaciones, Jugadores, Patrimonio, Internet y Entradas desde Configuración → Módulos.
 
 ### Interfaz y accesibilidad
 - **Sistema de diseño** (`DESIGN.md`): acento configurable, tokens y componentes UI unificados (`frontend/src/components/ui/`).
@@ -48,13 +48,6 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 - **Credenciales imprimibles**: carnets individuales (PDF con diseño CR80) o masivos (grilla 2×4, 8 por hoja A4) con QR escaneable. Selección múltiple desde la tabla de socios.
 - **Escáner QR en el POS**: al escanear el QR de un socio se aplican automáticamente sus descuentos en la venta.
 - **KPIs**: deuda total, cantidad de socios activos, socios con deuda.
-
-### Ligas Deportivas
-- **Tablas de posiciones**: seguimiento de torneos de fútbol con filtro por categoría. PJ, PG, PE, PP, GF, GC, DG y puntos. Equipo seguido resaltado con ⭐.
-- **Próximos partidos**: agenda de partidos pendientes del equipo, con fecha, jornada, rival y localía. Agrupación visual por fecha/jornada (sin repetir columnas).
-- **Partidos pendientes anteriores**: detección de partidos no actualizados (fechas pasadas sin status finalizado), mostrados en sección separada con nota aclaratoria.
-- **Configuración por torneo**: asociar múltiples ligas y equipos a seguir. Cada torneo genera una pestaña de navegación independiente.
-- Los datos se obtienen de una base externa (Supabase) poblada por scraping automático.
 
 ### Jugadores y Torneos
 - **Padrón de jugadores**: registro de jugadores con datos personales (nombre, apellido, DNI, fecha de nacimiento, sexo). Importación y exportación masiva desde Excel.
@@ -111,7 +104,7 @@ Sistema de punto de venta web para tablet/celular, diseñado para jornadas, even
 | **Feria / puesto callejero** | App Android en celular con impresión Bluetooth. Sin necesidad de PC ni instalación compleja. |
 | **Comercio minorista** | Catálogo de productos con imágenes, múltiples métodos de cobro, cierre de caja diario, libro diario contable. Ventas fiadas con control de acreedores. |
 | **Evento con múltiples puestos** | Cada puesto es una caja independiente. Admin centralizado que ve reportes, estadísticas y tesorería de todas las cajas. |
-| **Club deportivo** | Tablas de posiciones y próximos partidos de ligas de fútbol. Gestión de jugadores y torneos con fichaje automático por categoría. Dashboard de jugadores y cumpleaños. Seguimiento de uno o varios equipos por torneo. |
+| **Club deportivo** | Gestión de jugadores y torneos con fichaje automático por categoría. Dashboard de jugadores y cumpleaños. |
 | **Institución educativa** | Registro y seguimiento del patrimonio institucional (mobiliario, equipamiento, etc.) con historial de eventos y auditoría. Bajas lógicas sin pérdida de trazabilidad. |
 | **Proveedor de WiFi** | Venta de vouchers de acceso a internet. Planes configurables, generación automática de PINs respaldados por RADIUS. Impresión del PIN en el ticket de venta. |
 | **Club con acreedores** | Notificación a acreedores con deuda vía WhatsApp Cloud API. Mensaje personalizable con monto y antigüedad. Envío masivo o individual. |

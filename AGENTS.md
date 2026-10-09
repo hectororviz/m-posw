@@ -80,7 +80,6 @@ Login unificado por `username` + `password`. El endpoint `POST /auth/login` devu
 | Tesorería | `TESORERIA` | HIDDEN, READ, FULL |
 | Acreedores | `ACREEDORES` | HIDDEN, READ, FULL |
 | Internet | `INTERNET` | HIDDEN, READ, FULL |
-| Ligas | `LIGAS` | HIDDEN, READ, FULL |
 | Jugadores | `PLAYERS` | HIDDEN, READ, FULL |
 | Patrimonio | `PATRIMONIO` | HIDDEN, READ, FULL |
 | Stock | `STOCK` | HIDDEN, READ, FULL |
@@ -378,7 +377,6 @@ Solapa "Módulos" en Configuración (entre Usuarios y Sistema) para habilitar/de
 | `enableTreasuryModule` | true | Oculta "Tesorería" del menú |
 | `enableAcreedoresModule` | true | Oculta "Acreedores" del menú, el toggle Fiado en Ventas y el botón Fiado del checkout |
 | `enableInternetModule` | false | Activa el módulo de Vouchers WiFi. Agrega "Internet" al menú, la categoría en el POS, y genera vouchers al vender planes de internet |
-| `enableLigasModule` | false | Activa el módulo de Ligas Deportivas. Agrega "Ligas" al menú (solo ADMIN). Consulta Supabase para tablas de posiciones y próximos partidos |
 | `enablePlayersModule` | false | Activa el módulo de Jugadores. Agrega "Jugadores" al menú (sección Deportes). Gestión de jugadores, categorías por edad, torneos con fichaje |
 | `enablePatrimonioModule` | true | Activa el módulo de Patrimonio. Agrega "Patrimonio" al menú (sección Administración). Registro y gestión de bienes/activos con historial de eventos |
 | `enableNotificationsModule` | false | Activa el módulo de Notificaciones. Agrega "Notificaciones" al menú (sección Sistema). Envío de recordatorios de deuda a acreedores vía WhatsApp Cloud API (Meta) |
@@ -464,135 +462,6 @@ Dos tabs con estilo `treasury-subnav-link` (naranja):
 | `GET` | `/internet/vouchers/:pin` | Consultar voucher |
 | `DELETE` | `/internet/vouchers/:pin` | Anular voucher |
 
-## Ligas Deportivas / Sports Leagues Module
-
-Módulo para seguir tablas de posiciones y próximos partidos de ligas de fútbol. Datos obtenidos de una base Supabase externa (poblada por scraping independiente). Solo ADMIN.
-
-### Arquitectura
-
-```
-┌──────────────────────────┐
-│  Supabase (externo)       │  ← leagues, categories, teams, matches
-│  REST API v1              │  ← Scraping separado (no en este repo)
-└────────┬─────────────────┘
-         │ fetch() + apikey + Bearer
-         ▼
-┌──────────────────────────┐
-│  m-POSw Backend           │
-│  LigasService             │  ← Proxy REST, cómputo de posiciones
-│  LigasController          │  ← /api/ligas/* (solo ADMIN)
-└────────┬─────────────────┘
-         │ JSON
-         ▼
-┌──────────────────────────┐
-│  m-POSw Frontend          │
-│  LigasLayout              │  ← Sub-nav con tabs por liga + Config
-│  LigasStandingsPage       │  ← Tabla de posiciones + partidos
-│  LigasConfigPage          │  ← Asociar torneo+equipo
-└────────┬─────────────────┘
-         │
-         ▼
-┌──────────────────────────┐
-│  PostgreSQL (local)        │
-│  LigasConfig               │  ← Qué ligas/equipos seguir
-│  Setting.enableLigasModule │  ← Toggle del módulo
-└──────────────────────────┘
-```
-
-### Estructura
-
-```
-backend/src/modules/ligas/
-├── ligas.module.ts
-├── ligas.controller.ts        # Endpoints REST (ADMIN)
-├── ligas.service.ts           # Proxy Supabase + cómputo posiciones
-└── dto/
-    └── create-liga-config.dto.ts
-```
-
-### Modelo de datos local
-
-- **LigasConfig**: asocia una liga y un equipo de Supabase para seguimiento. Campos: `nombre` (nombre personalizado para el menú, opcional), `leagueId`, `leagueName`, `teamId`, `teamName`, `active`.
-- **Setting.enableLigasModule** (default: `false`): toggle del módulo.
-
-### Datos remotos (Supabase)
-
-Tablas externas consultadas vía REST:
-
-| Tabla | Campos relevantes |
-|-------|-------------------|
-| `leagues` | `id`, `name`, `active` |
-| `categories` | `id`, `name`, `league_id` |
-| `teams` | `id`, `name`, `short_name`, `logo_url`, `city` |
-| `matches` | `id`, `league_id`, `category_id`, `local_team_id`, `away_team_id`, `matchday`, `match_date`, `status`, `local_goals`, `away_goals` |
-
-### Endpoints
-
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| `GET` | `/ligas/leagues` | Lista ligas activas de Supabase |
-| `GET` | `/ligas/leagues/:id/categories` | Categorías dentro de una liga |
-| `GET` | `/ligas/leagues/:id/teams` | Equipos con partidos en la liga |
-| `GET` | `/ligas/standings?leagueId=&categoryId=` | Tabla de posiciones (solo `finalizado`) |
-| `GET` | `/ligas/teams/:id/next-matches?leagueId=` | Próximos partidos (`pendiente`) + pasados no actualizados |
-| `GET` | `/ligas/configs` | Lista ligas configuradas localmente |
-| `POST` | `/ligas/configs` | Asociar liga + equipo. Body: `{ leagueId, leagueName, teamId, teamName }` |
-| `DELETE` | `/ligas/configs/:id` | Eliminar asociación |
-
-### Cómputo de posiciones
-
-- Solo partidos con `status === 'finalizado'`.
-- Orden: puntos desc → diferencia de gol desc → goles a favor desc.
-- Filtro opcional `categoryId` para tabla por categoría.
-- La fila del equipo seguido se resalta con ⭐ en el frontend.
-
-### Próximos partidos
-
-- Filtro Supabase: `status=eq.pendiente`, orden `matchday.asc`, limit 50.
-- El backend marca cada partido con `isPast: boolean` según `match_date < hoy`.
-- Orden final: futuros/sin-fecha primero (por fecha asc), pasados después (más recientes primero).
-- Frontend separa en dos secciones:
-  - **"Próximos partidos"**: futuros o sin fecha asignada.
-  - **"Partidos pendientes (fechas anteriores)"**: partidos cuya fecha ya pasó pero el status no se actualizó en Supabase. Con nota aclaratoria.
-- Agrupación visual: filas consecutivas con misma fecha + jornada ocultan esos valores (efecto rowspan), sin columna de categoría.
-
-### Frontend
-
-```
-frontend/src/pages/
-├── LigasLayout.tsx              # Sub-nav con un tab por cada LigasConfig + tab Config
-├── LigasStandingsPage.tsx        # Tabla de posiciones con filtro de categoría + secciones de próximos partidos
-└── LigasConfigPage.tsx           # CRUD de asociaciones liga + equipo
-```
-
-- React Query hooks en `api/queries.ts`: `useLigasLeagues`, `useLigasCategories`, `useLigasTeams`, `useLigasStandings`, `useLigasNextMatches`, `useLigasConfigs`, `useLigasCreateConfig`, `useLigasDeleteConfig`.
-- Tipos en `api/types.ts`: `Liga`, `LigaCategoria`, `LigaEquipo`, `LigaPosicion`, `LigaProximoPartido` (con `isPast`), `LigasConfig`.
-- Stale time: 5–10 minutos.
-- Sidebar: ícono Trophy + label "Ligas", condicionado a `enableLigasModule` y permiso `LIGAS`.
-
-### Configuración
-
-- Toggle "Modulo de Ligas Deportivas" en Configuración → Módulos.
-- `Setting.enableLigasModule` (default: `false`).
-- Al activar, aparece "Ligas" en el sidebar (solo ADMIN).
-- En `/admin/ligas/configuracion` se asocian torneos: elegir liga de Supabase → elegir equipo → agregar.
-- Cada asociación genera un tab en la sub-nav de `LigasLayout`.
-
-### Variables de entorno
-
-| Variable | Propósito |
-|----------|-----------|
-| `SUPABASE_URL` | URL base de la instancia Supabase |
-| `SUPABASE_ANON_KEY` | Key anónima para consultas REST |
-
-### Consideraciones y troubleshooting
-
-- El módulo **no modifica datos en Supabase**, solo consulta.
-- El scraping que popula Supabase es un proceso externo (no incluido en este repo).
-- Si una liga no muestra partidos, revisar logs: `"Supabase returned 0 pending matches"` → no hay datos scrapeados para ese equipo/liga.
-- Si muestra partidos viejos, aparecen en "Partidos pendientes (fechas anteriores)" con nota aclaratoria. Significa que el scraping no actualizó el status a `finalizado`.
-- Los IDs de liga/equipo son UUIDs de Supabase — usar los endpoints `GET` para listarlos, no inventarlos.
-- `getTeams` consulta todos los matches de la liga para extraer los team IDs únicos, luego fetchea los detalles en chunks de 50 (límite de `or` en PostgREST).
 
 ## Jugadores / Players Module
 
@@ -882,7 +751,7 @@ Sistema de theming con CSS variables (`data-theme` attribute en `<html>`):
 
 - **Tokens** (`frontend/src/styles/tokens.css`): `--color-primary` (acento configurable desde Configuración, inyectado por `AppLayout` vía `utils/accent.ts` con `on-primary` por luminancia) + derivados `color-mix` (`hover/active/soft/border/text`), semánticos `*-soft`, tipografía por rol (`text-*`), espaciado (`space-*`), radios, sombras, `--control-h` (40px, 44px en `pointer:coarse`), `--content-max: 1400px`.
 - **Componentes** (`frontend/src/components/ui/`): `PageLayout/PageHeader`, `Tabs` (+ `RouteTabs` para layouts, con flechas ←/→), `KpiGrid/KpiCard` (`tone`, `loading`), `Badge`, `Button` (`busy`, tamaño `sm` 36px vía `--control-h-sm` para la topbar)/`Fab`, `Input/Select/DateInput/Textarea/MoneyInput/SearchInput/SegmentedControl/FormField/FormGrid/IconPicker`, `DataTable` (`density`, `priority="low"`, `loading`, `error`+`onRetry`, `emptyState` con acción), `Modal` (`dirty` con confirmación, trampa de foco, Esc, retorno de foco)/`ConfirmDialog`, `Card/Toolbar/ListError/Delta`.
-- **Layouts con tabs** (Socios, Tesorería, Jugadores, Ligas, Patrimonio): `PageHeader` del módulo + `RouteTabs` + `Outlet`; las páginas hijas no repiten header (acciones/info viva van en `ui-toolbar`).
+- **Layouts con tabs** (Socios, Tesorería, Jugadores, Patrimonio): `PageHeader` del módulo + `RouteTabs` + `Outlet`; las páginas hijas no repiten header (acciones/info viva van en `ui-toolbar`).
 - **Formato** (`frontend/src/utils/format.ts`, `es-AR`): `formatMoney` (`$ 1.200`, `cents: true` → `$ 1.200,00`), `formatPercent` (`500,0%`), `formatDate` (`dd/MM/yyyy`), `formatDateTime` (`dd/MM/yyyy HH:mm`), `formatDateLong`, `formatNumber`. Prohibido formatear fuera de ahí.
 - **Accesibilidad**: contraste texto 4,5:1 / iconos 3:1 (verificado), táctil 44px en coarse, foco solo con `:focus-visible`, `aria-label` en botones de ícono de la topbar, `ConfirmDialog` antes de eliminar, `ListError` + Reintentar, `Toast` (success/error/warning/info, `aria-live`).
 - **Reglas al tocar UI**: un `primary` por zona, estados con color semántico + texto (nunca solo color), sidebar activo = `primary-soft` + barra 3px (sin outline), logo solo en sidebar (versión corta al colapsar).
@@ -1266,7 +1135,6 @@ m-posw/
 │   │       ├── entradas/          # Entradas POS externo (device guard, fixtures, L/V, template)
 │   │       ├── icons/             # Listado de iconos
 │   │       ├── internet-vouchers/  # Vouchers WiFi (integración api-radius)
-│   │       ├── ligas/            # Ligas Deportivas (tablas + partidos vía Supabase)
 │   │       ├── mercadopago-oauth/ # OAuth 2.0 Mercado Pago
 │   │       ├── patrimonio/       # Patrimonio / Bienes (activos + historial)
 │   │       ├── payments/          # Transferencias (polling MP)

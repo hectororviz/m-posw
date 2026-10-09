@@ -7,7 +7,7 @@ Versión 2.3.1
 
 ## Novedades de la versión 2.3.1
 - **Topbar unificada**: botones con el componente Button (tamaño sm de 36px), alineados a la derecha, con táctil de 44px en tablet.
-- **Tabs únicos**: un solo componente en toda la app, siempre debajo del título de página (Socios, Tesorería, Jugadores, Ligas, Patrimonio, Configuración, Ventas, Internet, Notificaciones y Entradas).
+- **Tabs únicos**: un solo componente en toda la app, siempre debajo del título de página (Socios, Tesorería, Jugadores, Patrimonio, Configuración, Ventas, Internet, Notificaciones y Entradas).
 
 ## Novedades de la versión 2.3
 - **Sistema de diseño**: color de acento configurable con derivados automáticos, tokens de tipografía/espaciado/radios/sombras y componentes unificados (tablas, KPIs, badges, botones, modales, formularios).
