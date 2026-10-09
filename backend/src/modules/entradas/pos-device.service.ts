@@ -109,6 +109,12 @@ export class PosDeviceService implements OnModuleInit {
         data: { posDeviceUserId: user.id },
       });
     }
+    // Por si hay filas Setting duplicadas (instancias viejas): que ninguna
+    // quede sin vínculo, porque findFirst() sin orden es arbitrario.
+    await this.prisma.setting.updateMany({
+      where: { posDeviceUserId: null },
+      data: { posDeviceUserId: user.id },
+    });
     return user.id;
   }
 }

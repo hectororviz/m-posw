@@ -15,6 +15,7 @@ function makeService(opts: {
       findFirst: jest.fn().mockResolvedValue(opts.setting ?? null),
       update: jest.fn().mockImplementation(async ({ data }: any) => ({ ...opts.setting, ...data })),
       create: jest.fn().mockImplementation(async ({ data }: any) => ({ id: 's1', ...data })),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     user: {
       findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
