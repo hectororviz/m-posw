@@ -43,10 +43,11 @@
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/tgSector"
-            style="@style/Widget.Entradas.ToggleGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp">
+            android:layout_marginTop="10dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnLocal"

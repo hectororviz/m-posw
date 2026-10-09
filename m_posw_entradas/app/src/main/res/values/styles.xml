@@ -35,12 +35,6 @@
         <item name="android:textStyle">bold</item>
     </style>
 
-    <!-- Control segmentado: selección única obligatoria -->
-    <style name="Widget.Entradas.ToggleGroup">
-        <item name="singleSelection">true</item>
-        <item name="selectionRequired">true</item>
-    </style>
-
     <!-- Tarjeta: superficie + borde 1dp, sin elevation -->
     <style name="Widget.Entradas.Card" parent="Widget.Material3.CardView.Outlined">
         <item name="cardElevation">0dp</item>
@@ -50,10 +44,10 @@
     </style>
 
     <style name="Widget.Entradas.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
-        <item name="boxCornerTopStart">12dp</item>
-        <item name="boxCornerTopEnd">12dp</item>
-        <item name="boxCornerBottomStart">12dp</item>
-        <item name="boxCornerBottomEnd">12dp</item>
+        <item name="boxCornerTopLeft">12dp</item>
+        <item name="boxCornerTopRight">12dp</item>
+        <item name="boxCornerBottomLeft">12dp</item>
+        <item name="boxCornerBottomRight">12dp</item>
     </style>
 
     <style name="Shape.Entradas.ImageTop" parent="ShapeAppearance.Material3.SmallComponent">

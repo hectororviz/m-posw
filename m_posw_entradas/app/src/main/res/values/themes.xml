@@ -31,9 +31,6 @@
         <item name="colorSurfaceContainerHighest">@color/surface_container_highest</item>
         <item name="colorSurfaceBright">@color/surface_bright</item>
         <item name="colorSurfaceDim">@color/surface_dim</item>
-        <item name="colorInverseSurface">@color/inverse_surface</item>
-        <item name="colorInverseOnSurface">@color/inverse_on_surface</item>
-        <item name="colorInversePrimary">@color/inverse_primary</item>
         <item name="android:windowBackground">@color/background</item>
         <item name="materialButtonStyle">@style/Widget.Entradas.Button</item>
         <item name="textInputStyle">@style/Widget.Entradas.TextInput</item>

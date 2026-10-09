@@ -105,10 +105,11 @@
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/tgTextScale"
-            style="@style/Widget.Entradas.ToggleGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="8dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnScaleS"
@@ -153,10 +154,11 @@
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/tgTheme"
-            style="@style/Widget.Entradas.ToggleGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="8dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnThemeSystem"
