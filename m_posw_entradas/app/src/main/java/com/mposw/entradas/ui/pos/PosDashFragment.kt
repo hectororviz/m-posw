@@ -314,6 +314,12 @@ class PosDashFragment : Fragment() {
         ticker = null
         tabMediator?.detach()
         tabMediator = null
+        // Desmontar el ViewPager2 antes de destruir la vista: si queda el
+        // FragmentStateAdapter adjunto, al reemplazar el fragmento (cambio de
+        // modo POS -> Entradas desde la web) intenta remover sus páginas en una
+        // transacción sobre un FragmentManager que ya está ejecutando y la app
+        // se cierra con "FragmentManager is already executing transactions".
+        _b?.let { it.vpCategorias.adapter = null }
         super.onDestroyView()
         _b = null
     }

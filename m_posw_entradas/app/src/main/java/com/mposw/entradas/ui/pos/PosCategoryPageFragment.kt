@@ -55,7 +55,8 @@ class PosCategoryPageFragment : Fragment() {
 
     /** Actualiza solo las insignias de cantidad sin recargar la grilla. */
     fun refreshQty(qty: Map<String, Int>) {
-        val adapter = b.rvProductos.adapter as? PosProductAdapter ?: return
+        val binding = _b ?: return
+        val adapter = binding.rvProductos.adapter as? PosProductAdapter ?: return
         adapter.submitList(adapter.currentList.map { it.copy(qty = qty[it.product.id] ?: 0) })
     }
 
