@@ -33,11 +33,6 @@ export const AdminSociosMatrizPage: React.FC = () => {
 
   return (
     <div>
-      <div className="page-header">
-        <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Matriz de Cuotas</h2>
-        <p className="page-header-subtitle">Estado de cuotas por socio y mes.</p>
-      </div>
-
       <div className="stock-toolbar">
         <select
           className="stock-search-input"

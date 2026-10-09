@@ -477,11 +477,6 @@ export const AdminSociosPage: React.FC = () => {
   // ─── Render ───────────────────────────────────────────
   return (
     <div>
-      <div className="page-header">
-        <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Socios</h2>
-        <p className="page-header-subtitle">Gestión del padrón de socios del club.</p>
-      </div>
-
       {resumen && (
         <div className="sales-kpis">
           <div className="sales-kpi-card">

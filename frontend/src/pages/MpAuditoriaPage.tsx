@@ -157,15 +157,13 @@ export const MpAuditoriaPage: React.FC = () => {
 
   return (
     <div className="finanzas-page">
-      <div className="page-header">
-        <div>
-          <h2>Auditoría Mercado Pago</h2>
-          <p className="page-subtitle">
-            Movimientos de la cuenta MP y su vínculo con el sistema
-            {status?.cursor ? ` · actualizado ${formatDateTime(status.cursor)}` : ''}
-            {status?.disponible != null ? ` · disponible ${formatCurrency(status.disponible)}${status?.disponibleAt ? ` (${formatDate(status.disponibleAt)})` : ''}` : ''}
-          </p>
-        </div>
+      <p className="page-subtitle">
+        Movimientos de la cuenta MP y su vínculo con el sistema
+        {status?.cursor ? ` · actualizado ${formatDateTime(status.cursor)}` : ''}
+        {status?.disponible != null ? ` · disponible ${formatCurrency(status.disponible)}${status?.disponibleAt ? ` (${formatDate(status.disponibleAt)})` : ''}` : ''}
+      </p>
+      <div className="ui-toolbar">
+        <span className="spacer" />
         {canWrite && (
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-ghost finanzas-fab-btn" disabled={syncing} onClick={() => reconcile()}>

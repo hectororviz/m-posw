@@ -1,48 +1,21 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { useLigasConfigs } from '../api/queries';
+import { PageHeader, PageLayout } from '../components/ui/PageLayout';
+import { RouteTabs } from '../components/ui/Tabs';
 
 export const LigasLayout: React.FC = () => {
   const { data: configs, isLoading } = useLigasConfigs();
-
-  if (isLoading) {
-    return (
-      <div className="treasury-page">
-        <div className="treasury-content">
-          <div className="spinner" />
-        </div>
-      </div>
-    );
-  }
+  const tabs = [
+    ...(configs ?? []).map((cfg) => ({ value: cfg.id, label: cfg.nombre || cfg.leagueName, to: `/admin/ligas/${cfg.id}` })),
+    { value: 'configuracion', label: <><Settings size={14} /> Config</>, to: '/admin/ligas/configuracion' },
+  ];
 
   return (
-    <div className="treasury-page">
-      <nav className="treasury-subnav">
-        {(configs ?? []).map((cfg) => (
-          <NavLink
-            key={cfg.id}
-            to={`/admin/ligas/${cfg.id}`}
-            className={({ isActive }) =>
-              isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'
-            }
-          >
-            {cfg.nombre || cfg.leagueName}
-          </NavLink>
-        ))}
-        <NavLink
-          to="/admin/ligas/configuracion"
-          className={({ isActive }) =>
-            isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'
-          }
-          style={{ marginLeft: 'auto' }}
-        >
-          <Settings size={14} style={{ marginRight: 4 }} />
-          Config
-        </NavLink>
-      </nav>
-      <div className="treasury-content">
-        <Outlet />
-      </div>
-    </div>
+    <PageLayout>
+      <PageHeader title="Ligas" description="Tablas de posiciones y próximos partidos." />
+      {isLoading ? <div className="spinner" /> : <RouteTabs tabs={tabs} />}
+      <Outlet />
+    </PageLayout>
   );
 };

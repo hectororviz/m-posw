@@ -10,8 +10,6 @@ export const EfectivoPage: React.FC = () => {
   return (
     <FinanzasMovimientosPage
       fixedAccountId={efectivo.id}
-      title="Efectivo"
-      subtitle="Gastos e ingresos en efectivo (las ventas del POS se registran solas)"
       hideAccountFilter
     />
   );

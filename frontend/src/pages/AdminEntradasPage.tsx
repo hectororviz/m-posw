@@ -20,6 +20,8 @@ import {
 import type { EntradaBeneficio, EntradaBeneficioSector, EntradaBeneficioValidation, EntradaFixture, EntradaSaleStatus } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageLayout';
+import { Tabs } from '../components/ui/Tabs';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 import { formatDate, formatDateTime, formatMoney } from '../utils/format';
 
@@ -51,18 +53,12 @@ export const AdminEntradasPage: React.FC = () => {
 
   return (
     <div className="treasury-page">
-      <nav className="treasury-subnav">
-        {visibleTabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={activeTab === t.id ? 'treasury-subnav-link active' : 'treasury-subnav-link'}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <PageHeader title="Entradas" description="Venta de entradas y beneficios de bufet." />
+      <Tabs
+        tabs={visibleTabs.map((t) => ({ value: t.id, label: t.label }))}
+        value={activeTab}
+        onChange={(v) => setTab(v as TabId)}
+      />
       <div className="treasury-content">
         {activeTab === 'ventas' && <VentasTab canWrite={canWrite} />}
         {activeTab === 'calendario' && <CalendarioTab canWrite />}
@@ -91,10 +87,6 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
 
   return (
     <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Ventas</h2>
-      </div>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
         <select value={fixtureId} onChange={(e) => setFixtureId(e.target.value)} style={{ minWidth: 260 }}>
           <option value="">Partido: todos (últimas 500)</option>
@@ -364,10 +356,6 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
 
   return (
     <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Calendario</h2>
-      </div>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
       </div>
@@ -559,10 +547,6 @@ const AbmTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
 
   return (
     <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Torneos y rivales</h2>
-      </div>
-
       <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0 }}>Torneos</h3>
@@ -851,9 +835,6 @@ const BeneficiosTab: React.FC<{ canWrite: boolean }> = () => {
 
   return (
     <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Beneficios de bufet</h2>
-      </div>
       <p style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
         Descuento % estilo socios para canjear en bufet con el QR de la entrada. Alcance global por sector: se asigna
         automático al aprobar la venta (LOCAL, VISITANTE o AMBAS).

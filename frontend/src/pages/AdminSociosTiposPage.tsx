@@ -149,11 +149,6 @@ export const AdminSociosTiposPage: React.FC = () => {
 
   return (
     <div>
-      <div className="page-header">
-        <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Tipos de Socio</h2>
-        <p className="page-header-subtitle">Administra las categorias y montos mensuales.</p>
-      </div>
-
       <div className="settings-section" style={{ marginBottom: '1.25rem' }}>
         <h3 style={{ margin: '0 0 0.25rem' }}>Fondo de credencial</h3>
         <p style={{ color: 'var(--color-text-muted)', margin: '0 0 0.75rem', fontSize: '0.85rem' }}>

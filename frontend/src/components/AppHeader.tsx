@@ -66,7 +66,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showM
         {showMenuButton && (
           <button
             type="button"
-            className="ghost-button header-toggle-button admin-menu-button"
+            className="ui-btn ui-btn--icon ui-btn--sm admin-menu-button"
             onClick={onMenuClick}
             aria-label="Abrir menú"
             title="Abrir menú"
@@ -98,14 +98,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showM
           <span className="user-name" title={user?.username ?? 'Usuario'}>
             {user?.username ?? 'Usuario'}
           </span>
-          <button type="button" onClick={toggleTheme} className="ghost-button header-toggle-button theme-toggle" aria-label="Cambiar tema" title={resolved === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
+          <button type="button" onClick={toggleTheme} className="ui-btn ui-btn--icon ui-btn--sm" aria-label="Cambiar tema" title={resolved === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
             {resolved === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           {showNotifButton && (
             <button
               type="button"
               onClick={() => navigate('/admin/notificaciones?tab=conversaciones')}
-              className="ghost-button header-toggle-button"
+              className="ui-btn ui-btn--icon ui-btn--sm"
               aria-label="Notificaciones WhatsApp"
               title="Conversaciones WhatsApp"
               style={{ position: 'relative' }}
@@ -139,7 +139,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showM
           {!isAdmin && hasAdminAccess && (
             <NavLink
               to={isAdminScreen || isHomeScreen ? '/pos' : '/home'}
-              className="ghost-button sales-toggle-button"
+              className="ui-btn ui-btn--secondary ui-btn--sm"
             >
               {isAdminScreen || isHomeScreen ? 'POS' : 'Admin'}
             </NavLink>
@@ -147,7 +147,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showM
           {!isAdmin && !hasAdminAccess && (
             <NavLink
               to={isSalesScreen ? '/pos' : '/sales'}
-              className="ghost-button sales-toggle-button"
+              className="ui-btn ui-btn--secondary ui-btn--sm"
             >
               {isSalesScreen ? 'POS' : 'Movimientos'}
             </NavLink>
@@ -155,16 +155,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ settings, isLoading, showM
           {isAdmin && (
             <NavLink
               to={isPosScreen || isHomeScreen ? '/admin/settings' : '/pos'}
-              className="ghost-button header-toggle-button"
+              className="ui-btn ui-btn--icon ui-btn--sm"
               aria-label={isPosScreen || isHomeScreen ? 'Ir a Configuración' : 'Ir al POS'}
               title={isPosScreen || isHomeScreen ? 'Ir a Configuración' : 'Ir al POS'}
             >
               {isPosScreen || isHomeScreen ? <Settings size={18} /> : <DollarSign size={18} />}
             </NavLink>
           )}
-          <button type="button" onClick={logout} className="ghost-button logout-button" aria-label="Salir">
-            <LogOut size={18} className="logout-icon" />
-            <span className="logout-text">Salir</span>
+          <button type="button" onClick={logout} className="ui-btn ui-btn--secondary ui-btn--sm" aria-label="Salir" title="Salir">
+            <LogOut size={16} />
+            <span>Salir</span>
           </button>
         </div>
       </div>

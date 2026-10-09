@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { TicketPayload } from '../utils/ticketPrinting';
 import { useToast } from '../components/ToastProvider';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { Tabs } from '../components/ui/Tabs';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 import { formatDate, formatDateTime, formatMoney } from '../utils/format';
 
@@ -331,10 +332,11 @@ export const AdminSalesPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <nav className="treasury-subnav">
-          <button type="button" className="treasury-subnav-link" onClick={() => setSalesTab('ventas')}>Ventas</button>
-          <button type="button" className="treasury-subnav-link active" onClick={() => setSalesTab('reintentos')}>Reintentos{deadCount > 0 ? ` (${deadCount})` : ''}</button>
-        </nav>
+        <Tabs
+          tabs={[{ value: 'ventas', label: 'Ventas' }, { value: 'reintentos', label: `Reintentos${deadCount > 0 ? ` (${deadCount})` : ''}` }]}
+          value={salesTab}
+          onChange={(v) => setSalesTab(v as 'ventas' | 'reintentos')}
+        />
         <div className="stock-toolbar">
           <label className="input-field input-field--compact" style={{ margin: 0 }}>
             <select value={retryStatus} onChange={(e) => setRetryStatus(e.target.value)} style={{ padding: '0.5rem 0.65rem', fontSize: '0.85rem' }}>
@@ -392,10 +394,11 @@ export const AdminSalesPage: React.FC = () => {
         </div>
       </div>
       {isAdmin && (
-        <nav className="treasury-subnav">
-          <button type="button" className="treasury-subnav-link active" onClick={() => setSalesTab('ventas')}>Ventas</button>
-          <button type="button" className="treasury-subnav-link" onClick={() => setSalesTab('reintentos')}>Reintentos{deadCount > 0 ? ` (${deadCount})` : ''}</button>
-        </nav>
+        <Tabs
+          tabs={[{ value: 'ventas', label: 'Ventas' }, { value: 'reintentos', label: `Reintentos${deadCount > 0 ? ` (${deadCount})` : ''}` }]}
+          value={salesTab}
+          onChange={(v) => setSalesTab(v as 'ventas' | 'reintentos')}
+        />
       )}
 
       <div className="sales-kpis">

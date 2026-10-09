@@ -171,11 +171,6 @@ export const AdminSociosBeneficiosPage: React.FC = () => {
 
   return (
     <div>
-      <div className="page-header">
-        <h2 className="page-header-title" style={{ marginBottom: '0.15rem' }}>Beneficios</h2>
-        <p className="page-header-subtitle">Descuentos por tipo de socio y categoria de producto.</p>
-      </div>
-
       <div className="stock-toolbar" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <select
           className="stock-search-input"

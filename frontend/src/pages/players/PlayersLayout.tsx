@@ -1,27 +1,20 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Tag, Trophy, Users, UserCog } from 'lucide-react';
+import { Outlet } from 'react-router-dom';
+import { LayoutDashboard, Tag, Trophy, UserCog, Users } from 'lucide-react';
+import { PageHeader, PageLayout } from '../../components/ui/PageLayout';
+import { RouteTabs } from '../../components/ui/Tabs';
+
+const TABS = [
+  { value: 'dashboard', label: <><LayoutDashboard size={14} /> Dashboard</>, to: '/admin/players' },
+  { value: 'jugadores', label: <><Users size={14} /> Jugadores</>, to: '/admin/players/jugadores' },
+  { value: 'dts', label: <><UserCog size={14} /> DT's</>, to: '/admin/players/dts' },
+  { value: 'categorias', label: <><Tag size={14} /> Categorías</>, to: '/admin/players/categorias' },
+  { value: 'torneos', label: <><Trophy size={14} /> Torneos</>, to: '/admin/players/torneos' },
+];
 
 export const PlayersLayout: React.FC = () => (
-  <div className="treasury-page">
-    <nav className="treasury-subnav">
-      <NavLink to="/admin/players" end className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-        <LayoutDashboard size={14} /> Dashboard
-      </NavLink>
-      <NavLink to="/admin/players/jugadores" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-        <Users size={14} /> Jugadores
-      </NavLink>
-      <NavLink to="/admin/players/dts" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-        <UserCog size={14} /> DT's
-      </NavLink>
-      <NavLink to="/admin/players/categorias" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-        <Tag size={14} /> Categorías
-      </NavLink>
-      <NavLink to="/admin/players/torneos" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-        <Trophy size={14} /> Torneos
-      </NavLink>
-    </nav>
-    <div className="treasury-content">
-      <Outlet />
-    </div>
-  </div>
+  <PageLayout>
+    <PageHeader title="Jugadores" description="Padrón, categorías y torneos." />
+    <RouteTabs tabs={TABS} />
+    <Outlet />
+  </PageLayout>
 );

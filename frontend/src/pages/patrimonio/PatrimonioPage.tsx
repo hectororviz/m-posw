@@ -1,4 +1,6 @@
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
+import { PageHeader, PageLayout } from '../../components/ui/PageLayout';
+import { RouteTabs } from '../../components/ui/Tabs';
 import { Boxes, Settings } from 'lucide-react';
 
 const TABS = [
@@ -7,32 +9,17 @@ const TABS = [
 ];
 
 export const PatrimonioPage: React.FC = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const activeTab = location.pathname.endsWith('/configuracion') ? 'configuracion' : 'bienes';
-
   return (
-    <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Patrimonio</h2>
-      </div>
-
-      <nav className="treasury-subnav" style={{ marginBottom: '1.25rem' }}>
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`treasury-subnav-link ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => navigate(`/admin/patrimonio/${tab.id}`)}
-          >
-            <tab.icon size={16} style={{ marginRight: 6 }} />
-            {tab.label}
-          </button>
-        ))}
-      </nav>
-
+    <PageLayout>
+      <PageHeader title="Patrimonio" description="Bienes, categorías y estados." />
+      <RouteTabs
+        tabs={TABS.map((tab) => ({
+          value: tab.id,
+          label: <><tab.icon size={14} /> {tab.label}</>,
+          to: tab.id === 'bienes' ? '/admin/patrimonio/bienes' : `/admin/patrimonio/${tab.id}`,
+        }))}
+      />
       <Outlet />
-    </div>
+    </PageLayout>
   );
 };

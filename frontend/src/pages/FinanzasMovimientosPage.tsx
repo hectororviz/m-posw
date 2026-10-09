@@ -26,10 +26,8 @@ const sourceBadge = (m: FinanzasMovement) => {
 
 export const FinanzasMovimientosPage: React.FC<{
   fixedAccountId?: string;
-  title?: string;
-  subtitle?: string;
   hideAccountFilter?: boolean;
-}> = ({ fixedAccountId, title = 'Movimientos', subtitle = 'Compras, gastos, cobros y ventas', hideAccountFilter = false }) => {
+}> = ({ fixedAccountId, hideAccountFilter = false }) => {
   const access = useModuleAccess('TESORERIA');
   const canWrite = access === 'FULL';
   const queryClient = useQueryClient();
@@ -191,24 +189,19 @@ export const FinanzasMovimientosPage: React.FC<{
 
   return (
     <div className="finanzas-page">
-      <div className="page-header">
-        <div>
-          <h2>{title}</h2>
-          <p className="page-subtitle">{subtitle}</p>
-        </div>
-        {canWrite && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            {fixedAccountId && (
-              <button className="btn-ghost finanzas-fab-btn" onClick={() => { setTToAccount(''); setTraspasoOpen(true); }}>
-                <span className="finanzas-fab-label">Traspaso</span>
-              </button>
-            )}
-            <button className="btn-primary finanzas-fab-btn" onClick={openModal}>
-              <Plus size={18} /> <span className="finanzas-fab-label">Compra / Gasto</span>
+      {canWrite && (
+        <div className="ui-toolbar">
+          <span className="spacer" />
+          {fixedAccountId && (
+            <button className="btn-ghost finanzas-fab-btn" onClick={() => { setTToAccount(''); setTraspasoOpen(true); }}>
+              <span className="finanzas-fab-label">Traspaso</span>
             </button>
-          </div>
-        )}
-      </div>
+          )}
+          <button className="btn-primary finanzas-fab-btn" onClick={openModal}>
+            <Plus size={18} /> <span className="finanzas-fab-label">Compra / Gasto</span>
+          </button>
+        </div>
+      )}
 
       <div className="filter-bar finanzas-filters">
         <div className="filter-field">

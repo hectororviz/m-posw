@@ -267,13 +267,6 @@ export const FinanzasCuentasPage: React.FC = () => {
 
   return (
     <div className="finanzas-page">
-      <div className="page-header">
-        <div>
-          <h2>Configuración</h2>
-          <p className="page-subtitle">Cuentas, categorías, responsables y Mercado Pago</p>
-        </div>
-      </div>
-
       {(loadingA || loadingC) && <p className="loading-text">Cargando...</p>}
 
       <div className="finanzas-config-grid">

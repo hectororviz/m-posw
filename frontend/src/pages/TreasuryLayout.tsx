@@ -1,25 +1,20 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
+import { PageHeader, PageLayout } from '../components/ui/PageLayout';
+import { RouteTabs } from '../components/ui/Tabs';
+
+const TABS = [
+  { value: 'resumen', label: 'Resumen', to: '/admin/tesoreria' },
+  { value: 'efectivo', label: 'Efectivo', to: '/admin/tesoreria/efectivo' },
+  { value: 'auditoria', label: 'Auditoría MP', to: '/admin/tesoreria/auditoria-mp' },
+  { value: 'configuracion', label: 'Configuración', to: '/admin/tesoreria/configuracion' },
+];
 
 export const TreasuryLayout: React.FC = () => {
   return (
-    <div className="treasury-page">
-      <nav className="treasury-subnav">
-        <NavLink to="/admin/tesoreria" end className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Resumen
-        </NavLink>
-        <NavLink to="/admin/tesoreria/efectivo" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Efectivo
-        </NavLink>
-        <NavLink to="/admin/tesoreria/auditoria-mp" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Auditoría MP
-        </NavLink>
-        <NavLink to="/admin/tesoreria/configuracion" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Configuración
-        </NavLink>
-      </nav>
-      <div className="treasury-content">
-        <Outlet />
-      </div>
-    </div>
+    <PageLayout>
+      <PageHeader title="Tesorería" description="Caja, movimientos y auditoría de Mercado Pago." />
+      <RouteTabs tabs={TABS} />
+      <Outlet />
+    </PageLayout>
   );
 };

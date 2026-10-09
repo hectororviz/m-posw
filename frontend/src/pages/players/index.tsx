@@ -74,8 +74,8 @@ export const PlayersDashboardPage: React.FC = () => {
 
   return (
     <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Jugadores</h2>
+      <div className="ui-toolbar">
+        <span className="spacer" />
         <button className="btn-ghost" onClick={() => setReportModal(true)} title="Descargar informe PDF">
           <Download size={16} /> Informe
         </button>

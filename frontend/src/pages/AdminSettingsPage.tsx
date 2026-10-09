@@ -9,6 +9,7 @@ import { useMpOauthStatus, useSettings } from '../api/queries';
 import type { Setting } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { Tabs } from '../components/ui/Tabs';
 import { useEmbeddedKeyboard } from '../hooks/useEmbeddedKeyboard';
 import { formatDate } from '../utils/format';
 
@@ -440,19 +441,7 @@ export const AdminSettingsPage: React.FC = () => {
         <p className="page-header-subtitle">Gestiona los parametros del sistema</p>
       </div>
 
-      <div className="tab-bar" role="tablist">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id ? 'active' : ''}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={TABS.map((tab) => ({ value: tab.id, label: tab.label }))} value={activeTab} onChange={(v) => setActiveTab(v as TabId)} />
 
       <div className="tab-content">
         {error && <p className="error-text">{error}</p>}

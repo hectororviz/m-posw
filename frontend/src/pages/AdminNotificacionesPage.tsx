@@ -7,6 +7,8 @@ import { useConversationMessages, useConversations, useNotificacionesHistory, us
 import type { NotificacionesJob, WhatsAppMessage } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageLayout';
+import { Tabs } from '../components/ui/Tabs';
 import AuthenticatedMediaBubble from './notificaciones/AuthenticatedMediaBubble';
 import LightboxModal from './notificaciones/LightboxModal';
 import TemplateModal from './notificaciones/TemplateModal';
@@ -238,11 +240,16 @@ export const AdminNotificacionesPage: React.FC = () => {
   return (
     <>
     <div className="page-container">
-      <div className="treasury-subnav">
-        <button type="button" className={`treasury-subnav-link${tab === 'conversations' ? ' active' : ''}`} onClick={() => setTab('conversations')}>Conversaciones</button>
-        <button type="button" className={`treasury-subnav-link${tab === 'history' ? ' active' : ''}`} onClick={() => setTab('history')}>Historial</button>
-        <button type="button" className={`treasury-subnav-link${tab === 'config' ? ' active' : ''}`} onClick={() => setTab('config')}>Configuración</button>
-      </div>
+      <PageHeader title="Notificaciones" description="Envíos de WhatsApp y conversaciones." />
+      <Tabs
+        tabs={[
+          { value: 'conversations', label: 'Conversaciones' },
+          { value: 'history', label: 'Historial' },
+          { value: 'config', label: 'Configuración' },
+        ]}
+        value={tab}
+        onChange={(v) => setTab(v as Tab)}
+      />
 
       {tab === 'config' ? (
         <div style={{ maxWidth: '640px', margin: '1.5rem 0' }}>

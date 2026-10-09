@@ -113,10 +113,6 @@ export const PlayersPage: React.FC = () => {
 
   return (
     <div className="admin-page">
-      <div className="admin-page-header">
-        <h2>Jugadores</h2>
-      </div>
-
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <select value={sexFilter} onChange={(e) => { setSexFilter(e.target.value); setPage(1); }}>

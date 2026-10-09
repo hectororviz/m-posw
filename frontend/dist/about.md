@@ -3,7 +3,15 @@
 **m-POSw** (Mini POS Web) es un sistema de punto de venta diseñado para jornadas, eventos, comercios y clubes.
 
 ## Versión
-Versión 2.2.0
+Versión 2.3.0
+
+## Novedades de la versión 2.3
+- **Sistema de diseño**: color de acento configurable con derivados automáticos, tokens de tipografía/espaciado/radios/sombras y componentes unificados (tablas, KPIs, badges, botones, modales, formularios).
+- **Accesibilidad**: contraste de texto verificado (4,5:1), áreas táctiles de 44px en tablet, navegación por teclado con foco visible y confirmación antes de eliminar.
+- **Formato único**: montos, porcentajes y fechas en formato argentino en toda la app.
+- **Acreedores sin ruido**: una sola codificación por dato (saldo, estado, antigüedad) y etiquetas claras.
+- **Home reorganizado**: bloques de Atención, Actividad, Resumen y Últimos movimientos.
+- **Notificaciones de resultado**: avisos de éxito/error al guardar, eliminar e importar, con opción de reintentar ante fallas de red.
 
 ## Novedades de la versión 2.2
 - **Terminal Android dual Entradas/POS**: una sola APK nativa (Kotlin) para Sunmi V2s donde el servidor define el modo de cada equipo. Sin modo validado queda en Configuración.

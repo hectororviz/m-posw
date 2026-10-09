@@ -77,7 +77,6 @@ export const PlayerCategoriesPage: React.FC = () => {
 
   return (
     <div className="admin-page">
-      <div className="admin-page-header"><h2>Categorías</h2></div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
         <div className="search-box" style={{ minWidth: '240px' }}>

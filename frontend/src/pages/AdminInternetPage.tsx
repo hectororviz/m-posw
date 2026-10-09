@@ -6,6 +6,7 @@ import { useInternetHealth, useInternetPlans, useInternetVoucherDetail, useInter
 import type { ComputedVoucherStatus, InternetPlan } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { Tabs } from '../components/ui/Tabs';
 import { useModuleAccess } from '../hooks/useModuleAccess';
 import { formatDateTime, formatMoney } from '../utils/format';
 
@@ -332,18 +333,11 @@ export const AdminInternetPage: React.FC = () => {
         </div>
       </div>
 
-      <nav className="treasury-subnav" style={{ marginBottom: '1.25rem' }}>
-        {visibleTabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`treasury-subnav-link ${effectiveTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <Tabs
+        tabs={visibleTabs.map((tab) => ({ value: tab.id, label: tab.label }))}
+        value={effectiveTab}
+        onChange={(v) => setActiveTab(v as typeof effectiveTab)}
+      />
 
       {error && <p className="error-text">{error}</p>}
 

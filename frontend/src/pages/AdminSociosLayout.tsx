@@ -1,25 +1,20 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
+import { PageHeader, PageLayout } from '../components/ui/PageLayout';
+import { RouteTabs } from '../components/ui/Tabs';
+
+const TABS = [
+  { value: 'socios', label: 'Socios', to: '/admin/socios' },
+  { value: 'matriz', label: 'Matriz', to: '/admin/socios/matriz' },
+  { value: 'configuracion', label: 'Configuración', to: '/admin/socios/configuracion' },
+  { value: 'beneficios', label: 'Beneficios', to: '/admin/socios/beneficios' },
+];
 
 export const AdminSociosLayout: React.FC = () => {
   return (
-    <div className="treasury-page">
-      <nav className="treasury-subnav">
-        <NavLink to="/admin/socios" end className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Socios
-        </NavLink>
-        <NavLink to="/admin/socios/matriz" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Matriz
-        </NavLink>
-        <NavLink to="/admin/socios/configuracion" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Configuración
-        </NavLink>
-        <NavLink to="/admin/socios/beneficios" className={({ isActive }) => isActive ? 'treasury-subnav-link active' : 'treasury-subnav-link'}>
-          Beneficios
-        </NavLink>
-      </nav>
-      <div className="treasury-content">
-        <Outlet />
-      </div>
-    </div>
+    <PageLayout>
+      <PageHeader title="Socios" description="Gestión del padrón de socios del club." />
+      <RouteTabs tabs={TABS} />
+      <Outlet />
+    </PageLayout>
   );
 };

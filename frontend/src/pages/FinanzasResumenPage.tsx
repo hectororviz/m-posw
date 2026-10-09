@@ -37,13 +37,6 @@ export const FinanzasResumenPage: React.FC = () => {
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h2>Resumen de caja</h2>
-          <p className="page-subtitle">Saldos por cuenta, ingresos y gastos del período</p>
-        </div>
-      </div>
-
       <div className="filter-bar finanzas-filters">
         <div className="filter-field">
           <label>Desde</label>
