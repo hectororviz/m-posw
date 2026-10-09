@@ -2,7 +2,6 @@ package com.mposw.entradas.data
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -12,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 class EntradasRepo(private val session: SessionManager) {
     private val api: ApiService get() = ApiClient.service(session)
-    private val gson = Gson()
+    private val gson get() = ApiClient.gson
 
     suspend fun vigentes() = api.vigentes()
 

@@ -31,7 +31,7 @@ object PosTicketRenderer {
 
         // Filtro de categorías sin ticket (paridad con maybePrintTicket:
         // categoryTicket undefined/absent se asume true).
-        val items = sale.items
+        val items = (sale.items ?: emptyList())
             .filter { it.product?.category?.ticket != false }
             .filter { !(it.product?.name ?: "").isBlank() }
             .sortedWith { a, b ->
@@ -76,7 +76,7 @@ object PosTicketRenderer {
 
         blocks.add(PrintBlock.Text("Gracias por tu compra", 24f, false))
 
-        val pins = sale.vouchers.mapNotNull { it.pin?.trim()?.ifBlank { null } }
+        val pins = (sale.vouchers ?: emptyList()).mapNotNull { it.pin?.trim()?.ifBlank { null } }
         if (pins.isNotEmpty()) {
             blocks.add(PrintBlock.Line)
             for (pin in pins) {

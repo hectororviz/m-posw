@@ -2,9 +2,12 @@ package com.mposw.entradas.data
 
 import com.google.gson.annotations.SerializedName
 
+// Listas como `List?`: Gson no ejecuta constructores Kotlin, así que una
+// clave ausente queda en null aunque haya default. Siempre consumir con
+// `?: emptyList()` (más la fábrica de ApiClient para null explícitos).
 data class VigentesResponse(
     val now: String?,
-    val fixtures: List<FixtureVigente> = emptyList(),
+    val fixtures: List<FixtureVigente>? = null,
 )
 
 data class FixtureVigente(
@@ -45,7 +48,7 @@ data class StatusPayload(
     val qrImageUrl: String?,
     val templateVersion: Int = 1,
     val logoVersion: Int = 1,
-    val beneficios: List<SaleBeneficio> = emptyList(),
+    val beneficios: List<SaleBeneficio>? = null,
 )
 
 // Beneficio de bufet por unidad (QR `ENT:<benefitCode>`). Vacío si la entrada no tiene.
@@ -105,7 +108,7 @@ data class EscudoResponse(
 data class SocioLookupResponse(
     val socio: SocioInfo?,
     val estado: String?,
-    val beneficios: List<SocioBeneficio> = emptyList(),
+    val beneficios: List<SocioBeneficio>? = null,
 )
 
 data class SocioInfo(
@@ -144,8 +147,8 @@ data class DeviceMeResponse(
 // ── POS bufet (pos-device) ──────────────────────────────────
 
 data class PosCatalogResponse(
-    val categories: List<PosCategory> = emptyList(),
-    val products: List<PosProduct> = emptyList(),
+    val categories: List<PosCategory>? = null,
+    val products: List<PosProduct>? = null,
 )
 
 data class PosCategory(
@@ -254,8 +257,8 @@ data class PosSale(
     val changeAmount: String?,
     val paidAt: String?,
     val createdAt: String?,
-    val items: List<PosSaleItem> = emptyList(),
-    val vouchers: List<PosSaleVoucher> = emptyList(),
+    val items: List<PosSaleItem>? = null,
+    val vouchers: List<PosSaleVoucher>? = null,
 )
 
 data class PosSaleItem(

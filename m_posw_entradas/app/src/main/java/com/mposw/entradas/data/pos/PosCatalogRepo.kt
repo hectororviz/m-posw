@@ -1,7 +1,6 @@
 package com.mposw.entradas.data.pos
 
 import android.content.Context
-import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.mposw.entradas.data.ApiClient
 import com.mposw.entradas.data.ApiService
@@ -17,7 +16,7 @@ import com.mposw.entradas.data.SessionManager
 class PosCatalogRepo(ctx: Context, private val session: SessionManager) {
     private val appCtx = ctx.applicationContext
     private val api: ApiService get() = ApiClient.service(session)
-    private val gson = Gson()
+    private val gson get() = ApiClient.gson
 
     var catalog: PosCatalogResponse? = null
         private set

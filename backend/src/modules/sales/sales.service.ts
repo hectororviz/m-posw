@@ -72,7 +72,9 @@ export class SalesService {
             },
           });
         }
-        return sale;
+        // vouchers explícito: la APK (Gson) deja en null las claves ausentes
+        // y el ticket itera la lista (NPE en ventas sin vouchers).
+        return { ...sale, vouchers: [] };
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta en efectivo');
     }
@@ -202,7 +204,8 @@ export class SalesService {
           });
         }
 
-        return sale;
+        // vouchers explícito: la APK (Gson) deja en null las claves ausentes.
+        return { ...sale, vouchers: [] };
     } catch (error) {
       this.handlePrismaError(error, 'crear la venta fiado');
     }
@@ -362,7 +365,8 @@ export class SalesService {
     }
     if (sale.status === SaleStatus.APPROVED) {
       this.logger.warn(`Venta ${saleId} ya está aprobada, no se decrementa stock`);
-      return sale;
+      // vouchers explícito: la APK (Gson) deja en null las claves ausentes.
+      return { ...sale, vouchers: [] };
     }
     
     this.logger.log(`Completando venta ${saleId}, estado actual: ${sale.status}`);

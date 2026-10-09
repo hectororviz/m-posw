@@ -189,7 +189,7 @@ class PosDashFragment : Fragment() {
             try {
                 val c = catalogRepo.load()
                 lastLoad = System.currentTimeMillis()
-                categories = c.categories
+                categories = c.categories ?: emptyList()
                 if (!isAdded) return@launch
                 bindPages()
                 if (categories.isEmpty()) toast("Sin categorías activas")

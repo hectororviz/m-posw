@@ -116,7 +116,7 @@ class PosPaySheet : BottomSheetDialogFragment() {
                     toast("Socio no habilitado (${r.estado ?: "desconocido"})")
                     return@launch
                 }
-                dash().cart.setSocio(r.socio.id, r.socio.nombre ?: "", r.beneficios)
+                dash().cart.setSocio(r.socio.id, r.socio.nombre ?: "", r.beneficios ?: emptyList())
                 refreshTotal()
                 dash().refreshTotal()
                 toast("Descuentos de ${r.socio.nombre} aplicados")

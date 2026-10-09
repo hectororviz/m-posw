@@ -150,7 +150,7 @@ class ConfigFragment : Fragment() {
                 val r = repo.vigentes()
                 repo.syncTemplateForce()
                 refreshVersions()
-                b.tvConfigStatus.text = "OK: ${r.fixtures.size} partido(s) vigente(s). Modo: ${mode.name}."
+                b.tvConfigStatus.text = "OK: ${(r.fixtures ?: emptyList()).size} partido(s) vigente(s). Modo: ${mode.name}."
                 (activity as? MainActivity)?.enterModeIfRoot(mode)
             } catch (e: Exception) {
                 val msg = e.message ?: ""

@@ -320,7 +320,7 @@ class VentaFragment : Fragment() {
         lifecycleScope.launch {
             try {
                 val r = repo.vigentes()
-                fixtures = r.fixtures
+                fixtures = r.fixtures ?: emptyList()
                 if (fixtures.isEmpty()) {
                     toast(getString(com.mposw.entradas.R.string.sin_partidos))
                     b.spFixture.adapter = null
