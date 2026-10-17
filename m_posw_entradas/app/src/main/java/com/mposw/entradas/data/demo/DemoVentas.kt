@@ -60,6 +60,8 @@ object DemoVentas {
             tipo = "EVENTO",
             titulo = "Evento de prueba",
             fecha = hoy(),
+            torneoId = null,
+            rivalId = null,
             precio = "500",
             vendidos = vendidosEvento,
             ventanaDesde = isoOffset(-2),

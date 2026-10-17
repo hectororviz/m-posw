@@ -568,7 +568,7 @@ class VentaFragment : Fragment() {
             refrescarUltimas()
             actualizarUltimos()
             PagoExitosoDialogFragment.new(
-                payload.codigos.joinToString(", "),
+                (payload.codigos ?: emptyList()).joinToString(", "),
                 payload.total,
                 res.isSuccess,
             ).show(parentFragmentManager, "ok")
