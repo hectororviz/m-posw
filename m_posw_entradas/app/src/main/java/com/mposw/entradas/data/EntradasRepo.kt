@@ -34,41 +34,63 @@ class EntradasRepo(private val session: SessionManager) {
 
     suspend fun socio(uuid: String) = api.socio(uuid.trim())
 
+    // Cada paso es independiente: si uno falla (p. ej. el template evento
+    // aún no existe en un backend viejo), los demás igual corren. El escudo
+    // va primero porque es lo más visible.
     suspend fun syncTemplateIfNeeded(templateId: String?, tplV: Int, logoV: Int) {
-        if (templateId == "evento") {
-            if (session.templateEventoVersion != tplV || session.templateEventoJson.isBlank()) {
-                val t = api.template("evento")
-                session.templateEventoJson = gson.toJson(t)
-                session.templateEventoVersion = t.version
+        try {
+            val e = api.escudo()
+            if (session.logoVersion != logoV || session.escudoBase64.isBlank()) {
+                session.escudoBase64 = e.pngBase64 ?: ""
+                session.logoVersion = e.version
+                session.brandColor = e.accentColor ?: ""
+                session.clubName = e.clubName ?: ""
+                session.logoPath = e.logoUrl ?: ""
+            } else if (session.brandColor.isBlank() || session.clubName.isBlank()) {
+                session.brandColor = e.accentColor ?: session.brandColor
+                session.clubName = e.clubName ?: session.clubName
+                session.logoPath = e.logoUrl ?: session.logoPath
             }
-        } else if (session.templateVersion != tplV || session.templateJson.isBlank()) {
-            val t = api.template(null)
-            session.templateJson = gson.toJson(t)
-            session.templateVersion = t.version
+        } catch (_: Exception) {
         }
-        if (session.logoVersion != logoV || session.escudoBase64.isBlank()) {
+        try {
+            if (templateId == "evento") {
+                if (session.templateEventoVersion != tplV || session.templateEventoJson.isBlank()) {
+                    val t = api.template("evento")
+                    session.templateEventoJson = gson.toJson(t)
+                    session.templateEventoVersion = t.version
+                }
+            } else if (session.templateVersion != tplV || session.templateJson.isBlank()) {
+                val t = api.template(null)
+                session.templateJson = gson.toJson(t)
+                session.templateVersion = t.version
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    suspend fun syncTemplateForce() {
+        try {
             val e = api.escudo()
             session.escudoBase64 = e.pngBase64 ?: ""
             session.logoVersion = e.version
             session.brandColor = e.accentColor ?: ""
             session.clubName = e.clubName ?: ""
             session.logoPath = e.logoUrl ?: ""
+        } catch (_: Exception) {
         }
-    }
-
-    suspend fun syncTemplateForce() {
-        val t = api.template(null)
-        session.templateJson = gson.toJson(t)
-        session.templateVersion = t.version
-        val te = api.template("evento")
-        session.templateEventoJson = gson.toJson(te)
-        session.templateEventoVersion = te.version
-        val e = api.escudo()
-        session.escudoBase64 = e.pngBase64 ?: ""
-        session.logoVersion = e.version
-        session.brandColor = e.accentColor ?: ""
-        session.clubName = e.clubName ?: ""
-        session.logoPath = e.logoUrl ?: ""
+        try {
+            val t = api.template(null)
+            session.templateJson = gson.toJson(t)
+            session.templateVersion = t.version
+        } catch (_: Exception) {
+        }
+        try {
+            val te = api.template("evento")
+            session.templateEventoJson = gson.toJson(te)
+            session.templateEventoVersion = te.version
+        } catch (_: Exception) {
+        }
     }
 
     suspend fun downloadBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {

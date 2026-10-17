@@ -73,7 +73,7 @@ class QrPagoFragment : DialogFragment() {
                         "APPROVED" -> {
                             val json = Gson().toJson(p)
                             AppDb.get(requireContext()).sales().upsert(ApprovedSale(saleId, json))
-                            val elements = TicketRenderer.parseTemplate(session.templateJsonFor(p.templateId))
+                            val elements = TicketRenderer.parseTemplate(session.templateJsonFor(p.templateId), p.templateId)
                             val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
                             val printedOk = SunmiPrinter.printSale(requireContext(), p, elements, escudo).isSuccess
                             parentFragmentManager.setFragmentResult(
@@ -125,7 +125,7 @@ class QrPagoFragment : DialogFragment() {
             saleId: String?,
             qrUrl: String?,
             total: String?,
-            fixtureId: String = "",
+            fixtureId: String? = null,
             eventoId: String = "",
             sector: String = "",
             cantidad: Int = 0,

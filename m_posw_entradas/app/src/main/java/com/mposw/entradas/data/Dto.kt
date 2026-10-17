@@ -12,7 +12,8 @@ data class VigentesResponse(
 )
 
 data class FixtureVigente(
-    val fixtureId: String = "",
+    // Nullable: los eventos no traen fixtureId y Gson deja null las claves ausentes.
+    val fixtureId: String? = null,
     val eventoId: String? = null,
     val tipo: String? = null,
     val titulo: String? = null,

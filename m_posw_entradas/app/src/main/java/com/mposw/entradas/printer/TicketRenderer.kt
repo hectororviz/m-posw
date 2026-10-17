@@ -9,14 +9,16 @@ import com.mposw.entradas.data.TemplateResponse
 object TicketRenderer {
     private val gson = Gson()
 
-    fun parseTemplate(json: String): List<TemplateElement> {
-        if (json.isBlank()) return defaultElements()
+    fun parseTemplate(json: String, templateId: String? = null): List<TemplateElement> {
+        if (json.isBlank()) {
+            return if (templateId == "evento") defaultEventoElements() else defaultElements()
+        }
         return try {
             val t = gson.fromJson(json, TemplateResponse::class.java)
             t.layout?.elements?.filter { it.enabled }?.takeIf { it.isNotEmpty() }
-                ?: defaultElements()
+                ?: if (templateId == "evento") defaultEventoElements() else defaultElements()
         } catch (_: Exception) {
-            defaultElements()
+            if (templateId == "evento") defaultEventoElements() else defaultElements()
         }
     }
 

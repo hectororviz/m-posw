@@ -247,7 +247,7 @@ class VentaFragment : Fragment() {
         }
     }
 
-    private fun registrarVentaLocal(fixtureId: String, eventoId: String, sec: String, cant: Int) {
+    private fun registrarVentaLocal(fixtureId: String?, eventoId: String, sec: String, cant: Int) {
         if (cant <= 0) return
         fixtures = fixtures.map { fx ->
             if (fx.esEvento) {
@@ -491,7 +491,7 @@ class VentaFragment : Fragment() {
     private suspend fun guardarEImprimir(payload: com.mposw.entradas.data.StatusPayload) {
         val json = Gson().toJson(payload)
         payload.saleId?.let { AppDb.get(requireContext()).sales().upsert(ApprovedSale(it, json)) }
-        val elements = TicketRenderer.parseTemplate(session.templateJsonFor(payload.templateId))
+        val elements = TicketRenderer.parseTemplate(session.templateJsonFor(payload.templateId), payload.templateId)
         val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
         val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
         if (!isAdded) return

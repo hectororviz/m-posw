@@ -187,7 +187,12 @@ object SunmiPrinter {
             }
             printer.lineWrap(2, noop)
             printer.lineWrap(2, noop)
-            printer.cutPaper(noop)
+            // La V2s no tiene cutter ("This model does not support this method"):
+            // se intenta y se ignora, el ticket ya salió bien igual.
+            try {
+                printer.cutPaper(noop)
+            } catch (_: Exception) {
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
@@ -242,7 +247,10 @@ object SunmiPrinter {
                     }
                 }
                 printer.lineWrap(2, noop)
-                printer.cutPaper(noop)
+                try {
+                    printer.cutPaper(noop)
+                } catch (_: Exception) {
+                }
                 Result.success(Unit)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
