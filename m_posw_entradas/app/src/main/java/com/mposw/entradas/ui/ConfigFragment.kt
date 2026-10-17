@@ -75,6 +75,16 @@ class ConfigFragment : Fragment() {
         b.btnTest.setOnClickListener { probar() }
         b.toolbarConfig.setNavigationOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
 
+        b.swModoPrueba.isChecked = session.modoPrueba
+        b.swModoPrueba.setOnCheckedChangeListener { _, checked ->
+            session.modoPrueba = checked
+            b.tvConfigStatus.text = if (checked) {
+                "Modo prueba activado: las ventas son ficticias y no se registran."
+            } else {
+                "Modo prueba desactivado."
+            }
+        }
+
         when (session.themeMode) {
             "light" -> b.tgTheme.check(b.btnThemeLight.id)
             "dark" -> b.tgTheme.check(b.btnThemeDark.id)

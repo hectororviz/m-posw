@@ -100,6 +100,14 @@ class SessionManager(context: Context) {
         get() = prefs.getString("themeMode", "system") ?: "system"
         set(v) = prefs.edit().putString("themeMode", v).apply()
 
+    /**
+     * Modo prueba: la app simula ventas e impresión con datos ficticios.
+     * No llama al backend para vender y no persiste nada.
+     */
+    var modoPrueba: Boolean
+        get() = prefs.getBoolean("modoPrueba", false)
+        set(v) = prefs.edit().putBoolean("modoPrueba", v).apply()
+
     /** Origen https sin el /api final, para resolver uploads relativos. */
     fun apiRoot(): String = baseUrl.removeSuffix("api/")
 

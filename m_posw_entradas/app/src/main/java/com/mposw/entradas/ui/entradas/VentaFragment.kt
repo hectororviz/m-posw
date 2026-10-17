@@ -23,6 +23,8 @@ import com.mposw.entradas.data.ApprovedSale
 import com.mposw.entradas.data.EntradasRepo
 import com.mposw.entradas.data.FixtureVigente
 import com.mposw.entradas.data.SessionManager
+import com.mposw.entradas.data.StatusPayload
+import com.mposw.entradas.data.demo.DemoVentas
 import com.mposw.entradas.databinding.FragmentVentaBinding
 import com.mposw.entradas.printer.SunmiPrinter
 import com.mposw.entradas.printer.TicketRenderer
@@ -43,6 +45,12 @@ class VentaFragment : Fragment() {
     private var cantidad: Int = 1
     private var socioUuid: String? = null
     private var busy: Boolean = false
+    /** Últimas ventas ficticias de la sesión (modo prueba: no van a Room). */
+    private var demoUltimas: List<StatusPayload> = emptyList()
+    /** Modo con el que se cargó la lista (para recargar al volver de Config). */
+    private var modoPruebaVista = false
+
+    private val esModoPrueba: Boolean get() = session.modoPrueba
 
     private val cameraPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val scanSocio = registerForActivityResult(ScanContract()) { result ->
@@ -71,7 +79,9 @@ class VentaFragment : Fragment() {
         b.btnMinus.setOnClickListener { if (cantidad > 1) cantidad--; refreshTotal() }
         b.btnPlus.setOnClickListener { if (cantidad < 10) cantidad++; refreshTotal() }
         (activity as? MainActivity)?.setOnSocioClick(View.OnClickListener {
-            if (socioUuid != null) {
+            if (esModoPrueba) {
+                toast("En modo prueba el socio está deshabilitado")
+            } else if (socioUuid != null) {
                 socioUuid = null
                 (activity as? MainActivity)?.setSocioActive(false)
                 toast("Socio quitado")
@@ -80,7 +90,10 @@ class VentaFragment : Fragment() {
             }
         })
         b.btnCash.setOnClickListener { cobrar("CASH") }
-        b.btnQr.setOnClickListener { cobrar("MP_QR") }
+        b.btnQr.setOnClickListener {
+            if (esModoPrueba) toast("En modo prueba el QR está deshabilitado")
+            else cobrar("MP_QR")
+        }
         parentFragmentManager.setFragmentResultListener("qr_aprobado", this) { _, bundle ->
             val fixtureId = bundle.getString("fixtureId").orEmpty()
             val eventoId = bundle.getString("eventoId").orEmpty()
@@ -205,13 +218,18 @@ class VentaFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         _b?.let {
+            if (session.modoPrueba != modoPruebaVista) {
+                // Cambió el modo prueba en Config: recargar catálogo.
+                cargarFixtures()
+                return@let
+            }
             bindHeader()
             actualizarTorneo()
             actualizarSectores()
             refreshTotal()
             refrescarUltimas()
             actualizarUltimos()
-            (activity as? MainActivity)?.setSocioActive(socioUuid != null)
+            (activity as? MainActivity)?.setSocioActive(socioUuid != null && !esModoPrueba)
         }
     }
 
@@ -231,7 +249,8 @@ class VentaFragment : Fragment() {
     }
 
     private fun actualizarTorneo() {
-        b.tvTorneo.text = current()?.displayTitulo.orEmpty()
+        val titulo = current()?.displayTitulo.orEmpty()
+        b.tvTorneo.text = if (esModoPrueba) "★ PRUEBA · $titulo" else titulo
     }
 
     private fun actualizarUltimos() {
@@ -262,24 +281,30 @@ class VentaFragment : Fragment() {
 
     private fun refrescarUltimas() {
         lifecycleScope.launch {
-            val ventas = try {
-                AppDb.get(requireContext()).sales().lastFive()
-            } catch (_: Exception) {
-                emptyList()
+            // En modo prueba se muestran las ficticias de la sesión (en memoria).
+            val payloads: List<StatusPayload?> = if (esModoPrueba) {
+                demoUltimas
+            } else {
+                try {
+                    AppDb.get(requireContext()).sales().lastFive().map { v ->
+                        try {
+                            Gson().fromJson(v.payloadJson, com.mposw.entradas.data.StatusPayload::class.java)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                } catch (_: Exception) {
+                    emptyList()
+                }
             }
             val vb = _b ?: return@launch
-            if (ventas.isEmpty()) {
+            if (payloads.isEmpty()) {
                 vb.llUltimasSection.visibility = View.GONE
                 return@launch
             }
             vb.llUltimasSection.visibility = View.VISIBLE
             vb.llUltimasFilas.removeAllViews()
-            for (v in ventas) {
-                val p = try {
-                    Gson().fromJson(v.payloadJson, com.mposw.entradas.data.StatusPayload::class.java)
-                } catch (_: Exception) {
-                    null
-                }
+            for (p in payloads) {
                 val sectorRaw = p?.datos?.sector
                     ?: p?.codigos?.firstOrNull()?.substringBefore("-")
                 val lv = when {
@@ -299,7 +324,7 @@ class VentaFragment : Fragment() {
                     false,
                 )
                 row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaHora).text =
-                    horaDeVenta(p?.datos?.fechaPago, v.createdAt)
+                    horaDeVenta(p?.datos?.fechaPago, System.currentTimeMillis())
                 val tvSector = row.findViewById<TextView>(com.mposw.entradas.R.id.tvFilaSector)
                 tvSector.text = lv
                 tvSector.setTextColor(
@@ -359,35 +384,32 @@ class VentaFragment : Fragment() {
     }
 
     private fun cargarFixtures() {
+        modoPruebaVista = esModoPrueba
+        if (esModoPrueba) {
+            // Catálogo ficticio en memoria + template/escudo reales (solo lectura).
+            demoUltimas = emptyList()
+            socioUuid = null
+            fixtures = DemoVentas.catalog()
+            mostrarFixtures()
+            toast("Modo prueba: ventas ficticias, no se registran")
+            if (session.templateJson.isBlank() || session.templateEventoJson.isBlank() || session.escudoBase64.isBlank()) {
+                lifecycleScope.launch {
+                    try {
+                        repo.syncTemplateForce()
+                    } catch (_: Exception) {
+                    }
+                    if (!isAdded) return@launch
+                    bindHeader()
+                    refrescarUltimas()
+                }
+            }
+            return
+        }
         lifecycleScope.launch {
             try {
                 val r = repo.vigentes()
                 fixtures = (r.fixtures ?: emptyList()) + (r.eventos ?: emptyList())
-                if (fixtures.isEmpty()) {
-                    toast(getString(com.mposw.entradas.R.string.sin_partidos))
-                    b.spFixture.adapter = null
-                    actualizarTorneo()
-                    actualizarSectores()
-                    actualizarUltimos()
-                } else {
-                    b.spFixture.adapter = ArrayAdapter(
-                        requireContext(),
-                        android.R.layout.simple_spinner_dropdown_item,
-                        fixtures,
-                    )
-                    b.spFixture.visibility = if (fixtures.size == 1) View.GONE else View.VISIBLE
-                    b.spFixture.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                        override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                            refreshTotal()
-                            actualizarTorneo()
-                            actualizarSectores()
-                            actualizarUltimos()
-                        }
-                        override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
-                    }
-                    actualizarTorneo()
-                    actualizarSectores()
-                }
+                mostrarFixtures()
                 refreshTotal()
             } catch (e: Exception) {
                 if (ApiClient.isWrongMode(e)) {
@@ -398,6 +420,35 @@ class VentaFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun mostrarFixtures() {
+        if (fixtures.isEmpty()) {
+            toast(getString(com.mposw.entradas.R.string.sin_partidos))
+            _b?.spFixture?.adapter = null
+            actualizarTorneo()
+            actualizarSectores()
+            actualizarUltimos()
+        } else {
+            _b?.spFixture?.adapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                fixtures,
+            )
+            _b?.spFixture?.visibility = if (fixtures.size == 1) View.GONE else View.VISIBLE
+            _b?.spFixture?.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
+                    refreshTotal()
+                    actualizarTorneo()
+                    actualizarSectores()
+                    actualizarUltimos()
+                }
+                override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
+            }
+            actualizarTorneo()
+            actualizarSectores()
+        }
+        refreshTotal()
     }
 
     private fun extractUuid(raw: String): String {
@@ -435,6 +486,10 @@ class VentaFragment : Fragment() {
         val f = current()
         if (f == null) {
             toast("No hay evento vigente")
+            return
+        }
+        if (esModoPrueba) {
+            cobrarDemo(f)
             return
         }
         if (busy) return
@@ -485,6 +540,38 @@ class VentaFragment : Fragment() {
             } finally {
                 busy = false
             }
+        }
+    }
+
+    /** Venta ficticia: sin red, sin numeración real, sin persistencia. */
+    private fun cobrarDemo(f: FixtureVigente) {
+        val esEvento = f.esEvento
+        val sec = if (esEvento) "GENERAL" else sector
+        val templateId = if (esEvento) "evento" else "default"
+        val payload = DemoVentas.payload(
+            esEvento,
+            sec,
+            cantidad,
+            f.precioDouble,
+            session.clubName,
+            templateId,
+            if (esEvento) session.templateEventoVersion else session.templateVersion,
+            session.logoVersion,
+        )
+        lifecycleScope.launch {
+            val elements = TicketRenderer.parseTemplate(session.templateJsonFor(payload.templateId), payload.templateId)
+            val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
+            val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
+            if (!isAdded) return@launch
+            demoUltimas = (listOf(payload) + demoUltimas).take(5)
+            registrarVentaLocal(f.fixtureId, f.eventoId.orEmpty(), sec, cantidad)
+            refrescarUltimas()
+            actualizarUltimos()
+            PagoExitosoDialogFragment.new(
+                payload.codigos.joinToString(", "),
+                payload.total,
+                res.isSuccess,
+            ).show(parentFragmentManager, "ok")
         }
     }
 

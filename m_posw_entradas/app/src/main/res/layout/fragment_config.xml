@@ -199,5 +199,26 @@
                 app:backgroundTint="@color/toggle_sector_fill"
                 android:textColor="@color/toggle_sector_text" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Modo prueba"
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/swModoPrueba"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Simular ventas e impresión (no se registra nada)" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Muestra datos ficticios, vende e imprime tickets de prueba con el diseño real. QR y socio quedan deshabilitados."
+            android:textAppearance="@style/TextAppearance.Entradas.Support" />
     </LinearLayout>
 </ScrollView>
