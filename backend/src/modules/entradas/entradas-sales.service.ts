@@ -4,6 +4,7 @@ import { PrismaService } from '../common/prisma.service';
 import { SociosQrService } from '../socios/socios-qr.service';
 import { MercadoPagoInstoreService } from '../sales/services/mercadopago-instore.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
+import { TICKET_TEMPLATE_DEFAULT_ID, TICKET_TEMPLATE_EVENTO_ID } from './ticket-template.const';
 import { makeBenefitCode } from './entradas-beneficios.service';
 import { resolveDeviceMpOrThrow } from './device-mp.helper';
 import type { EntradasDeviceContext } from './device.guard';
@@ -14,7 +15,8 @@ const INTENT_RATE_LIMIT_PER_MIN = 10;
 
 const pad3 = (n: number) => String(n).padStart(3, '0');
 
-function prefixFor(sector: EntradaSector): string {
+function prefixFor(sector: EntradaSector | null | undefined): string {
+  if (!sector) return 'E';
   return sector === 'LOCAL' ? 'L' : 'V';
 }
 
@@ -38,15 +40,21 @@ export class EntradasSalesService {
     }
   }
 
-  // ── Fixtures vigentes ────────────────────────────────────
+  // ── Fixtures y eventos vigentes ──────────────────────────
   async vigentes() {
     await this.assertModuleEnabled();
     const now = new Date();
-    const fixtures = await this.prisma.entradaFixture.findMany({
-      where: { activo: true, ventanaDesde: { lte: now }, ventanaHasta: { gte: now } },
-      include: { torneo: true, rival: true },
-      orderBy: { ventanaDesde: 'asc' },
-    });
+    const [fixtures, eventos] = await Promise.all([
+      this.prisma.entradaFixture.findMany({
+        where: { activo: true, ventanaDesde: { lte: now }, ventanaHasta: { gte: now } },
+        include: { torneo: true, rival: true },
+        orderBy: { ventanaDesde: 'asc' },
+      }),
+      this.prisma.entradaEvento.findMany({
+        where: { activo: true, ventanaDesde: { lte: now }, ventanaHasta: { gte: now } },
+        orderBy: { ventanaDesde: 'asc' },
+      }),
+    ]);
     const withCounts = await Promise.all(
       fixtures
         .filter((f) => f.torneo.activo && f.rival.activo)
@@ -56,6 +64,7 @@ export class EntradasSalesService {
             this.prisma.ticketUnit.count({ where: { fixtureId: f.id, sector: 'VISITANTE' } }),
           ]);
           return {
+            tipo: 'PARTIDO' as const,
             fixtureId: f.id,
             fecha: f.fecha,
             torneo: f.torneo.nombre,
@@ -70,7 +79,22 @@ export class EntradasSalesService {
           };
         }),
     );
-    return { now, fixtures: withCounts };
+    const eventosConVentas = await Promise.all(
+      eventos.map(async (e) => {
+        const vendidos = await this.prisma.ticketUnit.count({ where: { eventoId: e.id } });
+        return {
+          tipo: 'EVENTO' as const,
+          eventoId: e.id,
+          titulo: e.titulo,
+          fecha: e.fecha,
+          precio: e.precio.toString(),
+          vendidos,
+          ventanaDesde: e.ventanaDesde,
+          ventanaHasta: e.ventanaHasta,
+        };
+      }),
+    );
+    return { now, fixtures: withCounts, eventos: eventosConVentas };
   }
 
   // ── Intent de venta ──────────────────────────────────────
@@ -88,14 +112,22 @@ export class EntradasSalesService {
     if (requestId) {
       const existing = await this.prisma.ticketSale.findUnique({
         where: { requestId },
-        include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } } },
+        include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } }, evento: true },
       });
       if (existing) return this.toStatusPayload(existing);
     }
 
+    if (!!dto.fixtureId === !!dto.eventoId) {
+      throw new BadRequestException({ code: 'TIPO_REQUERIDO', message: 'Indicá fixtureId o eventoId (solo uno)' });
+    }
+
     const now = new Date();
+    if (dto.eventoId) {
+      return this.createEventoIntent(device, dto, requestId, now);
+    }
+
     const fixture = await this.prisma.entradaFixture.findUnique({
-      where: { id: dto.fixtureId },
+      where: { id: dto.fixtureId! },
       include: { torneo: true, rival: true },
     });
     if (!fixture || !fixture.activo || !fixture.torneo.activo || !fixture.rival.activo) {
@@ -127,7 +159,8 @@ export class EntradasSalesService {
     const sale = await this.prisma.ticketSale.create({
       data: {
         fixtureId: fixture.id,
-        sector: dto.sector,
+        eventoId: null,
+        sector: dto.sector ?? null,
         cantidad: dto.cantidad,
         precioUnit: new Prisma.Decimal(precioUnit),
         descuento: new Prisma.Decimal(descuento),
@@ -179,7 +212,105 @@ export class EntradasSalesService {
     });
     const pending = await this.prisma.ticketSale.findUnique({
       where: { id: sale.id },
-      include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } } },
+      include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } }, evento: true },
+    });
+    const payload = await this.toStatusPayload(pending!);
+    return {
+      ...payload,
+      qrImageUrl: deviceMp?.mpQrData ?? payload.datos.qrImageUrl ?? null,
+    };
+  }
+
+  // ── Intent de venta para eventos especiales ────────────────
+  // Sin torneo/rival/sector: precio propio del evento, sector GENERAL,
+  // numeración E-xxx con contador único por evento.
+  private async createEventoIntent(
+    device: EntradasDeviceContext,
+    dto: CreateIntentDto,
+    requestId: string | undefined,
+    now: Date,
+  ) {
+    const evento = await this.prisma.entradaEvento.findUnique({ where: { id: dto.eventoId! } });
+    if (!evento || !evento.activo) {
+      throw new NotFoundException({ code: 'EVENTO_NO_DISPONIBLE', message: 'Evento no disponible' });
+    }
+    if (!(evento.ventanaDesde <= now && now <= evento.ventanaHasta)) {
+      throw new BadRequestException({ code: 'FUERA_DE_VENTANA', message: 'Fuera del horario de venta' });
+    }
+
+    const precioUnit = Number(evento.precio);
+
+    let socioId: number | null = null;
+    let beneficioId: string | null = null;
+    let descuento = 0;
+    if (dto.socioUuid) {
+      const resolved = await this.resolveSocioDiscount(dto.socioUuid, null, precioUnit * dto.cantidad);
+      socioId = resolved.socioId;
+      beneficioId = resolved.beneficioId;
+      descuento = resolved.descuento;
+    }
+
+    const subtotal = precioUnit * dto.cantidad;
+    const total = Math.round((subtotal - descuento + Number.EPSILON) * 100) / 100;
+    if (total <= 0) {
+      throw new BadRequestException({ code: 'TOTAL_INVALIDO', message: 'Total inválido' });
+    }
+
+    const sale = await this.prisma.ticketSale.create({
+      data: {
+        fixtureId: null,
+        eventoId: evento.id,
+        sector: null,
+        cantidad: dto.cantidad,
+        precioUnit: new Prisma.Decimal(precioUnit),
+        descuento: new Prisma.Decimal(descuento),
+        total: new Prisma.Decimal(total),
+        paymentMethod: dto.paymentMethod,
+        status: 'PENDING',
+        deviceId: device.id,
+        socioId,
+        beneficioId,
+        requestId: requestId ?? null,
+      },
+      include: { units: true },
+    });
+
+    if (dto.paymentMethod === EntradaPayMethod.CASH) {
+      const approved = await this.approveSale(sale.id, new Date());
+      return this.toStatusPayload(approved);
+    }
+
+    const externalReference = `ticket-${sale.id}`;
+    try {
+      const posOverride = await resolveDeviceMpOrThrow(this.prisma, device.id);
+      await this.mpInstore.putTicketOrder(
+        {
+          externalReference,
+          title: `Entradas ${evento.titulo}`,
+          description: `Entradas GENERAL x${dto.cantidad} ${evento.titulo}`,
+          totalAmount: total,
+        },
+        'entradas',
+        posOverride,
+      );
+    } catch (error) {
+      await this.prisma.ticketSale.update({
+        where: { id: sale.id },
+        data: { status: 'REJECTED' },
+      });
+      throw error;
+    }
+    await this.prisma.ticketSale.update({
+      where: { id: sale.id },
+      data: { mpExternalReference: externalReference },
+    });
+    const deviceMp = await this.prisma.posDevice.findUnique({
+      where: { id: device.id },
+      select: { mpQrData: true },
+    });
+    const pending = await this.prisma.ticketSale.findUnique({
+      where: { id: sale.id },
+      include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } }, evento: true },
     });
     const payload = await this.toStatusPayload(pending!);
     return {
@@ -194,6 +325,7 @@ export class EntradasSalesService {
       include: {
         units: { orderBy: { nro: 'asc' } },
         fixture: { include: { torneo: true, rival: true } },
+        evento: true,
       },
     });
     if (!sale) throw new NotFoundException({ code: 'VENTA_NO_ENCONTRADA', message: 'Venta no encontrada' });
@@ -218,7 +350,7 @@ export class EntradasSalesService {
     const updated = await this.prisma.ticketSale.update({
       where: { id: sale.id },
       data: { status: 'CANCELLED' },
-      include: { units: true, fixture: { include: { torneo: true, rival: true } } },
+      include: { units: true, fixture: { include: { torneo: true, rival: true } }, evento: true },
     });
     return this.toStatusPayload(updated);
   }
@@ -290,7 +422,7 @@ export class EntradasSalesService {
     });
   }
 
-  /** Aprueba y genera unidades L-xxx/V-xxx con contador atómico por (fixture, sector). */
+  /** Aprueba y genera unidades L-xxx/V-xxx (partidos) o E-xxx (eventos, contador único). */
   async approveSale(saleId: string, paidAt: Date, mp?: { paymentId?: string | null; merchantOrderId?: string | null }) {
     return this.prisma.$transaction(async (tx) => {
       const sale = await tx.ticketSale.findUnique({ where: { id: saleId } });
@@ -298,7 +430,7 @@ export class EntradasSalesService {
       if (sale.status === EntradaSaleStatus.APPROVED) {
         return tx.ticketSale.findUnique({
           where: { id: saleId },
-          include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } } },
+          include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } }, evento: true },
         });
       }
       // Update condicional: solo una transacción concurrente gana la aprobación
@@ -315,30 +447,48 @@ export class EntradasSalesService {
         if (current?.status === EntradaSaleStatus.APPROVED) {
           return tx.ticketSale.findUnique({
             where: { id: saleId },
-            include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } } },
+            include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } }, evento: true },
           });
         }
         throw new BadRequestException({ code: 'NO_APROBABLE', message: `Venta en estado ${current?.status}` });
       }
-      const counter = await tx.entradaContador.upsert({
-        where: { fixtureId_sector: { fixtureId: sale.fixtureId, sector: sale.sector } },
-        create: { fixtureId: sale.fixtureId, sector: sale.sector, ultimoNro: sale.cantidad },
-        update: { ultimoNro: { increment: sale.cantidad } },
-      });
-      const startNro = counter.ultimoNro - sale.cantidad + 1;
+      const esEvento = !!sale.eventoId;
+      let startNro: number;
+      let entradaBeneficio: { id: string; porcentaje: Prisma.Decimal } | null = null;
+      if (esEvento) {
+        const counter = await tx.entradaEventoContador.upsert({
+          where: { eventoId: sale.eventoId! },
+          create: { eventoId: sale.eventoId!, ultimoNro: sale.cantidad },
+          update: { ultimoNro: { increment: sale.cantidad } },
+        });
+        startNro = counter.ultimoNro - sale.cantidad + 1;
+        const rows = await tx.entradaBeneficio.findMany({
+          where: { activo: true, sector: EntradaBeneficioSector.AMBAS },
+          orderBy: { porcentaje: 'desc' },
+          take: 1,
+        });
+        entradaBeneficio = rows[0] ?? null;
+      } else {
+        const counter = await tx.entradaContador.upsert({
+          where: { fixtureId_sector: { fixtureId: sale.fixtureId!, sector: sale.sector! } },
+          create: { fixtureId: sale.fixtureId!, sector: sale.sector!, ultimoNro: sale.cantidad },
+          update: { ultimoNro: { increment: sale.cantidad } },
+        });
+        startNro = counter.ultimoNro - sale.cantidad + 1;
+        // Beneficio de bufet por sector (global + LOCAL|VISITANTE|AMBAS): el de mayor %.
+        // No descuenta la entrada; se imprime como 2º QR para canjear en bufet/cantina.
+        const scopes =
+          sale.sector === 'LOCAL'
+            ? [EntradaBeneficioSector.LOCAL, EntradaBeneficioSector.AMBAS]
+            : [EntradaBeneficioSector.VISITANTE, EntradaBeneficioSector.AMBAS];
+        const rows = await tx.entradaBeneficio.findMany({
+          where: { activo: true, sector: { in: scopes } },
+          orderBy: { porcentaje: 'desc' },
+          take: 1,
+        });
+        entradaBeneficio = rows[0] ?? null;
+      }
       const prefix = prefixFor(sale.sector);
-      // Beneficio de bufet por sector (global + LOCAL|VISITANTE|AMBAS): el de mayor %.
-      // No descuenta la entrada; se imprime como 2º QR para canjear en bufet/cantina.
-      const scopes =
-        sale.sector === 'LOCAL'
-          ? [EntradaBeneficioSector.LOCAL, EntradaBeneficioSector.AMBAS]
-          : [EntradaBeneficioSector.VISITANTE, EntradaBeneficioSector.AMBAS];
-      const rows = await tx.entradaBeneficio.findMany({
-        where: { activo: true, sector: { in: scopes } },
-        orderBy: { porcentaje: 'desc' },
-        take: 1,
-      });
-      const entradaBeneficio = rows[0] ?? null;
       const codes = Array.from({ length: sale.cantidad }, () => (entradaBeneficio ? makeBenefitCode() : null));
       const definedCodes = codes.filter((c): c is string => !!c);
       if (definedCodes.length > 0) {
@@ -357,6 +507,7 @@ export class EntradasSalesService {
           return {
             saleId: sale.id,
             fixtureId: sale.fixtureId,
+            eventoId: sale.eventoId,
             sector: sale.sector,
             nro,
             codigo: `${prefix}-${pad3(nro)}`,
@@ -377,23 +528,32 @@ export class EntradasSalesService {
           paidAt,
           ...(mp?.merchantOrderId ? { mpOrderId: mp.merchantOrderId } : {}),
         },
-        include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } } },
+        include: { units: { orderBy: { nro: 'asc' } }, fixture: { include: { torneo: true, rival: true } }, evento: true },
       });
     });
   }
 
   // ── Payload al POS ───────────────────────────────────────
-  private async toStatusPayload(
-    sale: Prisma.TicketSaleGetPayload<{ include: { units: true; fixture: { include: { torneo: true; rival: true } } } }> & {
-      units: { codigo: string }[];
-    },
-  ) {
-    const anySale = sale as unknown as {
-      fixture?: { torneo?: { nombre?: string }; rival?: { nombre?: string }; fecha?: Date };
-      units?: { codigo: string }[];
-    };
+  private async toStatusPayload(sale: {
+    id: string;
+    status: unknown;
+    cantidad: number;
+    precioUnit: unknown;
+    descuento: unknown;
+    total: unknown;
+    paymentMethod: unknown;
+    paidAt: unknown;
+    fixtureId?: string | null;
+    eventoId?: string | null;
+    sector?: string | null;
+    fixture?: { torneo?: { nombre?: string } | null; rival?: { nombre?: string } | null; fecha?: Date | null } | null;
+    evento?: { id: string; titulo: string; fecha: Date } | null;
+    units?: { codigo: string }[];
+  }) {
+    const esEvento = !!sale.eventoId;
+    const templateId = esEvento ? TICKET_TEMPLATE_EVENTO_ID : TICKET_TEMPLATE_DEFAULT_ID;
     const [template, asset, setting, benefitUnits] = await Promise.all([
-      this.prisma.entradaTicketTemplate.findUnique({ where: { id: 'default' } }),
+      this.prisma.entradaTicketTemplate.findUnique({ where: { id: templateId } }),
       this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } }),
       this.prisma.setting.findUnique({ where: { id: SETTING_ID }, select: { clubName: true } }),
       this.prisma.ticketUnit.findMany({
@@ -411,19 +571,22 @@ export class EntradasSalesService {
     return {
       saleId: sale.id,
       status: sale.status,
+      tipo: esEvento ? 'EVENTO' : 'PARTIDO',
+      eventoId: sale.eventoId ?? null,
       codigos,
       cantidad: sale.cantidad,
-      precioUnit: sale.precioUnit.toString(),
-      descuento: sale.descuento.toString(),
-      total: sale.total.toString(),
+      precioUnit: sale.precioUnit?.toString() ?? '0',
+      descuento: sale.descuento?.toString() ?? '0',
+      total: sale.total?.toString() ?? '0',
       paymentMethod: sale.paymentMethod,
       paidAt: sale.paidAt,
       datos: {
         club: setting?.clubName ?? '',
-        torneo: anySale.fixture?.torneo?.nombre ?? '',
-        rival: anySale.fixture?.rival?.nombre ?? '',
-        fecha: anySale.fixture?.fecha ?? null,
-        sector: sale.sector,
+        torneo: sale.fixture?.torneo?.nombre ?? '',
+        rival: sale.fixture?.rival?.nombre ?? '',
+        evento: esEvento ? (sale.evento?.titulo ?? '') : '',
+        fecha: (sale.fixture?.fecha ?? sale.evento?.fecha ?? null) as Date | null,
+        sector: sale.sector ?? (esEvento ? 'GENERAL' : ''),
         ventaId: sale.id,
         fechaPago: sale.paidAt ?? null,
         footer: 'Ticket no fiscal',
@@ -439,13 +602,16 @@ export class EntradasSalesService {
         porcentaje: u.beneficioPorcentaje?.toString() ?? null,
         usoUnico: u.beneficio?.usoUnico ?? null,
       })),
+      templateId,
       templateVersion: template?.version ?? 1,
       logoVersion: asset?.version ?? 1,
     };
   }
 
-  // ── Descuento socio (futuro) ─────────────────────────────
-  private async resolveSocioDiscount(socioUuid: string, torneoId: string, subtotal: number) {
+  // ── Descuento socio ──────────────────────────────────────
+  // Partidos: aplica el mejor beneficio del tipo (global o del torneo).
+  // Eventos (torneoId null): solo aplican beneficios globales (entradaTorneoId null).
+  private async resolveSocioDiscount(socioUuid: string, torneoId: string | null, subtotal: number) {
     const data = await this.sociosQr.resolve(socioUuid);
     if (!data) throw new NotFoundException({ code: 'SOCIO_NO_ENCONTRADO', message: 'Socio no encontrado' });
     if (data.estado !== 'AL_DIA') {
@@ -454,7 +620,9 @@ export class EntradasSalesService {
     const socio = await this.prisma.socio.findUnique({ where: { uuid: socioUuid }, select: { id: true, socioTipoId: true } });
     if (!socio) throw new NotFoundException({ code: 'SOCIO_NO_ENCONTRADO', message: 'Socio no encontrado' });
     const aplicables = await this.prisma.socioBeneficio.findMany({
-      where: { socioTipoId: socio.socioTipoId, activo: true, OR: [{ entradaTorneoId: null }, { entradaTorneoId: torneoId }] },
+      where: torneoId
+        ? { socioTipoId: socio.socioTipoId, activo: true, OR: [{ entradaTorneoId: null }, { entradaTorneoId: torneoId }] }
+        : { socioTipoId: socio.socioTipoId, activo: true, entradaTorneoId: null },
       orderBy: { porcentaje: 'desc' },
     });
     for (const b of aplicables) {

@@ -52,6 +52,10 @@ class SessionManager(context: Context) {
         get() = prefs.getInt("templateVersion", -1)
         set(v) = prefs.edit().putInt("templateVersion", v).apply()
 
+    var templateEventoVersion: Int
+        get() = prefs.getInt("templateEventoVersion", -1)
+        set(v) = prefs.edit().putInt("templateEventoVersion", v).apply()
+
     var logoVersion: Int
         get() = prefs.getInt("logoVersion", -1)
         set(v) = prefs.edit().putInt("logoVersion", v).apply()
@@ -59,6 +63,14 @@ class SessionManager(context: Context) {
     var templateJson: String
         get() = prefs.getString("templateJson", "") ?: ""
         set(v) = prefs.edit().putString("templateJson", v).apply()
+
+    var templateEventoJson: String
+        get() = prefs.getString("templateEventoJson", "") ?: ""
+        set(v) = prefs.edit().putString("templateEventoJson", v).apply()
+
+    /** Template según tipo de venta: eventos usan el diseño propio. */
+    fun templateJsonFor(templateId: String?): String =
+        if (templateId == "evento") templateEventoJson else templateJson
 
     var escudoBase64: String
         get() = prefs.getString("escudoBase64", "") ?: ""

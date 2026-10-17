@@ -2,11 +2,17 @@ import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-val
 import { EntradaPayMethod, EntradaSector } from '@prisma/client';
 
 export class CreateIntentDto {
+  @IsOptional()
   @IsUUID()
-  fixtureId!: string;
+  fixtureId?: string;
 
+  @IsOptional()
+  @IsUUID()
+  eventoId?: string;
+
+  @IsOptional()
   @IsEnum(EntradaSector)
-  sector!: EntradaSector;
+  sector?: EntradaSector;
 
   @IsInt()
   @Min(1)

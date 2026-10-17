@@ -82,9 +82,10 @@ class VentaFragment : Fragment() {
         b.btnCash.setOnClickListener { cobrar("CASH") }
         b.btnQr.setOnClickListener { cobrar("MP_QR") }
         parentFragmentManager.setFragmentResultListener("qr_aprobado", this) { _, bundle ->
-            val fixtureId = bundle.getString("fixtureId") ?: return@setFragmentResultListener
+            val fixtureId = bundle.getString("fixtureId").orEmpty()
+            val eventoId = bundle.getString("eventoId").orEmpty()
             val sec = bundle.getString("sector") ?: return@setFragmentResultListener
-            registrarVentaLocal(fixtureId, sec, bundle.getInt("cantidad", 0))
+            registrarVentaLocal(fixtureId, eventoId, sec, bundle.getInt("cantidad", 0))
             refrescarUltimas()
             actualizarUltimos()
         }
@@ -216,12 +217,21 @@ class VentaFragment : Fragment() {
 
     private fun actualizarSectores() {
         val f = current()
-        b.btnLocal.text = session.clubName.ifBlank { "Local" }
-        b.btnVisitante.text = f?.rival?.ifBlank { "Visitante" } ?: "Visitante"
+        if (f?.esEvento == true) {
+            // Eventos especiales: un solo sector "General".
+            b.btnLocal.text = "General"
+            b.btnVisitante.visibility = View.GONE
+            b.tgSector.check(b.btnLocal.id)
+        } else {
+            b.btnVisitante.visibility = View.VISIBLE
+            b.btnLocal.text = session.clubName.ifBlank { "Local" }
+            b.btnVisitante.text = f?.rival?.ifBlank { "Visitante" } ?: "Visitante"
+            refreshSector()
+        }
     }
 
     private fun actualizarTorneo() {
-        b.tvTorneo.text = current()?.torneo.orEmpty()
+        b.tvTorneo.text = current()?.displayTitulo.orEmpty()
     }
 
     private fun actualizarUltimos() {
@@ -230,15 +240,23 @@ class VentaFragment : Fragment() {
             (activity as? MainActivity)?.clearUltimosNumeros()
             return
         }
-        (activity as? MainActivity)?.setUltimosNumeros(f.vendidosL.coerceAtLeast(0), f.vendidosV.coerceAtLeast(0))
+        if (f.esEvento) {
+            (activity as? MainActivity)?.setUltimosEvento(f.vendidos)
+        } else {
+            (activity as? MainActivity)?.setUltimosNumeros(f.vendidosL.coerceAtLeast(0), f.vendidosV.coerceAtLeast(0))
+        }
     }
 
-    private fun registrarVentaLocal(fixtureId: String, sec: String, cant: Int) {
+    private fun registrarVentaLocal(fixtureId: String, eventoId: String, sec: String, cant: Int) {
         if (cant <= 0) return
         fixtures = fixtures.map { fx ->
-            if (fx.fixtureId != fixtureId) fx
-            else if (sec == "LOCAL") fx.copy(vendidosL = fx.vendidosL + cant)
-            else fx.copy(vendidosV = fx.vendidosV + cant)
+            if (fx.esEvento) {
+                if (eventoId.isNotBlank() && fx.eventoId == eventoId) fx.copy(vendidos = fx.vendidos + cant) else fx
+            } else {
+                if (fx.fixtureId != fixtureId) fx
+                else if (sec == "LOCAL") fx.copy(vendidosL = fx.vendidosL + cant)
+                else fx.copy(vendidosV = fx.vendidosV + cant)
+            }
         }
     }
 
@@ -267,6 +285,7 @@ class VentaFragment : Fragment() {
                 val lv = when {
                     sectorRaw.equals("LOCAL", ignoreCase = true) || sectorRaw == "L" -> "Local"
                     sectorRaw.equals("VISITANTE", ignoreCase = true) || sectorRaw == "V" -> "Visitante"
+                    sectorRaw.equals("GENERAL", ignoreCase = true) || sectorRaw == "E" -> "General"
                     else -> sectorRaw?.uppercase() ?: "–"
                 }
                 val metodo = when (p?.paymentMethod) {
@@ -287,6 +306,7 @@ class VentaFragment : Fragment() {
                     when (lv) {
                         "Local" -> androidx.core.content.ContextCompat.getColor(requireContext(), com.mposw.entradas.R.color.primary)
                         "Visitante" -> androidx.core.content.ContextCompat.getColor(requireContext(), com.mposw.entradas.R.color.tertiary)
+                        "General" -> androidx.core.content.ContextCompat.getColor(requireContext(), com.mposw.entradas.R.color.primary)
                         else -> androidx.core.content.ContextCompat.getColor(requireContext(), com.mposw.entradas.R.color.on_surface_variant)
                     }
                 )
@@ -342,7 +362,7 @@ class VentaFragment : Fragment() {
         lifecycleScope.launch {
             try {
                 val r = repo.vigentes()
-                fixtures = r.fixtures ?: emptyList()
+                fixtures = (r.fixtures ?: emptyList()) + (r.eventos ?: emptyList())
                 if (fixtures.isEmpty()) {
                     toast(getString(com.mposw.entradas.R.string.sin_partidos))
                     b.spFixture.adapter = null
@@ -414,19 +434,28 @@ class VentaFragment : Fragment() {
     private fun cobrar(method: String) {
         val f = current()
         if (f == null) {
-            toast("No hay partido vigente")
+            toast("No hay evento vigente")
             return
         }
         if (busy) return
         busy = true
+        val esEvento = f.esEvento
+        val sectorReq = if (esEvento) null else sector
         lifecycleScope.launch {
             try {
-                val (_, payload) = repo.intent(f.fixtureId, sector, cantidad, method, socioUuid)
-                repo.syncTemplateIfNeeded(payload.templateVersion, payload.logoVersion)
+                val (_, payload) = repo.intent(
+                    if (esEvento) null else f.fixtureId,
+                    if (esEvento) f.eventoId else null,
+                    sectorReq,
+                    cantidad,
+                    method,
+                    socioUuid,
+                )
+                repo.syncTemplateIfNeeded(payload.templateId, payload.templateVersion, payload.logoVersion)
                 if (method == "CASH") {
                     if (payload.status == "APPROVED") {
                         guardarEImprimir(payload)
-                        registrarVentaLocal(f.fixtureId, sector, cantidad)
+                        registrarVentaLocal(f.fixtureId, f.eventoId.orEmpty(), if (esEvento) "GENERAL" else sector, cantidad)
                         refrescarUltimas()
                         actualizarUltimos()
                         socioUuid = null
@@ -440,8 +469,15 @@ class VentaFragment : Fragment() {
                         toast("QR no configurado en el servidor (qrImageUrl vacío).")
                     } else {
                         val total = payload.total?.let { MoneyFormat.formatRaw(it) } ?: MoneyFormat.format(f.precioDouble * cantidad)
-                        QrPagoFragment.new(payload.saleId, qrUrl, total, f.fixtureId, sector, cantidad)
-                            .show(parentFragmentManager, "qr")
+                        QrPagoFragment.new(
+                            payload.saleId,
+                            qrUrl,
+                            total,
+                            f.fixtureId,
+                            f.eventoId.orEmpty(),
+                            if (esEvento) "GENERAL" else sector,
+                            cantidad,
+                        ).show(parentFragmentManager, "qr")
                     }
                 }
             } catch (e: Exception) {
@@ -455,7 +491,7 @@ class VentaFragment : Fragment() {
     private suspend fun guardarEImprimir(payload: com.mposw.entradas.data.StatusPayload) {
         val json = Gson().toJson(payload)
         payload.saleId?.let { AppDb.get(requireContext()).sales().upsert(ApprovedSale(it, json)) }
-        val elements = TicketRenderer.parseTemplate(session.templateJson)
+        val elements = TicketRenderer.parseTemplate(session.templateJsonFor(payload.templateId))
         val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
         val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
         if (!isAdded) return

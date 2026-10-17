@@ -32,6 +32,7 @@ class QrPagoFragment : DialogFragment() {
     private val qrUrl: String get() = requireArguments().getString("qrUrl") ?: ""
     private val total: String get() = requireArguments().getString("total") ?: ""
     private val fixtureId: String get() = requireArguments().getString("fixtureId") ?: ""
+    private val eventoId: String get() = requireArguments().getString("eventoId") ?: ""
     private val sector: String get() = requireArguments().getString("sector") ?: ""
     private val cantidad: Int get() = requireArguments().getInt("cantidad", 0)
 
@@ -65,20 +66,21 @@ class QrPagoFragment : DialogFragment() {
                 delay(2500)
                 try {
                     val p = repo.status(saleId)
-                    repo.syncTemplateIfNeeded(p.templateVersion, p.logoVersion)
+                    repo.syncTemplateIfNeeded(p.templateId, p.templateVersion, p.logoVersion)
                     val left = ((deadline - System.currentTimeMillis()) / 1000).toInt()
                     b.tvQrCountdown.text = "Esperando pago… ${left}s"
                     when (p.status) {
                         "APPROVED" -> {
                             val json = Gson().toJson(p)
                             AppDb.get(requireContext()).sales().upsert(ApprovedSale(saleId, json))
-                            val elements = TicketRenderer.parseTemplate(session.templateJson)
+                            val elements = TicketRenderer.parseTemplate(session.templateJsonFor(p.templateId))
                             val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
                             val printedOk = SunmiPrinter.printSale(requireContext(), p, elements, escudo).isSuccess
                             parentFragmentManager.setFragmentResult(
                                 "qr_aprobado",
                                 androidx.core.os.bundleOf(
                                     "fixtureId" to fixtureId,
+                                    "eventoId" to eventoId,
                                     "sector" to sector,
                                     "cantidad" to (if (cantidad > 0) cantidad else p.cantidad),
                                 ),
@@ -124,6 +126,7 @@ class QrPagoFragment : DialogFragment() {
             qrUrl: String?,
             total: String?,
             fixtureId: String = "",
+            eventoId: String = "",
             sector: String = "",
             cantidad: Int = 0,
         ): QrPagoFragment {
@@ -133,6 +136,7 @@ class QrPagoFragment : DialogFragment() {
                 putString("qrUrl", qrUrl)
                 putString("total", total)
                 putString("fixtureId", fixtureId)
+                putString("eventoId", eventoId)
                 putString("sector", sector)
                 putInt("cantidad", cantidad)
             }

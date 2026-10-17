@@ -1,17 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { memoryStorage } from 'multer';
@@ -21,6 +8,7 @@ import { RequireModule } from '../common/module-access.decorator';
 import { MAX_IMAGE_BYTES } from '../common/upload.constants';
 import { EntradasAdminService } from './entradas-admin.service';
 import { EntradasBeneficiosService } from './entradas-beneficios.service';
+import { CreateEventoDto, UpdateEventoDto } from './dto/create-evento.dto';
 import { CreateFixtureDto, UpdateFixtureDto } from './dto/create-fixture.dto';
 import { CreateRivalDto } from './dto/create-rival.dto';
 import { CreateTorneoDto } from './dto/create-torneo.dto';
@@ -100,6 +88,30 @@ export class EntradasAdminController {
     return this.admin.deleteFixture(id);
   }
 
+  // ── Eventos especiales (mismo permiso que fixtures: READ opera) ──
+  @Get('eventos')
+  eventos(@Query('from') from?: string, @Query('to') to?: string) {
+    return this.admin.listEventos(from, to);
+  }
+
+  @Post('eventos')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
+  createEvento(@Body() dto: CreateEventoDto) {
+    return this.admin.createEvento(dto);
+  }
+
+  @Patch('eventos/:id')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
+  updateEvento(@Param('id') id: string, @Body() dto: UpdateEventoDto) {
+    return this.admin.updateEvento(id, dto);
+  }
+
+  @Delete('eventos/:id')
+  @RequireModule(ModuleKey.ENTRADAS, ModuleAccess.READ)
+  deleteEvento(@Param('id') id: string) {
+    return this.admin.deleteEvento(id);
+  }
+
   // ── Dispositivos: movidos a DispositivosController (/dispositivos,
   // bajo CONFIGURACION). Ver device-lookup/dispositivos controllers.
 
@@ -172,13 +184,17 @@ export class EntradasAdminController {
 
   // ── Ventas ──
   @Get('sales')
-  sales(@Query('fixtureId') fixtureId?: string, @Query('status') status?: string) {
-    return this.admin.listSales(fixtureId, status);
+  sales(
+    @Query('fixtureId') fixtureId?: string,
+    @Query('eventoId') eventoId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.admin.listSales(fixtureId, eventoId, status);
   }
 
   @Get('sales/summary')
-  salesSummary(@Query('fixtureId') fixtureId: string) {
-    return this.admin.salesSummary(fixtureId);
+  salesSummary(@Query('fixtureId') fixtureId?: string, @Query('eventoId') eventoId?: string) {
+    return this.admin.salesSummary(fixtureId, eventoId);
   }
 
   // ── Template + escudo ──

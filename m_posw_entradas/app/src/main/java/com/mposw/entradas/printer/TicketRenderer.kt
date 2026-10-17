@@ -34,6 +34,20 @@ object TicketRenderer {
         TemplateElement("text", "{{beneficioNombre}} {{beneficioPorcentaje}}", "M", "center", true, true),
     )
 
+    fun defaultEventoElements(): List<TemplateElement> = listOf(
+        TemplateElement("logo", "{{escudo}}", null, "center", false, true),
+        TemplateElement("text", "{{club}}", "L", "center", true, true),
+        TemplateElement("text", "{{evento}}", "M", "center", true, true),
+        TemplateElement("text", "{{fecha}}", "M", "center", false, true),
+        TemplateElement("line", null, null, "center", false, true),
+        TemplateElement("text", "{{codigo}}", "XL", "center", true, true),
+        TemplateElement("qr", "{{codigo}}", null, "center", false, true),
+        TemplateElement("text", "\${{precioUnit}} x{{cantidad}} = \${{total}}", "M", "center", false, true),
+        TemplateElement("text", "{{footer}}", "S", "center", false, true),
+        TemplateElement("qr", "{{benefitQr}}", null, "center", false, true),
+        TemplateElement("text", "{{beneficioNombre}} {{beneficioPorcentaje}}", "M", "center", true, true),
+    )
+
     fun varsFor(p: StatusPayload, codigo: String): Map<String, String> {
         val d: DatosTicket? = p.datos
         // Beneficio de bufet de ESTA unidad (por codigo). Sin beneficio → vars vacías
@@ -47,6 +61,7 @@ object TicketRenderer {
             "club" to (d?.club ?: ""),
             "torneo" to (d?.torneo ?: ""),
             "rival" to (d?.rival ?: ""),
+            "evento" to (d?.evento ?: ""),
             "fecha" to fechaHora,
             "sector" to (d?.sector ?: ""),
             "codigo" to codigo,

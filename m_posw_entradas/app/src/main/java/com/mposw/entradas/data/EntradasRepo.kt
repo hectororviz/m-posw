@@ -15,9 +15,16 @@ class EntradasRepo(private val session: SessionManager) {
 
     suspend fun vigentes() = api.vigentes()
 
-    suspend fun intent(fixtureId: String, sector: String, cantidad: Int, method: String, socioUuid: String?): Pair<String, StatusPayload> {
+    suspend fun intent(
+        fixtureId: String?,
+        eventoId: String?,
+        sector: String?,
+        cantidad: Int,
+        method: String,
+        socioUuid: String?,
+    ): Pair<String, StatusPayload> {
         val reqId = UUID.randomUUID().toString()
-        val payload = api.intent(IntentRequest(fixtureId, sector, cantidad, method, socioUuid), reqId)
+        val payload = api.intent(IntentRequest(fixtureId, eventoId, sector, cantidad, method, socioUuid), reqId)
         return reqId to payload
     }
 
@@ -27,9 +34,15 @@ class EntradasRepo(private val session: SessionManager) {
 
     suspend fun socio(uuid: String) = api.socio(uuid.trim())
 
-    suspend fun syncTemplateIfNeeded(tplV: Int, logoV: Int) {
-        if (session.templateVersion != tplV || session.templateJson.isBlank()) {
-            val t = api.template()
+    suspend fun syncTemplateIfNeeded(templateId: String?, tplV: Int, logoV: Int) {
+        if (templateId == "evento") {
+            if (session.templateEventoVersion != tplV || session.templateEventoJson.isBlank()) {
+                val t = api.template("evento")
+                session.templateEventoJson = gson.toJson(t)
+                session.templateEventoVersion = t.version
+            }
+        } else if (session.templateVersion != tplV || session.templateJson.isBlank()) {
+            val t = api.template(null)
             session.templateJson = gson.toJson(t)
             session.templateVersion = t.version
         }
@@ -44,9 +57,12 @@ class EntradasRepo(private val session: SessionManager) {
     }
 
     suspend fun syncTemplateForce() {
-        val t = api.template()
+        val t = api.template(null)
         session.templateJson = gson.toJson(t)
         session.templateVersion = t.version
+        val te = api.template("evento")
+        session.templateEventoJson = gson.toJson(te)
+        session.templateEventoVersion = te.version
         val e = api.escudo()
         session.escudoBase64 = e.pngBase64 ?: ""
         session.logoVersion = e.version

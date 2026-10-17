@@ -8,12 +8,13 @@ import sharp = require('sharp');
 import { PrismaService } from '../common/prisma.service';
 import { validateImageFile } from '../common/image-storage';
 import { MercadoPagoOauthService } from '../mercadopago-oauth/mercadopago-oauth.service';
+import { CreateEventoDto, UpdateEventoDto } from './dto/create-evento.dto';
 import { CreateFixtureDto, UpdateFixtureDto } from './dto/create-fixture.dto';
 import { CreateRivalDto } from './dto/create-rival.dto';
 import { CreateTorneoDto } from './dto/create-torneo.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 import { generateDeviceToken, hashDeviceToken } from './device-token.util';
-import { DEFAULT_TICKET_LAYOUT, TICKET_WIDTH_COLS } from './ticket-template.const';
+import { TICKET_WIDTH_COLS, defaultLayoutFor, normalizeTemplateId } from './ticket-template.const';
 
 function startOfDayLocal(date: Date): Date {
   const d = new Date(date);
@@ -250,6 +251,80 @@ export class EntradasAdminService {
     return { id, deleted: true };
   }
 
+  // ── Eventos especiales (sin torneo ni rival) ────────────
+  listEventos(from?: string, to?: string) {
+    return this.prisma.entradaEvento.findMany({
+      where: {
+        ...(from || to
+          ? { fecha: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } }
+          : {}),
+      },
+      orderBy: [{ fecha: 'asc' }, { ventanaDesde: 'asc' }],
+      take: 500,
+    });
+  }
+
+  async createEvento(dto: CreateEventoDto) {
+    const titulo = dto.titulo.trim().slice(0, 32);
+    if (!titulo) throw new BadRequestException('Título requerido');
+    const defaults = defaultWindowFor(dto.fecha);
+    const ventanaDesde = dto.ventanaDesde ? new Date(dto.ventanaDesde) : defaults.ventanaDesde;
+    const ventanaHasta = dto.ventanaHasta ? new Date(dto.ventanaHasta) : defaults.ventanaHasta;
+    if (!(ventanaHasta > ventanaDesde)) {
+      throw new BadRequestException('La ventana de venta debe terminar después de empezar');
+    }
+    return this.prisma.entradaEvento.create({
+      data: {
+        titulo,
+        fecha: defaults.fecha,
+        precio: new Prisma.Decimal(dto.precio),
+        ventanaDesde,
+        ventanaHasta,
+        activo: dto.activo ?? true,
+      },
+    });
+  }
+
+  async updateEvento(id: string, dto: UpdateEventoDto) {
+    const evento = await this.prisma.entradaEvento.findUnique({ where: { id } });
+    if (!evento) throw new NotFoundException('Evento no encontrado');
+    const ventanaDesde = dto.ventanaDesde ? new Date(dto.ventanaDesde) : evento.ventanaDesde;
+    const ventanaHasta = dto.ventanaHasta ? new Date(dto.ventanaHasta) : evento.ventanaHasta;
+    if (!(ventanaHasta > ventanaDesde)) {
+      throw new BadRequestException('La ventana de venta debe terminar después de empezar');
+    }
+    return this.prisma.entradaEvento.update({
+      where: { id },
+      data: {
+        ...(dto.titulo !== undefined ? { titulo: dto.titulo.trim().slice(0, 32) } : {}),
+        ...(dto.precio !== undefined ? { precio: new Prisma.Decimal(dto.precio) } : {}),
+        ventanaDesde,
+        ventanaHasta,
+        ...(dto.activo !== undefined ? { activo: dto.activo } : {}),
+      },
+    });
+  }
+
+  async deleteEvento(id: string) {
+    const evento = await this.prisma.entradaEvento.findUnique({ where: { id } });
+    if (!evento) throw new NotFoundException('Evento no encontrado');
+    const [sales, units] = await Promise.all([
+      this.prisma.ticketSale.count({ where: { eventoId: id } }),
+      this.prisma.ticketUnit.count({ where: { eventoId: id } }),
+    ]);
+    if (sales > 0 || units > 0) {
+      throw new ConflictException({
+        code: 'EVENTO_CON_VENTAS',
+        message: 'No se puede eliminar: el evento ya tiene ventas registradas',
+      });
+    }
+    await this.prisma.$transaction([
+      this.prisma.entradaEventoContador.deleteMany({ where: { eventoId: id } }),
+      this.prisma.entradaEvento.delete({ where: { id } }),
+    ]);
+    return { id, deleted: true };
+  }
+
   // ── Dispositivos ─────────────────────────────────────────
   listDevices() {
     // Los revocados no se listan (baja lógica: TicketSale.deviceId impide borrar físicamente)
@@ -354,14 +429,16 @@ export class EntradasAdminService {
   }
 
   // ── Ventas (lectura + conteos) ───────────────────────────
-  async listSales(fixtureId?: string, status?: string) {
+  async listSales(fixtureId?: string, eventoId?: string, status?: string) {
     const sales = await this.prisma.ticketSale.findMany({
       where: {
         ...(fixtureId ? { fixtureId } : {}),
+        ...(eventoId ? { eventoId } : {}),
         ...(status ? { status: status as never } : {}),
       },
       include: {
         fixture: { include: { torneo: true, rival: true } },
+        evento: true,
         device: { select: { id: true, nombre: true } },
         units: {
           orderBy: { nro: 'asc' },
@@ -374,7 +451,21 @@ export class EntradasAdminService {
     return sales;
   }
 
-  async salesSummary(fixtureId: string) {
+  async salesSummary(fixtureId?: string, eventoId?: string) {
+    if (eventoId) {
+      const [total, units] = await Promise.all([
+        this.prisma.ticketSale.aggregate({
+          where: { eventoId, status: 'APPROVED' },
+          _sum: { total: true, cantidad: true },
+        }),
+        this.prisma.ticketUnit.count({ where: { eventoId } }),
+      ]);
+      return {
+        totalEntradas: total._sum.cantidad ?? 0,
+        recaudado: total._sum.total?.toString() ?? '0',
+        unidades: units,
+      };
+    }
     const [local, visitante, total] = await Promise.all([
       this.prisma.ticketUnit.count({ where: { fixtureId, sector: 'LOCAL' } }),
       this.prisma.ticketUnit.count({ where: { fixtureId, sector: 'VISITANTE' } }),
@@ -386,12 +477,13 @@ export class EntradasAdminService {
     return { local, visitante, totalEntradas: total._sum.cantidad ?? 0, recaudado: total._sum.total?.toString() ?? '0' };
   }
 
-  // ── Template ticket ──────────────────────────────────────
-  async getTemplate() {
-    const row = await this.prisma.entradaTicketTemplate.findUnique({ where: { id: 'default' } });
+  // ── Template ticket (uno por tipo: partido | evento) ──────
+  async getTemplate(rawId?: string) {
+    const id = normalizeTemplateId(rawId);
+    const row = await this.prisma.entradaTicketTemplate.findUnique({ where: { id } });
     if (row) return row;
     return this.prisma.entradaTicketTemplate.create({
-      data: { id: 'default', version: 1, widthCols: TICKET_WIDTH_COLS, layout: DEFAULT_TICKET_LAYOUT as Prisma.InputJsonValue },
+      data: { id, version: 1, widthCols: TICKET_WIDTH_COLS, layout: defaultLayoutFor(id) as Prisma.InputJsonValue },
     });
   }
 
@@ -399,14 +491,15 @@ export class EntradasAdminService {
     if (!Array.isArray(dto.elements) || dto.elements.length === 0 || dto.elements.length > 40) {
       throw new BadRequestException('El diseño debe tener entre 1 y 40 bloques');
     }
+    const id = normalizeTemplateId(dto.id);
     const widthCols = dto.widthCols ?? TICKET_WIDTH_COLS;
     const layout = { version: Date.now(), widthCols, elements: dto.elements } as Prisma.InputJsonValue;
-    const current = await this.prisma.entradaTicketTemplate.findUnique({ where: { id: 'default' } });
+    const current = await this.prisma.entradaTicketTemplate.findUnique({ where: { id } });
     if (!current) {
-      return this.prisma.entradaTicketTemplate.create({ data: { id: 'default', version: 1, widthCols, layout } });
+      return this.prisma.entradaTicketTemplate.create({ data: { id, version: 1, widthCols, layout } });
     }
     return this.prisma.entradaTicketTemplate.update({
-      where: { id: 'default' },
+      where: { id },
       data: { version: { increment: 1 }, widthCols, layout },
     });
   }

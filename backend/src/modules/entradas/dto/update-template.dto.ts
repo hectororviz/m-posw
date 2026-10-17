@@ -1,6 +1,10 @@
-import { IsArray, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class UpdateTemplateDto {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
   @IsOptional()
   @IsInt()
   @Min(20)

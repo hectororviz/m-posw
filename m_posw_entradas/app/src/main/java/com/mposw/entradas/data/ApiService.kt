@@ -5,6 +5,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     @GET("entradas/devices/me")
@@ -26,7 +27,7 @@ interface ApiService {
     suspend fun cancel(@Path("id") saleId: String): StatusPayload
 
     @GET("entradas/ticket-template")
-    suspend fun template(): TemplateResponse
+    suspend fun template(@Query("id") id: String? = null): TemplateResponse
 
     @GET("entradas/ticket-assets/escudo")
     suspend fun escudo(): EscudoResponse

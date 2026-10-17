@@ -153,6 +153,18 @@ class MainActivity : AppCompatActivity() {
         if (!::tvChipLocal.isInitialized) return
         tvChipLocal.text = "Local $local"
         tvChipVisitante.text = "Visitante $visitante"
+        tvChipVisitante.visibility = View.VISIBLE
+        if (::ultimosBar.isInitialized) {
+            val inHome = supportFragmentManager.backStackEntryCount == 0
+            ultimosBar.visibility =
+                if (inHome && currentMode == DeviceMode.ENTRADAS) View.VISIBLE else View.GONE
+        }
+    }
+
+    fun setUltimosEvento(total: Int) {
+        if (!::tvChipLocal.isInitialized) return
+        tvChipLocal.text = "General $total"
+        if (::tvChipVisitante.isInitialized) tvChipVisitante.visibility = View.GONE
         if (::ultimosBar.isInitialized) {
             val inHome = supportFragmentManager.backStackEntryCount == 0
             ultimosBar.visibility =

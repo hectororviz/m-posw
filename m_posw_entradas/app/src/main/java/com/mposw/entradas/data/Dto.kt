@@ -8,28 +8,38 @@ import com.google.gson.annotations.SerializedName
 data class VigentesResponse(
     val now: String?,
     val fixtures: List<FixtureVigente>? = null,
+    val eventos: List<FixtureVigente>? = null,
 )
 
 data class FixtureVigente(
-    val fixtureId: String,
+    val fixtureId: String = "",
+    val eventoId: String? = null,
+    val tipo: String? = null,
+    val titulo: String? = null,
     val fecha: String?,
-    val torneo: String,
+    val torneo: String? = null,
     val torneoId: String?,
-    val rival: String,
+    val rival: String? = null,
     val rivalId: String?,
     val precio: String,
     val vendidosL: Int = 0,
     val vendidosV: Int = 0,
+    val vendidos: Int = 0,
     val ventanaDesde: String?,
     val ventanaHasta: String?,
 ) {
+    val esEvento: Boolean get() = tipo == "EVENTO" || !eventoId.isNullOrBlank()
+    val displayTitulo: String
+        get() = if (esEvento) titulo.orEmpty().ifBlank { "Evento" } else "${torneo.orEmpty()} vs ${rival.orEmpty()}".trim()
     val precioDouble: Double get() = precio.toDoubleOrNull() ?: 0.0
-    override fun toString(): String = "$torneo vs $rival"
+    val totalVendidos: Int get() = if (esEvento) vendidos else vendidosL + vendidosV
+    override fun toString(): String = displayTitulo
 }
 
 data class IntentRequest(
-    val fixtureId: String,
-    val sector: String,
+    val fixtureId: String?,
+    val eventoId: String?,
+    val sector: String?,
     val cantidad: Int,
     val paymentMethod: String,
     val socioUuid: String?,
@@ -38,6 +48,8 @@ data class IntentRequest(
 data class StatusPayload(
     val saleId: String?,
     val status: String?,
+    val tipo: String? = null,
+    val eventoId: String? = null,
     val codigos: List<String>? = emptyList(),
     val cantidad: Int = 0,
     val precioUnit: String? = "0",
@@ -46,6 +58,7 @@ data class StatusPayload(
     val paymentMethod: String?,
     val datos: DatosTicket?,
     val qrImageUrl: String?,
+    val templateId: String? = null,
     val templateVersion: Int = 1,
     val logoVersion: Int = 1,
     val beneficios: List<SaleBeneficio>? = null,
@@ -66,6 +79,7 @@ data class DatosTicket(
     val club: String?,
     val torneo: String?,
     val rival: String?,
+    val evento: String?,
     val fecha: String?,
     val sector: String?,
     val ventaId: String?,

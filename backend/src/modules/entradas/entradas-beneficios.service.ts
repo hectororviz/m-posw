@@ -21,7 +21,8 @@ export function normalizeBenefitCode(input: string): string {
   return clean.startsWith('ENT:') ? clean.slice(4) : clean;
 }
 
-function scopesFor(sector: EntradaSector): EntradaBeneficioSector[] {
+function scopesFor(sector: EntradaSector | null | undefined): EntradaBeneficioSector[] {
+  if (!sector) return [EntradaBeneficioSector.AMBAS];
   return sector === 'LOCAL'
     ? [EntradaBeneficioSector.LOCAL, EntradaBeneficioSector.AMBAS]
     : [EntradaBeneficioSector.VISITANTE, EntradaBeneficioSector.AMBAS];
@@ -105,7 +106,8 @@ export class EntradasBeneficiosService {
 
   // ── Asignación automática por sector (al aprobar la venta) ──
   // MVP: un beneficio por entrada — el de mayor porcentaje entre los activos del sector.
-  async pickForSector(sector: EntradaSector) {
+  // Eventos (sector null): solo aplican los de alcance AMBAS.
+  async pickForSector(sector: EntradaSector | null | undefined) {
     const rows = await this.prisma.entradaBeneficio.findMany({
       where: { activo: true, sector: { in: scopesFor(sector) } },
       orderBy: { porcentaje: 'desc' },
@@ -129,6 +131,7 @@ export class EntradasBeneficiosService {
           },
         },
         fixture: { include: { torneo: true, rival: true } },
+        evento: true,
         sale: { select: { id: true, status: true } },
       },
     });
@@ -147,12 +150,21 @@ export class EntradasBeneficiosService {
       code,
       codigo: unit.codigo,
       sector: unit.sector,
-      fixture: {
-        id: unit.fixtureId,
-        torneo: unit.fixture.torneo.nombre,
-        rival: unit.fixture.rival.nombre,
-        fecha: unit.fixture.fecha,
-      },
+      fixture: unit.fixtureId
+        ? {
+            id: unit.fixtureId,
+            torneo: unit.fixture?.torneo.nombre ?? '',
+            rival: unit.fixture?.rival.nombre ?? '',
+            fecha: unit.fixture?.fecha ?? null,
+          }
+        : null,
+      evento: unit.eventoId
+        ? {
+            id: unit.eventoId,
+            titulo: unit.evento?.titulo ?? '',
+            fecha: unit.evento?.fecha ?? null,
+          }
+        : null,
       venta: { id: unit.sale.id, status: unit.sale.status },
       beneficio: {
         id: unit.beneficio.id,

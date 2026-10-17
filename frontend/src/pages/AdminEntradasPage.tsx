@@ -5,6 +5,7 @@ import { apiClient, normalizeApiError } from '../api/client';
 import {
   useAdminProducts,
   useCategories,
+  useEntradaEventos,
   useEntradaFixtures,
   useEntradaRivales,
   useEntradaTicketTemplate,
@@ -14,12 +15,11 @@ import {
   useInternetPlans,
   useInvalidateEntradas,
   useTicketSales,
-  consumirEntradaBeneficio,
-  validarEntradaBeneficio,
 } from '../api/queries';
-import type { EntradaBeneficio, EntradaBeneficioSector, EntradaBeneficioValidation, EntradaFixture, EntradaSaleStatus } from '../api/types';
+import type { EntradaBeneficio, EntradaBeneficioSector, EntradaEvento, EntradaFixture, EntradaSaleStatus, TicketSale } from '../api/types';
 import { useToast } from '../components/ToastProvider';
 import { ConfirmDialog } from '../components/ui/Modal';
+import { SegmentedControl } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageLayout';
 import { Tabs } from '../components/ui/Tabs';
 import { useModuleAccess } from '../hooks/useModuleAccess';
@@ -73,26 +73,37 @@ export const AdminEntradasPage: React.FC = () => {
 
 // ── Ventas ───────────────────────────────────────────────────
 const VentasTab: React.FC<{ canWrite: boolean }> = () => {
-  const [fixtureId, setFixtureId] = useState('');
+  const [sel, setSel] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const { data: fixtures } = useEntradaFixtures();
-  const { data: sales, isLoading } = useTicketSales(fixtureId || undefined);
-  const { data: summary } = useEntradasSalesSummary(fixtureId || undefined);
+  const { data: eventos } = useEntradaEventos();
+  const esEventoSel = sel.startsWith('E:');
+  const fixtureId = sel.startsWith('P:') ? sel.slice(2) : undefined;
+  const eventoId = esEventoSel ? sel.slice(2) : undefined;
+  const { data: sales, isLoading } = useTicketSales(fixtureId, eventoId);
+  const { data: summary } = useEntradasSalesSummary(fixtureId, eventoId);
 
-  const options = useMemo(() => (fixtures ?? []).slice(-60), [fixtures]);
   const rows = useMemo(
     () => (sales ?? []).filter((s) => !statusFilter || s.status === statusFilter),
     [sales, statusFilter],
   );
 
+  const tituloDe = (s: TicketSale) =>
+    s.evento ? s.evento.titulo : `${s.fixture?.torneo.nombre ?? '—'} vs ${s.fixture?.rival.nombre ?? '—'}`;
+
   return (
     <div className="admin-page">
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-        <select value={fixtureId} onChange={(e) => setFixtureId(e.target.value)} style={{ minWidth: 260 }}>
-          <option value="">Partido: todos (últimas 500)</option>
-          {options.map((f) => (
-            <option key={f.id} value={f.id}>
+        <select value={sel} onChange={(e) => setSel(e.target.value)} style={{ minWidth: 260 }}>
+          <option value="">Partido/evento: todos (últimas 500)</option>
+          {(fixtures ?? []).slice(-60).map((f) => (
+            <option key={`P:${f.id}`} value={`P:${f.id}`}>
               {fmtFecha(f.fecha)} · {f.torneo.nombre} vs {f.rival.nombre}
+            </option>
+          ))}
+          {(eventos ?? []).slice(-60).map((e) => (
+            <option key={`E:${e.id}`} value={`E:${e.id}`}>
+              {fmtFecha(e.fecha)} · ★ {e.titulo}
             </option>
           ))}
         </select>
@@ -104,11 +115,22 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
         </select>
       </div>
 
-      {summary && fixtureId && (
+      {summary && sel && (
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {!esEventoSel && summary.local !== undefined && summary.visitante !== undefined && (
+            <>
+              <div style={{ background: 'var(--color-surface-alt)', borderRadius: 8, padding: '0.6rem 1rem', minWidth: 150 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Entradas locales</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{`${summary.local} entrada${summary.local === 1 ? '' : 's'}`}</div>
+              </div>
+              <div style={{ background: 'var(--color-surface-alt)', borderRadius: 8, padding: '0.6rem 1rem', minWidth: 150 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Entradas visitantes</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{`${summary.visitante} entrada${summary.visitante === 1 ? '' : 's'}`}</div>
+              </div>
+            </>
+          )}
           {[
-            { label: 'Entradas locales', value: `${summary.local} entrada${summary.local === 1 ? '' : 's'}` },
-            { label: 'Entradas visitantes', value: `${summary.visitante} entrada${summary.visitante === 1 ? '' : 's'}` },
+            { label: 'Total entradas', value: `${summary.totalEntradas}` },
             {
               label: 'Recaudado',
               value: formatMoney(summary.recaudado || 0),
@@ -126,7 +148,7 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
         <div className="sales-table">
           <div className="sales-table-head">
             <span className="col-date" style={{ flex: '0 0 130px' }}>Fecha</span>
-            <span className="col-user" style={{ flex: 2 }}>Partido</span>
+            <span className="col-user" style={{ flex: 2 }}>Partido / Evento</span>
             <span className="col-method" style={{ flex: '0 0 90px' }}>Sector</span>
             <span className="col-num" style={{ flex: '0 0 50px' }}>Cant</span>
             <span className="col-user" style={{ flex: 2 }}>Códigos</span>
@@ -142,8 +164,8 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
             rows.map((s) => (
               <div key={s.id} className="sales-table-row">
                 <span className="col-date" style={{ flex: '0 0 130px' }}>{fmtDateTime(s.createdAt)}</span>
-                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{s.fixture.torneo.nombre} vs {s.fixture.rival.nombre}</span>
-                <span className="col-method" style={{ flex: '0 0 90px' }}>{s.sector}</span>
+                <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{tituloDe(s)}</span>
+                <span className="col-method" style={{ flex: '0 0 90px' }}>{s.sector ?? 'GENERAL'}</span>
                 <span className="col-num" style={{ flex: '0 0 50px', textAlign: 'center' }}>{s.cantidad}</span>
                 <span className="col-user" style={{ flex: 2, fontFamily: 'monospace', fontSize: '0.8rem' }}>
                   {s.units.map((u) => u.codigo).join(', ')}
@@ -161,93 +183,6 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
       <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
         <span>Mostrando {rows.length} ventas</span>
       </div>
-
-      <ValidadorBeneficio />
-    </div>
-  );
-};
-
-// ── Validador de beneficios (bufet/puerta: valida con READ, sin FULL) ──
-const ValidadorBeneficio: React.FC = () => {
-  const { pushToast } = useToast();
-  const [code, setCode] = useState('');
-  const [result, setResult] = useState<EntradaBeneficioValidation | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const validar = async () => {
-    if (!code.trim()) return;
-    setBusy(true);
-    try {
-      const data = await validarEntradaBeneficio(code);
-      setResult(data);
-    } catch (e) {
-      setResult(null);
-      pushToast(normalizeApiError(e), 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const consumir = async () => {
-    if (!code.trim()) return;
-    setBusy(true);
-    try {
-      await consumirEntradaBeneficio(code);
-      pushToast('Beneficio consumido', 'success');
-      const data = await validarEntradaBeneficio(code);
-      setResult(data);
-    } catch (e) {
-      pushToast(normalizeApiError(e), 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const destino = result
-    ? result.beneficio.destino.categoria?.name
-      ?? result.beneficio.destino.producto?.name
-      ?? result.beneficio.destino.internetPlan?.name
-      ?? '—'
-    : null;
-
-  return (
-    <div className="settings-section" style={{ marginTop: '1.25rem' }}>
-      <h3 style={{ margin: '0 0 0.25rem' }}>Validar beneficio de bufet</h3>
-      <p style={{ margin: '0 0 0.75rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-        Escaneá o cargá el QR de la entrada (<span style={{ fontFamily: 'monospace' }}>ENT:XXXXXXXXXX</span>).
-      </p>
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <input
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          onKeyDown={(e) => { if (e.key === 'Enter') validar(); }}
-          placeholder="ENT:..."
-          style={{ fontFamily: 'monospace', minWidth: 220 }}
-        />
-        <button type="button" className="btn-ghost" onClick={validar} disabled={busy || !code.trim()}>
-          {busy ? '...' : 'Validar'}
-        </button>
-        {result?.disponible && (
-          <button type="button" className="btn-primary" onClick={consumir} disabled={busy}>
-            Consumir
-          </button>
-        )}
-      </div>
-      {result && (
-        <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          {result.disponible
-            ? <span className="badge badge-success">Válido</span>
-            : <span className="badge badge-neutral">{result.consumido ? 'Consumido' : 'No disponible'}</span>}
-          <span><strong>{result.beneficio.nombre}</strong> ({result.beneficio.porcentaje}% en {destino})</span>
-          <span style={{ color: 'var(--color-text-muted)' }}>
-            {result.codigo} · {result.sector} · {result.fixture.torneo} vs {result.fixture.rival}
-            {result.beneficio.usoUnico ? ' · uso único' : ' · multiuso'}
-          </span>
-          {result.motivoNoDisponible && (
-            <span style={{ color: 'var(--color-danger-text)' }}>{result.motivoNoDisponible}</span>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -290,32 +225,72 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const toDate = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0);
   const to = `${month}-${String(toDate.getDate()).padStart(2, '0')}`;
   const { data: fixtures, isLoading } = useEntradaFixtures(from, to);
+  const { data: eventos, isLoading: isLoadingEventos } = useEntradaEventos(from, to);
   const { data: torneos } = useEntradaTorneos();
   const { data: rivales } = useEntradaRivales();
   const [showCreate, setShowCreate] = useState(false);
+  const [kind, setKind] = useState<'PARTIDO' | 'ESPECIAL'>('PARTIDO');
   const [form, setForm] = useState({ fecha: todayISO(), torneoId: '', rivalId: '' });
+  const [eform, setEform] = useState({ titulo: '', fecha: todayISO(), precio: '' });
   const [editing, setEditing] = useState<EntradaFixture | null>(null);
+  const [editingEvento, setEditingEvento] = useState<EntradaEvento | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EntradaFixture | null>(null);
+  const [deleteEventoTarget, setDeleteEventoTarget] = useState<EntradaEvento | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [ventana, setVentana] = useState({ desde: '', hasta: '' });
+  const [eprecio, setEprecio] = useState('');
+  const [etitulo, setEtitulo] = useState('');
 
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
   const now = Date.now();
 
+  type CalItem =
+    | { kind: 'PARTIDO'; key: string; fecha: string; titulo: string; subtitulo: string; ventanaDesde: string; ventanaHasta: string; activo: boolean; raw: EntradaFixture }
+    | { kind: 'ESPECIAL'; key: string; fecha: string; titulo: string; subtitulo: string; ventanaDesde: string; ventanaHasta: string; activo: boolean; raw: EntradaEvento };
+
   const ordenados = useMemo(() => {
-    const arr = [...(fixtures ?? [])];
-    const rank = (f: EntradaFixture) => (fixtureEstado(f, now) === 'EN_CURSO' ? 0 : fixtureEstado(f, now) === 'PROGRAMADO' ? 1 : 2);
-    arr.sort((a, b) => {
+    const items: CalItem[] = [
+      ...((fixtures ?? []).map((f): CalItem => ({
+        kind: 'PARTIDO', key: `P:${f.id}`, fecha: f.fecha,
+        titulo: `${f.torneo.nombre} vs ${f.rival.nombre}`, subtitulo: `$${f.torneo.precio}`,
+        ventanaDesde: f.ventanaDesde, ventanaHasta: f.ventanaHasta, activo: f.activo, raw: f,
+      }))),
+      ...((eventos ?? []).map((e): CalItem => ({
+        kind: 'ESPECIAL', key: `E:${e.id}`, fecha: e.fecha,
+        titulo: `★ ${e.titulo}`, subtitulo: `$${e.precio}`,
+        ventanaDesde: e.ventanaDesde, ventanaHasta: e.ventanaHasta, activo: e.activo, raw: e,
+      }))),
+    ];
+    const rank = (i: CalItem) => (fixtureEstado({ ventanaDesde: i.ventanaDesde, ventanaHasta: i.ventanaHasta } as EntradaFixture, now) === 'EN_CURSO' ? 0 : fixtureEstado({ ventanaDesde: i.ventanaDesde, ventanaHasta: i.ventanaHasta } as EntradaFixture, now) === 'PROGRAMADO' ? 1 : 2);
+    items.sort((a, b) => {
       const r = rank(a) - rank(b);
       if (r !== 0) return r;
       const fa = new Date(a.ventanaDesde).getTime();
       const fb = new Date(b.ventanaDesde).getTime();
       return rank(a) === 2 ? fb - fa : fa - fb;
     });
-    return arr;
-  }, [fixtures, now]);
+    return items;
+  }, [fixtures, eventos, now]);
 
   const submitCreate = async () => {
+    if (kind === 'ESPECIAL') {
+      if (!eform.titulo.trim() || !eform.fecha || !eform.precio) {
+        pushToast('Completá título, fecha y precio', 'error');
+        return;
+      }
+      try {
+        await apiClient.post('/entradas/eventos', {
+          titulo: eform.titulo.trim().slice(0, 32),
+          fecha: eform.fecha,
+          precio: Number(eform.precio),
+        });
+        pushToast('Evento creado (ventana default 06:00 → 05:59+1)', 'success');
+        setShowCreate(false);
+        setEform({ titulo: '', fecha: todayISO(), precio: '' });
+        invalidate();
+      } catch (e) { err(e); }
+      return;
+    }
     if (!form.fecha || !form.torneoId || !form.rivalId) {
       pushToast('Completá fecha, torneo y rival', 'error');
       return;
@@ -334,6 +309,13 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     setVentana({ desde: toLocalInput(f.ventanaDesde), hasta: toLocalInput(f.ventanaHasta) });
   };
 
+  const openEditEvento = (e: EntradaEvento) => {
+    setEditingEvento(e);
+    setVentana({ desde: toLocalInput(e.ventanaDesde), hasta: toLocalInput(e.ventanaHasta) });
+    setEprecio(String(e.precio));
+    setEtitulo(e.titulo);
+  };
+
   const submitEdit = async () => {
     if (!editing) return;
     try {
@@ -347,9 +329,31 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     } catch (e) { err(e); }
   };
 
+  const submitEditEvento = async () => {
+    if (!editingEvento) return;
+    try {
+      await apiClient.patch(`/entradas/eventos/${editingEvento.id}`, {
+        titulo: etitulo.trim().slice(0, 32),
+        precio: eprecio ? Number(eprecio) : undefined,
+        ventanaDesde: ventana.desde ? new Date(ventana.desde).toISOString() : undefined,
+        ventanaHasta: ventana.hasta ? new Date(ventana.hasta).toISOString() : undefined,
+      });
+      pushToast('Evento actualizado', 'success');
+      setEditingEvento(null);
+      invalidate();
+    } catch (e) { err(e); }
+  };
+
   const toggleActive = async (f: EntradaFixture) => {
     try {
       await apiClient.patch(`/entradas/fixtures/${f.id}`, { activo: !f.activo });
+      invalidate();
+    } catch (e) { err(e); }
+  };
+
+  const toggleActiveEvento = async (e: EntradaEvento) => {
+    try {
+      await apiClient.patch(`/entradas/eventos/${e.id}`, { activo: !e.activo });
       invalidate();
     } catch (e) { err(e); }
   };
@@ -364,32 +368,32 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
         <div className="sales-table">
           <div className="sales-table-head">
             <span className="col-date" style={{ flex: '0 0 130px' }}>Fecha</span>
-            <span className="col-user" style={{ flex: 1 }}>Torneo</span>
-            <span className="col-user" style={{ flex: 1 }}>Rival</span>
+            <span className="col-method" style={{ flex: '0 0 90px' }}>Tipo</span>
+            <span className="col-user" style={{ flex: 2 }}>Partido / Evento</span>
             <span className="col-date" style={{ flex: '0 0 150px' }}>Horario</span>
             <span className="col-method" style={{ flex: '0 0 110px' }}>Estado</span>
             {canWrite && <span className="col-action" style={{ flex: '0 0 120px', textAlign: 'right' }}></span>}
           </div>
-          {isLoading ? (
+          {isLoading || isLoadingEventos ? (
             <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Cargando...</span></div>
           ) : ordenados.length === 0 ? (
-            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin partidos este mes</span></div>
+            <div className="sales-table-row"><span style={{ padding: '1rem', color: 'var(--color-text-muted)' }}>Sin partidos ni eventos este mes</span></div>
           ) : (
-            ordenados.map((f) => {
-              const estado = fixtureEstado(f, now);
+            ordenados.map((item) => {
+              const estado = fixtureEstado({ ventanaDesde: item.ventanaDesde, ventanaHasta: item.ventanaHasta } as EntradaFixture, now);
               const jugado = estado === 'JUGADO';
               return (
-                <div key={f.id} className="sales-table-row" style={jugado ? { opacity: 0.55 } : undefined}>
-                  <span className="col-date" style={{ flex: '0 0 130px' }}>{fmtFecha(f.fecha)}</span>
-                  <span className="col-user" style={{ flex: 1, fontWeight: 500 }}>{f.torneo.nombre} <small style={{ color: 'var(--color-text-muted)' }}>(${f.torneo.precio})</small></span>
-                  <span className="col-user" style={{ flex: 1 }}>{f.rival.nombre}</span>
-                  <span className="col-date" style={{ flex: '0 0 150px' }}>{fmtHora(f.ventanaDesde)} → {fmtHora(f.ventanaHasta)}</span>
+                <div key={item.key} className="sales-table-row" style={jugado ? { opacity: 0.55 } : undefined}>
+                  <span className="col-date" style={{ flex: '0 0 130px' }}>{fmtFecha(item.fecha)}</span>
+                  <span className="col-method" style={{ flex: '0 0 90px' }}>{item.kind === 'ESPECIAL' ? '★ Especial' : 'Partido'}</span>
+                  <span className="col-user" style={{ flex: 2, fontWeight: 500 }}>{item.titulo} <small style={{ color: 'var(--color-text-muted)' }}>({item.subtitulo})</small></span>
+                  <span className="col-date" style={{ flex: '0 0 150px' }}>{fmtHora(item.ventanaDesde)} → {fmtHora(item.ventanaHasta)}</span>
                   <span className="col-method" style={{ flex: '0 0 110px' }}><FixtureBadge estado={estado} /></span>
                   {canWrite && (
                     <span className="col-action" style={{ flex: '0 0 120px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.25rem' }}>
-                      <button className="btn-ghost" disabled={jugado} onClick={() => openEdit(f)} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
-                      <button className="btn-ghost" disabled={jugado} onClick={() => toggleActive(f)} title={f.activo ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>{f.activo ? <EyeOff size={14} /> : <Eye size={14} />}</button>
-                      <button className="btn-ghost" onClick={() => setDeleteTarget(f)} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
+                      <button className="btn-ghost" disabled={jugado} onClick={() => item.kind === 'PARTIDO' ? openEdit(item.raw as EntradaFixture) : openEditEvento(item.raw as EntradaEvento)} title="Editar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}><Pencil size={14} /></button>
+                      <button className="btn-ghost" disabled={jugado} onClick={() => item.kind === 'PARTIDO' ? toggleActive(item.raw as EntradaFixture) : toggleActiveEvento(item.raw as EntradaEvento)} title={item.activo ? 'Desactivar' : 'Activar'} style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem' }}>{item.activo ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                      <button className="btn-ghost" onClick={() => item.kind === 'PARTIDO' ? setDeleteTarget(item.raw as EntradaFixture) : setDeleteEventoTarget(item.raw as EntradaEvento)} title="Eliminar" style={{ padding: '0.3rem 0.4rem', fontSize: '0.8rem', color: 'var(--color-danger)' }}><Trash2 size={14} /></button>
                     </span>
                   )}
                 </div>
@@ -400,11 +404,11 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
       </div>
 
       <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-        <span>Mostrando {ordenados.length} partidos</span>
+        <span>Mostrando {ordenados.length} partidos/eventos</span>
       </div>
 
       {canWrite && (
-        <button type="button" className="fab-button-v2" onClick={() => setShowCreate(true)} aria-label="Nuevo partido" title="Nuevo partido">
+        <button type="button" className="fab-button-v2" onClick={() => setShowCreate(true)} aria-label="Nuevo partido o evento" title="Nuevo partido o evento">
           <Plus size={24} />
         </button>
       )}
@@ -412,28 +416,54 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
         <div className="modal-backdrop" onClick={() => setShowCreate(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-header">
-              <h3>Nuevo partido</h3>
+              <h3>{kind === 'ESPECIAL' ? 'Nuevo evento' : 'Nuevo partido'}</h3>
               <button className="icon-button" onClick={() => setShowCreate(false)}><X size={16} /></button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div className="settings-field"><label>Fecha</label>
-                  <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-                </div>
-                <div className="settings-field"><label>Torneo</label>
-                  <select value={form.torneoId} onChange={(e) => setForm({ ...form, torneoId: e.target.value })}>
-                    <option value="">Seleccionar</option>
-                    {(torneos ?? []).filter((t) => t.activo).map((t) => <option key={t.id} value={t.id}>{t.nombre} (${t.precio})</option>)}
-                  </select>
-                </div>
-                <div className="settings-field"><label>Rival</label>
-                  <select value={form.rivalId} onChange={(e) => setForm({ ...form, rivalId: e.target.value })}>
-                    <option value="">Seleccionar</option>
-                    {(rivales ?? []).filter((r) => r.activo).map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                  </select>
-                </div>
-                <button type="button" className="btn-primary btn-sm" onClick={submitCreate}>Guardar</button>
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <SegmentedControl
+                  options={[
+                    { value: 'PARTIDO', label: 'Torneo' },
+                    { value: 'ESPECIAL', label: 'Especial' },
+                  ]}
+                  value={kind}
+                  onChange={(v) => setKind(v as 'PARTIDO' | 'ESPECIAL')}
+                />
               </div>
+              {kind === 'ESPECIAL' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="settings-field"><label>Título (máx. 32 caracteres)</label>
+                    <input value={eform.titulo} maxLength={32} onChange={(e) => setEform({ ...eform, titulo: e.target.value })} placeholder="Mini torneo U12" />
+                    <small>{eform.titulo.length}/32</small>
+                  </div>
+                  <div className="settings-field"><label>Fecha</label>
+                    <input type="date" value={eform.fecha} onChange={(e) => setEform({ ...eform, fecha: e.target.value })} />
+                  </div>
+                  <div className="settings-field"><label>Precio de la entrada</label>
+                    <input value={eform.precio} onChange={(e) => setEform({ ...eform, precio: e.target.value })} placeholder="1500" inputMode="decimal" />
+                  </div>
+                  <button type="button" className="btn-primary btn-sm" onClick={submitCreate}>Guardar</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="settings-field"><label>Fecha</label>
+                    <input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+                  </div>
+                  <div className="settings-field"><label>Torneo</label>
+                    <select value={form.torneoId} onChange={(e) => setForm({ ...form, torneoId: e.target.value })}>
+                      <option value="">Seleccionar</option>
+                      {(torneos ?? []).filter((t) => t.activo).map((t) => <option key={t.id} value={t.id}>{t.nombre} (${t.precio})</option>)}
+                    </select>
+                  </div>
+                  <div className="settings-field"><label>Rival</label>
+                    <select value={form.rivalId} onChange={(e) => setForm({ ...form, rivalId: e.target.value })}>
+                      <option value="">Seleccionar</option>
+                      {(rivales ?? []).filter((r) => r.activo).map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                    </select>
+                  </div>
+                  <button type="button" className="btn-primary btn-sm" onClick={submitCreate}>Guardar</button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -460,6 +490,34 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
           </div>
         </div>
       )}
+      {editingEvento && (
+        <div className="modal-backdrop" onClick={() => setEditingEvento(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>Editar evento</h3>
+              <button className="icon-button" onClick={() => setEditingEvento(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div className="settings-field"><label>Título (máx. 32 caracteres)</label>
+                  <input value={etitulo} maxLength={32} onChange={(e) => setEtitulo(e.target.value)} />
+                  <small>{etitulo.length}/32</small>
+                </div>
+                <div className="settings-field"><label>Precio</label>
+                  <input value={eprecio} onChange={(e) => setEprecio(e.target.value)} inputMode="decimal" />
+                </div>
+                <div className="settings-field"><label>Desde</label>
+                  <input type="datetime-local" value={ventana.desde} onChange={(e) => setVentana({ ...ventana, desde: e.target.value })} />
+                </div>
+                <div className="settings-field"><label>Hasta</label>
+                  <input type="datetime-local" value={ventana.hasta} onChange={(e) => setVentana({ ...ventana, hasta: e.target.value })} />
+                </div>
+                <button type="button" className="btn-primary btn-sm" onClick={submitEditEvento}>Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {deleteTarget && (
         <ConfirmDialog
           title="Eliminar el partido"
@@ -474,6 +532,24 @@ const CalendarioTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
               pushToast('Partido eliminado', 'success');
               invalidate();
               setDeleteTarget(null);
+            } catch (e) { err(e); } finally { setDeleting(false); }
+          }}
+        />
+      )}
+      {deleteEventoTarget && (
+        <ConfirmDialog
+          title="Eliminar el evento"
+          message={`Se eliminará "${deleteEventoTarget.titulo}" (${fmtFecha(deleteEventoTarget.fecha)}). Solo es posible si aún no tiene ventas.`}
+          confirmLabel="Eliminar"
+          busy={deleting}
+          onCancel={() => { if (!deleting) setDeleteEventoTarget(null); }}
+          onConfirm={async () => {
+            setDeleting(true);
+            try {
+              await apiClient.delete(`/entradas/eventos/${deleteEventoTarget.id}`);
+              pushToast('Evento eliminado', 'success');
+              invalidate();
+              setDeleteEventoTarget(null);
             } catch (e) { err(e); } finally { setDeleting(false); }
           }}
         />
@@ -662,7 +738,7 @@ const AbmTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
 
 // ── POS Mercado Pago dedicado ────────────────────────────────
 // ── Diseño (editor + preview en vivo) ──────────────────────────
-const PREVIEW_SAMPLE: Record<string, string> = {
+const PREVIEW_SAMPLE_PARTIDO: Record<string, string> = {
   club: 'Club Atlético Soler',
   torneo: 'Femenino',
   rival: 'Mundialito',
@@ -684,12 +760,20 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   escudo: '',
 };
 
-const substituteVars = (value: string) =>
-  value.replace(/\{\{(\w+)\}\}/g, (_, key: string) => PREVIEW_SAMPLE[key] ?? `{{${key}}}`);
+const PREVIEW_SAMPLE_EVENTO: Record<string, string> = {
+  ...PREVIEW_SAMPLE_PARTIDO,
+  evento: 'Mini torneo U12',
+  codigo: 'E-007',
+  codigos: 'E-007',
+  sector: 'GENERAL',
+};
+
+const substituteVars = (value: string, sample: Record<string, string> = PREVIEW_SAMPLE_PARTIDO) =>
+  value.replace(/\{\{(\w+)\}\}/g, (_, key: string) => sample[key] ?? `{{${key}}}`);
 
 const PREVIEW_FONT_SIZE: Record<string, number> = { S: 11, M: 14, L: 18, XL: 26 };
 
-const TicketPreview: React.FC<{ elements: Array<Record<string, unknown>>; escudoBase64: string | null }> = ({ elements, escudoBase64 }) => (
+const TicketPreview: React.FC<{ elements: Array<Record<string, unknown>>; escudoBase64: string | null; sample?: Record<string, string> }> = ({ elements, escudoBase64, sample }) => (
   <div style={{ background: '#fff', color: '#000', width: 300, padding: '12px 10px', fontFamily: 'monospace, monospace', borderRadius: 4, boxShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
     {elements.filter((el) => el.enabled !== false).map((el, i) => {
       const type = String(el.type ?? '');
@@ -708,7 +792,7 @@ const TicketPreview: React.FC<{ elements: Array<Record<string, unknown>>; escudo
         );
       }
       if (type === 'qr') {
-        const value = substituteVars(String(el.value ?? ''));
+        const value = substituteVars(String(el.value ?? ''), sample);
         return (
           <div key={i} style={{ textAlign: align as never, margin: '6px 0' }}>
             <div style={{ display: 'inline-block', border: '2px solid #000', padding: 6, fontSize: 10, lineHeight: 1.4 }}>
@@ -721,7 +805,7 @@ const TicketPreview: React.FC<{ elements: Array<Record<string, unknown>>; escudo
       const size = PREVIEW_FONT_SIZE[String(el.size ?? 'M')] ?? 14;
       return (
         <div key={i} style={{ textAlign: align as never, fontSize: size, fontWeight: el.bold ? 'bold' : 'normal', margin: '2px 0', wordBreak: 'break-word' }}>
-          {substituteVars(String(el.value ?? ''))}
+          {substituteVars(String(el.value ?? ''), sample)}
         </div>
       );
     })}
@@ -996,14 +1080,20 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
   const { pushToast } = useToast();
   const invalidate = useInvalidateEntradas();
   const queryClient = useQueryClient();
-  const { data: template } = useEntradaTicketTemplate();
-  const [elements, setElements] = useState<Array<Record<string, unknown>> | null>(null);
+  const [templateId, setTemplateId] = useState<'default' | 'evento'>('default');
+  const { data: template } = useEntradaTicketTemplate(templateId);
+  const [buffers, setBuffers] = useState<Record<string, Array<Record<string, unknown>> | undefined>>({});
   const [escudoWidth, setEscudoWidth] = useState('256');
   const [escudoFile, setEscudoFile] = useState<File | null>(null);
   const [escudoDims, setEscudoDims] = useState<{ w: number; h: number } | null>(null);
   const err = (e: unknown) => pushToast(normalizeApiError(e), 'error');
 
-  const currentElements = elements ?? (template?.layout.elements as Array<Record<string, unknown>> | undefined) ?? [];
+  const currentElements = buffers[templateId] ?? (template?.layout.elements as Array<Record<string, unknown>> | undefined) ?? [];
+  const previewSample = templateId === 'evento' ? PREVIEW_SAMPLE_EVENTO : PREVIEW_SAMPLE_PARTIDO;
+
+  const setElements = (els: Array<Record<string, unknown>> | null) =>
+    setBuffers((b) => ({ ...b, [templateId]: els ?? undefined }));
+
 
   const { data: escudoFull } = useQuery({
     queryKey: ['entradas-escudo-full'],
@@ -1015,8 +1105,8 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
 
   const saveTemplate = async () => {
     try {
-      await apiClient.patch('/entradas/ticket-template', { widthCols: 32, elements: currentElements });
-      pushToast('Diseño guardado', 'success');
+      await apiClient.patch('/entradas/ticket-template', { id: templateId, widthCols: 32, elements: currentElements });
+      pushToast(`Diseño ${templateId === 'evento' ? 'de eventos' : 'de partidos'} guardado`, 'success');
       setElements(null);
       invalidate();
     } catch (e) { err(e); }
@@ -1073,7 +1163,17 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '1.5rem', alignItems: 'start' }}>
       <div style={{ display: 'grid', gap: '1.5rem' }}>
         <section>
-          <h3><Ticket size={16} /> Diseño del ticket (32 columnas)</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <h3 style={{ margin: 0 }}><Ticket size={16} /> Diseño del ticket (32 columnas)</h3>
+            <SegmentedControl
+              options={[
+                { value: 'default', label: 'Torneo' },
+                { value: 'evento', label: 'Especial' },
+              ]}
+              value={templateId}
+              onChange={(v) => setTemplateId(v as 'default' | 'evento')}
+            />
+          </div>
           <table className="sales-table">
             <thead><tr><th style={{ width: 90 }}>Bloque</th><th>Contenido</th><th style={{ width: 140 }}>Formato</th><th style={{ width: 44 }}>On</th>{canWrite && <th style={{ width: 110 }} />}</tr></thead>
             <tbody>
@@ -1128,7 +1228,7 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
           </table>
           {canWrite && (
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <button type="button" className="btn-primary btn-sm" onClick={saveTemplate}>Guardar diseño (v{(template?.version ?? 1) + (elements ? 1 : 0)})</button>
+              <button type="button" className="btn-primary btn-sm" onClick={saveTemplate}>Guardar diseño (v{(template?.version ?? 1) + (buffers[templateId] ? 1 : 0)})</button>
               <button type="button" className="btn-secondary btn-sm" onClick={() => setElements(null)}>Descartar</button>
               <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', marginLeft: 'auto' }}>
                 <select id="new-block-type" defaultValue="text" style={{ maxWidth: 130 }}>
@@ -1163,7 +1263,7 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
               </span>
             </div>
           )}
-          <p><small>{currentElements.length}/40 bloques · Variables: {'{{club}} {{torneo}} {{rival}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}} {{benefitQr}} {{beneficioNombre}} {{beneficioPorcentaje}}'}</small></p>
+          <p><small>{currentElements.length}/40 bloques · Variables: {'{{club}} {{torneo}} {{rival}} {{evento}} {{fecha}} {{sector}} {{codigo}} {{codigos}} {{precioUnit}} {{cantidad}} {{total}} {{descuento}} {{subtotal}} {{ventaId}} {{fechaPago}} {{footer}} {{escudo}} {{benefitQr}} {{beneficioNombre}} {{beneficioPorcentaje}}'}</small></p>
         </section>
 
         <section>
@@ -1190,9 +1290,9 @@ const DisenoTab: React.FC<{ canWrite: boolean }> = ({ canWrite }) => {
       </div>
 
       <div style={{ position: 'sticky', top: 12 }}>
-        <h3>Vista previa</h3>
-        <p><small>Datos de ejemplo · aprox. 32 columnas{elements ? ' · con cambios sin guardar' : ''}</small></p>
-        <TicketPreview elements={currentElements} escudoBase64={escudoFull?.pngBase64 ?? null} />
+        <h3>Vista previa ({templateId === 'evento' ? 'especial' : 'torneo'})</h3>
+        <p><small>Datos de ejemplo · aprox. 32 columnas{buffers[templateId] ? ' · con cambios sin guardar' : ''}</small></p>
+        <TicketPreview elements={currentElements} escudoBase64={escudoFull?.pngBase64 ?? null} sample={previewSample} />
       </div>
     </div>
   );

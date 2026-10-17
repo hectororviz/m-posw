@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo, MpStoresResponse } from './types';
+import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaEvento, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo, MpStoresResponse } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1140,6 +1140,19 @@ export const useEntradaFixtures = (from?: string, to?: string) =>
     },
   });
 
+export const useEntradaEventos = (from?: string, to?: string) =>
+  useQuery({
+    queryKey: ['entradas-eventos', from, to],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      const response = await apiClient.get<EntradaEvento[]>(`/entradas/eventos${qs ? `?${qs}` : ''}`);
+      return response.data;
+    },
+  });
+
 export const usePosDevices = () =>
   useQuery({
     queryKey: ['dispositivos'],
@@ -1167,31 +1180,37 @@ export const useDispositivosMpStores = (enabled = true) =>
     enabled,
   });
 
-export const useTicketSales = (fixtureId?: string) =>
+export const useTicketSales = (fixtureId?: string, eventoId?: string) =>
   useQuery({
-    queryKey: ['entradas-sales', fixtureId],
+    queryKey: ['entradas-sales', fixtureId, eventoId],
     queryFn: async () => {
-      const qs = fixtureId ? `?fixtureId=${fixtureId}` : '';
-      const response = await apiClient.get<TicketSale[]>(`/entradas/sales${qs}`);
+      const params = new URLSearchParams();
+      if (fixtureId) params.set('fixtureId', fixtureId);
+      if (eventoId) params.set('eventoId', eventoId);
+      const qs = params.toString();
+      const response = await apiClient.get<TicketSale[]>(`/entradas/sales${qs ? `?${qs}` : ''}`);
       return response.data;
     },
   });
 
-export const useEntradasSalesSummary = (fixtureId?: string) =>
+export const useEntradasSalesSummary = (fixtureId?: string, eventoId?: string) =>
   useQuery({
-    queryKey: ['entradas-sales-summary', fixtureId],
+    queryKey: ['entradas-sales-summary', fixtureId, eventoId],
     queryFn: async () => {
-      const response = await apiClient.get<EntradasSalesSummary>(`/entradas/sales/summary?fixtureId=${fixtureId}`);
+      const params = new URLSearchParams();
+      if (fixtureId) params.set('fixtureId', fixtureId);
+      if (eventoId) params.set('eventoId', eventoId);
+      const response = await apiClient.get<EntradasSalesSummary>(`/entradas/sales/summary?${params.toString()}`);
       return response.data;
     },
-    enabled: Boolean(fixtureId),
+    enabled: Boolean(fixtureId || eventoId),
   });
 
-export const useEntradaTicketTemplate = () =>
+export const useEntradaTicketTemplate = (templateId: string = 'default') =>
   useQuery({
-    queryKey: ['entradas-ticket-template'],
+    queryKey: ['entradas-ticket-template', templateId],
     queryFn: async () => {
-      const response = await apiClient.get<EntradaTicketTemplate>('/entradas/ticket-template');
+      const response = await apiClient.get<EntradaTicketTemplate>(`/entradas/ticket-template?id=${templateId}`);
       return response.data;
     },
   });
@@ -1211,6 +1230,7 @@ export const useInvalidateEntradas = () => {
     queryClient.invalidateQueries({ queryKey: ['entradas-torneos'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-rivales'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-fixtures'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-eventos'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-devices'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-sales'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-sales-summary'] });

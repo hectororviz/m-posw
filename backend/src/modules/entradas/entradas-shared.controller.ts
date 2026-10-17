@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { EntradasAdminService } from './entradas-admin.service';
 import { EntradasFlexibleGuard } from './entradas-flexible.guard';
 
@@ -12,8 +12,8 @@ export class EntradasSharedController {
   constructor(private readonly admin: EntradasAdminService) {}
 
   @Get('ticket-template')
-  template() {
-    return this.admin.getTemplate();
+  template(@Query('id') id?: string) {
+    return this.admin.getTemplate(id);
   }
 
   @Get('ticket-assets/escudo')

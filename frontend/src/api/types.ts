@@ -1055,6 +1055,8 @@ export interface NotificationStatusMap {
 }
 
 export type EntradaSector = 'LOCAL' | 'VISITANTE';
+export type EntradaSectorVenta = EntradaSector | 'GENERAL';
+export type EntradaTipo = 'PARTIDO' | 'EVENTO';
 export type EntradaPayMethod = 'CASH' | 'MP_QR';
 export type EntradaSaleStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
 
@@ -1078,6 +1080,16 @@ export interface EntradaFixture {
   torneo: EntradaTorneo;
   rivalId: string;
   rival: EntradaRival;
+  ventanaDesde: string;
+  ventanaHasta: string;
+  activo: boolean;
+}
+
+export interface EntradaEvento {
+  id: string;
+  titulo: string;
+  fecha: string;
+  precio: string;
   ventanaDesde: string;
   ventanaHasta: string;
   activo: boolean;
@@ -1119,7 +1131,7 @@ export interface TicketUnit {
   id: string;
   codigo: string;
   nro: number;
-  sector: EntradaSector;
+  sector: EntradaSectorVenta | null;
   beneficioId?: string | null;
   benefitCode?: string | null;
   beneficioPorcentaje?: string | null;
@@ -1159,8 +1171,9 @@ export interface TicketSaleBeneficio {
 export interface EntradaBeneficioValidation {
   code: string;
   codigo: string;
-  sector: EntradaSector;
-  fixture: { id: string; torneo: string; rival: string; fecha: string };
+  sector: EntradaSectorVenta | null;
+  fixture: { id: string; torneo: string; rival: string; fecha: string } | null;
+  evento: { id: string; titulo: string; fecha: string } | null;
   venta: { id: string; status: EntradaSaleStatus };
   beneficio: {
     id: string;
@@ -1183,9 +1196,11 @@ export interface EntradaBeneficioValidation {
 
 export interface TicketSale {
   id: string;
-  fixtureId: string;
-  fixture: EntradaFixture;
-  sector: EntradaSector;
+  fixtureId: string | null;
+  fixture: EntradaFixture | null;
+  eventoId: string | null;
+  evento: EntradaEvento | null;
+  sector: EntradaSectorVenta | null;
   cantidad: number;
   precioUnit: string;
   descuento: string;
@@ -1200,8 +1215,8 @@ export interface TicketSale {
 }
 
 export interface EntradasSalesSummary {
-  local: number;
-  visitante: number;
+  local?: number;
+  visitante?: number;
   totalEntradas: number;
   recaudado: string;
 }
