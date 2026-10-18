@@ -48,7 +48,7 @@ const MetodoLegend: React.FC<{ metodos: JornadaMetodo[]; offset?: number }> = ({
         <span style={{ width: 12, height: 12, borderRadius: 3, background: COLORS[(i + offset) % COLORS.length] }} />
         <strong>{m.metodo}</strong>
         <span style={muted}>
-          {m.cant} · {formatMoney(m.monto)} ({formatPercent(m.pct / 100)})
+          {m.cant} · {formatMoney(m.monto)} ({formatPercent(m.pct)})
         </span>
       </li>
     ))}
@@ -140,7 +140,7 @@ export const ResumenJornada: React.FC<{ fixtureId?: string; eventoId?: string }>
                     <span style={{ width: 12, height: 12, borderRadius: 3, background: COLORS[i % COLORS.length] }} />
                     <strong>{s.sector}</strong>
                     <span style={muted}>
-                      {s.cant} ({formatPercent(s.pct / 100)}) · {formatMoney(s.monto)}
+                      {s.cant} ({formatPercent(s.pct)}) · {formatMoney(s.monto)}
                     </span>
                   </li>
                 ))}

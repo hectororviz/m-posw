@@ -642,182 +642,25 @@ export class EntradasAdminService {
     ]);
     const clubName = branding?.clubName?.trim() || branding?.storeName || 'Club';
     const accent = normalizeHexColor(branding?.accentColor) ?? '#0e7490';
-    const money = (n: number) =>
-      n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
-
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margins: { top: 44, bottom: 44, left: 50, right: 50 } });
       doc.on('data', (c: Buffer) => chunks.push(c));
       doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), filename: jornadaFilename(r) }));
       doc.on('error', reject);
-
-      const W = 495.28; // contenido útil A4 - márgenes
-      const left = 50;
-      const track = '#e5e7eb';
-      const palette = [accent, '#16a34a', '#f59e0b', '#6366f1', '#ec4899', '#14b8a6'];
-      const ensure = (h: number) => {
-        if (doc.y + h > doc.page.height - 44) doc.addPage();
-      };
-
-      // Encabezado: escudo/logo + club + jornada
-      const logoPath = resolveUploadFile(branding?.logoUrl);
-      let hx = left;
-      if (logoPath) {
-        try { doc.image(logoPath, left, doc.y, { fit: [64, 64] }); hx = left + 76; } catch { /* sin logo */ }
-      } else if (escudo?.pngBase64) {
-        try { doc.image(Buffer.from(escudo.pngBase64, 'base64'), left, doc.y, { fit: [64, 64] }); hx = left + 76; } catch { /* sin escudo */ }
-      }
-      const hy = doc.y;
-      doc.font('Helvetica-Bold').fontSize(16).fill('#111827').text(clubName, hx, hy, { width: W - (hx - left) });
-      doc.font('Helvetica-Bold').fontSize(13).fill(accent).text(r.jornada.titulo, { width: W - (hx - left) });
-      doc.font('Helvetica').fontSize(9).fill('#6b7280')
-        .text(`Resumen de jornada · ${fmtEs(r.jornada.fecha)} · Ventana ${fmtHoraEs(r.jornada.ventanaDesde)} → ${fmtHoraEs(r.jornada.ventanaHasta)}`);
-      doc.moveDown(0.6);
-      doc.moveTo(left, doc.y).lineTo(left + W, doc.y).stroke(accent);
-      doc.moveDown(0.6);
-
-      // KPIs
-      const kpis = [
-        { label: 'Entradas', value: `${r.entradas.totalCant}`, sub: money(r.entradas.totalMonto) },
-        { label: 'Bufet', value: `${r.bufet.totalCant} tickets`, sub: money(r.bufet.totalMonto) },
-        { label: 'Ticket prom. bufet', value: money(r.bufet.ticketPromedio), sub: `${r.bufet.topProductos.length} productos distintos en top` },
-        { label: 'TOTAL GENERAL', value: money(r.totalGeneral), sub: 'Entradas + bufet', hot: true },
-      ];
-      const kw = W / 4;
-      ensure(64);
-      const ky = doc.y;
-      kpis.forEach((k, i) => {
-        const x = left + i * kw;
-        if (k.hot) { doc.save().roundedRect(x, ky, kw - 8, 56, 6).fill(accent).restore(); }
-        else { doc.save().roundedRect(x, ky, kw - 8, 56, 6).fill('#f3f4f6').restore(); }
-        const fg = k.hot ? '#ffffff' : '#111827';
-        doc.font('Helvetica').fontSize(8).fill(k.hot ? '#f0fdfa' : '#6b7280').text(k.label.toUpperCase(), x + 8, ky + 7, { width: kw - 24 });
-        doc.font('Helvetica-Bold').fontSize(13).fill(fg).text(k.value, x + 8, ky + 20, { width: kw - 24 });
-        doc.font('Helvetica').fontSize(8).fill(k.hot ? '#f0fdfa' : '#374151').text(k.sub, x + 8, ky + 38, { width: kw - 24 });
-      });
-      doc.y = ky + 64;
-
-      // Entradas por sector (barra dual / múltiple)
-      ensure(90);
-      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Entradas por sector');
-      doc.moveDown(0.25);
-      if (r.entradas.porSector.length === 0) {
-        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin entradas aprobadas en esta jornada.');
-      } else {
-        const tot = r.entradas.totalCant || 1;
-        let acc = 0;
-        const by = doc.y;
-        r.entradas.porSector.forEach((s, i) => {
-          const wSeg = (W * s.cant) / tot;
-          doc.save().rect(left + acc, by, wSeg, 18).fill(palette[i % palette.length]).restore();
-          acc += wSeg;
+      try {
+        drawJornadaPdf(doc, r, {
+          clubName,
+          accent,
+          logoPath: resolveUploadFile(branding?.logoUrl),
+          escudoPng: escudo?.pngBase64 ?? null,
+          money: (n: number) =>
+            n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }),
         });
-        doc.save().roundedRect(left, by, W, 18, 4);
-        doc.stroke(track).restore();
-        doc.y = by + 24;
-        r.entradas.porSector.forEach((s, i) => {
-          ensure(16);
-          doc.fill(palette[i % palette.length]).rect(left, doc.y, 10, 10).fill();
-          doc.font('Helvetica').fontSize(10).fill('#111827')
-            .text(`  ${s.sector}: ${s.cant} (${s.pct}%) · ${money(s.monto)}`, left + 14, doc.y - 11);
-          doc.moveDown(0.15);
-        });
+      } catch (e) {
+        reject(e);
+        return;
       }
-      doc.moveDown(0.5);
-
-      // Entradas por medio de pago (barra dual efectivo/QR)
-      ensure(70);
-      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Entradas por medio de pago');
-      doc.moveDown(0.25);
-      dualBar(doc, left, W, r.entradas.porMetodo.map((m, i) => ({ pct: m.pct, color: palette[i % palette.length] })), track);
-      metodoLegend(doc, left, W, r.entradas.porMetodo, money, palette);
-      doc.moveDown(0.5);
-
-      // Bufet por medio de pago (barra apilada)
-      ensure(70);
-      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Bufet por medio de pago');
-      doc.moveDown(0.25);
-      if (r.bufet.porMetodo.length === 0) {
-        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas de bufet en la ventana de esta jornada.');
-      } else {
-        dualBar(doc, left, W, r.bufet.porMetodo.map((m, i) => ({ pct: m.pct, color: palette[(i + 1) % palette.length] })), track);
-        metodoLegend(doc, left, W, r.bufet.porMetodo, money, palette, 1);
-      }
-      doc.moveDown(0.5);
-
-      // Top productos (barras horizontales)
-      ensure(70);
-      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Productos más vendidos (bufet)');
-      doc.moveDown(0.25);
-      if (r.bufet.topProductos.length === 0) {
-        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin productos vendidos.');
-      } else {
-        const max = Math.max(...r.bufet.topProductos.map((p) => p.monto), 1);
-        r.bufet.topProductos.slice(0, 8).forEach((p) => {
-          ensure(30);
-          doc.font('Helvetica').fontSize(9).fill('#111827').text(`${p.nombre} · ${p.cant} u · ${money(p.monto)}`, left, doc.y, { width: W });
-          const bw = (W * p.monto) / max;
-          doc.save().roundedRect(left, doc.y + 2, W, 10, 3).fill(track).restore();
-          if (bw > 0) { doc.save().roundedRect(left, doc.y + 2, Math.max(bw, 3), 10, 3).fill(accent).restore(); }
-          doc.y += 16;
-        });
-      }
-      doc.moveDown(0.5);
-
-      // Horas pico (barras verticales doble serie)
-      ensure(120);
-      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Horas pico de ventas');
-      doc.moveDown(0.25);
-      const buckets = r.horasPico.filter((h) => h.entradas > 0 || h.bufet > 0);
-      if (buckets.length === 0) {
-        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas registradas por hora.');
-      } else {
-        const peak = buckets.reduce((a, b) => (b.entradas + b.bufet >= a.entradas + a.bufet ? b : a), buckets[0]);
-        doc.font('Helvetica').fontSize(10).fill('#374151')
-          .text(`Pico ${peak.hora} — ${peak.entradas + peak.bufet} ventas (entradas ${peak.entradas} + bufet ${peak.bufet})`);
-        doc.moveDown(0.25);
-        const ch = 110;
-        const n = buckets.length;
-        const slot = Math.min(W / n, 64);
-        const maxV = Math.max(...buckets.map((b) => Math.max(b.entradas, b.bufet)), 1);
-        ensure(ch + 30);
-        const baseY = doc.y + ch;
-        buckets.forEach((b, i) => {
-          const x = left + i * slot;
-          const hE = (ch * b.entradas) / maxV;
-          const hB = (ch * b.bufet) / maxV;
-          const bwBar = Math.max(Math.min(slot * 0.22, 18), 4);
-          doc.save().rect(x + slot * 0.18, baseY - hE, bwBar, hE).fill(accent).restore();
-          doc.save().rect(x + slot * 0.46, baseY - hB, bwBar, hB).fill('#16a34a').restore();
-          doc.font('Helvetica').fontSize(7).fill('#374151').text(b.hora, x, baseY + 3, { width: slot, align: 'left' });
-        });
-        doc.y = baseY + 16;
-        doc.fill(accent).rect(left, doc.y, 10, 10).fill();
-        doc.font('Helvetica').fontSize(9).fill('#111827').text('  Entradas      ', left + 14, doc.y - 10, { continued: true });
-        doc.fill('#16a34a').rect(doc.x, doc.y - 1, 10, 10).fill();
-        doc.font('Helvetica').fontSize(9).fill('#111827').text('  Bufet', doc.x + 14, doc.y - 11);
-        doc.moveDown(0.8);
-      }
-
-      // Pie: beneficios + no aprobadas + total
-      ensure(80);
-      doc.moveTo(left, doc.y).lineTo(left + W, doc.y).stroke('#d1d5db');
-      doc.moveDown(0.4);
-      doc.font('Helvetica').fontSize(9).fill('#374151')
-        .text(`Beneficios de bufet: ${r.beneficios.otorgados} otorgados · ${r.beneficios.canjeados} canjeados`);
-      if (r.noAprobadas.length > 0) {
-        doc.font('Helvetica').fontSize(9).fill('#6b7280')
-          .text(`No suman al total: ${r.noAprobadas.map((x) => `${x.status} ${x.cant}`).join(' · ')}`);
-      }
-      doc.moveDown(0.3);
-      doc.save().roundedRect(left, doc.y, W, 34, 6).fill('#111827').restore();
-      doc.font('Helvetica-Bold').fontSize(13).fill('#ffffff')
-        .text(`TOTAL GENERAL  ${money(r.totalGeneral)}`, left, doc.y + 10, { width: W, align: 'center' });
-      doc.moveDown(1.2);
-      doc.font('Helvetica').fontSize(8).fill('#9ca3af')
-        .text(`Emitido el ${fmtEs(new Date().toISOString())} · ${clubName}`, { align: 'center' });
-
       doc.end();
     });
   }
@@ -959,6 +802,10 @@ export function pctOf(part: number, total: number): number {
   return Math.round((part / total) * 1000) / 10;
 }
 
+export const TZ_ARG = 'America/Argentina/Buenos_Aires';
+
+const horaFmtAR = new Intl.DateTimeFormat('es-AR', { timeZone: TZ_ARG, hour: '2-digit', hourCycle: 'h23' });
+
 export function buildHoraBuckets(
   desde: Date,
   hasta: Date,
@@ -972,7 +819,7 @@ export function buildHoraBuckets(
   let guard = 0;
   for (let t = start.getTime(); t <= end.getTime() && guard < 48; t += 3_600_000, guard += 1) {
     const d = new Date(t);
-    buckets.push({ hora: `${String(d.getHours()).padStart(2, '0')}:00`, entradas: 0, bufet: 0, _t: d.getTime() } as JornadaHora & { _t: number });
+    buckets.push({ hora: `${horaFmtAR.format(d)}:00`, entradas: 0, bufet: 0, _t: d.getTime() } as JornadaHora & { _t: number });
   }
   const place = (at: Date, cant: number, key: 'entradas' | 'bufet') => {
     const h = new Date(at);
@@ -1000,15 +847,15 @@ export function resolveUploadFile(url: string | null | undefined): string | null
 
 export function fmtEs(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('es-AR', { timeZone: TZ_ARG, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function fmtHoraEs(iso: string): string {
-  return new Date(iso).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString('es-AR', { timeZone: TZ_ARG, hour: '2-digit', minute: '2-digit' });
 }
 
 export function jornadaFilename(r: JornadaResumen): string {
-  const fecha = new Date(r.jornada.fecha).toISOString().slice(0, 10);
+  const fecha = new Date(r.jornada.fecha).toLocaleDateString('en-CA', { timeZone: TZ_ARG });
   const slug = r.jornada.titulo
     .normalize('NFD')
     .replace(/[^\x00-\x7F]/g, '')
@@ -1019,43 +866,236 @@ export function jornadaFilename(r: JornadaResumen): string {
   return `jornada-${fecha}-${slug || 'resumen'}.pdf`;
 }
 
-function dualBar(
-  doc: PDFKit.PDFDocument,
-  left: number,
-  w: number,
-  segs: Array<{ pct: number; color: string }>,
-  track: string,
-): void {
-  const y = doc.y;
-  doc.save().roundedRect(left, y, w, 18, 4).fill(track).restore();
-  let acc = 0;
-  for (const s of segs) {
-    const wSeg = (w * s.pct) / 100;
-    if (wSeg > 0.5) doc.save().rect(left + acc, y, wSeg, 18).fill(s.color).restore();
-    acc += wSeg;
-  }
-  doc.y = y + 24;
+// ─── Dibujo del PDF de jornada (cursor explícito, sin depender de doc.y) ───
+// Cada bloque reserva su alto con ensure() y avanza un cursor propio `y`,
+// así nada se superpone y el contenido fluye a hoja 2 cuando no entra.
+
+export interface JornadaPdfOpts {
+  clubName: string;
+  accent: string;
+  logoPath: string | null;
+  escudoPng: string | null;
+  money: (n: number) => string;
 }
 
-function metodoLegend(
-  doc: PDFKit.PDFDocument,
-  left: number,
-  w: number,
-  metodos: JornadaMetodo[],
-  money: (n: number) => string,
-  palette: string[],
-  offset = 0,
-): void {
-  if (metodos.length === 0) {
-    doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas aprobadas.');
-    return;
-  }
-  metodos.forEach((m, i) => {
-    const color = palette[(i + offset) % palette.length];
-    if (doc.y + 16 > doc.page.height - 44) doc.addPage();
-    doc.fill(color).rect(left, doc.y, 10, 10).fill();
-    doc.font('Helvetica').fontSize(10).fill('#111827')
-      .text(`  ${m.metodo}: ${m.cant} · ${money(m.monto)} (${m.pct}%)`, left + 14, doc.y - 11, { width: w - 14 });
-    doc.moveDown(0.15);
+const JORNADA_LEFT = 50;
+const JORNADA_WIDTH = 495.28;
+const JORNADA_BOTTOM = 841.89 - 44;
+const JORNADA_TRACK = '#e5e7eb';
+
+function fitText(doc: PDFKit.PDFDocument, text: string, maxW: number, font: string, size: number): string {
+  doc.font(font).fontSize(size);
+  if (doc.widthOfString(text) <= maxW) return text;
+  let t = text;
+  while (t.length > 1 && doc.widthOfString(`${t}…`) > maxW) t = t.slice(0, -1);
+  return `${t}…`;
+}
+
+export function drawJornadaPdf(doc: PDFKit.PDFDocument, r: JornadaResumen, opts: JornadaPdfOpts): void {
+  const { accent, clubName, money } = opts;
+  const left = JORNADA_LEFT;
+  const W = JORNADA_WIDTH;
+  const palette = [accent, '#16a34a', '#f59e0b', '#6366f1', '#ec4899', '#14b8a6'];
+  let y = doc.y;
+
+  const ensure = (h: number) => {
+    if (y + h > JORNADA_BOTTOM) {
+      doc.addPage();
+      y = doc.page.margins.top;
+    }
+    doc.y = y;
+  };
+  const advance = (h: number) => {
+    y += h;
+    doc.y = y;
+  };
+  const sectionTitle = (t: string) => {
+    ensure(28);
+    doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text(t, left, y, { width: W });
+    advance(20);
+  };
+  const legendRow = (color: string, text: string) => {
+    ensure(17);
+    doc.fill(color).rect(left, y + 2, 10, 10).fill();
+    doc.font('Helvetica').fontSize(10).fill('#111827').text(fitText(doc, text, W - 18, 'Helvetica', 10), left + 16, y, { width: W - 16 });
+    advance(15);
+  };
+  const dualBar = (segs: Array<{ pct: number; color: string }>) => {
+    ensure(28);
+    doc.save().roundedRect(left, y, W, 18, 4).fill(JORNADA_TRACK).restore();
+    let acc = 0;
+    for (const s of segs) {
+      const wSeg = (W * s.pct) / 100;
+      if (wSeg > 0.5) doc.save().rect(left + acc, y, wSeg, 18).fill(s.color).restore();
+      acc += wSeg;
+    }
+    advance(26);
+  };
+
+  // Encabezado: escudo/logo + club + jornada
+  ensure(80);
+  const yHead = y;
+  let hx = left;
+  const drawImg = (src: string | Buffer) => {
+    try {
+      doc.image(src, left, yHead, { fit: [64, 64] });
+      hx = left + 76;
+    } catch {
+      /* sin imagen */
+    }
+  };
+  if (opts.logoPath) drawImg(opts.logoPath);
+  else if (opts.escudoPng) drawImg(Buffer.from(opts.escudoPng, 'base64'));
+  doc.font('Helvetica-Bold').fontSize(16).fill('#111827').text(clubName, hx, yHead, { width: W - (hx - left) });
+  doc.font('Helvetica-Bold').fontSize(13).fill(accent).text(r.jornada.titulo);
+  doc.font('Helvetica').fontSize(9).fill('#6b7280')
+    .text(`Resumen de jornada · ${fmtEs(r.jornada.fecha)} · Ventana ${fmtHoraEs(r.jornada.ventanaDesde)} → ${fmtHoraEs(r.jornada.ventanaHasta)}`);
+  y = Math.max(yHead + 70, doc.y + 4);
+  doc.y = y;
+  doc.moveTo(left, y).lineTo(left + W, y).stroke(accent);
+  advance(10);
+
+  // KPIs
+  const kpis = [
+    { label: 'Entradas', value: `${r.entradas.totalCant}`, sub: money(r.entradas.totalMonto) },
+    { label: 'Bufet', value: `${r.bufet.totalCant} tickets`, sub: money(r.bufet.totalMonto) },
+    { label: 'Ticket prom. bufet', value: money(r.bufet.ticketPromedio), sub: `${r.bufet.topProductos.length} en top` },
+    { label: 'TOTAL GENERAL', value: money(r.totalGeneral), sub: 'Entradas + bufet', hot: true },
+  ];
+  ensure(64);
+  const ky = y;
+  const kw = W / 4;
+  kpis.forEach((k, i) => {
+    const x = left + i * kw;
+    if (k.hot) doc.save().roundedRect(x, ky, kw - 8, 56, 6).fill(accent).restore();
+    else doc.save().roundedRect(x, ky, kw - 8, 56, 6).fill('#f3f4f6').restore();
+    const fg = k.hot ? '#ffffff' : '#111827';
+    doc.font('Helvetica').fontSize(8).fill(k.hot ? '#f0fdfa' : '#6b7280').text(k.label.toUpperCase(), x + 8, ky + 7, { width: kw - 24 });
+    doc.font('Helvetica-Bold').fontSize(13).fill(fg).text(fitText(doc, k.value, kw - 24, 'Helvetica-Bold', 13), x + 8, ky + 20, { width: kw - 24 });
+    doc.font('Helvetica').fontSize(8).fill(k.hot ? '#f0fdfa' : '#374151').text(fitText(doc, k.sub, kw - 24, 'Helvetica', 8), x + 8, ky + 38, { width: kw - 24 });
   });
+  y = ky + 64;
+  doc.y = y;
+
+  // Entradas por sector
+  sectionTitle('Entradas por sector');
+  if (r.entradas.porSector.length === 0) {
+    ensure(18);
+    doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin entradas aprobadas en esta jornada.', left, y, { width: W });
+    advance(16);
+  } else {
+    const tot = r.entradas.totalCant || 1;
+    dualBar(r.entradas.porSector.map((s, i) => ({ pct: (s.cant / tot) * 100, color: palette[i % palette.length] })));
+    r.entradas.porSector.forEach((s, i) => {
+      legendRow(palette[i % palette.length], `${s.sector}: ${s.cant} (${s.pct}%) · ${money(s.monto)}`);
+    });
+  }
+  advance(8);
+
+  // Entradas por medio de pago
+  sectionTitle(`Entradas por medio de pago · ${money(r.entradas.totalMonto)}`);
+  if (r.entradas.porMetodo.length === 0) {
+    ensure(18);
+    doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas aprobadas.', left, y, { width: W });
+    advance(16);
+  } else {
+    dualBar(r.entradas.porMetodo.map((m, i) => ({ pct: m.pct, color: palette[i % palette.length] })));
+    r.entradas.porMetodo.forEach((m, i) => {
+      legendRow(palette[i % palette.length], `${m.metodo}: ${m.cant} · ${money(m.monto)} (${m.pct}%)`);
+    });
+  }
+  advance(8);
+
+  // Bufet por medio de pago
+  sectionTitle(`Bufet por medio de pago · ${money(r.bufet.totalMonto)}`);
+  if (r.bufet.porMetodo.length === 0) {
+    ensure(18);
+    doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas de bufet en la ventana de esta jornada.', left, y, { width: W });
+    advance(16);
+  } else {
+    dualBar(r.bufet.porMetodo.map((m, i) => ({ pct: m.pct, color: palette[(i + 1) % palette.length] })));
+    r.bufet.porMetodo.forEach((m, i) => {
+      legendRow(palette[(i + 1) % palette.length], `${m.metodo}: ${m.cant} · ${money(m.monto)} (${m.pct}%)`);
+    });
+  }
+  advance(8);
+
+  // Top productos
+  sectionTitle('Productos más vendidos (bufet)');
+  if (r.bufet.topProductos.length === 0) {
+    ensure(18);
+    doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin productos vendidos.', left, y, { width: W });
+    advance(16);
+  } else {
+    const max = Math.max(...r.bufet.topProductos.map((p) => p.monto), 1);
+    r.bufet.topProductos.slice(0, 8).forEach((p) => {
+      ensure(32);
+      doc.font('Helvetica').fontSize(9).fill('#111827')
+        .text(fitText(doc, `${p.nombre} · ${p.cant} u · ${money(p.monto)}`, W, 'Helvetica', 9), left, y, { width: W });
+      advance(13);
+      const bw = (W * p.monto) / max;
+      doc.save().roundedRect(left, y, W, 10, 3).fill(JORNADA_TRACK).restore();
+      if (bw > 0) doc.save().roundedRect(left, y, Math.max(bw, 3), 10, 3).fill(accent).restore();
+      advance(17);
+    });
+  }
+  advance(4);
+
+  // Horas pico
+  sectionTitle('Horas pico de ventas');
+  const buckets = r.horasPico.filter((h) => h.entradas > 0 || h.bufet > 0);
+  if (buckets.length === 0) {
+    ensure(18);
+    doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas registradas por hora.', left, y, { width: W });
+    advance(16);
+  } else {
+    const peak = buckets.reduce((a, b) => (b.entradas + b.bufet >= a.entradas + a.bufet ? b : a), buckets[0]);
+    ensure(20);
+    doc.font('Helvetica').fontSize(10).fill('#374151')
+      .text(`Pico ${peak.hora} — ${peak.entradas + peak.bufet} ventas (entradas ${peak.entradas} + bufet ${peak.bufet})`, left, y, { width: W });
+    advance(18);
+    const ch = 110;
+    const n = buckets.length;
+    const slot = Math.min(W / n, 64);
+    const maxV = Math.max(...buckets.map((b) => Math.max(b.entradas, b.bufet)), 1);
+    ensure(ch + 44);
+    const baseY = y + ch;
+    buckets.forEach((b, i) => {
+      const x = left + i * slot;
+      const hE = (ch * b.entradas) / maxV;
+      const hB = (ch * b.bufet) / maxV;
+      const bwBar = Math.max(Math.min(slot * 0.22, 18), 4);
+      if (hE > 0) doc.save().rect(x + slot * 0.18, baseY - hE, bwBar, Math.max(hE, 1)).fill(accent).restore();
+      if (hB > 0) doc.save().rect(x + slot * 0.46, baseY - hB, bwBar, Math.max(hB, 1)).fill('#16a34a').restore();
+      doc.font('Helvetica').fontSize(7).fill('#374151').text(b.hora, x, baseY + 4, { width: slot });
+    });
+    advance(ch + 20);
+    ensure(18);
+    doc.fill(accent).rect(left, y + 2, 10, 10).fill();
+    doc.font('Helvetica').fontSize(9).fill('#111827').text('Entradas', left + 16, y);
+    const wEntr = doc.widthOfString('Entradas') + 28;
+    doc.fill('#16a34a').rect(left + wEntr, y + 2, 10, 10).fill();
+    doc.font('Helvetica').fontSize(9).fill('#111827').text('Bufet', left + wEntr + 16, y);
+    advance(18);
+  }
+
+  // Pie: beneficios + no aprobadas + total
+  ensure(96);
+  doc.moveTo(left, y).lineTo(left + W, y).stroke('#d1d5db');
+  advance(8);
+  doc.font('Helvetica').fontSize(9).fill('#374151')
+    .text(`Beneficios de bufet: ${r.beneficios.otorgados} otorgados · ${r.beneficios.canjeados} canjeados`, left, y, { width: W });
+  advance(14);
+  if (r.noAprobadas.length > 0) {
+    doc.font('Helvetica').fontSize(9).fill('#6b7280')
+      .text(`No suman al total: ${r.noAprobadas.map((x) => `${x.status} ${x.cant}`).join(' · ')}`, left, y, { width: W });
+    advance(14);
+  }
+  doc.save().roundedRect(left, y, W, 34, 6).fill('#111827').restore();
+  doc.font('Helvetica-Bold').fontSize(13).fill('#ffffff')
+    .text(`TOTAL GENERAL  ${money(r.totalGeneral)}`, left, y + 10, { width: W, align: 'center' });
+  advance(42);
+  doc.font('Helvetica').fontSize(8).fill('#9ca3af')
+    .text(`Emitido el ${fmtEs(new Date().toISOString())} · ${clubName}`, left, y, { width: W, align: 'center' });
+  advance(14);
 }
