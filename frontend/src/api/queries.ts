@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
-import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaEvento, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo, MpStoresResponse } from './types';
+import type { Acreedor, AcreedorDeuda, AcreedoresResumen, CashClose, Category, Coach, ConversationMessagesResponse, ConversationsResponse, EligiblePlayer, EntradaBeneficio, EntradaBeneficioValidation, EntradaEvento, EntradaFixture, EntradaRival, EntradaTicketAssetInfo, EntradaTicketTemplate, EntradaTorneo, EntradasMpPosStatus, EntradasSalesSummary, FichadoPlayer, FinanzasMonthly, InternetPlan, JornadaResumen, ManualMovement, MpAuditoriaResponse, MpAuditoriaStatus, MpAuditoriaItem, MpOauthStatus, NotifBatchStatus, NotificationStatusMap, NotificacionesConfig, NotificacionesHistoryResponse, NotificacionesJob, NotificacionesQueueResponse, NotificarDeudaBatchRequest, NotificarDeudaBatchResponse, PaginatedCoaches, PaginatedPlayers, PaginatedTournaments, Player, PlayerCategory, PlayersDashboard, PosDevice, Product, Responsable, Sale, Setting, Socio, SocioCuotaItem, SocioMatriz, SocioTipo, SociosTesoreriaResumen, StatsSummary, StockCategory, TicketSale, Tournament, TournamentCoachCategory, MoneyAccount, MoneyCategory, FinanzasSummary, FinanzasMovementsResponse, FinanzasRubroDetail, User, VoucherDetail, VoucherListItem, VoucherStats, InternetHealth, StaffVoucher, Asset, AssetCategory, AssetStatus, AssetEvent, PaginatedAssets, PaginatedWebhookRetries, UnreadCountResponse, WhatsAppMessage, WhatsAppPhoneInfo, WhatsAppTemplateInfo, MpStoresResponse } from './types';
 
 const sevenMinutes = 7 * 60 * 1000;
 const fiveMinutes = 5 * 60 * 1000;
@@ -1206,6 +1206,37 @@ export const useEntradasSalesSummary = (fixtureId?: string, eventoId?: string) =
     enabled: Boolean(fixtureId || eventoId),
   });
 
+export const useEntradasJornadaResumen = (fixtureId?: string, eventoId?: string) =>
+  useQuery({
+    queryKey: ['entradas-jornada', fixtureId, eventoId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (fixtureId) params.set('fixtureId', fixtureId);
+      if (eventoId) params.set('eventoId', eventoId);
+      const response = await apiClient.get<JornadaResumen>(`/entradas/sales/jornada?${params.toString()}`);
+      return response.data;
+    },
+    enabled: Boolean(fixtureId || eventoId),
+  });
+
+export const downloadEntradasJornadaPdf = async (fixtureId?: string, eventoId?: string): Promise<void> => {
+  const params = new URLSearchParams();
+  if (fixtureId) params.set('fixtureId', fixtureId);
+  if (eventoId) params.set('eventoId', eventoId);
+  const response = await apiClient.get(`/entradas/sales/jornada.pdf?${params.toString()}`, { responseType: 'blob' });
+  const disposition: string = response.headers?.['content-disposition'] ?? '';
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const filename = match?.[1] ?? 'jornada.pdf';
+  const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
 export const useEntradaTicketTemplate = (templateId: string = 'default') =>
   useQuery({
     queryKey: ['entradas-ticket-template', templateId],
@@ -1234,6 +1265,7 @@ export const useInvalidateEntradas = () => {
     queryClient.invalidateQueries({ queryKey: ['entradas-devices'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-sales'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-sales-summary'] });
+    queryClient.invalidateQueries({ queryKey: ['entradas-jornada'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-ticket-template'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-escudo'] });
     queryClient.invalidateQueries({ queryKey: ['entradas-beneficios'] });

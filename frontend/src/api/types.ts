@@ -1221,6 +1221,59 @@ export interface EntradasSalesSummary {
   recaudado: string;
 }
 
+export interface JornadaMetodo {
+  metodo: string;
+  cant: number;
+  monto: number;
+  pct: number;
+}
+
+export interface JornadaSector {
+  sector: string;
+  cant: number;
+  monto: number;
+  pct: number;
+}
+
+export interface JornadaProducto {
+  nombre: string;
+  cant: number;
+  monto: number;
+}
+
+export interface JornadaHora {
+  hora: string;
+  entradas: number;
+  bufet: number;
+}
+
+export interface JornadaResumen {
+  jornada: {
+    tipo: 'PARTIDO' | 'EVENTO';
+    titulo: string;
+    fecha: string;
+    ventanaDesde: string;
+    ventanaHasta: string;
+  };
+  entradas: {
+    totalCant: number;
+    totalMonto: number;
+    porSector: JornadaSector[];
+    porMetodo: JornadaMetodo[];
+  };
+  bufet: {
+    totalCant: number;
+    totalMonto: number;
+    ticketPromedio: number;
+    porMetodo: JornadaMetodo[];
+    topProductos: JornadaProducto[];
+  };
+  horasPico: JornadaHora[];
+  beneficios: { otorgados: number; canjeados: number };
+  noAprobadas: Array<{ status: string; cant: number }>;
+  totalGeneral: number;
+}
+
 export interface EntradaTicketTemplate {
   id: string;
   version: number;

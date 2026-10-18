@@ -1,10 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Express } from 'express';
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import sharp = require('sharp');
+import * as PDFDocument from 'pdfkit';
 import { PrismaService } from '../common/prisma.service';
 import { validateImageFile } from '../common/image-storage';
 import { MercadoPagoOauthService } from '../mercadopago-oauth/mercadopago-oauth.service';
@@ -477,6 +478,350 @@ export class EntradasAdminService {
     return { local, visitante, totalEntradas: total._sum.cantidad ?? 0, recaudado: total._sum.total?.toString() ?? '0' };
   }
 
+  // ── Resumen de jornada (entradas + bufet en ventana) ─────
+  // Una jornada = un fixture (partido) o un evento especial.
+  // Bufet = Sale APPROVED con paidAt dentro de la ventana.
+  async jornadaResumen(fixtureId?: string, eventoId?: string): Promise<JornadaResumen> {
+    if ((!fixtureId && !eventoId) || (fixtureId && eventoId)) {
+      throw new BadRequestException('Indicá fixtureId o eventoId (solo uno)');
+    }
+    const fixture = fixtureId
+      ? await this.prisma.entradaFixture.findUnique({
+          where: { id: fixtureId },
+          include: { torneo: true, rival: true },
+        })
+      : null;
+    if (fixtureId && !fixture) throw new NotFoundException('Partido no encontrado');
+    const evento = eventoId
+      ? await this.prisma.entradaEvento.findUnique({ where: { id: eventoId } })
+      : null;
+    if (eventoId && !evento) throw new NotFoundException('Evento no encontrado');
+
+    const ventanaDesde = new Date(fixture ? fixture.ventanaDesde : evento!.ventanaDesde);
+    const ventanaHasta = new Date(fixture ? fixture.ventanaHasta : evento!.ventanaHasta);
+    const titulo = fixture
+      ? `${fixture.torneo.nombre} vs ${fixture.rival.nombre}`
+      : `★ ${evento!.titulo}`;
+
+    const saleWhere = fixtureId ? { fixtureId } : { eventoId };
+
+    const [ticketSales, noAprobadas, beneficiosOtorgados, beneficiosCanjeados] = await Promise.all([
+      this.prisma.ticketSale.findMany({
+        where: { ...saleWhere, status: 'APPROVED' },
+        select: { sector: true, cantidad: true, total: true, paymentMethod: true, paidAt: true, createdAt: true },
+        take: 10000,
+      }),
+      this.prisma.ticketSale.groupBy({
+        by: ['status'],
+        where: saleWhere,
+        _count: { status: true },
+      }),
+      this.prisma.ticketUnit.count({ where: { ...saleWhere, beneficioId: { not: null } } }),
+      this.prisma.entradaBeneficioConsumo.count({
+        where: { ticketUnit: fixtureId ? { fixtureId } : { eventoId } },
+      }),
+    ]);
+
+    // Entradas por sector
+    const porSector: Record<string, { cant: number; monto: number }> = {};
+    const porMetodoEntradas: Record<string, { cant: number; monto: number }> = {};
+    let totalEntradas = 0;
+    let montoEntradas = 0;
+    for (const s of ticketSales) {
+      const sector = s.sector ?? 'GENERAL';
+      const cant = s.cantidad;
+      const monto = Number(s.total);
+      totalEntradas += cant;
+      montoEntradas += monto;
+      const sec = porSector[sector] ?? { cant: 0, monto: 0 };
+      sec.cant += cant;
+      sec.monto += monto;
+      porSector[sector] = sec;
+      const met = porMetodoEntradas[s.paymentMethod] ?? { cant: 0, monto: 0 };
+      met.cant += cant;
+      met.monto += monto;
+      porMetodoEntradas[s.paymentMethod] = met;
+    }
+
+    // Bufet: ventas aprobadas con paidAt en ventana
+    const bufetSales = await this.prisma.sale.findMany({
+      where: { status: 'APPROVED', paidAt: { gte: ventanaDesde, lte: ventanaHasta } },
+      select: {
+        id: true,
+        total: true,
+        paymentMethod: true,
+        paidAt: true,
+        createdAt: true,
+        items: { select: { quantity: true, subtotal: true, product: { select: { name: true } } } },
+      },
+      take: 10000,
+    });
+    const porMetodoBufet: Record<string, { cant: number; monto: number }> = {};
+    const porProducto: Record<string, { cant: number; monto: number }> = {};
+    let montoBufet = 0;
+    for (const s of bufetSales) {
+      const monto = Number(s.total);
+      montoBufet += monto;
+      const met = porMetodoBufet[s.paymentMethod] ?? { cant: 0, monto: 0 };
+      met.cant += 1;
+      met.monto += monto;
+      porMetodoBufet[s.paymentMethod] = met;
+      for (const it of s.items) {
+        const nombre = it.product?.name ?? 'Sin nombre';
+        const p = porProducto[nombre] ?? { cant: 0, monto: 0 };
+        p.cant += it.quantity;
+        p.monto += Number(it.subtotal);
+        porProducto[nombre] = p;
+      }
+    }
+    const topProductos = Object.entries(porProducto)
+      .map(([nombre, v]) => ({ nombre, cant: v.cant, monto: round2(v.monto) }))
+      .sort((a, b) => b.monto - a.monto)
+      .slice(0, 10);
+
+    // Horas pico: buckets por hora local entre ventanaDesde y ventanaHasta
+    const horasPico = buildHoraBuckets(
+      ventanaDesde,
+      ventanaHasta,
+      ticketSales.map((s) => ({ at: s.paidAt ?? s.createdAt, cant: s.cantidad })),
+      bufetSales.map((s) => ({ at: s.paidAt ?? s.createdAt, cant: 1 })),
+    );
+
+    const metodoArr = (r: Record<string, { cant: number; monto: number }>, base: number) =>
+      Object.entries(r).map(([metodo, v]) => ({
+        metodo,
+        cant: v.cant,
+        monto: round2(v.monto),
+        pct: pctOf(v.monto, base),
+      }));
+    const sectorArr = Object.entries(porSector).map(([sector, v]) => ({
+      sector,
+      cant: v.cant,
+      monto: round2(v.monto),
+      pct: pctOf(v.cant, totalEntradas),
+    }));
+
+    return {
+      jornada: {
+        tipo: fixture ? 'PARTIDO' : 'EVENTO',
+        titulo,
+        fecha: (fixture ? fixture.fecha : evento!.fecha).toISOString(),
+        ventanaDesde: ventanaDesde.toISOString(),
+        ventanaHasta: ventanaHasta.toISOString(),
+      },
+      entradas: {
+        totalCant: totalEntradas,
+        totalMonto: round2(montoEntradas),
+        porSector: sectorArr,
+        porMetodo: metodoArr(porMetodoEntradas, montoEntradas),
+      },
+      bufet: {
+        totalCant: bufetSales.length,
+        totalMonto: round2(montoBufet),
+        ticketPromedio: bufetSales.length > 0 ? round2(montoBufet / bufetSales.length) : 0,
+        porMetodo: metodoArr(porMetodoBufet, montoBufet),
+        topProductos,
+      },
+      horasPico,
+      beneficios: { otorgados: beneficiosOtorgados, canjeados: beneficiosCanjeados },
+      noAprobadas: noAprobadas
+        .filter((g) => g.status !== 'APPROVED')
+        .map((g) => ({ status: g.status, cant: g._count.status })),
+      totalGeneral: round2(montoEntradas + montoBufet),
+    };
+  }
+
+  // ── PDF gráfico del resumen de jornada (para la comisión) ──
+  async jornadaPdf(fixtureId?: string, eventoId?: string): Promise<{ buffer: Buffer; filename: string }> {
+    const r = await this.jornadaResumen(fixtureId, eventoId);
+    const [branding, escudo] = await Promise.all([
+      this.prisma.setting.findFirst({
+        select: { clubName: true, storeName: true, accentColor: true, logoUrl: true },
+      }),
+      this.prisma.entradaTicketAsset.findUnique({ where: { id: 'escudo' } }),
+    ]);
+    const clubName = branding?.clubName?.trim() || branding?.storeName || 'Club';
+    const accent = normalizeHexColor(branding?.accentColor) ?? '#0e7490';
+    const money = (n: number) =>
+      n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+
+    return new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const doc = new PDFDocument({ size: 'A4', layout: 'portrait', margins: { top: 44, bottom: 44, left: 50, right: 50 } });
+      doc.on('data', (c: Buffer) => chunks.push(c));
+      doc.on('end', () => resolve({ buffer: Buffer.concat(chunks), filename: jornadaFilename(r) }));
+      doc.on('error', reject);
+
+      const W = 495.28; // contenido útil A4 - márgenes
+      const left = 50;
+      const track = '#e5e7eb';
+      const palette = [accent, '#16a34a', '#f59e0b', '#6366f1', '#ec4899', '#14b8a6'];
+      const ensure = (h: number) => {
+        if (doc.y + h > doc.page.height - 44) doc.addPage();
+      };
+
+      // Encabezado: escudo/logo + club + jornada
+      const logoPath = resolveUploadFile(branding?.logoUrl);
+      let hx = left;
+      if (logoPath) {
+        try { doc.image(logoPath, left, doc.y, { fit: [64, 64] }); hx = left + 76; } catch { /* sin logo */ }
+      } else if (escudo?.pngBase64) {
+        try { doc.image(Buffer.from(escudo.pngBase64, 'base64'), left, doc.y, { fit: [64, 64] }); hx = left + 76; } catch { /* sin escudo */ }
+      }
+      const hy = doc.y;
+      doc.font('Helvetica-Bold').fontSize(16).fill('#111827').text(clubName, hx, hy, { width: W - (hx - left) });
+      doc.font('Helvetica-Bold').fontSize(13).fill(accent).text(r.jornada.titulo, { width: W - (hx - left) });
+      doc.font('Helvetica').fontSize(9).fill('#6b7280')
+        .text(`Resumen de jornada · ${fmtEs(r.jornada.fecha)} · Ventana ${fmtHoraEs(r.jornada.ventanaDesde)} → ${fmtHoraEs(r.jornada.ventanaHasta)}`);
+      doc.moveDown(0.6);
+      doc.moveTo(left, doc.y).lineTo(left + W, doc.y).stroke(accent);
+      doc.moveDown(0.6);
+
+      // KPIs
+      const kpis = [
+        { label: 'Entradas', value: `${r.entradas.totalCant}`, sub: money(r.entradas.totalMonto) },
+        { label: 'Bufet', value: `${r.bufet.totalCant} tickets`, sub: money(r.bufet.totalMonto) },
+        { label: 'Ticket prom. bufet', value: money(r.bufet.ticketPromedio), sub: `${r.bufet.topProductos.length} productos distintos en top` },
+        { label: 'TOTAL GENERAL', value: money(r.totalGeneral), sub: 'Entradas + bufet', hot: true },
+      ];
+      const kw = W / 4;
+      ensure(64);
+      const ky = doc.y;
+      kpis.forEach((k, i) => {
+        const x = left + i * kw;
+        if (k.hot) { doc.save().roundedRect(x, ky, kw - 8, 56, 6).fill(accent).restore(); }
+        else { doc.save().roundedRect(x, ky, kw - 8, 56, 6).fill('#f3f4f6').restore(); }
+        const fg = k.hot ? '#ffffff' : '#111827';
+        doc.font('Helvetica').fontSize(8).fill(k.hot ? '#f0fdfa' : '#6b7280').text(k.label.toUpperCase(), x + 8, ky + 7, { width: kw - 24 });
+        doc.font('Helvetica-Bold').fontSize(13).fill(fg).text(k.value, x + 8, ky + 20, { width: kw - 24 });
+        doc.font('Helvetica').fontSize(8).fill(k.hot ? '#f0fdfa' : '#374151').text(k.sub, x + 8, ky + 38, { width: kw - 24 });
+      });
+      doc.y = ky + 64;
+
+      // Entradas por sector (barra dual / múltiple)
+      ensure(90);
+      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Entradas por sector');
+      doc.moveDown(0.25);
+      if (r.entradas.porSector.length === 0) {
+        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin entradas aprobadas en esta jornada.');
+      } else {
+        const tot = r.entradas.totalCant || 1;
+        let acc = 0;
+        const by = doc.y;
+        r.entradas.porSector.forEach((s, i) => {
+          const wSeg = (W * s.cant) / tot;
+          doc.save().rect(left + acc, by, wSeg, 18).fill(palette[i % palette.length]).restore();
+          acc += wSeg;
+        });
+        doc.save().roundedRect(left, by, W, 18, 4);
+        doc.stroke(track).restore();
+        doc.y = by + 24;
+        r.entradas.porSector.forEach((s, i) => {
+          ensure(16);
+          doc.fill(palette[i % palette.length]).rect(left, doc.y, 10, 10).fill();
+          doc.font('Helvetica').fontSize(10).fill('#111827')
+            .text(`  ${s.sector}: ${s.cant} (${s.pct}%) · ${money(s.monto)}`, left + 14, doc.y - 11);
+          doc.moveDown(0.15);
+        });
+      }
+      doc.moveDown(0.5);
+
+      // Entradas por medio de pago (barra dual efectivo/QR)
+      ensure(70);
+      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Entradas por medio de pago');
+      doc.moveDown(0.25);
+      dualBar(doc, left, W, r.entradas.porMetodo.map((m, i) => ({ pct: m.pct, color: palette[i % palette.length] })), track);
+      metodoLegend(doc, left, W, r.entradas.porMetodo, money, palette);
+      doc.moveDown(0.5);
+
+      // Bufet por medio de pago (barra apilada)
+      ensure(70);
+      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Bufet por medio de pago');
+      doc.moveDown(0.25);
+      if (r.bufet.porMetodo.length === 0) {
+        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas de bufet en la ventana de esta jornada.');
+      } else {
+        dualBar(doc, left, W, r.bufet.porMetodo.map((m, i) => ({ pct: m.pct, color: palette[(i + 1) % palette.length] })), track);
+        metodoLegend(doc, left, W, r.bufet.porMetodo, money, palette, 1);
+      }
+      doc.moveDown(0.5);
+
+      // Top productos (barras horizontales)
+      ensure(70);
+      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Productos más vendidos (bufet)');
+      doc.moveDown(0.25);
+      if (r.bufet.topProductos.length === 0) {
+        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin productos vendidos.');
+      } else {
+        const max = Math.max(...r.bufet.topProductos.map((p) => p.monto), 1);
+        r.bufet.topProductos.slice(0, 8).forEach((p) => {
+          ensure(30);
+          doc.font('Helvetica').fontSize(9).fill('#111827').text(`${p.nombre} · ${p.cant} u · ${money(p.monto)}`, left, doc.y, { width: W });
+          const bw = (W * p.monto) / max;
+          doc.save().roundedRect(left, doc.y + 2, W, 10, 3).fill(track).restore();
+          if (bw > 0) { doc.save().roundedRect(left, doc.y + 2, Math.max(bw, 3), 10, 3).fill(accent).restore(); }
+          doc.y += 16;
+        });
+      }
+      doc.moveDown(0.5);
+
+      // Horas pico (barras verticales doble serie)
+      ensure(120);
+      doc.font('Helvetica-Bold').fontSize(12).fill('#111827').text('Horas pico de ventas');
+      doc.moveDown(0.25);
+      const buckets = r.horasPico.filter((h) => h.entradas > 0 || h.bufet > 0);
+      if (buckets.length === 0) {
+        doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas registradas por hora.');
+      } else {
+        const peak = buckets.reduce((a, b) => (b.entradas + b.bufet >= a.entradas + a.bufet ? b : a), buckets[0]);
+        doc.font('Helvetica').fontSize(10).fill('#374151')
+          .text(`Pico ${peak.hora} — ${peak.entradas + peak.bufet} ventas (entradas ${peak.entradas} + bufet ${peak.bufet})`);
+        doc.moveDown(0.25);
+        const ch = 110;
+        const n = buckets.length;
+        const slot = Math.min(W / n, 64);
+        const maxV = Math.max(...buckets.map((b) => Math.max(b.entradas, b.bufet)), 1);
+        ensure(ch + 30);
+        const baseY = doc.y + ch;
+        buckets.forEach((b, i) => {
+          const x = left + i * slot;
+          const hE = (ch * b.entradas) / maxV;
+          const hB = (ch * b.bufet) / maxV;
+          const bwBar = Math.max(Math.min(slot * 0.22, 18), 4);
+          doc.save().rect(x + slot * 0.18, baseY - hE, bwBar, hE).fill(accent).restore();
+          doc.save().rect(x + slot * 0.46, baseY - hB, bwBar, hB).fill('#16a34a').restore();
+          doc.font('Helvetica').fontSize(7).fill('#374151').text(b.hora, x, baseY + 3, { width: slot, align: 'left' });
+        });
+        doc.y = baseY + 16;
+        doc.fill(accent).rect(left, doc.y, 10, 10).fill();
+        doc.font('Helvetica').fontSize(9).fill('#111827').text('  Entradas      ', left + 14, doc.y - 10, { continued: true });
+        doc.fill('#16a34a').rect(doc.x, doc.y - 1, 10, 10).fill();
+        doc.font('Helvetica').fontSize(9).fill('#111827').text('  Bufet', doc.x + 14, doc.y - 11);
+        doc.moveDown(0.8);
+      }
+
+      // Pie: beneficios + no aprobadas + total
+      ensure(80);
+      doc.moveTo(left, doc.y).lineTo(left + W, doc.y).stroke('#d1d5db');
+      doc.moveDown(0.4);
+      doc.font('Helvetica').fontSize(9).fill('#374151')
+        .text(`Beneficios de bufet: ${r.beneficios.otorgados} otorgados · ${r.beneficios.canjeados} canjeados`);
+      if (r.noAprobadas.length > 0) {
+        doc.font('Helvetica').fontSize(9).fill('#6b7280')
+          .text(`No suman al total: ${r.noAprobadas.map((x) => `${x.status} ${x.cant}`).join(' · ')}`);
+      }
+      doc.moveDown(0.3);
+      doc.save().roundedRect(left, doc.y, W, 34, 6).fill('#111827').restore();
+      doc.font('Helvetica-Bold').fontSize(13).fill('#ffffff')
+        .text(`TOTAL GENERAL  ${money(r.totalGeneral)}`, left, doc.y + 10, { width: W, align: 'center' });
+      doc.moveDown(1.2);
+      doc.font('Helvetica').fontSize(8).fill('#9ca3af')
+        .text(`Emitido el ${fmtEs(new Date().toISOString())} · ${clubName}`, { align: 'center' });
+
+      doc.end();
+    });
+  }
+
   // ── Template ticket (uno por tipo: partido | evento) ──────
   async getTemplate(rawId?: string) {
     const id = normalizeTemplateId(rawId);
@@ -548,4 +893,169 @@ export class EntradasAdminService {
     });
   }
 
+}
+
+// ─── Resumen de jornada: tipos + helpers puros ────────────
+
+export interface JornadaMetodo {
+  metodo: string;
+  cant: number;
+  monto: number;
+  pct: number;
+}
+
+export interface JornadaSector {
+  sector: string;
+  cant: number;
+  monto: number;
+  pct: number;
+}
+
+export interface JornadaProducto {
+  nombre: string;
+  cant: number;
+  monto: number;
+}
+
+export interface JornadaHora {
+  hora: string;
+  entradas: number;
+  bufet: number;
+}
+
+export interface JornadaResumen {
+  jornada: {
+    tipo: 'PARTIDO' | 'EVENTO';
+    titulo: string;
+    fecha: string;
+    ventanaDesde: string;
+    ventanaHasta: string;
+  };
+  entradas: {
+    totalCant: number;
+    totalMonto: number;
+    porSector: JornadaSector[];
+    porMetodo: JornadaMetodo[];
+  };
+  bufet: {
+    totalCant: number;
+    totalMonto: number;
+    ticketPromedio: number;
+    porMetodo: JornadaMetodo[];
+    topProductos: JornadaProducto[];
+  };
+  horasPico: JornadaHora[];
+  beneficios: { otorgados: number; canjeados: number };
+  noAprobadas: Array<{ status: string; cant: number }>;
+  totalGeneral: number;
+}
+
+export function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function pctOf(part: number, total: number): number {
+  if (!total) return 0;
+  return Math.round((part / total) * 1000) / 10;
+}
+
+export function buildHoraBuckets(
+  desde: Date,
+  hasta: Date,
+  entradas: Array<{ at: Date; cant: number }>,
+  bufet: Array<{ at: Date; cant: number }>,
+): JornadaHora[] {
+  const buckets: JornadaHora[] = [];
+  const start = new Date(desde);
+  start.setMinutes(0, 0, 0);
+  const end = new Date(hasta);
+  let guard = 0;
+  for (let t = start.getTime(); t <= end.getTime() && guard < 48; t += 3_600_000, guard += 1) {
+    const d = new Date(t);
+    buckets.push({ hora: `${String(d.getHours()).padStart(2, '0')}:00`, entradas: 0, bufet: 0, _t: d.getTime() } as JornadaHora & { _t: number });
+  }
+  const place = (at: Date, cant: number, key: 'entradas' | 'bufet') => {
+    const h = new Date(at);
+    h.setMinutes(0, 0, 0);
+    const b = buckets.find((x) => (x as unknown as { _t: number })._t === h.getTime());
+    if (b) b[key] += cant;
+  };
+  for (const e of entradas) place(new Date(e.at), e.cant, 'entradas');
+  for (const b of bufet) place(new Date(b.at), b.cant, 'bufet');
+  return buckets.map(({ hora, entradas: e, bufet: b }) => ({ hora, entradas: e, bufet: b }));
+}
+
+export function normalizeHexColor(v: string | null | undefined): string | null {
+  if (!v) return null;
+  const t = v.trim();
+  return /^#[0-9a-fA-F]{6}$/.test(t) ? t : null;
+}
+
+export function resolveUploadFile(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const p = url.startsWith('/') ? join('/data/uploads', url.replace('/uploads/', '')) : url;
+  if (!p.startsWith('/data/uploads') || !existsSync(p)) return null;
+  return p;
+}
+
+export function fmtEs(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+export function fmtHoraEs(iso: string): string {
+  return new Date(iso).toLocaleString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function jornadaFilename(r: JornadaResumen): string {
+  const fecha = new Date(r.jornada.fecha).toISOString().slice(0, 10);
+  const slug = r.jornada.titulo
+    .normalize('NFD')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .toLowerCase();
+  return `jornada-${fecha}-${slug || 'resumen'}.pdf`;
+}
+
+function dualBar(
+  doc: PDFKit.PDFDocument,
+  left: number,
+  w: number,
+  segs: Array<{ pct: number; color: string }>,
+  track: string,
+): void {
+  const y = doc.y;
+  doc.save().roundedRect(left, y, w, 18, 4).fill(track).restore();
+  let acc = 0;
+  for (const s of segs) {
+    const wSeg = (w * s.pct) / 100;
+    if (wSeg > 0.5) doc.save().rect(left + acc, y, wSeg, 18).fill(s.color).restore();
+    acc += wSeg;
+  }
+  doc.y = y + 24;
+}
+
+function metodoLegend(
+  doc: PDFKit.PDFDocument,
+  left: number,
+  w: number,
+  metodos: JornadaMetodo[],
+  money: (n: number) => string,
+  palette: string[],
+  offset = 0,
+): void {
+  if (metodos.length === 0) {
+    doc.font('Helvetica').fontSize(10).fill('#6b7280').text('Sin ventas aprobadas.');
+    return;
+  }
+  metodos.forEach((m, i) => {
+    const color = palette[(i + offset) % palette.length];
+    if (doc.y + 16 > doc.page.height - 44) doc.addPage();
+    doc.fill(color).rect(left, doc.y, 10, 10).fill();
+    doc.font('Helvetica').fontSize(10).fill('#111827')
+      .text(`  ${m.metodo}: ${m.cant} · ${money(m.monto)} (${m.pct}%)`, left + 14, doc.y - 11, { width: w - 14 });
+    doc.moveDown(0.15);
+  });
 }

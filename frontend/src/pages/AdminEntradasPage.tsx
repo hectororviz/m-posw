@@ -18,6 +18,7 @@ import {
 } from '../api/queries';
 import type { EntradaBeneficio, EntradaBeneficioSector, EntradaEvento, EntradaFixture, EntradaSaleStatus, TicketSale } from '../api/types';
 import { useToast } from '../components/ToastProvider';
+import { ResumenJornada } from '../components/ResumenJornada';
 import { ConfirmDialog } from '../components/ui/Modal';
 import { SegmentedControl } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageLayout';
@@ -143,6 +144,8 @@ const VentasTab: React.FC<{ canWrite: boolean }> = () => {
           ))}
         </div>
       )}
+
+      {sel && <ResumenJornada fixtureId={fixtureId} eventoId={eventoId} />}
 
       <div className="sales-table-wrapper" style={{ marginBottom: '1rem' }}>
         <div className="sales-table">

@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ModuleAccess, ModuleKey } from '@prisma/client';
 import { memoryStorage } from 'multer';
@@ -195,6 +196,26 @@ export class EntradasAdminController {
   @Get('sales/summary')
   salesSummary(@Query('fixtureId') fixtureId?: string, @Query('eventoId') eventoId?: string) {
     return this.admin.salesSummary(fixtureId, eventoId);
+  }
+
+  @Get('sales/jornada')
+  jornadaResumen(@Query('fixtureId') fixtureId?: string, @Query('eventoId') eventoId?: string) {
+    return this.admin.jornadaResumen(fixtureId, eventoId);
+  }
+
+  @Get('sales/jornada.pdf')
+  async jornadaPdf(
+    @Query('fixtureId') fixtureId: string | undefined,
+    @Query('eventoId') eventoId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.admin.jornadaPdf(fixtureId, eventoId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   // ── Template + escudo ──
