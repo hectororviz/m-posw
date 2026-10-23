@@ -280,16 +280,22 @@ export const AdminInternetPage: React.FC = () => {
     if (!Number.isInteger(staffDuration) || staffDuration <= 0) { setError('Duración inválida'); return; }
     setSavingStaff(true);
     try {
-      await apiClient.post('/internet/staff-vouchers', {
+      const res = await apiClient.post('/internet/staff-vouchers', {
         label: staffLabel.trim(),
         notes: staffNotes.trim() || undefined,
         duration: staffDuration,
       });
+      const createdPin = res?.data?.pin as string | undefined;
       setShowStaffModal(false);
       setStaffLabel('');
       setStaffNotes('');
       await queryClient.invalidateQueries({ queryKey: ['staff-vouchers'] });
-      pushToast('Pin de personal creado', 'success');
+      if (createdPin) {
+        setDetailPin(createdPin);
+        pushToast(`Pin de personal creado: ${createdPin}`, 'success');
+      } else {
+        pushToast('Pin de personal creado', 'success');
+      }
     } catch (err) { setError(normalizeApiError(err)); } finally { setSavingStaff(false); }
   };
 
@@ -306,20 +312,16 @@ export const AdminInternetPage: React.FC = () => {
     }
   };
 
-  const renderMaskedPin = (v: { pin: string; firstUseAt: string | null }) => {
-    if (!v.firstUseAt) {
-      return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: 'var(--color-text-faint)' }}>
-          <span style={{ fontFamily: 'Consolas,monospace', letterSpacing: '0.15rem' }}>••••••</span>
-        </span>
-      );
-    }
+  const renderPin = (v: { pin: string; firstUseAt: string | null }) => {
     return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontFamily: 'Consolas,monospace', fontWeight: 600 }}>
         {v.pin}
         <button type="button" className="btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); copyPin(v.pin); }} aria-label={`Copiar PIN ${v.pin}`} style={{ padding: '0.1rem 0.3rem' }}>
           <Copy size={13} />
         </button>
+        {!v.firstUseAt && (
+          <span className="badge badge-info" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400 }}>Sin canjear</span>
+        )}
       </span>
     );
   };
@@ -443,7 +445,7 @@ export const AdminInternetPage: React.FC = () => {
                     <span className="col-type vcol-venta">#{v.saleOrderNumber}</span>
                     <span className="col-user vcol-plan">{v.planName}</span>
                     <span className="col-user vcol-pin">
-                      {renderMaskedPin(v)}
+                      {renderPin(v)}
                       <br />
                       <small style={{ color: 'var(--color-text-faint)', fontFamily: 'Consolas,monospace' }}>{v.firstUseAt ? (v.macAddress ?? '—') : 'Sin canjear'}</small>
                     </span>
@@ -501,13 +503,12 @@ export const AdminInternetPage: React.FC = () => {
                 <>
                   <div className="settings-field">
                     <label>PIN</label>
-                    {detail.first_use_at ? (
-                      <p style={{ margin: 0, fontFamily: 'Consolas,monospace', fontWeight: 700, letterSpacing: '0.1rem' }}>{detail.pin}</p>
-                    ) : (
-                      <p style={{ margin: 0, fontFamily: 'Consolas,monospace', letterSpacing: '0.15rem', color: 'var(--color-text-faint)' }}>
-                        •••••• <small>(se revela al canjear — ya no se puede reutilizar)</small>
-                      </p>
-                    )}
+                    <p style={{ margin: 0, fontFamily: 'Consolas,monospace', fontWeight: 700, letterSpacing: '0.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {detail.pin}
+                      <button type="button" className="btn-ghost btn-sm" onClick={() => copyPin(detail.pin)} aria-label={`Copiar PIN ${detail.pin}`} style={{ padding: '0.1rem 0.3rem' }}>
+                        <Copy size={13} />
+                      </button>
+                    </p>
                   </div>
                   {selectedStaff && (
                     <>
@@ -752,7 +753,7 @@ export const AdminInternetPage: React.FC = () => {
                   <div key={s.id} className="sales-table-row voucher-row-clickable" onClick={() => setDetailPin(s.pin)}>
                     <span className="col-date" style={{ fontWeight: 500 }}>{s.label}</span>
                     <span className="col-user vcol-pin">
-                      {renderMaskedPin(s)}
+                      {renderPin(s)}
                       <br />
                       <small style={{ color: 'var(--color-text-faint)', fontFamily: 'Consolas,monospace' }}>{s.firstUseAt ? (s.macAddress ?? '—') : 'Sin canjear'}</small>
                     </span>
