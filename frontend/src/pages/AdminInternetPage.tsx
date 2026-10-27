@@ -46,6 +46,7 @@ interface PlanForm {
   uploadBandwidth: string;
   idleTimeout: number;
   customDuration: boolean;
+  active: boolean;
 }
 
 const EMPTY_FORM: PlanForm = {
@@ -56,6 +57,7 @@ const EMPTY_FORM: PlanForm = {
   uploadBandwidth: '2M',
   idleTimeout: 1800,
   customDuration: false,
+  active: true,
 };
 
 const isPreset = (seconds: number) => DURATION_OPTIONS.some((o) => o.value === seconds);
@@ -213,6 +215,7 @@ export const AdminInternetPage: React.FC = () => {
       uploadBandwidth: plan.uploadBandwidth,
       idleTimeout: plan.idleTimeout,
       customDuration: !isPreset(plan.duration),
+      active: plan.active,
     });
     setShowModal(true);
   };
@@ -245,7 +248,7 @@ export const AdminInternetPage: React.FC = () => {
     if (isNaN(priceNum) || priceNum < 0) { setError('El precio no puede ser negativo'); return; }
     setSaving(true);
     try {
-      const payload = { name: form.name.trim(), duration: form.duration, price: priceNum, downloadBandwidth: form.downloadBandwidth, uploadBandwidth: form.uploadBandwidth, idleTimeout: form.idleTimeout };
+      const payload = { name: form.name.trim(), duration: form.duration, price: priceNum, downloadBandwidth: form.downloadBandwidth, uploadBandwidth: form.uploadBandwidth, idleTimeout: form.idleTimeout, active: form.active };
       if (editingPlan) {
         await apiClient.patch(`/internet/plans/${editingPlan.id}`, payload);
       } else {
@@ -622,9 +625,12 @@ export const AdminInternetPage: React.FC = () => {
                       <input id="plan-price" type="number" min="0" step="1" placeholder="2000" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
                     </div>
                   </div>
-                  <div className="settings-field" style={{ marginBottom: 0 }}>
+                  <div className="settings-field">
                     <label htmlFor="plan-idle">Timeout de inactividad (segundos)</label>
                     <input id="plan-idle" type="number" min="0" step="1" value={form.idleTimeout} onChange={(e) => setForm({ ...form, idleTimeout: Number(e.target.value) || 0 })} />
+                  </div>
+                  <div className="settings-field" style={{ marginBottom: 0 }}>
+                    <label className="toggle-switch"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} /><span className="toggle-switch-track" />Activo (visible en POS)</label>
                   </div>
                 </div>
                 <div className="modal-footer" style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>

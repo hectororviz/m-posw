@@ -32,13 +32,14 @@ export class InternetPlansService {
     const category = await this.ensureInternetCategory();
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const isActive = dto.active ?? true;
       const product = await tx.product.create({
         data: {
           name: dto.name,
           price: dto.price,
           stock: 0,
           type: 'SIMPLE',
-          active: true,
+          active: isActive,
           categoryId: category.id,
           iconName: formatDurationShort(dto.duration),
           colorHex: INTERNET_CATEGORY_COLOR,
@@ -53,6 +54,7 @@ export class InternetPlansService {
           downloadBandwidth: dto.downloadBandwidth ?? '10M',
           uploadBandwidth: dto.uploadBandwidth ?? '2M',
           price: dto.price,
+          active: isActive,
           position: dto.position ?? 0,
           productId: product.id,
           categoryId: category.id,

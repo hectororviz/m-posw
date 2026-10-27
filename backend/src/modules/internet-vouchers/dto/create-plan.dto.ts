@@ -26,6 +26,10 @@ export class CreatePlanDto {
   price: number;
 
   @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
   @IsInt()
   position?: number;
 }

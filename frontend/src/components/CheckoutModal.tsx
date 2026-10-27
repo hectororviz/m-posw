@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import { X } from 'lucide-react';
 import { apiClient, getUploadsBaseUrl, normalizeApiError } from '../api/client';
@@ -71,7 +70,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const { items, discounts, socioData, clear } = useCart();
   const { pushToast } = useToast();
   const { data: settings } = useSettings();
-  const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>('SELECT_METHOD');
   const [cashReceived, setCashReceived] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -919,7 +917,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     }
     resetState();
     onClose();
-    navigate('/');
   };
 
   const handleAcceptDifferentAmount = async () => {
