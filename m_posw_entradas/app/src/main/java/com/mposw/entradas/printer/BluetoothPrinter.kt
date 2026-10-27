@@ -75,7 +75,7 @@ object BluetoothPrinter {
         }
     }
 
-    fun printBlocks(ctx: Context, blocks: List<PrintBlock>): Result<Unit> {
+    suspend fun printBlocks(ctx: Context, blocks: List<PrintBlock>): Result<Unit> {
         if (blocks.isEmpty()) return Result.failure(IllegalStateException("Nada para imprimir"))
         return printBytes(ctx, EscPosEncoder.encode(blocks))
     }
