@@ -68,6 +68,9 @@ jobs:
         run: cp m_posw_entradas/app/build/outputs/apk/debug/app-universal-debug.apk mposw-terminal.apk
 
       - name: Publish rolling release
+        # Solo en main: los runs manuales sobre branches verifican
+        # compilación sin pisar el APK de la flota.
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: terminal-latest
