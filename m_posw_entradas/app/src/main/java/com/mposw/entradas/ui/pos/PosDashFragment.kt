@@ -50,10 +50,13 @@ class PosDashFragment : Fragment() {
         else -> 1.0f
     }
 
-    fun imageHeightDp(): Int = when (session.textScale) {
-        "S" -> 72
-        "L" -> 120
-        else -> 96
+    fun imageHeightDp(): Int {
+        val base = when (session.textScale) {
+            "S" -> 72
+            "L" -> 120
+            else -> 96
+        }
+        return if (com.mposw.entradas.util.DialogStyle.isWide(this)) base + 32 else base
     }
 
     fun productsOf(categoryId: String): List<PosProduct> = catalogRepo.productsOf(categoryId)

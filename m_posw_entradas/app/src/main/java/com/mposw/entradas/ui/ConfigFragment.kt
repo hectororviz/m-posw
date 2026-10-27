@@ -70,6 +70,8 @@ class ConfigFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         session = SessionManager(requireContext())
         cameraPerm.launch(Manifest.permission.CAMERA)
+        // En tablets el contenido no se estira a todo el ancho.
+        com.mposw.entradas.util.DialogStyle.centerContentWide(b.root)
         b.etBaseUrl.setText(session.baseUrl)
         b.etToken.setText(session.token)
         refreshVersions()

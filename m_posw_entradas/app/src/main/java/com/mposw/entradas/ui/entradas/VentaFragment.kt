@@ -72,6 +72,8 @@ class VentaFragment : Fragment() {
         session = SessionManager(requireContext())
         repo = EntradasRepo(session)
         cameraPerm.launch(Manifest.permission.CAMERA)
+        // En tablets el contenido no se estira a todo el ancho.
+        com.mposw.entradas.util.DialogStyle.centerContentWide(b.root)
 
         b.tgSector.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener

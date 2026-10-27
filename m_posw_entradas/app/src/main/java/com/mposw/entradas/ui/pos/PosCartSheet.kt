@@ -25,6 +25,12 @@ class PosCartSheet : BottomSheetDialogFragment() {
         return b.root
     }
 
+    override fun onStart() {
+        super.onStart()
+        // En tablets el sheet no ocupa todo el ancho.
+        com.mposw.entradas.util.DialogStyle.capWidth(this, fullHeight = true)
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         b.rvCart.layoutManager = LinearLayoutManager(requireContext())
         b.rvCart.adapter = LineAdapter()

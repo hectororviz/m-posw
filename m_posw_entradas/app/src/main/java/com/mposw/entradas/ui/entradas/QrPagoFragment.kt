@@ -44,6 +44,7 @@ class QrPagoFragment : DialogFragment() {
 
     override fun onStart() {
         super.onStart()
+        DialogStyle.capWidth(this)
         DialogStyle.round(dialog?.window)
     }
 
