@@ -100,6 +100,15 @@ class SessionManager(context: Context) {
         get() = prefs.getString("themeMode", "system") ?: "system"
         set(v) = prefs.edit().putString("themeMode", v).apply()
 
+    /** Impresora Bluetooth externa (teléfonos/tablets genéricos): MAC + nombre elegido en Config. */
+    var printerMac: String
+        get() = prefs.getString("printerMac", "")?.trim() ?: ""
+        set(v) = prefs.edit().putString("printerMac", v.trim()).apply()
+
+    var printerName: String
+        get() = prefs.getString("printerName", "") ?: ""
+        set(v) = prefs.edit().putString("printerName", v.trim()).apply()
+
     /**
      * Modo prueba: la app simula ventas e impresión con datos ficticios.
      * No llama al backend para vender y no persiste nada.

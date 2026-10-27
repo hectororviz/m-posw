@@ -26,6 +26,7 @@ import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.data.StatusPayload
 import com.mposw.entradas.data.demo.DemoVentas
 import com.mposw.entradas.databinding.FragmentVentaBinding
+import com.mposw.entradas.printer.PrinterRouter
 import com.mposw.entradas.printer.SunmiPrinter
 import com.mposw.entradas.printer.TicketRenderer
 import com.mposw.entradas.ui.BrandApplier
@@ -71,6 +72,8 @@ class VentaFragment : Fragment() {
         session = SessionManager(requireContext())
         repo = EntradasRepo(session)
         cameraPerm.launch(Manifest.permission.CAMERA)
+        // En tablets el contenido no se estira a todo el ancho.
+        com.mposw.entradas.util.DialogStyle.centerContentWide(b.root)
 
         b.tgSector.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
@@ -561,7 +564,7 @@ class VentaFragment : Fragment() {
         lifecycleScope.launch {
             val elements = TicketRenderer.parseTemplate(session.templateJsonFor(payload.templateId), payload.templateId)
             val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
-            val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
+            val res = PrinterRouter.printSale(requireContext(), payload, elements, escudo)
             if (!isAdded) return@launch
             demoUltimas = (listOf(payload) + demoUltimas).take(5)
             registrarVentaLocal(f.fixtureId, f.eventoId.orEmpty(), sec, cantidad)
@@ -580,7 +583,7 @@ class VentaFragment : Fragment() {
         payload.saleId?.let { AppDb.get(requireContext()).sales().upsert(ApprovedSale(it, json)) }
         val elements = TicketRenderer.parseTemplate(session.templateJsonFor(payload.templateId), payload.templateId)
         val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
-        val res = SunmiPrinter.printSale(requireContext(), payload, elements, escudo)
+        val res = PrinterRouter.printSale(requireContext(), payload, elements, escudo)
         if (!isAdded) return
         com.mposw.entradas.ui.PagoExitosoDialogFragment.new(
             (payload.codigos ?: emptyList()).joinToString(", "),

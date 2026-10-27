@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
+import com.mposw.entradas.R
 import com.mposw.entradas.databinding.PagePosCategoryBinding
 
 /** Una página del ViewPager: grilla de productos de una categoría. */
@@ -16,10 +17,11 @@ class PosCategoryPageFragment : Fragment() {
     private val categoryId: String get() = requireArguments().getString("categoryId") ?: ""
     private fun dash(): PosDashFragment? = parentFragment as? PosDashFragment
 
-    /** Columnas según el ancho real: 150dp mínimo por tarjeta, entre 2 y 4. */
+    /** Columnas según el ancho real: 150dp mínimo por tarjeta (tope por recurso: 4 teléfono, 6 tablet). */
     internal fun spanForWidth(widthPx: Int, density: Float): Int {
         if (widthPx <= 0 || density <= 0) return 2
-        return ((widthPx / density) / 150).toInt().coerceIn(2, 4)
+        val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
+        return ((widthPx / density) / 150).toInt().coerceIn(2, max)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {

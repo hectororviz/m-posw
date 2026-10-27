@@ -37,6 +37,7 @@ class PosFiadoDialog : DialogFragment() {
         super.onStart()
         // Ancho completo: el default de DialogFragment es angosto y corta nombres.
         dialog?.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        DialogStyle.capWidth(this)
         DialogStyle.round(dialog?.window)
     }
 

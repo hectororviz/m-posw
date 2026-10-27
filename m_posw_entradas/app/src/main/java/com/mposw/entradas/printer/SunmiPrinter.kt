@@ -2,8 +2,6 @@ package com.mposw.entradas.printer
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.util.Base64
 import android.widget.Toast
 import com.mposw.entradas.data.StatusPayload
 import com.mposw.entradas.data.TemplateElement
@@ -75,15 +73,7 @@ object SunmiPrinter {
         return svc ?: throw IllegalStateException("Impresora no conectada")
     }
 
-    fun escudoBitmap(base64Png: String): Bitmap? {
-        if (base64Png.isBlank()) return null
-        return try {
-            val bytes = Base64.decode(base64Png, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        } catch (_: Exception) {
-            null
-        }
-    }
+    fun escudoBitmap(base64Png: String): Bitmap? = Escudo.decode(base64Png)
 
     /**
      * Normaliza el escudo para la térmica: aplana transparencias sobre
@@ -202,14 +192,7 @@ object SunmiPrinter {
         }
     }
 
-    /** Bloques genéricos para tickets no-entradas (POS bufet). align: 0 izq, 1 centro, 2 der. */
-    sealed interface PrintBlock {
-        data class Text(val line: String, val size: Float = 24f, val bold: Boolean = false, val align: Int = 1) : PrintBlock
-        data class Qr(val content: String) : PrintBlock
-        data object Line : PrintBlock
-        data object Feed : PrintBlock
-    }
-
+    /** Bloques genéricos para tickets no-entradas (POS bufet). Ver [PrintBlock]. */
     suspend fun printBlocks(ctx: Context, escudo: Bitmap?, blocks: List<PrintBlock>): Result<Unit> =
         withContext(Dispatchers.IO) {
             try {
@@ -221,6 +204,13 @@ object SunmiPrinter {
                 }
                 for (bl in blocks) {
                     when (bl) {
+                        is PrintBlock.Image -> {
+                            val bmp = prepareEscudo(bl.bitmap)
+                            if (bmp != null) {
+                                printer.setAlignment(1, noop)
+                                printer.printBitmap(bmp, noop)
+                            }
+                        }
                         is PrintBlock.Text -> {
                             if (bl.line.isBlank()) continue
                             printer.setFontSize(bl.size, noop)

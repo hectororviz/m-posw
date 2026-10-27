@@ -5,6 +5,12 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- Impresora externa por Bluetooth SPP (teléfonos/tablets genéricos).
+         En API 31+ el runtime pide BLUETOOTH_CONNECT; en ≤30 estos son de instalación. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <!-- Visibilidad de paquetes (API 30+): sin esto el bind al
          servicio de impresión Sunmi falla en silencio en Android 11 -->
     <queries>

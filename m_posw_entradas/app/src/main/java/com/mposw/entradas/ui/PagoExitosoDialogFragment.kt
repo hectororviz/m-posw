@@ -25,6 +25,7 @@ class PagoExitosoDialogFragment : DialogFragment() {
 
     override fun onStart() {
         super.onStart()
+        DialogStyle.capWidth(this)
         DialogStyle.round(dialog?.window)
     }
 

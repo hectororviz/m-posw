@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Columnas máximas de la grilla POS (mínimo 150dp por tarjeta). -->
+    <integer name="grid_max_span">4</integer>
+</resources>
