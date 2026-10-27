@@ -1,14 +1,18 @@
 package com.mposw.entradas.ui
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.mposw.entradas.data.ApiClient
@@ -18,6 +22,9 @@ import com.mposw.entradas.data.ModeResolver
 import com.mposw.entradas.data.ModeResult
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.databinding.FragmentConfigBinding
+import com.mposw.entradas.printer.BluetoothPrinter
+import com.mposw.entradas.printer.PrintBlock
+import com.mposw.entradas.printer.PrinterRouter
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -27,6 +34,10 @@ class ConfigFragment : Fragment() {
     private lateinit var session: SessionManager
 
     private val cameraPerm = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val btPerm = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        // Con o sin permiso se muestra el diálogo: sin permiso explica cómo emparejar.
+        if (isAdded) showPrinterDialog()
+    }
     private val scanPairing = registerForActivityResult(ScanContract()) { result ->
         val raw = result.contents
         if (raw == null) {
@@ -74,6 +85,17 @@ class ConfigFragment : Fragment() {
         }
         b.btnTest.setOnClickListener { probar() }
         b.toolbarConfig.setNavigationOnClickListener { requireActivity().onBackPressedDispatcher.onBackPressed() }
+
+        refreshPrinterStatus()
+        b.btnPrinterChoose.setOnClickListener { elegirImpresora() }
+        b.btnPrinterForget.setOnClickListener {
+            session.printerMac = ""
+            session.printerName = ""
+            refreshPrinterStatus()
+            b.tvConfigStatus.text = "Impresora olvidada."
+        }
+        b.btnPrinterTest.setOnClickListener { imprimirPrueba() }
+        b.btnBtSettings.setOnClickListener { abrirAjustesBt() }
 
         b.swModoPrueba.isChecked = session.modoPrueba
         b.swModoPrueba.setOnCheckedChangeListener { _, checked ->
@@ -126,6 +148,83 @@ class ConfigFragment : Fragment() {
     private fun refreshVersions() {
         val app = "v${com.mposw.entradas.BuildConfig.VERSION_NAME} (${com.mposw.entradas.BuildConfig.GIT_SHA})"
         b.tvVersions.text = "$app · modo ${session.deviceMode} · template v${session.templateVersion} · escudo v${session.logoVersion}"
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (_b != null && isAdded) refreshPrinterStatus()
+    }
+
+    private fun refreshPrinterStatus() {
+        if (_b == null || !isAdded) return
+        b.tvPrinterStatus.text = PrinterRouter.describe(requireContext())
+    }
+
+    private fun elegirImpresora() {
+        if (PrinterRouter.isSunmiDevice(requireContext())) {
+            b.tvConfigStatus.text = "Este equipo usa su impresora integrada."
+            return
+        }
+        val faltantes = BluetoothPrinter.missingPermissions(requireContext())
+        if (faltantes.isNotEmpty()) {
+            btPerm.launch(faltantes.toTypedArray())
+            return
+        }
+        showPrinterDialog()
+    }
+
+    private fun showPrinterDialog() {
+        if (!isAdded || _b == null) return
+        val devices = BluetoothPrinter.pairedDevices(requireContext())
+        if (devices.isEmpty()) {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Elegir impresora")
+                .setMessage("No hay impresoras emparejadas. Emparejá la impresora en los ajustes Bluetooth del sistema y volvé a elegir.")
+                .setPositiveButton("Abrir ajustes") { _, _ -> abrirAjustesBt() }
+                .setNegativeButton("Cerrar", null)
+                .show()
+            return
+        }
+        val names = devices.map { "${it.name}\n${it.mac}" }.toTypedArray()
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Elegir impresora")
+            .setItems(names) { _, which ->
+                session.printerMac = devices[which].mac
+                session.printerName = devices[which].name
+                refreshPrinterStatus()
+                b.tvConfigStatus.text = "Impresora: ${devices[which].name}."
+            }
+            .setNegativeButton("Cerrar", null)
+            .show()
+    }
+
+    private fun imprimirPrueba() {
+        b.tvConfigStatus.text = "Imprimiendo prueba…"
+        lifecycleScope.launch {
+            val res = PrinterRouter.printBlocks(
+                requireContext(),
+                null,
+                listOf(
+                    PrintBlock.Text("PRUEBA DE IMPRESION", 28f, true),
+                    PrintBlock.Line,
+                    PrintBlock.Text(PrinterRouter.describe(requireContext()), 24f, false),
+                    PrintBlock.Feed,
+                ),
+            )
+            if (!isAdded || _b == null) return@launch
+            b.tvConfigStatus.text = res.fold(
+                { "Prueba OK." },
+                { "Prueba falló: ${it.message}" },
+            )
+        }
+    }
+
+    private fun abrirAjustesBt() {
+        try {
+            startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+        } catch (_: Exception) {
+            if (isAdded) Toast.makeText(requireContext(), "No se pudo abrir ajustes Bluetooth", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun probar() {

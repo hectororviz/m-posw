@@ -18,11 +18,12 @@
             app:navigationIcon="?attr/homeAsUpIndicator"
             app:title="@string/config_titulo" />
 
+        <!-- Conexión al servidor -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="Vinculación con la app principal"
+            android:text="@string/seccion_conexion"
             android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
 
         <com.google.android.material.textfield.TextInputLayout
@@ -89,13 +90,71 @@
             android:layout_marginTop="12dp"
             android:textAppearance="@style/TextAppearance.Entradas.Label" />
 
-        <TextView android:id="@+id/tvVersions"
+        <!-- Impresora -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/seccion_impresora"
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
+
+        <TextView android:id="@+id/tvPrinterStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:gravity="end"
-            android:textAppearance="@style/TextAppearance.Entradas.Support" />
+            android:textAppearance="@style/TextAppearance.Entradas.Label" />
 
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPrinterChoose"
+                style="@style/Widget.Entradas.Button.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/impresora_elegir" />
+
+            <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPrinterTest"
+                style="@style/Widget.Entradas.Button.Secondary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/impresora_probar" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPrinterForget"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/impresora_olvidar" />
+
+            <Space android:layout_width="8dp" android:layout_height="wrap_content" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBtSettings"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/impresora_ajustes_bt" />
+        </LinearLayout>
+
+        <!-- Apariencia -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -200,12 +259,20 @@
                 android:textColor="@color/toggle_sector_text" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
+        <!-- Avanzado -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Modo prueba"
+            android:text="@string/seccion_avanzado"
             android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Modo prueba"
+            android:textAppearance="@style/TextAppearance.Entradas.Label" />
 
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/swModoPrueba"
@@ -219,6 +286,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:text="Muestra datos ficticios, vende e imprime tickets de prueba con el diseño real. QR y socio quedan deshabilitados."
+            android:textAppearance="@style/TextAppearance.Entradas.Support" />
+
+        <TextView android:id="@+id/tvVersions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="end"
             android:textAppearance="@style/TextAppearance.Entradas.Support" />
     </LinearLayout>
 </ScrollView>

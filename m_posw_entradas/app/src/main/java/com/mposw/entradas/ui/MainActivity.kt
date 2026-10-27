@@ -15,7 +15,7 @@ import com.mposw.entradas.data.DeviceMode
 import com.mposw.entradas.data.ModeResolver
 import com.mposw.entradas.data.ModeResult
 import com.mposw.entradas.data.SessionManager
-import com.mposw.entradas.printer.SunmiPrinter
+import com.mposw.entradas.printer.PrinterRouter
 import com.mposw.entradas.ui.entradas.VentaFragment
 import com.mposw.entradas.ui.pos.PosDashFragment
 import kotlinx.coroutines.launch
@@ -38,9 +38,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         session = SessionManager(this)
-        // Común a ambos modos (impresora integrada). Nada de Room ni de
-        // pantallas de un modo se inicializa acá.
-        SunmiPrinter.init(this)
+        // Impresora: en Sunmi se bindea el servicio integrado; en equipos
+        // genéricos el backend es Bluetooth y no hay nada que inicializar.
+        // Nada de Room ni de pantallas de un modo se inicializa acá.
+        if (PrinterRouter.isSunmiDevice(this)) {
+            com.mposw.entradas.printer.SunmiPrinter.init(this)
+        }
         bottomBar = findViewById(R.id.bottomBar)
         ultimosBar = findViewById(R.id.ultimosBar)
         btnConfig = findViewById(R.id.btnConfig)

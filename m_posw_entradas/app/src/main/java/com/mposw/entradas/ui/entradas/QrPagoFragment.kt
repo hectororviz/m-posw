@@ -14,6 +14,7 @@ import com.mposw.entradas.data.ApprovedSale
 import com.mposw.entradas.data.EntradasRepo
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.databinding.FragmentQrPagoBinding
+import com.mposw.entradas.printer.PrinterRouter
 import com.mposw.entradas.printer.SunmiPrinter
 import com.mposw.entradas.printer.TicketRenderer
 import com.mposw.entradas.ui.PagoExitosoDialogFragment
@@ -75,7 +76,7 @@ class QrPagoFragment : DialogFragment() {
                             AppDb.get(requireContext()).sales().upsert(ApprovedSale(saleId, json))
                             val elements = TicketRenderer.parseTemplate(session.templateJsonFor(p.templateId), p.templateId)
                             val escudo = SunmiPrinter.escudoBitmap(session.escudoBase64)
-                            val printedOk = SunmiPrinter.printSale(requireContext(), p, elements, escudo).isSuccess
+                            val printedOk = PrinterRouter.printSale(requireContext(), p, elements, escudo).isSuccess
                             parentFragmentManager.setFragmentResult(
                                 "qr_aprobado",
                                 androidx.core.os.bundleOf(

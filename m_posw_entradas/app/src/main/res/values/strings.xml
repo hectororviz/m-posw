@@ -28,6 +28,13 @@
     <string name="socio_quitar">Quitar socio</string>
     <string name="config_desc">Configuración</string>
     <string name="apariencia">Apariencia</string>
+    <string name="seccion_conexion">Conexión al servidor</string>
+    <string name="seccion_impresora">Impresora</string>
+    <string name="impresora_elegir">Elegir impresora</string>
+    <string name="impresora_olvidar">Olvidar</string>
+    <string name="impresora_probar">Imprimir prueba</string>
+    <string name="impresora_ajustes_bt">Ajustes Bluetooth</string>
+    <string name="seccion_avanzado">Avanzado</string>
     <string name="tema_sistema">Sistema</string>
     <string name="tema_claro">Claro</string>
     <string name="tema_oscuro">Noche</string>

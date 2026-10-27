@@ -4,8 +4,8 @@ import android.content.Context
 import com.mposw.entradas.util.MoneyFormat
 import com.mposw.entradas.data.PosSale
 import com.mposw.entradas.data.SessionManager
-import com.mposw.entradas.printer.SunmiPrinter
-import com.mposw.entradas.printer.SunmiPrinter.PrintBlock
+import com.mposw.entradas.printer.PrintBlock
+import com.mposw.entradas.printer.PrinterRouter
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -84,7 +84,7 @@ object PosTicketRenderer {
         blocks.add(PrintBlock.Text("Ticket no fiscal", 24f, false))
         blocks.add(PrintBlock.Feed)
 
-        return SunmiPrinter.printBlocks(ctx, null, blocks).isSuccess
+        return PrinterRouter.printBlocks(ctx, null, blocks).isSuccess
     }
 
     /** ISO UTC → "dd/MM/yy - HH:mm" en hora local (igual que la web). */
