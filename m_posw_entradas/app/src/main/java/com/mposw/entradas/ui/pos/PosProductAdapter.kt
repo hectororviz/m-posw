@@ -22,6 +22,7 @@ class PosProductAdapter(
     private val textScale: Float,
     private val imageHeightDp: Int,
     private val apiRoot: String,
+    private val imageFile: (PosProduct) -> java.io.File?,
     private val onTap: (PosProduct) -> Unit,
 ) : ListAdapter<PosProductRow, PosProductAdapter.Holder>(DIFF) {
 
@@ -62,11 +63,16 @@ class PosProductAdapter(
             h.b.tvProdBadge.visibility = View.GONE
         }
 
-        val url = p.imageUrl(apiRoot)
-        if (url != null) {
+        // Archivo local vigente primero (funciona sin red); si no, URL.
+        val data: Any? = try {
+            imageFile(p)
+        } catch (_: Exception) {
+            null
+        } ?: p.imageUrl(apiRoot)
+        if (data != null) {
             showFallback(h, p, true)
             h.b.ivProd.visibility = View.VISIBLE
-            h.b.ivProd.load(url) {
+            h.b.ivProd.load(data) {
                 size(ViewSizeResolver(h.b.ivProd))
                 crossfade(100)
                 listener(

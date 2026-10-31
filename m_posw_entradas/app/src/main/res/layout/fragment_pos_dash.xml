@@ -90,4 +90,49 @@
             android:contentDescription="Ver carrito"
             app:icon="@drawable/ic_cart" />
     </LinearLayout>
+
+    <!-- Panel lateral del carrito (solo tablet apaisada; oculto en teléfono). -->
+    <FrameLayout
+        android:id="@+id/cartPanelContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/expandStrip"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone">
+
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnExpandCart"
+            style="@style/Widget.Entradas.Button.Neutral"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Carrito" />
+    </LinearLayout>
+
+    <!-- Solo existen en la variante apaisada de tablet (binding compartido). -->
+    <FrameLayout
+        android:id="@+id/sideCartHost"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/sideExpandStrip"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone">
+
+        <com.google.android.material.button.MaterialButton android:id="@+id/btnSideExpand"
+            style="?attr/materialIconButtonOutlinedStyle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:text="‹"
+            android:contentDescription="Mostrar carrito" />
+    </LinearLayout>
 </LinearLayout>

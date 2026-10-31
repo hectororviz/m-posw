@@ -17,10 +17,7 @@ import com.mposw.entradas.databinding.TabConfigEstadoBinding
 import com.mposw.entradas.printer.PrinterRouter
 import com.mposw.entradas.ui.MainActivity
 import com.mposw.entradas.util.DialogStyle
-import com.mposw.entradas.util.PosImages
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Pestaña Estado: resumen + Probar conexión (navega al modo si es raíz). */
 class ConfigEstadoFragment : Fragment() {
@@ -55,21 +52,12 @@ class ConfigEstadoFragment : Fragment() {
 
     private fun refreshVersions() {
         if (_b == null) return
-        b.tvVersions.text = versionText("…")
-        lifecycleScope.launch {
-            val mb = try {
-                withContext(Dispatchers.IO) { PosImages.diskCacheMb(requireContext().applicationContext) }
-            } catch (_: Exception) {
-                null
-            }
-            if (!isAdded || _b == null) return@launch
-            b.tvVersions.text = versionText(mb?.let { "$it MB" } ?: "?")
-        }
+        b.tvVersions.text = versionText()
     }
 
-    private fun versionText(imgs: String): String {
+    private fun versionText(): String {
         val app = "v${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_SHA})"
-        return "$app · modo ${session.deviceMode} · template v${session.templateVersion} · escudo v${session.logoVersion} · imgs $imgs"
+        return "$app · modo ${session.deviceMode} · template v${session.templateVersion} · escudo v${session.logoVersion} · fotos ${session.imgLocal}/${session.imgTotal} · ${session.imgMb} MB"
     }
 
     private fun probar() {
