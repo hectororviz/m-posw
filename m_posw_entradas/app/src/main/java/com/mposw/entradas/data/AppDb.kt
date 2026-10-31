@@ -29,6 +29,14 @@ interface ApprovedSaleDao {
     @Query("SELECT * FROM approved_sales ORDER BY createdAt DESC LIMIT 5")
     suspend fun lastFive(): List<ApprovedSale>
 
+    /** Últimas del día (desde inicio del día en hora del equipo). */
+    @Query("SELECT * FROM approved_sales WHERE createdAt >= :since ORDER BY createdAt DESC LIMIT 5")
+    suspend fun lastFiveSince(since: Long): List<ApprovedSale>
+
+    /** Poda filas anteriores a `before` (higiene de la tabla local). */
+    @Query("DELETE FROM approved_sales WHERE createdAt < :before")
+    suspend fun pruneBefore(before: Long)
+
     @Query("SELECT * FROM approved_sales WHERE saleId = :id LIMIT 1")
     suspend fun byId(id: String): ApprovedSale?
 }

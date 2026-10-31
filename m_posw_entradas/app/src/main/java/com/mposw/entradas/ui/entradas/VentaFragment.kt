@@ -289,7 +289,18 @@ class VentaFragment : Fragment() {
                 demoUltimas
             } else {
                 try {
-                    AppDb.get(requireContext()).sales().lastFive().map { v ->
+                    val dao = AppDb.get(requireContext()).sales()
+                    // Solo las del día (hora del equipo) + poda de anteriores a 7 días.
+                    val startOfDay = java.util.Calendar.getInstance().apply {
+                        set(java.util.Calendar.HOUR_OF_DAY, 0)
+                        set(java.util.Calendar.MINUTE, 0)
+                        set(java.util.Calendar.SECOND, 0)
+                        set(java.util.Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+                    try {
+                        dao.pruneBefore(startOfDay - 7L * 24 * 60 * 60 * 1000)
+                    } catch (_: Exception) {}
+                    dao.lastFiveSince(startOfDay).map { v ->
                         try {
                             Gson().fromJson(v.payloadJson, com.mposw.entradas.data.StatusPayload::class.java)
                         } catch (_: Exception) {

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:padding="16dp"
     android:layout_width="match_parent"
@@ -26,6 +27,14 @@
             android:layout_height="48dp"
             android:text="→"
             android:contentDescription="Ocultar carrito" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnPanelConfig"
+            style="?attr/materialIconButtonOutlinedStyle"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            app:icon="@drawable/ic_settings"
+            android:contentDescription="Configuración" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnPanelClose"
@@ -55,14 +64,6 @@
         android:layout_marginTop="8dp"
         android:textAppearance="?attr/textAppearanceHeadlineSmall"
         android:textStyle="bold" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnPanelReprint"
-        style="@style/Widget.Entradas.Button.Ghost"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="Reimprimir última" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnPanelCobrar"

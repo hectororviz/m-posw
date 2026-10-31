@@ -4,15 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.mposw.entradas.databinding.FragmentPosCartPanelBinding
 import com.mposw.entradas.databinding.ItemPosCartLineBinding
+import com.mposw.entradas.ui.MainActivity
 import com.mposw.entradas.util.MoneyFormat
-import kotlinx.coroutines.launch
 
 /**
  * Contenido del carrito (líneas +/−/eliminar, descuentos, total, Cobrar):
@@ -43,9 +41,10 @@ class PosCartPanelFragment : Fragment() {
         b.rvCart.adapter = LineAdapter()
         b.btnPanelClose.visibility = if (inSheet) View.VISIBLE else View.GONE
         b.btnPanelCollapse.visibility = if (inSheet) View.GONE else View.VISIBLE
+        b.btnPanelConfig.visibility = if (inSheet) View.GONE else View.VISIBLE
         b.btnPanelClose.setOnClickListener { (parentFragment as? PosCartSheet)?.dismissAllowingStateLoss() }
         b.btnPanelCollapse.setOnClickListener { (parentFragment as? PosDashFragment)?.setSideCartCollapsed(true) }
-        b.btnPanelReprint.setOnClickListener { reprint() }
+        b.btnPanelConfig.setOnClickListener { (activity as? MainActivity)?.openConfig() }
         b.btnPanelCobrar.setOnClickListener { dash().pagar() }
         refresh()
     }
@@ -61,28 +60,6 @@ class PosCartPanelFragment : Fragment() {
         b.tvCartTotal.text = "TOTAL  ${MoneyFormat.format(cart.total)}"
         b.btnPanelCobrar.isEnabled = cart.lines.isNotEmpty()
         dash().refreshTotal(fromPanel = true)
-    }
-
-    private fun reprint() {
-        lifecycleScope.launch {
-            val dash = try { dash() } catch (_: Exception) { return@launch }
-            if (!isAdded) return@launch
-            val last = dash.salesRepo.lastApproved()
-            if (last == null) {
-                Toast.makeText(requireContext(), "Sin ventas para reimprimir", Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            val ok = try {
-                com.mposw.entradas.util.PrintHelper.reprintLast(requireContext())
-            } catch (_: Exception) {
-                false
-            }
-            Toast.makeText(
-                requireContext(),
-                if (ok) "Reimpreso" else "Error de impresora",
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
     }
 
     private inner class LineAdapter : RecyclerView.Adapter<LineAdapter.Holder>() {
@@ -101,9 +78,11 @@ class PosCartPanelFragment : Fragment() {
             h.b.tvLineName.text = line.product.name
             h.b.tvLinePrice.text = "${MoneyFormat.format(line.product.price)} c/u · ${MoneyFormat.format(line.product.price * line.quantity)}"
             h.b.tvQty.text = line.quantity.toString()
-            h.b.btnMinus.setOnClickListener { cart.setQuantity(line.product.id, line.quantity - 1); refresh() }
-            h.b.btnPlus.setOnClickListener { cart.setQuantity(line.product.id, line.quantity + 1); refresh() }
-            h.b.btnDel.setOnClickListener { cart.remove(line.product.id); refresh() }
+            // OJO: refresh() a secas resolvería al del adapter (solo re-bindea
+            // filas); hay que llamar al del panel para actualizar el total.
+            h.b.btnMinus.setOnClickListener { cart.setQuantity(line.product.id, line.quantity - 1); this@PosCartPanelFragment.refresh() }
+            h.b.btnPlus.setOnClickListener { cart.setQuantity(line.product.id, line.quantity + 1); this@PosCartPanelFragment.refresh() }
+            h.b.btnDel.setOnClickListener { cart.remove(line.product.id); this@PosCartPanelFragment.refresh() }
         }
     }
 

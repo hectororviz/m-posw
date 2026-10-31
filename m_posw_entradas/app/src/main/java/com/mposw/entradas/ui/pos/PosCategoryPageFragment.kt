@@ -17,11 +17,14 @@ class PosCategoryPageFragment : Fragment() {
     private val categoryId: String get() = requireArguments().getString("categoryId") ?: ""
     private fun dash(): PosDashFragment? = parentFragment as? PosDashFragment
 
-    /** Columnas según el ancho real: 150dp mínimo por tarjeta (tope por recurso: 4 teléfono, 6 tablet). */
+    /** Columnas según el ancho real (tope por recurso: 4 teléfono, 6 tablet). */
     internal fun spanForWidth(widthPx: Int, density: Float): Int {
         if (widthPx <= 0 || density <= 0) return 2
         val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
-        return ((widthPx / density) / 150).toInt().coerceIn(2, max)
+        // Con el lateral abierto las tarjetas mantienen su tamaño (~210dp):
+        // se ven menos columnas en vez de angostarse.
+        val min = dash()?.gridMinCardDp() ?: 150
+        return ((widthPx / density) / min).toInt().coerceIn(2, max)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
