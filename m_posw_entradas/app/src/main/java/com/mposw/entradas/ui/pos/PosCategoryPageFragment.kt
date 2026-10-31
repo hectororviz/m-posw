@@ -35,7 +35,7 @@ class PosCategoryPageFragment : Fragment() {
         rv.setHasFixedSize(true)
         val lm = GridLayoutManager(requireContext(), 2)
         rv.layoutManager = lm
-        val adapter = PosProductAdapter(d.textScaleFactor(), d.imageHeightDp(), d.apiRoot()) { p -> d.onProductTap(p) }
+        val adapter = PosProductAdapter(d.textScaleFactor(), d.imageHeightDp(), d.apiRoot(), d::productImageFile) { p -> d.onProductTap(p) }
         rv.adapter = adapter
         val rows = d.productsOf(categoryId).map { PosProductRow(it, d.cartQtyOf(it.id)) }
         adapter.submitList(rows)
@@ -60,6 +60,12 @@ class PosCategoryPageFragment : Fragment() {
         val binding = _b ?: return
         val adapter = binding.rvProductos.adapter as? PosProductAdapter ?: return
         adapter.submitList(adapter.currentList.map { it.copy(qty = qty[it.product.id] ?: 0) })
+    }
+
+    /** Re-bindea todo (p. ej. llegaron fotos a la caché propia en segundo plano). */
+    fun refreshImages() {
+        val binding = _b ?: return
+        (binding.rvProductos.adapter as? PosProductAdapter)?.notifyDataSetChanged()
     }
 
     override fun onDestroyView() {

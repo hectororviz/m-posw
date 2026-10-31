@@ -1,24 +1,19 @@
 package com.mposw.entradas.ui.pos
 
 import android.os.Bundle
-import com.mposw.entradas.util.MoneyFormat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.mposw.entradas.databinding.ItemPosCartLineBinding
+import com.mposw.entradas.R
 import com.mposw.entradas.databinding.SheetPosCartBinding
-import kotlinx.coroutines.launch
+import com.mposw.entradas.util.DialogStyle
 
-/** Carrito slide-up: líneas con +/−/eliminar, descuentos y total. */
+/** Carrito slide-up en teléfono: contenedor del panel compartido. */
 class PosCartSheet : BottomSheetDialogFragment() {
     private var _b: SheetPosCartBinding? = null
     private val b get() = _b!!
-    private fun dash(): PosDashFragment = parentFragment as PosDashFragment
+    fun dash(): PosDashFragment = parentFragment as PosDashFragment
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _b = SheetPosCartBinding.inflate(inflater, container, false)
@@ -28,69 +23,14 @@ class PosCartSheet : BottomSheetDialogFragment() {
     override fun onStart() {
         super.onStart()
         // En tablets el sheet no ocupa todo el ancho.
-        com.mposw.entradas.util.DialogStyle.capWidth(this, fullHeight = true)
+        DialogStyle.capWidth(this, fullHeight = true)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        b.rvCart.layoutManager = LinearLayoutManager(requireContext())
-        b.rvCart.adapter = LineAdapter()
-        b.btnCartClose.setOnClickListener { dismissAllowingStateLoss() }
-        b.btnCartReprint.setOnClickListener { reprint() }
-        refresh()
-    }
-
-    fun refresh() {
-        if (_b == null) return
-        (b.rvCart.adapter as? LineAdapter)?.refresh()
-        val cart = dash().cart
-        val descLines = cart.discounts.map { "− ${it.titulo} (${it.porcentaje}%): ${MoneyFormat.format(it.monto)}" } +
-            (cart.entradaDesc?.let { listOf("− ${it.nombre}: ${MoneyFormat.format(it.monto)}") } ?: emptyList())
-        b.tvCartDiscounts.text = descLines.joinToString("\n")
-        b.tvCartDiscounts.visibility = if (descLines.isEmpty()) View.GONE else View.VISIBLE
-        b.tvCartTotal.text = "TOTAL  ${MoneyFormat.format(cart.total)}"
-        dash().refreshTotal()
-    }
-
-    private fun reprint() {
-        lifecycleScope.launch {
-            val dash = parentFragment as? PosDashFragment ?: return@launch
-            val last = dash.salesRepo.lastApproved()
-            if (last == null) {
-                Toast.makeText(requireContext(), "Sin ventas para reimprimir", Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            val ok = try {
-                com.mposw.entradas.util.PrintHelper.reprintLast(requireContext())
-            } catch (_: Exception) {
-                false
-            }
-            Toast.makeText(
-                requireContext(),
-                if (ok) "Reimpreso" else "Error de impresora",
-                Toast.LENGTH_SHORT,
-            ).show()
-        }
-    }
-
-    private inner class LineAdapter : RecyclerView.Adapter<LineAdapter.Holder>() {
-        inner class Holder(val b: ItemPosCartLineBinding) : RecyclerView.ViewHolder(b.root)
-
-        fun refresh() = notifyDataSetChanged()
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder =
-            Holder(ItemPosCartLineBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-
-        override fun getItemCount(): Int = dash().cart.lines.size
-
-        override fun onBindViewHolder(h: Holder, position: Int) {
-            val cart = dash().cart
-            val line = cart.lines[position]
-            h.b.tvLineName.text = line.product.name
-            h.b.tvLinePrice.text = "${MoneyFormat.format(line.product.price)} c/u · ${MoneyFormat.format(line.product.price * line.quantity)}"
-            h.b.tvQty.text = line.quantity.toString()
-            h.b.btnMinus.setOnClickListener { cart.setQuantity(line.product.id, line.quantity - 1); refresh() }
-            h.b.btnPlus.setOnClickListener { cart.setQuantity(line.product.id, line.quantity + 1); refresh() }
-            h.b.btnDel.setOnClickListener { cart.remove(line.product.id); refresh() }
+        if (childFragmentManager.findFragmentByTag("panel") == null) {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.cartHost, PosCartPanelFragment.new(true), "panel")
+                .commit()
         }
     }
 

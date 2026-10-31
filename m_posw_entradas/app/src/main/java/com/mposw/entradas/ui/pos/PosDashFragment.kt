@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import com.google.android.material.tabs.TabLayoutMediator
+import com.mposw.entradas.R
 import com.mposw.entradas.data.PosCategory
 import com.mposw.entradas.data.PosProduct
 import com.mposw.entradas.data.SessionManager
@@ -117,8 +118,10 @@ class PosDashFragment : Fragment() {
             (activity as? com.mposw.entradas.ui.MainActivity)?.openConfig()
         }
         b.btnPosPagar.setOnClickListener { pagar() }
+        // Tablet apaisada: el carrito vive en el lateral, no en slide-up.
+        setupSideCart()
         // Apertura instantánea: snapshot de Room primero (las fotos salen
-        // de la caché de disco si ya se vieron), la red refresca después.
+        // de la caché propia si ya se vieron), la red refresca después.
         lifecycleScope.launch {
             try {
                 catalogRepo.cachedSnapshot()?.let {
@@ -234,14 +237,43 @@ class PosDashFragment : Fragment() {
         loadCatalog()
     }
 
-    /** Precalienta la caché de disco con las fotos de la primera categoría. */
-    private fun prefetchFirst() {
-        if (!isAdded) return
-        try {
-            val first = categories.firstOrNull() ?: return
-            val urls = productsOf(first.id).mapNotNull { it.imageUrl(apiRoot()) }
-            com.mposw.entradas.util.PosImages.prefetch(requireContext().applicationContext, urls)
-        } catch (_: Exception) {}
+    /**
+     * Sincroniza la caché propia de fotos (descarga lo que falta/cambió,
+     * limpia obsoletos), guarda el conteo para la pestaña Estado y re-bindea
+     * las páginas para que muestren lo recién descargado.
+     */
+    private fun syncImages() {
+        val prods = try {
+            categories.flatMap { productsOf(it.id) }
+        } catch (_: Exception) {
+            return
+        }
+        if (prods.isEmpty() || !isAdded) return
+        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val appCtx = requireContext().applicationContext
+                com.mposw.entradas.data.pos.ProductImageStore.sync(appCtx, apiRoot(), prods)
+                val st = com.mposw.entradas.data.pos.ProductImageStore.stats(appCtx, prods)
+                session.imgLocal = st.local
+                session.imgTotal = st.total
+                session.imgMb = st.mb
+            } catch (_: Exception) {}
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                if (!isAdded) return@withContext
+                childFragmentManager.fragments
+                    .filterIsInstance<PosCategoryPageFragment>()
+                    .forEach { it.refreshImages() }
+            }
+        }
+    }
+
+    fun productImageFile(p: PosProduct): java.io.File? {
+        if (!isAdded) return null
+        return try {
+            com.mposw.entradas.data.pos.ProductImageStore.freshFile(requireContext(), p)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun onProductTap(p: PosProduct) {
@@ -260,13 +292,54 @@ class PosDashFragment : Fragment() {
 
     fun cartQtyOf(productId: String): Int = cart.lines.firstOrNull { it.product.id == productId }?.quantity ?: 0
 
+    /** Tablet apaisada: carrito lateral fijo en vez del slide-up. */
+    fun useSideCart(): Boolean =
+        com.mposw.entradas.util.DialogStyle.isWide(this) &&
+            resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+    private fun sidePanel(): PosCartPanelFragment? =
+        childFragmentManager.findFragmentById(R.id.sideCartHost) as? PosCartPanelFragment
+
+    private fun setupSideCart() {
+        if (_b == null) return
+        if (!useSideCart()) {
+            // Al rotar a vertical/teléfono se retira el panel lateral.
+            sidePanel()?.let {
+                try {
+                    childFragmentManager.beginTransaction().remove(it).commit()
+                } catch (_: Exception) {}
+            }
+            return
+        }
+        if (sidePanel() == null) {
+            childFragmentManager.beginTransaction()
+                .replace(R.id.sideCartHost, PosCartPanelFragment.new(false), "sidecart")
+                .commit()
+        }
+        b.btnSideExpand.setOnClickListener { setSideCartCollapsed(false) }
+        applySideCartCollapsed()
+    }
+
+    private fun applySideCartCollapsed() {
+        if (_b == null || !useSideCart()) return
+        val c = session.cartSideCollapsed
+        b.sideCartHost.visibility = if (c) View.GONE else View.VISIBLE
+        b.sideExpandStrip.visibility = if (c) View.VISIBLE else View.GONE
+    }
+
+    fun setSideCartCollapsed(collapsed: Boolean) {
+        if (!::session.isInitialized) return
+        session.cartSideCollapsed = collapsed
+        if (_b != null && isAdded && useSideCart()) applySideCartCollapsed()
+    }
+
     private fun refreshBadges() {
         if (_b == null) return
         val tag = "f" + b.vpCategorias.currentItem
         (childFragmentManager.findFragmentByTag(tag) as? PosCategoryPageFragment)?.refreshQty(cartQty())
     }
 
-    fun refreshTotal() {
+    fun refreshTotal(fromPanel: Boolean = false) {
         if (_b == null) return
         val count = cart.lines.sumOf { it.quantity }
         b.btnPosPagar.isEnabled = count > 0
@@ -281,9 +354,15 @@ class PosDashFragment : Fragment() {
         b.tvPosSocio.visibility = if (socio != null) View.VISIBLE else View.GONE
         if (socio != null) b.tvPosSocio.text = "Socio: $socio ✕"
         b.tvPosSocio.setOnClickListener { cart.clearSocio(); cart.setEntradaDesc(null); refreshTotal() }
+        // El panel refresca al dash con fromPanel=true para no recursar.
+        if (!fromPanel) {
+            try {
+                sidePanel()?.refresh()
+            } catch (_: Exception) {}
+        }
     }
 
-    private fun pagar() {
+    fun pagar() {
         if (cart.lines.isEmpty()) {
             toast("Carrito vacío")
             return
@@ -293,6 +372,11 @@ class PosDashFragment : Fragment() {
 
     fun openCart() {
         if (!isAdded) return
+        if (useSideCart()) {
+            // Siempre visible en el lateral: si estaba colapsado, expandir.
+            setSideCartCollapsed(false)
+            return
+        }
         if (childFragmentManager.findFragmentByTag("cart") == null) {
             PosCartSheet().show(childFragmentManager, "cart")
         }

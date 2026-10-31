@@ -109,6 +109,24 @@ class SessionManager(context: Context) {
         get() = prefs.getString("printerName", "") ?: ""
         set(v) = prefs.edit().putString("printerName", v.trim()).apply()
 
+    /** Carrito lateral (tablet apaisada) colapsado. */
+    var cartSideCollapsed: Boolean
+        get() = prefs.getBoolean("cartSideCollapsed", false)
+        set(v) = prefs.edit().putBoolean("cartSideCollapsed", v).apply()
+
+    /** Último estado conocido de la caché propia de fotos (para la pestaña Estado). */
+    var imgLocal: Int
+        get() = prefs.getInt("imgLocal", 0)
+        set(v) = prefs.edit().putInt("imgLocal", v).apply()
+
+    var imgTotal: Int
+        get() = prefs.getInt("imgTotal", 0)
+        set(v) = prefs.edit().putInt("imgTotal", v).apply()
+
+    var imgMb: Long
+        get() = prefs.getLong("imgMb", 0L)
+        set(v) = prefs.edit().putLong("imgMb", v).apply()
+
     /**
      * Modo prueba: la app simula ventas e impresión con datos ficticios.
      * No llama al backend para vender y no persiste nada.
