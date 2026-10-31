@@ -33,7 +33,6 @@ class PosCategoryPageFragment : Fragment() {
         val rv = b.rvProductos
         rv.setHasFixedSize(true)
         val dm = resources.displayMetrics
-        val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
         val target = d.cardTargetDp()
         val lm = GridLayoutManager(requireContext(), 2)
         rv.layoutManager = lm
@@ -49,22 +48,38 @@ class PosCategoryPageFragment : Fragment() {
         b.tvEmpty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
         b.loadError.visibility = View.GONE
         b.btnRetry.setOnClickListener { d.reloadCatalog() }
-        rv.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-            // El lateral cambia el ancho: se recalcula cantidad, y el alto de
-            // foto se deriva del ancho medido para no deformar nunca.
-            val span = spanForWidth(v.width, dm.density, target, max)
-            var changed = false
-            if (lm.spanCount != span) {
-                lm.spanCount = span
-                changed = true
-            }
-            val cw = if (span > 0) v.width / span else 0
-            if (cw > 0 && kotlin.math.abs(cw - adapter.cardWidthPx) > 4) {
-                adapter.cardWidthPx = cw
-                changed = true
-            }
-            if (changed) adapter.notifyDataSetChanged()
+        rv.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> restyle() }
+    }
+
+    /**
+     * Recalcula columnas y tamaño de tarjeta con el ancho actual.
+     * Lo llama el dash tras abrir/cerrar el lateral (con el ancho ya
+     * asentado); el listener queda como respaldo para rotaciones.
+     */
+    fun restyle() {
+        val binding = _b ?: return
+        val rv = binding.rvProductos
+        val lm = rv.layoutManager as? GridLayoutManager ?: return
+        val adapter = rv.adapter as? PosProductAdapter ?: return
+        val w = rv.width
+        if (w <= 0) return
+        val dm = resources.displayMetrics
+        val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
+        val target = dash()?.cardTargetDp() ?: 180
+        val span = spanForWidth(w, dm.density, target, max)
+        var changed = false
+        if (lm.spanCount != span) {
+            lm.spanCount = span
+            changed = true
         }
+        // El lateral cambia el ancho: se recalcula cantidad, y el alto de
+        // foto se deriva del ancho medido para no deformar nunca.
+        val cw = if (span > 0) w / span else 0
+        if (cw > 0 && kotlin.math.abs(cw - adapter.cardWidthPx) > 4) {
+            adapter.cardWidthPx = cw
+            changed = true
+        }
+        if (changed) adapter.notifyDataSetChanged()
     }
 
     /** Muestra el estado de error de carga con reintento. */

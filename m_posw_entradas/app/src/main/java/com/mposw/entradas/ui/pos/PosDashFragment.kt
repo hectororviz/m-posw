@@ -323,6 +323,16 @@ class PosDashFragment : Fragment() {
         val c = session.cartSideCollapsed
         b.sideCartHost.visibility = if (c) View.GONE else View.VISIBLE
         b.sideExpandStrip.visibility = if (c) View.VISIBLE else View.GONE
+        // El listener de ancho no siempre resuelve el toggle a tiempo:
+        // se ordena el re-cálculo explícito con el ancho ya asentado.
+        b.vpCategorias.post {
+            if (_b == null || !isAdded) return@post
+            try {
+                childFragmentManager.fragments
+                    .filterIsInstance<PosCategoryPageFragment>()
+                    .forEach { it.restyle() }
+            } catch (_: Exception) {}
+        }
     }
 
     fun setSideCartCollapsed(collapsed: Boolean) {
