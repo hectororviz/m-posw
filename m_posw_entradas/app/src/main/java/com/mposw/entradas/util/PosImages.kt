@@ -15,17 +15,18 @@ import coil.request.ImageRequest
 object PosImages {
     fun init(ctx: Context) {
         try {
-            Coil.setImageLoader { c ->
-                ImageLoader.Builder(c)
+            val appCtx = ctx.applicationContext
+            Coil.setImageLoader(
+                ImageLoader.Builder(appCtx)
                     .diskCache {
                         DiskCache.Builder()
-                            .directory(c.cacheDir.resolve("pos_images"))
+                            .directory(appCtx.cacheDir.resolve("pos_images"))
                             .maxSizeBytes(128L * 1024 * 1024)
                             .build()
                     }
                     .allowRgb565(true)
-                    .build()
-            }
+                    .build(),
+            )
         } catch (_: IllegalStateException) {
             // Ya inicializado (recreación de actividad): se conserva.
         }
@@ -34,7 +35,7 @@ object PosImages {
     /** MB ocupados en disco, o null si no se pudo medir. */
     fun diskCacheMb(ctx: Context): Long? {
         return try {
-            val size = Coil.imageLoader(ctx).diskCache?.size() ?: return null
+            val size = Coil.imageLoader(ctx).diskCache?.size ?: return null
             size / (1024 * 1024)
         } catch (_: Exception) {
             null
