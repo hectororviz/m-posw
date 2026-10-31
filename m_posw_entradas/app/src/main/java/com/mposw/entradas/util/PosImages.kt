@@ -1,8 +1,8 @@
 package com.mposw.entradas.util
 
 import android.content.Context
+import coil.Coil
 import coil.ImageLoader
-import coil.SingletonImageLoader
 import coil.disk.DiskCache
 import coil.request.CachePolicy
 import coil.request.ImageRequest
@@ -14,25 +14,31 @@ import coil.request.ImageRequest
  */
 object PosImages {
     fun init(ctx: Context) {
-        SingletonImageLoader.setSafe { c ->
-            ImageLoader.Builder(c)
-                .diskCache {
-                    DiskCache.Builder()
-                        .directory(c.cacheDir.resolve("pos_images"))
-                        .maxSizeBytes(128L * 1024 * 1024)
-                        .build()
-                }
-                .allowRgb565(true)
-                .build()
+        try {
+            Coil.setImageLoader { c ->
+                ImageLoader.Builder(c)
+                    .diskCache {
+                        DiskCache.Builder()
+                            .directory(c.cacheDir.resolve("pos_images"))
+                            .maxSizeBytes(128L * 1024 * 1024)
+                            .build()
+                    }
+                    .allowRgb565(true)
+                    .build()
+            }
+        } catch (_: IllegalStateException) {
+            // Ya inicializado (recreación de actividad): se conserva.
         }
     }
 
     /** MB ocupados en disco, o null si no se pudo medir. */
-    fun diskCacheMb(ctx: Context): Long? = try {
-        val size = SingletonImageLoader.get(ctx).diskCache?.size() ?: return null
-        size / (1024 * 1024)
-    } catch (_: Exception) {
-        null
+    fun diskCacheMb(ctx: Context): Long? {
+        return try {
+            val size = Coil.imageLoader(ctx).diskCache?.size() ?: return null
+            size / (1024 * 1024)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**
@@ -42,7 +48,7 @@ object PosImages {
     fun prefetch(ctx: Context, urls: List<String>) {
         if (urls.isEmpty()) return
         try {
-            val loader = SingletonImageLoader.get(ctx)
+            val loader = Coil.imageLoader(ctx)
             for (u in urls.take(24)) {
                 loader.enqueue(
                     ImageRequest.Builder(ctx)
