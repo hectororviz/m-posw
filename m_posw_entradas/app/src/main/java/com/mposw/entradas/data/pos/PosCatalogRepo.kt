@@ -25,6 +25,19 @@ class PosCatalogRepo(ctx: Context, private val session: SessionManager) {
     var payFlags: com.mposw.entradas.data.PosSettingsResponse? = null
         private set
 
+    /** Snapshot de Room para apertura instantánea (stale-while-revalidate). */
+    suspend fun cachedSnapshot(): PosCatalogResponse? {
+        return try {
+            PosDb.get(appCtx).cache().byKey(PosDb.CATALOG_KEY)?.json?.let {
+                gson.fromJson<PosCatalogResponse>(it, object : TypeToken<PosCatalogResponse>() {}.type)
+            }
+        } catch (_: Exception) { null }
+    }
+
+    fun seedSnapshot(c: PosCatalogResponse) {
+        catalog = c
+    }
+
     suspend fun load(): PosCatalogResponse {
         return try {
             val fresh = api.posCatalog()

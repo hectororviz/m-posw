@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tamaño (POS)"
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/tgTextScale"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnScaleS"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:text="Chico"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnScaleM"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:text="Medio"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnScaleL"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:text="Grande"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/apariencia"
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/tgTheme"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeSystem"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/tema_sistema"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeLight"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/tema_claro"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeDark"
+                style="@style/Widget.Entradas.Button.Neutral"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checkable="true"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="@string/tema_oscuro"
+                app:backgroundTint="@color/toggle_sector_fill"
+                android:textColor="@color/toggle_sector_text" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Modo prueba"
+            android:textAppearance="@style/TextAppearance.Entradas.SectionTitle" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/swModoPrueba"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Simular ventas e impresión (no se registra nada)" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Muestra datos ficticios, vende e imprime tickets de prueba con el diseño real. QR y socio quedan deshabilitados."
+            android:textAppearance="@style/TextAppearance.Entradas.Support" />
+    </LinearLayout>
+</ScrollView>

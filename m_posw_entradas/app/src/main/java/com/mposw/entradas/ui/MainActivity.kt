@@ -16,6 +16,7 @@ import com.mposw.entradas.data.ModeResolver
 import com.mposw.entradas.data.ModeResult
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.printer.PrinterRouter
+import com.mposw.entradas.ui.config.ConfigTabsFragment
 import com.mposw.entradas.ui.entradas.VentaFragment
 import com.mposw.entradas.ui.pos.PosDashFragment
 import kotlinx.coroutines.launch
@@ -38,6 +39,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         session = SessionManager(this)
+        // Imágenes: Coil con disco fijo + RGB_565 antes de cualquier load().
+        com.mposw.entradas.util.PosImages.init(this)
         // Impresora: en Sunmi se bindea el servicio integrado; en equipos
         // genéricos el backend es Bluetooth y no hay nada que inicializar.
         // Nada de Room ni de pantallas de un modo se inicializa acá.
@@ -100,11 +103,11 @@ class MainActivity : AppCompatActivity() {
     /** Config como pantalla raíz (sin back): el equipo aún no tiene modo. */
     private fun showConfigRoot() {
         val current = supportFragmentManager.findFragmentById(R.id.nav_host)
-        if (current is ConfigFragment && supportFragmentManager.backStackEntryCount == 0) return
+        if (current is ConfigTabsFragment && supportFragmentManager.backStackEntryCount == 0) return
         currentMode = null
         supportFragmentManager.popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
         supportFragmentManager.beginTransaction()
-            .replace(R.id.nav_host, ConfigFragment())
+            .replace(R.id.nav_host, ConfigTabsFragment())
             .commit()
         syncGear()
     }
@@ -123,7 +126,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showConfig() {
         supportFragmentManager.beginTransaction()
-            .replace(R.id.nav_host, ConfigFragment())
+            .replace(R.id.nav_host, ConfigTabsFragment())
             .addToBackStack(null)
             .commit()
     }
@@ -137,7 +140,7 @@ class MainActivity : AppCompatActivity() {
      */
     fun enterModeIfRoot(mode: DeviceMode) {
         val current = supportFragmentManager.findFragmentById(R.id.nav_host)
-        if (current is ConfigFragment && supportFragmentManager.backStackEntryCount == 0) {
+        if (current is ConfigTabsFragment && supportFragmentManager.backStackEntryCount == 0) {
             showMode(mode)
         }
     }

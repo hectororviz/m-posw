@@ -117,10 +117,20 @@ class PosDashFragment : Fragment() {
             (activity as? com.mposw.entradas.ui.MainActivity)?.openConfig()
         }
         b.btnPosPagar.setOnClickListener { pagar() }
-        // Enlaza lo que haya en memoria de inmediato (la vista pudo
-        // recrearse al volver de Config); la red refresca después.
-        bindPages()
-        loadCatalog()
+        // Apertura instantánea: snapshot de Room primero (las fotos salen
+        // de la caché de disco si ya se vieron), la red refresca después.
+        lifecycleScope.launch {
+            try {
+                catalogRepo.cachedSnapshot()?.let {
+                    if (!isAdded) return@launch
+                    categories = it.categories ?: emptyList()
+                    catalogRepo.seedSnapshot(it)
+                    bindPages()
+                    prefetchFirst()
+                }
+            } catch (_: Exception) {}
+            loadCatalog()
+        }
         refreshTotal()
         startModeTicker()
     }
@@ -201,6 +211,7 @@ class PosDashFragment : Fragment() {
                 categories = c.categories ?: emptyList()
                 if (!isAdded) return@launch
                 bindPages()
+                prefetchFirst()
                 if (categories.isEmpty()) toast("Sin categorías activas")
             } catch (e: Exception) {
                 if (!isAdded) return@launch
@@ -221,6 +232,16 @@ class PosDashFragment : Fragment() {
 
     fun reloadCatalog() {
         loadCatalog()
+    }
+
+    /** Precalienta la caché de disco con las fotos de la primera categoría. */
+    private fun prefetchFirst() {
+        if (!isAdded) return
+        try {
+            val first = categories.firstOrNull() ?: return
+            val urls = productsOf(first.id).mapNotNull { it.imageUrl(apiRoot()) }
+            com.mposw.entradas.util.PosImages.prefetch(requireContext().applicationContext, urls)
+        } catch (_: Exception) {}
     }
 
     fun onProductTap(p: PosProduct) {
