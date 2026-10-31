@@ -22,13 +22,11 @@ class PosProductAdapter(
     private val textScale: Float,
     private val apiRoot: String,
     private val imageFile: (PosProduct) -> java.io.File?,
-    var cardWidthPx: Int,
+    private val imageSidePx: Int,
     private val onTap: (PosProduct) -> Unit,
 ) : ListAdapter<PosProductRow, PosProductAdapter.Holder>(DIFF) {
 
     companion object {
-        /** Proporción foto/ancho de tarjeta: el aspecto no cambia nunca. */
-        private const val IMAGE_RATIO = 0.55f
         private val DIFF = object : DiffUtil.ItemCallback<PosProductRow>() {
             override fun areItemsTheSame(a: PosProductRow, b: PosProductRow): Boolean =
                 a.product.id == b.product.id
@@ -57,7 +55,7 @@ class PosProductAdapter(
         h.b.tvProdName.textSize = 17f * textScale
         h.b.tvProdPrice.text = MoneyFormat.format(p.price)
         h.b.tvProdPrice.textSize = 19f * textScale
-        h.b.mediaBox.layoutParams.height = (cardWidthPx * IMAGE_RATIO).toInt().coerceAtLeast(1)
+        h.b.mediaBox.layoutParams.height = imageSidePx
         if (row.qty > 0) {
             h.b.tvProdBadge.visibility = View.VISIBLE
             h.b.tvProdBadge.text = if (row.qty > 99) "99+" else row.qty.toString()

@@ -1,9 +1,11 @@
 package com.mposw.entradas.ui.pos
 
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import com.mposw.entradas.R
@@ -17,10 +19,10 @@ class PosCategoryPageFragment : Fragment() {
     private val categoryId: String get() = requireArguments().getString("categoryId") ?: ""
     private fun dash(): PosDashFragment? = parentFragment as? PosDashFragment
 
-    /** Columnas según el ancho real y el tamaño objetivo de tarjeta (fijo por escala). */
-    internal fun spanForWidth(widthPx: Int, density: Float, targetDp: Int, max: Int): Int {
-        if (widthPx <= 0 || density <= 0 || targetDp <= 0) return 2
-        return ((widthPx / density) / targetDp).toInt().coerceIn(1, max)
+    /** Columnas según el ancho del contenedor y el tamaño objetivo (fijo por escala). */
+    internal fun spanForWidth(parentPx: Int, density: Float, targetDp: Int, max: Int): Int {
+        if (parentPx <= 0 || density <= 0 || targetDp <= 0) return 2
+        return ((parentPx / density) / targetDp).toInt().coerceIn(1, max)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -36,11 +38,14 @@ class PosCategoryPageFragment : Fragment() {
         val target = d.cardTargetDp()
         val lm = GridLayoutManager(requireContext(), 2)
         rv.layoutManager = lm
+        // Foto cuadrada: lado = tarjeta menos insets fijos del item
+        // (margen 4+4 + padding 8+8 = 24dp). Constante por escala.
+        val imageSidePx = ((target - 24) * dm.density).toInt().coerceAtLeast(1)
         val adapter = PosProductAdapter(
             d.textScaleFactor(),
             d.apiRoot(),
             d::productImageFile,
-            (target * dm.density).toInt(),
+            imageSidePx,
         ) { p -> d.onProductTap(p) }
         rv.adapter = adapter
         val rows = d.productsOf(categoryId).map { PosProductRow(it, d.cartQtyOf(it.id)) }
@@ -48,38 +53,45 @@ class PosCategoryPageFragment : Fragment() {
         b.tvEmpty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
         b.loadError.visibility = View.GONE
         b.btnRetry.setOnClickListener { d.reloadCatalog() }
-        rv.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> restyle() }
+        // Se escucha al contenedor (match_parent): el RV tiene ancho fijo y
+        // sus propios bounds no cambian al togglear el lateral.
+        b.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> restyle() }
     }
 
     /**
-     * Recalcula columnas y tamaño de tarjeta con el ancho actual.
-     * Lo llama el dash tras abrir/cerrar el lateral (con el ancho ya
-     * asentado); el listener queda como respaldo para rotaciones.
+     * Grilla de tamaño fijo: el span solo decide cantidad y el RV toma ancho
+     * exacto `span × tamaño`, centrado (el sobrante queda de margen).
+     * Lo llama el dash tras abrir/cerrar el lateral y el listener del
+     * contenedor en rotaciones. Sin re-bindear: los tamaños no cambian.
      */
     fun restyle() {
         val binding = _b ?: return
         val rv = binding.rvProductos
         val lm = rv.layoutManager as? GridLayoutManager ?: return
-        val adapter = rv.adapter as? PosProductAdapter ?: return
-        val w = rv.width
-        if (w <= 0) return
+        val parentW = (rv.parent as? View)?.width ?: 0
+        if (parentW <= 0) return
         val dm = resources.displayMetrics
         val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
         val target = dash()?.cardTargetDp() ?: 180
-        val span = spanForWidth(w, dm.density, target, max)
+        val targetPx = (target * dm.density).toInt()
+        if (targetPx <= 0) return
+        val span = spanForWidth(parentW, dm.density, target, max)
+        if (lm.spanCount != span) lm.spanCount = span
+        val lp = rv.layoutParams as? FrameLayout.LayoutParams ?: return
+        val wantW = span * targetPx
         var changed = false
-        if (lm.spanCount != span) {
-            lm.spanCount = span
+        if (lp.width != wantW) {
+            lp.width = wantW
             changed = true
         }
-        // El lateral cambia el ancho: se recalcula cantidad, y el alto de
-        // foto se deriva del ancho medido para no deformar nunca.
-        val cw = if (span > 0) w / span else 0
-        if (cw > 0 && kotlin.math.abs(cw - adapter.cardWidthPx) > 4) {
-            adapter.cardWidthPx = cw
+        if (lp.gravity != Gravity.CENTER_HORIZONTAL) {
+            lp.gravity = Gravity.CENTER_HORIZONTAL
             changed = true
         }
-        if (changed) adapter.notifyDataSetChanged()
+        if (changed) {
+            rv.layoutParams = lp
+            rv.requestLayout()
+        }
     }
 
     /** Muestra el estado de error de carga con reintento. */
