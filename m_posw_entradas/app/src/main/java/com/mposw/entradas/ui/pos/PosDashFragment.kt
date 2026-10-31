@@ -323,8 +323,21 @@ class PosDashFragment : Fragment() {
         val c = session.cartSideCollapsed
         b.sideCartHost.visibility = if (c) View.GONE else View.VISIBLE
         b.sideExpandStrip.visibility = if (c) View.VISIBLE else View.GONE
-        // El listener de ancho no siempre resuelve el toggle a tiempo:
-        // se ordena el re-cálculo explícito con el ancho ya asentado.
+        // Cálculo sincrónico con anchos conocidos (no depende del layout):
+        // el catálogo mide el total menos el lateral (360) o la tira (56).
+        try {
+            val totalW = b.root.width
+            if (totalW > 0) {
+                val sideW = ((if (c) 56 else 360) * resources.displayMetrics.density).toInt()
+                val catalogW = (totalW - sideW).coerceAtLeast(0)
+                if (catalogW > 0) {
+                    childFragmentManager.fragments
+                        .filterIsInstance<PosCategoryPageFragment>()
+                        .forEach { it.applyWidth(catalogW) }
+                }
+            }
+        } catch (_: Exception) {}
+        // Respaldo post-layout por si el ancho aún no estaba asentado.
         b.vpCategorias.post {
             if (_b == null || !isAdded) return@post
             try {

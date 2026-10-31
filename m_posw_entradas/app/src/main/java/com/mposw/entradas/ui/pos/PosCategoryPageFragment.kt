@@ -66,16 +66,26 @@ class PosCategoryPageFragment : Fragment() {
      */
     fun restyle() {
         val binding = _b ?: return
+        applyWidth((binding.rvProductos.parent as? View)?.width ?: 0)
+    }
+
+    /**
+     * Aplica span y ancho exacto para un ancho de catálogo dado, con clamp
+     * anti-desborde (el RV nunca excede al contenedor: si no entra, baja el
+     * span). Determinístico: no depende de timings de layout.
+     */
+    fun applyWidth(catalogWpx: Int) {
+        val binding = _b ?: return
+        if (catalogWpx <= 0) return
         val rv = binding.rvProductos
         val lm = rv.layoutManager as? GridLayoutManager ?: return
-        val parentW = (rv.parent as? View)?.width ?: 0
-        if (parentW <= 0) return
         val dm = resources.displayMetrics
         val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
         val target = dash()?.cardTargetDp() ?: 180
         val targetPx = (target * dm.density).toInt()
         if (targetPx <= 0) return
-        val span = spanForWidth(parentW, dm.density, target, max)
+        var span = spanForWidth(catalogWpx, dm.density, target, max)
+        while (span > 1 && span * targetPx > catalogWpx) span--
         if (lm.spanCount != span) lm.spanCount = span
         val lp = rv.layoutParams as? FrameLayout.LayoutParams ?: return
         val wantW = span * targetPx
