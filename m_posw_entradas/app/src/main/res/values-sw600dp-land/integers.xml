@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="grid_max_span">6</integer>
+    <integer name="grid_min_card_dp">200</integer>
+</resources>

@@ -60,12 +60,6 @@ class PosDashFragment : Fragment() {
         return if (com.mposw.entradas.util.DialogStyle.isWide(this)) base + 32 else base
     }
 
-    /** Ancho mínimo de tarjeta: con el lateral abierto se conserva el tamaño (~210dp). */
-    fun gridMinCardDp(): Int {
-        if (!::session.isInitialized) return 150
-        return if (useSideCart() && !session.cartSideCollapsed) 200 else 150
-    }
-
     fun productsOf(categoryId: String): List<PosProduct> = catalogRepo.productsOf(categoryId)
 
     fun apiRoot(): String = session.apiRoot()
