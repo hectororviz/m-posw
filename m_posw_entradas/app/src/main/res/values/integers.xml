@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Columnas máximas de la grilla POS (tope en teléfono). -->
+    <!-- Columnas máximas de la grilla POS. El tamaño de tarjeta lo fija la
+         escala S/M/L (cardTargetDp); el span solo cambia la cantidad. -->
     <integer name="grid_max_span">4</integer>
-    <!-- Ancho mínimo de tarjeta: en apaisado de tablet es mayor para que
-         la tarjeta conserve su tamaño con el lateral abierto o cerrado. -->
-    <integer name="grid_min_card_dp">150</integer>
 </resources>

@@ -51,13 +51,11 @@ class PosDashFragment : Fragment() {
         else -> 1.0f
     }
 
-    fun imageHeightDp(): Int {
-        val base = when (session.textScale) {
-            "S" -> 72
-            "L" -> 120
-            else -> 96
-        }
-        return if (com.mposw.entradas.util.DialogStyle.isWide(this)) base + 32 else base
+    /** Ancho objetivo de tarjeta en dp: fijo por escala, no cambia con el lateral. */
+    fun cardTargetDp(): Int = when (session.textScale) {
+        "S" -> 140
+        "L" -> 220
+        else -> 180
     }
 
     fun productsOf(categoryId: String): List<PosProduct> = catalogRepo.productsOf(categoryId)

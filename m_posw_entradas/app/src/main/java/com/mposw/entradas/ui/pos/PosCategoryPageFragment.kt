@@ -17,12 +17,10 @@ class PosCategoryPageFragment : Fragment() {
     private val categoryId: String get() = requireArguments().getString("categoryId") ?: ""
     private fun dash(): PosDashFragment? = parentFragment as? PosDashFragment
 
-    /** Columnas según el ancho real (mínimo y tope por recurso). */
-    internal fun spanForWidth(widthPx: Int, density: Float): Int {
-        if (widthPx <= 0 || density <= 0) return 2
-        val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
-        val min = try { resources.getInteger(R.integer.grid_min_card_dp) } catch (_: Exception) { 150 }
-        return ((widthPx / density) / min).toInt().coerceIn(2, max)
+    /** Columnas según el ancho real y el tamaño objetivo de tarjeta (fijo por escala). */
+    internal fun spanForWidth(widthPx: Int, density: Float, targetDp: Int, max: Int): Int {
+        if (widthPx <= 0 || density <= 0 || targetDp <= 0) return 2
+        return ((widthPx / density) / targetDp).toInt().coerceIn(1, max)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -34,9 +32,17 @@ class PosCategoryPageFragment : Fragment() {
         val d = dash() ?: return
         val rv = b.rvProductos
         rv.setHasFixedSize(true)
+        val dm = resources.displayMetrics
+        val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
+        val target = d.cardTargetDp()
         val lm = GridLayoutManager(requireContext(), 2)
         rv.layoutManager = lm
-        val adapter = PosProductAdapter(d.textScaleFactor(), d.imageHeightDp(), d.apiRoot(), d::productImageFile) { p -> d.onProductTap(p) }
+        val adapter = PosProductAdapter(
+            d.textScaleFactor(),
+            d.apiRoot(),
+            d::productImageFile,
+            (target * dm.density).toInt(),
+        ) { p -> d.onProductTap(p) }
         rv.adapter = adapter
         val rows = d.productsOf(categoryId).map { PosProductRow(it, d.cartQtyOf(it.id)) }
         adapter.submitList(rows)
@@ -44,8 +50,20 @@ class PosCategoryPageFragment : Fragment() {
         b.loadError.visibility = View.GONE
         b.btnRetry.setOnClickListener { d.reloadCatalog() }
         rv.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-            val span = spanForWidth(v.width, resources.displayMetrics.density)
-            if (lm.spanCount != span) lm.spanCount = span
+            // El lateral cambia el ancho: se recalcula cantidad, y el alto de
+            // foto se deriva del ancho medido para no deformar nunca.
+            val span = spanForWidth(v.width, dm.density, target, max)
+            var changed = false
+            if (lm.spanCount != span) {
+                lm.spanCount = span
+                changed = true
+            }
+            val cw = if (span > 0) v.width / span else 0
+            if (cw > 0 && kotlin.math.abs(cw - adapter.cardWidthPx) > 4) {
+                adapter.cardWidthPx = cw
+                changed = true
+            }
+            if (changed) adapter.notifyDataSetChanged()
         }
     }
 
