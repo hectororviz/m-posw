@@ -129,7 +129,7 @@ class PosDashFragment : Fragment() {
                     categories = it.categories ?: emptyList()
                     catalogRepo.seedSnapshot(it)
                     bindPages()
-                    prefetchFirst()
+                    syncImages()
                 }
             } catch (_: Exception) {}
             loadCatalog()
@@ -214,7 +214,7 @@ class PosDashFragment : Fragment() {
                 categories = c.categories ?: emptyList()
                 if (!isAdded) return@launch
                 bindPages()
-                prefetchFirst()
+                syncImages()
                 if (categories.isEmpty()) toast("Sin categorías activas")
             } catch (e: Exception) {
                 if (!isAdded) return@launch
