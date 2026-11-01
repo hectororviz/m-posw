@@ -207,7 +207,7 @@ Accesible en `/admin/socios`. Modelo: `SocioTipo → Socio → SocioCuota → So
 
 ## Acreedores / Fiado
 
-Ventas fiadas con control de saldo por acreedor (FIFO sobre `FiadoVenta.saldoRestante`). El POS vende con `paymentMethod: FIADO` + acreedor; pagos `POST /acreedores/:id/pagos` y ajustes `POST /acreedores/:id/ajustes`. Límites opcionales (`limiteDeuda` bloquea, `advertenciaDeuda` avisa) e intereses (`GET /acreedores/intereses/preview`, `POST /acreedores/intereses/aplicar`, config `interesAcreedoresHabilitado`/`tasaInteresMensualAcreedores`/`interesFechaAmnistia`).
+Ventas fiadas con control de saldo por acreedor (FIFO sobre `FiadoVenta.saldoRestante`). El POS vende con `paymentMethod: FIADO` + acreedor; pagos `POST /acreedores/:id/pagos` y ajustes `POST /acreedores/:id/ajustes`. Límites opcionales (`limiteDeuda` bloquea, `advertenciaDeuda` avisa) e intereses (`GET /acreedores/intereses/preview`, `POST /acreedores/intereses/aplicar`, config `interesAcreedoresHabilitado`/`tasaInteresMensualAcreedores`/`interesFechaAmnistia`). Gestión mínima también en terminal POS (solapa Acreedores del engranaje, ver Entradas).
 
 - Toggle "Fiado" en Configuración → Ventas → Medios de pago (requiere `enableAcreedoresModule` y `enableFiadoPayment`).
 - Frontend: `AdminAcreedoresPage` + `AdminAcreedorDetailPage`.
@@ -269,7 +269,8 @@ Venta de entradas y POS bufet desde terminal Android (Sunmi V2s o equipo genéri
 ### Endpoints (web + device)
 - Admin (JWT, `RequireModule ENTRADAS`): CRUD torneos/rivales, fixtures (`?from=&to=`), ventas (`/entradas/sales?fixtureId=`, `/summary`), beneficios (CRUD + validar/consumir), ticket-template/escudo.
 - Device (`EntradasDeviceGuard`, Bearer `ent_...`): `GET /entradas/fixtures/vigentes` (alias `/hoy`), `POST /entradas/sales/intent`, `GET /entradas/sales/:id/status`, `POST /entradas/sales/:id/cancel`, `GET /entradas/socios/:uuid`, beneficios.
-- POS bufet (`@DeviceKind pos`): `GET /pos-device/catalog`, `/acreedores`, `/settings`, `/mp-qr`; `POST /pos-device/sales/{cash,qr,fiado}`, `GET /pos-device/sales/:id[/status]`, `POST .../cancel`, `.../ticket-printed`, `POST /pos-device/socios/canjes`.
+- POS bufet (`@DeviceKind pos`): `GET /pos-device/catalog`, `/acreedores`, `/settings`, `/mp-qr`; `POST /pos-device/sales/{cash,qr,fiado}`, `GET /pos-device/sales/:id[/status]` (detalle sin chequeo de propiedad: el fiado consultado suele ser de otro usuario web), `POST .../cancel`, `.../ticket-printed`, `POST /pos-device/socios/canjes`.
+- Gestión de acreedores en terminal: `POST /pos-device/acreedores` (alta mínima solo nombre), `GET /pos-device/acreedores/:id/deuda`, `POST /pos-device/acreedores/:id/pagos` (efectivo, fecha hoy servidor, cuenta EFECTIVO automática).
 - Dispositivos (CONFIGURACION): `GET /dispositivos` (+`/mp-stores`), `POST /dispositivos`, `PATCH /:id/tipo`, `POST /:id/{revoke,rotate,mp-select,mp-setup,mp-disconnect}`.
 - Shared: `GET /entradas/ticket-template`, `/entradas/ticket-assets/escudo` (JWT o device, FlexibleGuard).
 
@@ -282,7 +283,7 @@ Venta de entradas y POS bufet desde terminal Android (Sunmi V2s o equipo genéri
 - **Room**: `entradas.db` solo en ENTRADAS; `pos.db` solo en POS. Sin `Application` custom (RAM 1GB).
 - **Impresión**: `PrinterRouter` automático (Sunmi AIDL si el equipo lo trae, si no BT 58mm ESC/POS configurada en Config → Impresora). Sin impresora la venta aprueba igual y queda para reimprimir.
 - **POS UI**: dash con fotos (caché propia `<id>_<imageUpdatedAt>.webp` en filesDir + snapshot Room + RGB_565), carrito lateral colapsable en tablet apaisada (`sw600dp-land`, panel compartido con el slide-up de teléfono), pay-sheet según Setting (CASH exacto / QR / Fiado, sin transferencia), escaneo único (UUID→socio, `ENT:`→beneficio), escala S/M/L (tarjeta fija 140/180/220dp, foto cuadrada; el span sale de métricas de ventana). Últimas de Entradas solo del día. UI v2 M3 claro/oscuro con `AccentTheme` (semilla = `accentColor`).
-- **Config** por pestañas: Estado (modo, impresora, sello, fotos) | Conexión | Impresora | Apariencia.
+- **Config** por pestañas: Estado (modo, impresora, sello, fotos) | Conexión | Impresora | Apariencia. En terminales POS con fiado se antepone **Acreedores** (`ui/config/acreedores/`): tabla Nombre|Estado|Monto con cebra pastel del acento (1 línea, badges OK/AVISO/LÍMITE), búsqueda local, FAB + (alta mínima sin teléfono), detalle con saldo + movimientos (tap = fecha/hora + productos de la venta + saldo) + botones fijos Registrar pago e Imprimir ticket de cuenta (nombre, fecha/hora, saldo, últimos 20 con importe y saldo corrido).
 - **Sello de versión** `vX.Y.Z (sha)` (`BuildConfig.GIT_SHA`). **CI** `.github/workflows/build-apk.yml` (tag `terminal-latest` solo desde main; en branches solo verifica; package-separation check).
 - **Límites v1**: una orden QR activa por POS de MP; transferencia discontinuada en terminales; `SocioCanje.usuarioId` nullable (`posId` = deviceId).
 
