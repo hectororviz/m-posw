@@ -32,12 +32,6 @@
             android:layout_marginTop="8dp"
             android:textAppearance="@style/TextAppearance.Entradas.Support" />
 
-        <TextView android:id="@+id/tvGridDiag"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textAppearance="@style/TextAppearance.Entradas.Support" />
-
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnTest"
             style="@style/Widget.Entradas.Button.Primary"

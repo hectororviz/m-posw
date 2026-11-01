@@ -1,16 +1,11 @@
 package com.mposw.entradas.ui.pos
 
 import android.os.Bundle
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
-import android.widget.FrameLayout
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
-import com.mposw.entradas.R
-import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.databinding.PagePosCategoryBinding
 
 /** Una página del ViewPager: grilla de productos de una categoría. */
@@ -20,14 +15,6 @@ class PosCategoryPageFragment : Fragment() {
 
     private val categoryId: String get() = requireArguments().getString("categoryId") ?: ""
     private fun dash(): PosDashFragment? = parentFragment as? PosDashFragment
-    private var diagSession: SessionManager? = null
-    private var preDraw: ViewTreeObserver.OnPreDrawListener? = null
-
-    /** Columnas según el ancho del contenedor y el tamaño objetivo (fijo por escala). */
-    internal fun spanForWidth(parentPx: Int, density: Float, targetDp: Int, max: Int): Int {
-        if (parentPx <= 0 || density <= 0 || targetDp <= 0) return 2
-        return ((parentPx / density) / targetDp).toInt().coerceIn(1, max)
-    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _b = PagePosCategoryBinding.inflate(inflater, container, false)
@@ -36,15 +23,11 @@ class PosCategoryPageFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val d = dash() ?: return
-        try {
-            diagSession = SessionManager(requireContext())
-        } catch (_: Exception) {
-        }
         val rv = b.rvProductos
         rv.setHasFixedSize(true)
         val dm = resources.displayMetrics
         val target = d.cardTargetDp()
-        val lm = GridLayoutManager(requireContext(), 2)
+        val lm = GridLayoutManager(requireContext(), d.gridSpan())
         rv.layoutManager = lm
         // Foto cuadrada: lado = tarjeta menos insets fijos del item
         // (margen 4+4 + padding 8+8 = 24dp). Constante por escala.
@@ -61,77 +44,23 @@ class PosCategoryPageFragment : Fragment() {
         b.tvEmpty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
         b.loadError.visibility = View.GONE
         b.btnRetry.setOnClickListener { d.reloadCatalog() }
-        // Se escucha al contenedor (match_parent): el RV tiene ancho fijo y
-        // sus propios bounds no cambian al togglear el lateral.
-        b.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> restyle() }
-        // Pre-draw: dispara siempre antes de dibujar (no depende de que el
-        // listener de layout llegue a tiempo) y converge solo.
-        preDraw = ViewTreeObserver.OnPreDrawListener { restyle(); true }.also {
-            try {
-                rv.viewTreeObserver.addOnPreDrawListener(it)
-            } catch (_: Exception) {
-            }
-        }
+        restyle()
     }
 
     /**
-     * Grilla de tamaño fijo: el span solo decide cantidad y el RV toma ancho
-     * exacto `span × tamaño`, centrado (el sobrante queda de margen).
-     * Lo llama el dash tras abrir/cerrar el lateral y el listener del
-     * contenedor en rotaciones. Sin re-bindear: los tamaños no cambian.
+     * Aplica el span desde métricas de ventana (sincrónico, sin medir
+     * vistas). Lo llama el dash tras abrir/cerrar el lateral. El RV queda
+     * match_parent (nunca desborda); solo cambia la cantidad.
      */
     fun restyle() {
         val binding = _b ?: return
-        applyWidth((binding.rvProductos.parent as? View)?.width ?: 0)
-    }
-
-    /**
-     * Aplica span y ancho exacto para un ancho de catálogo dado, con clamp
-     * anti-desborde (el RV nunca excede al contenedor: si no entra, baja el
-     * span). Determinístico: no depende de timings de layout.
-     */
-    fun applyWidth(catalogWpx: Int) {
-        val binding = _b ?: return
-        if (catalogWpx <= 0) return
-        val rv = binding.rvProductos
-        val lm = rv.layoutManager as? GridLayoutManager ?: return
-        val dm = resources.displayMetrics
-        val max = try { resources.getInteger(R.integer.grid_max_span) } catch (_: Exception) { 4 }
-        val target = dash()?.cardTargetDp() ?: 180
-        val targetPx = (target * dm.density).toInt()
-        if (targetPx <= 0) return
-        var span = spanForWidth(catalogWpx, dm.density, target, max)
-        while (span > 1 && span * targetPx > catalogWpx) span--
-        if (lm.spanCount != span) lm.spanCount = span
-        val lp = rv.layoutParams as? FrameLayout.LayoutParams ?: return
-        val wantW = span * targetPx
-        var changed = false
-        if (lp.width != wantW) {
-            lp.width = wantW
-            changed = true
-        }
-        if (lp.gravity != Gravity.CENTER_HORIZONTAL) {
-            lp.gravity = Gravity.CENTER_HORIZONTAL
-            changed = true
-        }
-        if (changed) {
-            rv.layoutParams = lp
-            rv.requestLayout()
-        }
-        recordGrid(span, catalogWpx, wantW, target)
-    }
-
-    /** Guarda el último estado aplicado para el diagnóstico de Estado. */
-    private fun recordGrid(span: Int, panePx: Int, rvPx: Int, target: Int) {
-        try {
-            val s = diagSession ?: return
-            if (s.gridSpan == span && s.gridPanePx == panePx && s.gridRvPx == rvPx && s.gridTarget == target) return
-            s.gridSpan = span
-            s.gridPanePx = panePx
-            s.gridRvPx = rvPx
-            s.gridTarget = target
+        val lm = binding.rvProductos.layoutManager as? GridLayoutManager ?: return
+        val span = try {
+            dash()?.gridSpan() ?: lm.spanCount
         } catch (_: Exception) {
+            return
         }
+        if (lm.spanCount != span) lm.spanCount = span
     }
 
     /** Muestra el estado de error de carga con reintento. */
@@ -155,14 +84,6 @@ class PosCategoryPageFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        preDraw?.let { l ->
-            try {
-                b.rvProductos.viewTreeObserver.removeOnPreDrawListener(l)
-            } catch (_: Exception) {
-            }
-        }
-        preDraw = null
-        diagSession = null
         super.onDestroyView()
         _b = null
     }

@@ -58,6 +58,33 @@ class PosDashFragment : Fragment() {
         else -> 180
     }
 
+    /**
+     * Ancho del catálogo en dp desde métricas de ventana (siempre correctas,
+     * nunca transitorias): pantalla menos el lateral en apaisado de tablet.
+     */
+    fun catalogWidthDp(): Int {
+        return try {
+            val dm = resources.displayMetrics
+            val screenDp = (dm.widthPixels / dm.density).toInt()
+            if (!useSideCart() || !::session.isInitialized) return screenDp
+            screenDp - (if (session.cartSideCollapsed) 56 else 360)
+        } catch (_: Exception) {
+            0
+        }
+    }
+
+    /** Columnas desde el ancho de ventana: sincrónico, sin medir vistas. */
+    fun gridSpan(): Int {
+        return try {
+            val max = resources.getInteger(R.integer.grid_max_span)
+            val target = cardTargetDp()
+            if (target <= 0) return 2
+            (catalogWidthDp() / target).coerceIn(1, max)
+        } catch (_: Exception) {
+            2
+        }
+    }
+
     fun productsOf(categoryId: String): List<PosProduct> = catalogRepo.productsOf(categoryId)
 
     fun apiRoot(): String = session.apiRoot()
@@ -323,29 +350,13 @@ class PosDashFragment : Fragment() {
         val c = session.cartSideCollapsed
         b.sideCartHost.visibility = if (c) View.GONE else View.VISIBLE
         b.sideExpandStrip.visibility = if (c) View.VISIBLE else View.GONE
-        // Cálculo sincrónico con anchos conocidos (no depende del layout):
-        // el catálogo mide el total menos el lateral (360) o la tira (56).
+        // Sincrónico con valores conocidos (métricas de ventana): no depende
+        // de que el layout ya haya pasado.
         try {
-            val totalW = b.root.width
-            if (totalW > 0) {
-                val sideW = ((if (c) 56 else 360) * resources.displayMetrics.density).toInt()
-                val catalogW = (totalW - sideW).coerceAtLeast(0)
-                if (catalogW > 0) {
-                    childFragmentManager.fragments
-                        .filterIsInstance<PosCategoryPageFragment>()
-                        .forEach { it.applyWidth(catalogW) }
-                }
-            }
+            childFragmentManager.fragments
+                .filterIsInstance<PosCategoryPageFragment>()
+                .forEach { it.restyle() }
         } catch (_: Exception) {}
-        // Respaldo post-layout por si el ancho aún no estaba asentado.
-        b.vpCategorias.post {
-            if (_b == null || !isAdded) return@post
-            try {
-                childFragmentManager.fragments
-                    .filterIsInstance<PosCategoryPageFragment>()
-                    .forEach { it.restyle() }
-            } catch (_: Exception) {}
-        }
     }
 
     fun setSideCartCollapsed(collapsed: Boolean) {
