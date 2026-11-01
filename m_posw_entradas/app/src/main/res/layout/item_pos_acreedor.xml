@@ -8,30 +8,30 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <LinearLayout
-        android:orientation="vertical"
+    <TextView android:id="@+id/tvAcreedorName"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:singleLine="true"
+        android:ellipsize="end" />
 
-        <TextView android:id="@+id/tvAcreedorName"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:textSize="18sp"
-            android:maxLines="2"
-            android:ellipsize="end" />
-
-        <TextView android:id="@+id/tvAcreedorSaldo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-    </LinearLayout>
-
-    <TextView android:id="@+id/tvAcreedorIcon"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+    <TextView android:id="@+id/tvAcreedorEstado"
+        android:layout_width="@dimen/acreedor_estado_w"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
         android:gravity="center"
-        android:textSize="24sp"
-        android:visibility="gone" />
+        android:paddingVertical="4dp"
+        android:textStyle="bold"
+        android:textSize="11sp"
+        android:singleLine="true" />
+
+    <TextView android:id="@+id/tvAcreedorSaldo"
+        android:layout_width="@dimen/acreedor_monto_w"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:gravity="end"
+        android:textSize="15sp"
+        android:singleLine="true" />
 </LinearLayout>

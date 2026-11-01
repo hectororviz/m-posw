@@ -23,12 +23,57 @@
             android:layout_marginTop="8dp"
             android:textAppearance="@style/TextAppearance.Entradas.Support" />
 
+        <LinearLayout
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Nombre"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:textAppearance="@style/TextAppearance.Entradas.Support" />
+
+            <TextView
+                android:layout_width="@dimen/acreedor_estado_w"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="center"
+                android:text="Estado"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:textAppearance="@style/TextAppearance.Entradas.Support" />
+
+            <TextView
+                android:layout_width="@dimen/acreedor_monto_w"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:gravity="end"
+                android:text="Deuda"
+                android:textStyle="bold"
+                android:textSize="13sp"
+                android:textAppearance="@style/TextAppearance.Entradas.Support" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="4dp"
+            android:background="?attr/colorOutline" />
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvConfigAcreedores"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
             android:clipToPadding="false"
             android:paddingBottom="80dp" />
 

@@ -1,20 +1,25 @@
 package com.mposw.entradas.ui.config.acreedores
 
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.SearchView
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.mposw.entradas.R
 import com.mposw.entradas.data.ApiClient
 import com.mposw.entradas.data.PosAcreedor
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.data.pos.PosSalesRepo
 import com.mposw.entradas.databinding.ItemPosAcreedorBinding
 import com.mposw.entradas.databinding.TabConfigAcreedoresBinding
+import com.mposw.entradas.ui.BrandApplier
 import com.mposw.entradas.util.MoneyFormat
 import kotlinx.coroutines.launch
 
@@ -98,9 +103,53 @@ class ConfigAcreedoresFragment : Fragment() {
     private inner class AcreedorAdapter(val onPick: (PosAcreedor) -> Unit) :
         RecyclerView.Adapter<AcreedorAdapter.Holder>() {
         private var items: List<PosAcreedor> = emptyList()
+        // Pastel del acento del club para la cebra (nulo = sin semilla).
+        private var zebra: Int? = null
+        private var zebraReady = false
+        // Pill del badge por estado (se crean una vez con los colores del tema).
+        private var pills: Map<String, GradientDrawable>? = null
+        private var pillFg: Map<String, Int>? = null
+
         fun set(v: List<PosAcreedor>) {
             items = v
             notifyDataSetChanged()
+        }
+
+        private fun zebraColor(): Int? {
+            if (!zebraReady && isAdded) {
+                zebraReady = true
+                zebra = try {
+                    BrandApplier.parse(session.brandColor)?.first?.let {
+                        ColorUtils.setAlphaComponent(it, 24)
+                    }
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            return zebra
+        }
+
+        private fun pillFor(estado: String): Pair<GradientDrawable, Int> {
+            val ctx = requireContext()
+            if (pills == null) {
+                val radius = 12 * ctx.resources.displayMetrics.density
+                fun pill(bgRes: Int): GradientDrawable = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = radius
+                    setColor(ContextCompat.getColor(ctx, bgRes))
+                }
+                pills = mapOf(
+                    "OK" to pill(R.color.primary_container),
+                    "AVISO" to pill(R.color.tertiary_container),
+                    "LIMITE" to pill(R.color.error_container),
+                )
+                pillFg = mapOf(
+                    "OK" to ContextCompat.getColor(ctx, R.color.on_primary_container),
+                    "AVISO" to ContextCompat.getColor(ctx, R.color.on_tertiary_container),
+                    "LIMITE" to ContextCompat.getColor(ctx, R.color.on_error_container),
+                )
+            }
+            return (pills!![estado] ?: pills!!["OK"]!!) to (pillFg!![estado] ?: pillFg!!["OK"]!!)
         }
 
         inner class Holder(val b: ItemPosAcreedorBinding) : RecyclerView.ViewHolder(b.root) {
@@ -120,21 +169,28 @@ class ConfigAcreedoresFragment : Fragment() {
         override fun onBindViewHolder(h: Holder, position: Int) {
             val a = items[position]
             h.b.tvAcreedorName.text = a.nombre ?: ""
-            h.b.tvAcreedorSaldo.text = "Deuda: ${MoneyFormat.format(a.saldo ?: 0.0)}"
-            val proyectado = a.saldo ?: 0.0
-            when {
-                a.limiteDeuda != null && proyectado > a.limiteDeuda -> {
-                    h.b.tvAcreedorIcon.visibility = View.VISIBLE
-                    h.b.tvAcreedorIcon.text = "⛔"
-                    h.b.tvAcreedorIcon.contentDescription = "Límite superado"
-                }
-                a.advertenciaDeuda != null && proyectado > a.advertenciaDeuda -> {
-                    h.b.tvAcreedorIcon.visibility = View.VISIBLE
-                    h.b.tvAcreedorIcon.text = "⚠️"
-                    h.b.tvAcreedorIcon.contentDescription = "Supera la advertencia"
-                }
-                else -> h.b.tvAcreedorIcon.visibility = View.GONE
+            val saldo = a.saldo ?: 0.0
+            h.b.tvAcreedorSaldo.text = MoneyFormat.format(saldo)
+            h.b.tvAcreedorSaldo.setTextColor(
+                if (saldo < 0) ContextCompat.getColor(h.itemView.context, R.color.primary)
+                else ContextCompat.getColor(h.itemView.context, R.color.on_surface),
+            )
+            val estado = when {
+                a.limiteDeuda != null && saldo > a.limiteDeuda -> "LIMITE"
+                a.advertenciaDeuda != null && saldo > a.advertenciaDeuda -> "AVISO"
+                else -> "OK"
             }
+            val (bg, fg) = pillFor(estado)
+            h.b.tvAcreedorEstado.text = when (estado) {
+                "LIMITE" -> "LÍMITE"
+                "AVISO" -> "AVISO"
+                else -> "OK"
+            }
+            h.b.tvAcreedorEstado.background = bg
+            h.b.tvAcreedorEstado.setTextColor(fg)
+            h.b.tvAcreedorEstado.contentDescription = "Estado: ${h.b.tvAcreedorEstado.text}"
+            // Cebra pastel del acento en filas impares.
+            h.b.root.setBackgroundColor(zebraColor()?.takeIf { position % 2 == 1 } ?: 0)
         }
     }
 

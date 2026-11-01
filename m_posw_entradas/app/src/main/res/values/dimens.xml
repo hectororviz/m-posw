@@ -22,4 +22,8 @@
     <dimen name="stroke_card">1dp</dimen>
     <dimen name="icon_sm">20dp</dimen>
     <dimen name="icon_md">24dp</dimen>
+
+    <!-- Tabla de acreedores: anchos fijos compartidos fila/header -->
+    <dimen name="acreedor_estado_w">92dp</dimen>
+    <dimen name="acreedor_monto_w">116dp</dimen>
 </resources>

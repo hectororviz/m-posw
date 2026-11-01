@@ -3,14 +3,17 @@ package com.mposw.entradas.ui.pos
 import android.os.Bundle
 import com.mposw.entradas.util.DialogStyle
 import com.mposw.entradas.util.MoneyFormat
+import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.mposw.entradas.R
 import com.mposw.entradas.data.PosAcreedor
 import com.mposw.entradas.databinding.DialogPosFiadoBinding
 import com.mposw.entradas.databinding.ItemPosAcreedorBinding
@@ -111,9 +114,35 @@ class PosFiadoDialog : DialogFragment() {
 
     private inner class AcreedorAdapter : RecyclerView.Adapter<AcreedorAdapter.Holder>() {
         private var items: List<PosAcreedor> = emptyList()
+        private var pills: Map<String, GradientDrawable>? = null
+        private var pillFg: Map<String, Int>? = null
+
         fun set(v: List<PosAcreedor>) {
             items = v
             notifyDataSetChanged()
+        }
+
+        private fun pillFor(estado: String): Pair<GradientDrawable, Int> {
+            val ctx = requireContext()
+            if (pills == null) {
+                val radius = 12 * ctx.resources.displayMetrics.density
+                fun pill(bgRes: Int): GradientDrawable = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = radius
+                    setColor(ContextCompat.getColor(ctx, bgRes))
+                }
+                pills = mapOf(
+                    "OK" to pill(R.color.primary_container),
+                    "ADVERTENCIA" to pill(R.color.tertiary_container),
+                    "LIMITE" to pill(R.color.error_container),
+                )
+                pillFg = mapOf(
+                    "OK" to ContextCompat.getColor(ctx, R.color.on_primary_container),
+                    "ADVERTENCIA" to ContextCompat.getColor(ctx, R.color.on_tertiary_container),
+                    "LIMITE" to ContextCompat.getColor(ctx, R.color.on_error_container),
+                )
+            }
+            return (pills!![estado] ?: pills!!["OK"]!!) to (pillFg!![estado] ?: pillFg!!["OK"]!!)
         }
 
         inner class Holder(val b: ItemPosAcreedorBinding) : RecyclerView.ViewHolder(b.root) {
@@ -134,20 +163,16 @@ class PosFiadoDialog : DialogFragment() {
             val a = items[position]
             h.b.tvAcreedorName.text = a.nombre ?: ""
             h.b.tvAcreedorSaldo.text = "Deuda: ${MoneyFormat.format(a.saldo ?: 0.0)}"
-            // Solo icono de estado al lado del nombre (el detalle va en el error al tocar).
-            when (estado(a)) {
-                "LIMITE" -> {
-                    h.b.tvAcreedorIcon.visibility = View.VISIBLE
-                    h.b.tvAcreedorIcon.text = "⛔"
-                    h.b.tvAcreedorIcon.contentDescription = "Límite superado"
-                }
-                "ADVERTENCIA" -> {
-                    h.b.tvAcreedorIcon.visibility = View.VISIBLE
-                    h.b.tvAcreedorIcon.text = "⚠️"
-                    h.b.tvAcreedorIcon.contentDescription = "Supera la advertencia"
-                }
-                else -> h.b.tvAcreedorIcon.visibility = View.GONE
+            val e = estado(a)
+            val (bg, fg) = pillFor(e)
+            h.b.tvAcreedorEstado.text = when (e) {
+                "LIMITE" -> "LÍMITE"
+                "ADVERTENCIA" -> "AVISO"
+                else -> "OK"
             }
+            h.b.tvAcreedorEstado.background = bg
+            h.b.tvAcreedorEstado.setTextColor(fg)
+            h.b.tvAcreedorEstado.contentDescription = "Estado: ${h.b.tvAcreedorEstado.text}"
         }
     }
 

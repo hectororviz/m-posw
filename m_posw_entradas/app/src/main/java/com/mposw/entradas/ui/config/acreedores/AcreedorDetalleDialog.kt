@@ -55,7 +55,8 @@ class AcreedorDetalleDialog : DialogFragment() {
     override fun onStart() {
         super.onStart()
         dialog?.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        DialogStyle.capWidth(this)
+        // Tabla ancha en tablets: tope mayor que el default de 560dp.
+        DialogStyle.capWidth(this, 720)
         DialogStyle.round(dialog?.window)
     }
 
