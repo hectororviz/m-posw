@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Req, UseGuards } from '@nestjs/common';
 import { ProductType } from '@prisma/client';
 import type { Request } from 'express';
 import { PrismaService } from '../common/prisma.service';
 import { AcreedoresService } from '../acreedores/acreedores.service';
+import { CreateAcreedorDto } from '../acreedores/dto/create-acreedor.dto';
+import { PosCreateAcreedorDto, PosPagoAcreedorDto } from './dto/pos-acreedores.dto';
 import { CreateCanjesDto } from '../socios/dto/create-canjes.dto';
 import { SociosBeneficiosService } from '../socios/socios-beneficios.service';
 import { SalesService } from '../sales/sales.service';
@@ -124,6 +126,41 @@ export class PosDeviceController {
   @Get('acreedores')
   async listAcreedores() {
     return this.acreedores.findAll();
+  }
+
+  // ── Gestión de acreedores desde terminal POS (alta mínima + pagos) ──
+  @Post('acreedores')
+  async createAcreedor(@Body() dto: PosCreateAcreedorDto) {
+    const nombre = dto.nombre?.trim();
+    if (!nombre) {
+      throw new BadRequestException('El nombre es obligatorio');
+    }
+    const createDto = new CreateAcreedorDto();
+    createDto.nombre = nombre;
+    return this.acreedores.create(createDto);
+  }
+
+  @Get('acreedores/:id/deuda')
+  async getAcreedorDeuda(@Param('id', ParseIntPipe) id: number) {
+    return this.acreedores.getDeuda(id);
+  }
+
+  @Post('acreedores/:id/pagos')
+  async addAcreedorPago(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: PosPagoAcreedorDto,
+  ) {
+    if (!dto.monto || dto.monto <= 0) {
+      throw new BadRequestException('El monto debe ser mayor a 0');
+    }
+    const fecha = new Date().toISOString().slice(0, 10);
+    return this.acreedores.addPago(await this.posDevices.resolvePosUserId(), id, {
+      monto: dto.monto,
+      fecha,
+      medioPago: 'efectivo',
+      notas: dto.notas || undefined,
+      moneyAccountId: undefined,
+    });
   }
 
   // ── Ventas ───────────────────────────────────────────────

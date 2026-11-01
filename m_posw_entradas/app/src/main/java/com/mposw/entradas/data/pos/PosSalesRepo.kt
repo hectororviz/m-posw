@@ -10,8 +10,10 @@ import com.mposw.entradas.data.PosApprovedSale
 import com.mposw.entradas.data.PosCanjeInput
 import com.mposw.entradas.data.PosCanjesRequest
 import com.mposw.entradas.data.PosCashRequest
+import com.mposw.entradas.data.PosCrearAcreedorRequest
 import com.mposw.entradas.data.PosDb
 import com.mposw.entradas.data.PosFiadoRequest
+import com.mposw.entradas.data.PosPagoRequest
 import com.mposw.entradas.data.PosQrRequest
 import com.mposw.entradas.data.PosSaleItemInput
 import com.mposw.entradas.data.SessionManager
@@ -71,6 +73,14 @@ class PosSalesRepo(ctx: Context, private val session: SessionManager) {
         )
 
     suspend fun acreedores() = api.posAcreedores().filter { it.activo }
+
+    suspend fun crearAcreedor(nombre: String) =
+        api.posCrearAcreedor(PosCrearAcreedorRequest(nombre.trim()))
+
+    suspend fun deuda(acreedorId: Int) = api.posDeuda(acreedorId)
+
+    suspend fun pagar(acreedorId: Int, monto: Double, notas: String?) =
+        api.posPago(acreedorId, PosPagoRequest(monto, notas?.trim()?.takeIf { it.isNotEmpty() }))
 
     suspend fun settings() = api.posSettings()
 

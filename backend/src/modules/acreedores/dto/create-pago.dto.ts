@@ -1,4 +1,4 @@
-import { IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsDateString, IsIn, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CreatePagoDto {
   @IsNumber()
@@ -17,7 +17,7 @@ export class CreatePagoDto {
   @IsString()
   notas?: string;
 
+  @IsOptional()
   @IsUUID()
-  @IsNotEmpty()
-  moneyAccountId: string;
+  moneyAccountId?: string;
 }

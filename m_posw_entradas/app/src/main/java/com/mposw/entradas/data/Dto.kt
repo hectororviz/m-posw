@@ -313,6 +313,54 @@ data class PosAcreedor(
     val advertenciaDeuda: Double?,
 )
 
+// ── Gestión de acreedores desde terminal POS (solapa Config) ──
+data class PosCrearAcreedorRequest(
+    val nombre: String,
+)
+
+data class PosPagoRequest(
+    val monto: Double,
+    val notas: String? = null,
+)
+
+data class PosDeudaFiadoVenta(
+    val id: Int = 0,
+    val monto: Double? = null,
+    val createdAt: String? = null,
+    val ventaId: String? = null,
+    val saldoRestante: Double? = null,
+)
+
+data class PosDeudaAjuste(
+    val id: Int = 0,
+    val monto: Double? = null,
+    val fecha: String? = null,
+    val descripcion: String? = null,
+    val saldoRestante: Double? = null,
+)
+
+data class PosDeudaPago(
+    val id: Int = 0,
+    val monto: Double? = null,
+    val medioPago: String? = null,
+    val fecha: String? = null,
+    val notas: String? = null,
+    val createdAt: String? = null,
+)
+
+data class PosAcreedorDeuda(
+    val saldoPendiente: Double? = null,
+    val saldoFavor: Double? = null,
+    val totalFiado: Double? = null,
+    val totalPagado: Double? = null,
+    val estadoDeuda: String? = null,
+    val limiteDeuda: Double? = null,
+    val advertenciaDeuda: Double? = null,
+    val fiadoVentas: List<PosDeudaFiadoVenta>? = null,
+    val ajustes: List<PosDeudaAjuste>? = null,
+    val pagos: List<PosDeudaPago>? = null,
+)
+
 data class PosFiadoRequest(
     val items: List<PosSaleItemInput>,
     val total: Double,

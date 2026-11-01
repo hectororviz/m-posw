@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Registrar pago"
+        android:textAppearance="?attr/textAppearanceTitleLarge"
+        android:textStyle="bold" />
+
+    <TextView android:id="@+id/tvPagoPara"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="Monto *">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etPagoMonto"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:inputType="numberDecimal" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="Notas (opcional)">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etPagoNotas"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLength="280"
+            android:inputType="textMultiLine"
+            android:minLines="1"
+            android:maxLines="3" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView android:id="@+id/tvPagoError"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPagoGuardar"
+        style="@style/Widget.Entradas.Button.Primary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Guardar pago" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPagoCancel"
+        style="@style/Widget.Entradas.Button.Ghost"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Cancelar" />
+</LinearLayout>

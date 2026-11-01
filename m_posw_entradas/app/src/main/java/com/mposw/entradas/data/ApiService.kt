@@ -63,6 +63,15 @@ interface ApiService {
     @GET("pos-device/acreedores")
     suspend fun posAcreedores(): List<PosAcreedor>
 
+    @POST("pos-device/acreedores")
+    suspend fun posCrearAcreedor(@Body body: PosCrearAcreedorRequest): PosAcreedor
+
+    @GET("pos-device/acreedores/{id}/deuda")
+    suspend fun posDeuda(@Path("id") id: Int): PosAcreedorDeuda
+
+    @POST("pos-device/acreedores/{id}/pagos")
+    suspend fun posPago(@Path("id") id: Int, @Body body: PosPagoRequest): Any
+
     @GET("pos-device/sales/{id}")
     suspend fun posSale(@Path("id") saleId: String): PosSale
 
