@@ -167,7 +167,9 @@ export class PosDeviceController {
   @Get('sales/:id')
   async getSale(@Param('id') id: string) {
     // Incluye items + vouchers (la app reintenta 1.5s si los vouchers aún no están).
-    return this.sales.getSaleById(id, await this.requester());
+    // Sin chequeo de propiedad: el fiado consultado desde Acreedores suele
+    // ser de otro usuario (web); la terminal ya está autenticada por DeviceGuard.
+    return this.sales.getSaleByIdForDevice(id);
   }
 
   @Get('sales/:id/status')

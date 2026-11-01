@@ -85,8 +85,12 @@ class MovimientoDetalleDialog : DialogFragment() {
                     b.tvMovDetalleCuerpo.text = cuerpo.toString()
                 } catch (e: Exception) {
                     if (!isAdded) return@launch
+                    if (ApiClient.isWrongMode(e)) {
+                        (activity as? com.mposw.entradas.ui.MainActivity)?.refreshMode()
+                        return@launch
+                    }
                     b.tvMovDetalleCuerpo.text =
-                        "Fiado por ${MoneyFormat.format(kotlin.math.abs(monto))}\nSaldo: ${MoneyFormat.format(saldoTras)}\n\n(${ApiClient.parseError(e)})"
+                        "Fiado por ${MoneyFormat.format(kotlin.math.abs(monto))}\nSaldo: ${MoneyFormat.format(saldoTras)}\n\n(Detalle de productos no disponible)"
                 }
             }
         } else {

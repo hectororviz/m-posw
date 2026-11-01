@@ -267,6 +267,29 @@ export class SalesService {
     return refreshed ?? sale;
   }
 
+  /**
+   * Detalle para terminales POS autenticadas por DeviceGuard (token pareado
+   * por un admin): sin chequeo de propiedad, porque el fiado que se consulta
+   * desde la solapa Acreedores suele haberlo vendido otro usuario (web).
+   * Leer ítems no es más sensible que los saldos ya expuestos en
+   * GET /pos-device/acreedores. No usar en rutas con JWT.
+   */
+  async getSaleByIdForDevice(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        user: { select: { id: true, username: true } },
+        items: { include: { product: { include: { category: true } } } },
+        vouchers: { include: { plan: true } },
+      },
+    });
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+    const refreshed = await this.expireIfNeeded(sale);
+    return refreshed ?? sale;
+  }
+
   async getSaleStatus(saleId: string, requester: { id: string; role: string }) {
     const sale = await this.prisma.sale.findUnique({
       where: { id: saleId },
