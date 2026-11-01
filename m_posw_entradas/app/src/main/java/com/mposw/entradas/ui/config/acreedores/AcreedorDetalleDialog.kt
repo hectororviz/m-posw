@@ -4,10 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.mposw.entradas.R
 import com.mposw.entradas.data.ApiClient
 import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.data.pos.PosSalesRepo
@@ -21,7 +24,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Detalle: saldo actual + últimos movimientos (tap = detalle) +
- * botón para registrar pago. Solo lectura salvo el pago.
+ * botones fijos abajo: Imprimir, Registrar pago y Cerrar.
  */
 class AcreedorDetalleDialog : DialogFragment() {
     private var _b: DialogAcreedorDetalleBinding? = null
@@ -29,6 +32,7 @@ class AcreedorDetalleDialog : DialogFragment() {
     private var acreedorId: Int = 0
     private var acreedorNombre: String = ""
     private val adapter = MovAdapter { openMovDetalle(it) }
+    private var movs: List<MovUi> = emptyList()
 
     companion object {
         fun new(id: Int, nombre: String): AcreedorDetalleDialog {
@@ -54,10 +58,16 @@ class AcreedorDetalleDialog : DialogFragment() {
 
     override fun onStart() {
         super.onStart()
-        dialog?.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        // Tabla ancha en tablets: tope mayor que el default de 560dp.
-        DialogStyle.capWidth(this, 720)
-        DialogStyle.round(dialog?.window)
+        dialog?.window?.let { w ->
+            // Ancho: tope 720dp en tablets; alto 90% para lista con scroll
+            // y botones siempre visibles.
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            DialogStyle.capWidth(this, 720)
+            val lp = w.attributes
+            lp.height = (resources.displayMetrics.heightPixels * 0.9).toInt()
+            w.attributes = lp
+            DialogStyle.round(w)
+        }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -69,6 +79,7 @@ class AcreedorDetalleDialog : DialogFragment() {
             AcreedorPagoDialog.new(acreedorId, acreedorNombre)
                 .show(childFragmentManager, "acreedor-pago")
         }
+        b.btnDetalleImprimir.setOnClickListener { imprimir() }
         load()
     }
 
@@ -96,7 +107,8 @@ class AcreedorDetalleDialog : DialogFragment() {
                     "ADVERTENCIA" -> "Supera la advertencia"
                     else -> ""
                 }
-                adapter.set(buildMovs(d))
+                movs = buildMovs(d)
+                adapter.set(movs)
             } catch (e: Exception) {
                 if (!isAdded) return@launch
                 if (ApiClient.isWrongMode(e)) {
@@ -109,69 +121,90 @@ class AcreedorDetalleDialog : DialogFragment() {
         }
     }
 
-    private data class MovUi(
+    private fun imprimir() {
+        if (movs.isEmpty()) {
+            Toast.makeText(requireContext(), "Sin movimientos para imprimir", Toast.LENGTH_SHORT).show()
+        }
+        b.btnDetalleImprimir.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val ok = AcreedorTicketRenderer.print(
+                    requireContext(), acreedorNombre, movs,
+                    b.tvDetalleSaldo.text?.toString().orEmpty(),
+                )
+                if (isAdded && !ok) {
+                    Toast.makeText(requireContext(), "No se pudo imprimir. Revisá la impresora en Config.", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                if (isAdded) Toast.makeText(requireContext(), ApiClient.parseError(e), Toast.LENGTH_LONG).show()
+            } finally {
+                if (isAdded) b.btnDetalleImprimir.isEnabled = true
+            }
+        }
+    }
+
+    data class MovUi(
         val kind: String,
-        val titulo: String,
         val fechaIso: String,
         val montoSigned: Double,
-        val detalle: String,
+        val saldoTras: Double,
+        val ventaId: String?,
+        val descripcion: String?,
+        val notas: String?,
     )
 
     private fun buildMovs(d: com.mposw.entradas.data.PosAcreedorDeuda): List<MovUi> {
         val out = mutableListOf<MovUi>()
         d.fiadoVentas.orEmpty().forEach { v ->
-            val monto = v.monto ?: 0.0
-            val fecha = v.createdAt.orEmpty()
             out.add(
                 MovUi(
                     kind = "venta",
-                    titulo = "Fiado${if (v.ventaId.isNullOrBlank()) "" else " · ${v.ventaId}"}",
-                    fechaIso = fecha,
-                    montoSigned = monto,
-                    detalle = "Fiado por ${MoneyFormat.format(monto)}\n" +
-                        "Fecha: ${fmtFecha(fecha)}\n" +
-                        (if (v.ventaId.isNullOrBlank()) "" else "Venta: ${v.ventaId}\n") +
-                        "Saldo restante: ${MoneyFormat.format(v.saldoRestante ?: 0.0)}",
+                    fechaIso = v.createdAt.orEmpty(),
+                    montoSigned = v.monto ?: 0.0,
+                    saldoTras = 0.0,
+                    ventaId = v.ventaId,
+                    descripcion = null,
+                    notas = null,
                 ),
             )
         }
         d.ajustes.orEmpty().forEach { a ->
-            val monto = a.monto ?: 0.0
-            val fecha = a.fecha.orEmpty()
             out.add(
                 MovUi(
                     kind = "ajuste",
-                    titulo = "Ajuste${if (a.descripcion.isNullOrBlank()) "" else " · ${a.descripcion}"}",
-                    fechaIso = fecha,
-                    montoSigned = monto,
-                    detalle = "Ajuste por ${MoneyFormat.format(monto)}\n" +
-                        "Fecha: ${fmtFecha(fecha)}\n" +
-                        (if (a.descripcion.isNullOrBlank()) "" else "Detalle: ${a.descripcion}\n") +
-                        "Saldo restante: ${MoneyFormat.format(a.saldoRestante ?: 0.0)}",
+                    fechaIso = a.fecha.orEmpty(),
+                    montoSigned = a.monto ?: 0.0,
+                    saldoTras = 0.0,
+                    ventaId = null,
+                    descripcion = a.descripcion,
+                    notas = null,
                 ),
             )
         }
         d.pagos.orEmpty().forEach { p ->
-            val monto = p.monto ?: 0.0
-            val fecha = p.fecha.orEmpty().ifEmpty { p.createdAt.orEmpty() }
             out.add(
                 MovUi(
                     kind = "pago",
-                    titulo = "Pago en efectivo",
-                    fechaIso = fecha,
-                    montoSigned = -monto,
-                    detalle = "Pago por ${MoneyFormat.format(monto)}\n" +
-                        "Fecha: ${fmtFecha(fecha)}\n" +
-                        (if (p.notas.isNullOrBlank()) "" else "Notas: ${p.notas}\n"),
+                    fechaIso = p.fecha.orEmpty().ifEmpty { p.createdAt.orEmpty() },
+                    montoSigned = -(p.monto ?: 0.0),
+                    saldoTras = 0.0,
+                    ventaId = null,
+                    descripcion = null,
+                    notas = p.notas,
                 ),
             )
         }
-        return out.sortedWith(
-            compareByDescending<MovUi> { timeOf(it.fechaIso) }.thenByDescending { it.montoSigned },
-        )
+        // Saldo corrido como la web: ascendente acumulando, se muestra desc.
+        val asc = out.sortedBy { timeOf(it.fechaIso) }
+        var running = 0.0
+        val conSaldo = asc.map {
+            running += it.montoSigned
+            it.copy(saldoTras = Math.round(running * 100) / 100.0)
+        }
+        return conSaldo.sortedByDescending { timeOf(it.fechaIso) }
     }
 
-    private fun timeOf(iso: String): Long {
+    fun timeOf(iso: String): Long {
         if (iso.isBlank()) return 0L
         val patterns = listOf(
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
@@ -191,19 +224,18 @@ class AcreedorDetalleDialog : DialogFragment() {
         return 0L
     }
 
-    private fun fmtFecha(iso: String): String {
+    fun fmtFecha(iso: String): String {
         val t = timeOf(iso)
         if (t == 0L) return iso.ifEmpty { "--" }
         return try {
-            SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "AR")).format(java.util.Date(t))
+            SimpleDateFormat("dd/MM/yyyy - HH:mm", Locale("es", "AR")).format(java.util.Date(t))
         } catch (_: Exception) {
             iso
         }
     }
 
     private fun openMovDetalle(m: MovUi) {
-        MovimientoDetalleDialog.new(m.titulo, "${fmtFecha(m.fechaIso)}\n\n${m.detalle}")
-            .show(childFragmentManager, "mov-detalle")
+        MovimientoDetalleDialog.new(m).show(childFragmentManager, "mov-detalle")
     }
 
     private inner class MovAdapter(val onPick: (MovUi) -> Unit) : RecyclerView.Adapter<MovAdapter.Holder>() {
@@ -229,15 +261,14 @@ class AcreedorDetalleDialog : DialogFragment() {
 
         override fun onBindViewHolder(h: Holder, position: Int) {
             val m = items[position]
-            h.b.tvMovTitulo.text = m.titulo
             h.b.tvMovFecha.text = fmtFecha(m.fechaIso)
             val abs = kotlin.math.abs(m.montoSigned)
-            h.b.tvMovMonto.text = (if (m.montoSigned < 0) "− " else "+ ") + MoneyFormat.format(abs)
-            h.b.tvMovSigno.text = when (m.kind) {
-                "pago" -> "−"
-                "ajuste" -> "±"
-                else -> "+"
-            }
+            val pago = m.montoSigned < 0
+            h.b.tvMovMonto.text = (if (pago) "− " else "+ ") + MoneyFormat.format(abs)
+            h.b.tvMovMonto.setTextColor(
+                if (pago) ContextCompat.getColor(h.itemView.context, R.color.primary)
+                else ContextCompat.getColor(h.itemView.context, R.color.on_surface),
+            )
         }
     }
 
