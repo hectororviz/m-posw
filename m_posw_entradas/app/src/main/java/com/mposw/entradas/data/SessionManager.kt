@@ -127,6 +127,23 @@ class SessionManager(context: Context) {
         get() = prefs.getLong("imgMb", 0L)
         set(v) = prefs.edit().putLong("imgMb", v).apply()
 
+    /** Último estado aplicado de la grilla POS (diagnóstico en Estado). */
+    var gridSpan: Int
+        get() = prefs.getInt("gridSpan", -1)
+        set(v) = prefs.edit().putInt("gridSpan", v).apply()
+
+    var gridPanePx: Int
+        get() = prefs.getInt("gridPanePx", -1)
+        set(v) = prefs.edit().putInt("gridPanePx", v).apply()
+
+    var gridRvPx: Int
+        get() = prefs.getInt("gridRvPx", -1)
+        set(v) = prefs.edit().putInt("gridRvPx", v).apply()
+
+    var gridTarget: Int
+        get() = prefs.getInt("gridTarget", -1)
+        set(v) = prefs.edit().putInt("gridTarget", v).apply()
+
     /**
      * Modo prueba: la app simula ventas e impresión con datos ficticios.
      * No llama al backend para vender y no persiste nada.

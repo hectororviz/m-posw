@@ -5,10 +5,12 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import com.mposw.entradas.R
+import com.mposw.entradas.data.SessionManager
 import com.mposw.entradas.databinding.PagePosCategoryBinding
 
 /** Una página del ViewPager: grilla de productos de una categoría. */
@@ -18,6 +20,8 @@ class PosCategoryPageFragment : Fragment() {
 
     private val categoryId: String get() = requireArguments().getString("categoryId") ?: ""
     private fun dash(): PosDashFragment? = parentFragment as? PosDashFragment
+    private var diagSession: SessionManager? = null
+    private var preDraw: ViewTreeObserver.OnPreDrawListener? = null
 
     /** Columnas según el ancho del contenedor y el tamaño objetivo (fijo por escala). */
     internal fun spanForWidth(parentPx: Int, density: Float, targetDp: Int, max: Int): Int {
@@ -32,6 +36,10 @@ class PosCategoryPageFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val d = dash() ?: return
+        try {
+            diagSession = SessionManager(requireContext())
+        } catch (_: Exception) {
+        }
         val rv = b.rvProductos
         rv.setHasFixedSize(true)
         val dm = resources.displayMetrics
@@ -56,6 +64,14 @@ class PosCategoryPageFragment : Fragment() {
         // Se escucha al contenedor (match_parent): el RV tiene ancho fijo y
         // sus propios bounds no cambian al togglear el lateral.
         b.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> restyle() }
+        // Pre-draw: dispara siempre antes de dibujar (no depende de que el
+        // listener de layout llegue a tiempo) y converge solo.
+        preDraw = ViewTreeObserver.OnPreDrawListener { restyle(); true }.also {
+            try {
+                rv.viewTreeObserver.addOnPreDrawListener(it)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     /**
@@ -102,6 +118,20 @@ class PosCategoryPageFragment : Fragment() {
             rv.layoutParams = lp
             rv.requestLayout()
         }
+        recordGrid(span, catalogWpx, wantW, target)
+    }
+
+    /** Guarda el último estado aplicado para el diagnóstico de Estado. */
+    private fun recordGrid(span: Int, panePx: Int, rvPx: Int, target: Int) {
+        try {
+            val s = diagSession ?: return
+            if (s.gridSpan == span && s.gridPanePx == panePx && s.gridRvPx == rvPx && s.gridTarget == target) return
+            s.gridSpan = span
+            s.gridPanePx = panePx
+            s.gridRvPx = rvPx
+            s.gridTarget = target
+        } catch (_: Exception) {
+        }
     }
 
     /** Muestra el estado de error de carga con reintento. */
@@ -125,6 +155,14 @@ class PosCategoryPageFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        preDraw?.let { l ->
+            try {
+                b.rvProductos.viewTreeObserver.removeOnPreDrawListener(l)
+            } catch (_: Exception) {
+            }
+        }
+        preDraw = null
+        diagSession = null
         super.onDestroyView()
         _b = null
     }

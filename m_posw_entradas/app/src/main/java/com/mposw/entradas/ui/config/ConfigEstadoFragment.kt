@@ -48,6 +48,13 @@ class ConfigEstadoFragment : Fragment() {
         b.tvEstadoServidor.text = "Servidor: ${session.baseUrl.ifBlank { "sin configurar" }}"
         b.tvEstadoImpresora.text = "Impresora: ${PrinterRouter.describe(requireContext())}"
         refreshVersions()
+        b.tvGridDiag.text = try {
+            val dm = resources.displayMetrics
+            val scrDp = (dm.widthPixels / dm.density).toInt()
+            "Grilla: dens ${dm.density} · pant ${scrDp}dp · escala ${session.textScale} · span ${session.gridSpan} · panel ${session.gridPanePx}px · RV ${session.gridRvPx}px · obj ${session.gridTarget}dp"
+        } catch (_: Exception) {
+            "Grilla: ?"
+        }
     }
 
     private fun refreshVersions() {
